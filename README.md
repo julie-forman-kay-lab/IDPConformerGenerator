@@ -9,6 +9,7 @@ This module is part of the IDPCalculator project of [Dr. Julie Forman-Kay's Lab]
 ## Dependencies
 
 * [Python 3.7](https://docs.python.org/3/) standard library
+* [numpy](https://numpy.org/)
 * [pytest](https://docs.pytest.org/en/latest/) _only for testing_
 
 ## Usage
