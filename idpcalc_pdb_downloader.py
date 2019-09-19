@@ -7,6 +7,8 @@ IDPCalculator: PDB Downloader
 Dr. Julie Forman-Kay Lab
 http://abragam.med.utoronto.ca/~JFKlab/
 
+version: 0.1
+
 DESCRIPTION:
 
     Download structural information from rcsb.org (PDB or CIF files)
@@ -68,6 +70,8 @@ import re
 import string
 import time
 import urllib.request
+
+version = '0.1'
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
 CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
