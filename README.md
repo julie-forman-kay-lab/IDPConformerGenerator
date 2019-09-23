@@ -28,3 +28,7 @@ Implemented tests can be run with:
 pytest idpcalc_pdb_downloader.py
 ```
 
+## Available scripts
+
+* PDB Downloader
+* PDB to DSSP, secondary structure extractor
