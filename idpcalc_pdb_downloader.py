@@ -7,7 +7,7 @@ IDPCalculator: PDB Downloader
 Dr. Julie Forman-Kay Lab
 http://abragam.med.utoronto.ca/~JFKlab/
 
-version: 0.2
+version: 0.3
 
 DESCRIPTION:
 
@@ -71,7 +71,7 @@ import string
 import time
 import urllib.request
 
-version = '0.2'
+version = '0.3'
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
 CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
@@ -373,7 +373,11 @@ class PDBList:
             return super().__new__(cls)
         
     def __init__(self, pdb_names):
-        self.set = set(PDBIDFactory(element) for element in pdb_names)
+        valid_pdb_names = filter(
+            lambda x: not str(x).startswith('#'),  # may receive Paths
+            pdb_names,
+            )
+        self.set = set(PDBIDFactory(element) for element in valid_pdb_names)
     
     def __repr__(self):
         return '{}(\n    {})\n'.format(
@@ -1063,6 +1067,21 @@ class TestPDBList:
         pdblist = PDBList(names)
         pdbids = [PDBIDFactory(name) for name in names]
         assert len(pdblist) == len(names)
+        assert pdblist == set(pdbids)
+    
+    def test_3(self):
+        
+        names = (
+            '1ABC',
+            '2ABCZ',
+            str(Path('some', 'path', '3RFC_YYY.pdb')),
+            Path('some', 'path', '3RFC_ZZZ.pdb'),
+            '# some comment',
+            )
+        
+        pdblist = PDBList(names)
+        pdbids = [PDBIDFactory(name) for name in names[:-1]]
+        assert len(pdblist) == len(names) - 1
         assert pdblist == set(pdbids)
     
     def test_difference(self):
