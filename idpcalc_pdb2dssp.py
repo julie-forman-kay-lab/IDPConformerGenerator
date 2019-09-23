@@ -1,13 +1,13 @@
 """
-*****************************
+************************************
 IDPCalculator: PDB to DSSP extractor
-*****************************
+************************************
 
 2019
 Dr. Julie Forman-Kay Lab
 http://abragam.med.utoronto.ca/~JFKlab/
 
-version: 0.1
+version: 0.2
 
 DESCRIPTION:
 
@@ -68,10 +68,10 @@ import subprocess
 import sys
 import traceback
 
-version = '0.1'
+version = '0.2'
 
-LOG_NAME = 'pdb_dssp_exec.log'
-ERRORLOG = 'dssp_error.log'
+LOGFILE = 'idpcalc_pdb2dssp.log'
+ERRORLOG = 'idpcalc_pdb2dssp.error'
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -83,6 +83,19 @@ FORMATTER = logging.Formatter('%(message)s')
 
 ch.setFormatter(FORMATTER)
 log.addHandler(ch)
+
+
+def _initiate_logfile():
+    
+    logfile = logging.FileHandler(LOGFILE, mode='w')
+    logfile.setLevel(logging.DEBUG)
+    logfile.setFormatter(FORMATTER)
+    log.addHandler(logfile)
+    
+    errorlogfile = logging.FileHandler(ERRORLOG, mode='w')
+    errorlogfile.setLevel(logging.ERROR)
+    errorlogfile.setFormatter(FORMATTER)
+    log.addHandler(errorlogfile)
 
 
 class TitleLog:
@@ -385,19 +398,6 @@ def register_if_error():
         log.error(traceback.format_exc())
         log.error(repr(e))
         return
-
-
-def _initiate_logfile():
-    
-    logfile = logging.FileHandler(LOG_NAME, mode='w')
-    logfile.setLevel(logging.DEBUG)
-    logfile.setFormatter(FORMATTER)
-    log.addHandler(logfile)
-    
-    errorlogfile = logging.FileHandler(ERRORLOG, mode='w')
-    errorlogfile.setLevel(logging.ERROR)
-    errorlogfile.setFormatter(FORMATTER)
-    log.addHandler(errorlogfile)
 
 
 def main(

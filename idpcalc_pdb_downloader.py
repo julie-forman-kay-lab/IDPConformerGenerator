@@ -7,7 +7,7 @@ IDPCalculator: PDB Downloader
 Dr. Julie Forman-Kay Lab
 http://abragam.med.utoronto.ca/~JFKlab/
 
-version: 0.1
+version: 0.2
 
 DESCRIPTION:
 
@@ -71,7 +71,7 @@ import string
 import time
 import urllib.request
 
-version = '0.1'
+version = '0.2'
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
 CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
@@ -79,7 +79,6 @@ POSSIBLELINKS = [
     PDB_WEB_LINK,
     CIF_WEB_LINK,
     ]
-NOT_DOWNLOADED = 'PDBs_not_downloaded.txt'
 
 CIF_ATOM_KEYS = [
     '_atom_site.group_PDB',  # 1 atom HETATM
@@ -114,7 +113,8 @@ class Path(type(_Path())):
         return os.fspath(self)
 
 
-LOG_NAME = 'idpcalc_pdb_downloader.log'
+LOGFILE = 'idpcalc_pdb_downloader.log'
+ERRORLOG = 'idbpcalc_pdb_downloader.error'
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -122,12 +122,27 @@ log.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.INFO)
 
-formatter = logging.Formatter('%(message)s')
+FORMATTER = logging.Formatter('%(message)s')
 
-ch.setFormatter(formatter)
+ch.setFormatter(FORMATTER)
 
 log.addHandler(ch)
 
+
+def _initiate_logfiles():
+    
+    # initiates log file only if main is run
+    logfile = logging.FileHandler(LOGFILE, mode='w')
+    logfile.setLevel(logging.DEBUG)
+    log.addHandler(logfile)
+    logfile.setFormatter(FORMATTER)
+    
+    errorlog = logging.FileHandler(ERRORLOG, mode='w')
+    errorlog.setLevel(logging.ERROR)
+    log.addHandler(errorlog)
+    errorlog.setFormatter(FORMATTER)
+
+    return
 
 
 class TitleLog:
@@ -415,7 +430,6 @@ class PDBDownloader:
             self,
             pdb_list,
             destination,
-            report_file=NOT_DOWNLOADED,
             ncores=1,
             record_name=('ATOM',),
             **kwargs,
@@ -429,8 +443,6 @@ class PDBDownloader:
 
         self.destination = Path(destination)
         self.destination.mkdir(parents=True, exist_ok=True)
-        
-        self.report_file = report_file
         
         self.ncores = ncores
         
@@ -452,7 +464,6 @@ class PDBDownloader:
     @record_time()
     def run(self):
         log.info(T('starting raw PDB download'))
-        self._create_report_file()
         log.info(S(
             f'{len(self.pdbs_to_download)} PDBs will be downloaded '
             f'and at least {len(self.pdb_list)} chains will be saved'
@@ -465,11 +476,6 @@ class PDBDownloader:
         
         for r in results:
             continue
-    
-    def _create_report_file(self):
-        self.not_downloaded = Path(self.destination, self.report_file)
-        with contextlib.suppress(FileNotFoundError):
-            self.not_downloaded.unlink()
     
     def _download_single_pdb(self, pdbid_and_chains_tuple):
         
@@ -505,7 +511,7 @@ class PDBDownloader:
             try:
                 response = urllib.request.urlopen(weblink)
             except urllib.error.HTTPError:
-                log.info(S(f'failed from {weblink}'))
+                log.error(S(f'failed from {weblink}'))
                 continue
             else:
                 log.info(S(f'completed from {weblink}'))
@@ -517,10 +523,8 @@ class PDBDownloader:
     def _attempt_download(self, pdbname):
         try:
             yield
-        except DownloadFailedError:
-            with open(self.not_downloaded, 'a') as fh:
-                fh.write(f'{pdbname}\n')
-            log.info(S(f'FAILED {pdbname}, see {self.not_downloaded}'))
+        except DownloadFailedError as e:
+            log.error(S(f'{repr(e)}: FAILED {pdbname}'))
             return
 
 
@@ -898,6 +902,16 @@ def load_args():
     return cmd
 
 
+@contextlib.contextmanager
+def register_error():
+    try:
+        yield
+    except Exception as e:
+        log.error(traceback.format_exc())
+        log.error(repr(e))
+        return
+
+
 def main(
         pdb_list,
         destination=None,
@@ -906,11 +920,7 @@ def main(
         ncores=1,
         ):
     
-    # initiates log file only if main is run
-    logfile = logging.FileHandler(LOG_NAME, mode='w')
-    logfile.setLevel(logging.DEBUG)
-    log.addHandler(logfile)
-    logfile.setFormatter(formatter)
+    _initiate_logfiles()
     
     with pdb_list.open('r') as fh:
         pdblist = PDBList(fh.readlines())
@@ -950,8 +960,6 @@ def main(
 
 
 class TestPDBID:
-    
-    import pytest
     
     def test_PDBID1(self):
         pdbid = PDBID('1ABC', chain='D')
@@ -995,8 +1003,6 @@ class TestPDBID:
 
 
 class TestPDBIDFactory:
-    
-    import pytest
     
     def test_parse1(self):
         pdbid0 = PDBIDFactory('1ABC')
