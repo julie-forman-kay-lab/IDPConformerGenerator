@@ -202,6 +202,9 @@ class DownloadFailedError(Exception):
     pass
 
 
+class EmptyFilterError(Exception):
+    pass
+
 class PDBParams:
     """
     PDB Format string slicing according to:
@@ -507,7 +510,11 @@ class PDBDownloader:
             
             pdbdata.add_filter_record_name(self.record_name)
             pdbdata.add_filter_chain(chain)
-            pdbdata.write(Path(self.destination, f'{pdbname}_{chain}.pdb'))
+            destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
+            try:
+                pdbdata.write(destination)
+            except EmptyFilterError as e:
+                log.error(f'Empty Filter for {destination}')
             pdbdata.clear_filters()
         
     def _download_data(self, possible_links):
@@ -594,9 +601,18 @@ class PDBData(ABC):
         """
         Writes filtered data to file in PDB format.
         """
+        data2write = self.join_filtered()
+
         with open(filename, 'w') as fh:
-            fh.write('\n'.join(self.filtered) + '\n')
+            fh.write(data2write + '\n')
         log.info(S(f'saved: {filename}'))
+   
+    def join_filtered(self):
+        datafiltered = '\n'.join(self.filtered)
+        if datafiltered.strip():
+            return datafiltered
+        else:
+            raise EmptyFilterError
 
 
 class DataFromPDB(PDBData):
