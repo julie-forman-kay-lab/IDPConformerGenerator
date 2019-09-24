@@ -69,6 +69,7 @@ from pathlib import Path as _Path
 import re
 import string
 import time
+import traceback
 import urllib.request
 
 version = '0.3'
@@ -205,6 +206,7 @@ class DownloadFailedError(Exception):
 class EmptyFilterError(Exception):
     pass
 
+
 class PDBParams:
     """
     PDB Format string slicing according to:
@@ -255,6 +257,7 @@ class PDBID:
         The chain identifier.
     """
     def __init__(self, name, chain=None):
+        
         self.name = name.upper()
         self.chain = chain
         
@@ -513,7 +516,8 @@ class PDBDownloader:
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
             try:
                 pdbdata.write(destination)
-            except EmptyFilterError as e:
+            except EmptyFilterError:
+                log.error(traceback.format_exc())
                 log.error(f'Empty Filter for {destination}')
             pdbdata.clear_filters()
         
