@@ -9,4 +9,4 @@
 #    )
 #E402,F401,W605
 clear
-/home/joao/anaconda3/envs/conformergenerator/bin/flake8 --hang-closing --ignore=W293,W503 $1
+flake8 --hang-closing --ignore=W293,W503 $1
