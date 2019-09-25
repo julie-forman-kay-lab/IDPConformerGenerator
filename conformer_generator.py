@@ -23,11 +23,11 @@ class Protein_Search:
              and search through the primary_seq_db"""
 
             # base case
-            try:
-                current_pattern = \
-                    input_pattern[pattern_index:pattern_index + pattern_size]
-            except IndexError:
+            if pattern_index + pattern_size > input_pattern_length:
                 return
+            
+            current_pattern = \
+                input_pattern[pattern_index:pattern_index + pattern_size]
             
             previous_pattern = current_pattern[:-1]
 
