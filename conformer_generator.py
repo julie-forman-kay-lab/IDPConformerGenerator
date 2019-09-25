@@ -2,7 +2,7 @@ from collections import defaultdict
 import logging
 
 
-class Protein_Search:
+class ProteinSearch:
 
     def __init__(self):
         # both lists should be the same size
@@ -91,7 +91,7 @@ class Protein_Search:
 class TestSearch:
 
     def test_class(self):
-        proteins = Protein_Search()
+        proteins = ProteinSearch()
         proteins.start_search("ACD", "ACD")
         assert proteins.proteins_sequences[-1] == "ACD"
 
@@ -99,12 +99,12 @@ class TestSearch:
         assert proteins.proteins_sequences[-1] == "KED"
 
     def test_edgecase1(self):
-        proteins = Protein_Search()
+        proteins = ProteinSearch()
         proteins.start_search("", "ACD")
         assert len(proteins.results[-1]) == 0
 
     def test_edgecase2(self):
-        proteins = Protein_Search()
+        proteins = ProteinSearch()
         proteins.start_search("", "")
         assert len(proteins.results) == 0
         assert len(proteins.proteins_sequences) == 0
@@ -114,12 +114,12 @@ class TestSearch:
         assert len(proteins.proteins_sequences) == 0
 
     def test_edgecase3(self):
-        proteins = Protein_Search()
+        proteins = ProteinSearch()
         proteins.start_search("ACD", "ACD")
         assert len(proteins.results[-1]) == 1
 
     def test_edgecase4(self):
-        proteins = Protein_Search()
+        proteins = ProteinSearch()
         proteins.start_search("ACDED", "ACDED")
         assert len(proteins.results[-1]) == 6
 
@@ -161,7 +161,7 @@ class TestSearch:
 #     # middle = time.time()
 #     # stopWatch(middle-start)
 
-#     search = Protein_Search()
+#     search = ProteinSearch()
 #     print("searching..")
 #     search.start_search(input_seq, "")
 #     # end = time.time()
