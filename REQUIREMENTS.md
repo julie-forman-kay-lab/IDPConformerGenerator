@@ -1,6 +1,44 @@
-# Requirements for Conformer Generator
+# Requirements for IDPCalc Conformer Generator
 
 _under construction_
+
+## Structural Databases
+
+To generate *ab initio* structural conformers of Intrisically Disordered Proteins,  **IDPCalc Conformer Generator** relies on three previously built _databases_ of three different types:
+
+1. primary sequences
+1. secondary structure 
+1. phi, psi, omega angles
+
+The source of the information that populates these databases derives from mining the [RCSB PDB DataBank][rcsb] after a non-redunctant set of structures (PDB IDs and chain identifiers) was obtained from the [Dubrack Lab: PISCES project][pisces]. We usually selected the *cullpdb_pc90_res2.2_R1.0* subset.
+
+The necessary software resources to download and prepare the before mentioned databases from a *cullpdb* file are provided by the following Python programs presented in the repository, *at the time of writting not all the listed programs have been written, in those cases links won't work*:
+
+* [idpcalc_pdb_downloader.py][pdbdownloader]
+* [idpcalc_pdb2dssp.py][pdb2dssp]
+* [idpcalc_pdb_spliter.py][pdbsplitter]
+* [idpcalc_pdb_idealizor.py][pdbidealizor]
+* [idpcalc_pdb_angle_extract.py][pdbangle]
+* [idpcalc_confgen_db_builder.py][dbbuilder]
+
+
+Upon building, the three databases will contain the specified information for the different PDBIDs/ChainIDs (*cullpdb* entries), also, the three databases will be aligned equaly so that indexing information can be used transversally across the DBs. A forth database will link the structural information to the PDB/CHAIN identifier. This construction grants traceability throughout the whole process.
+
+The four databases (structure plus indexes) might be text files, binary files or Python pickled objects, whichever better fits our needs.
+
+Theses databases will be used by IDPCalculator Conformer Generator to build the different conformers.
+
+## Approach
+
+IDPCalc Conformer Generator will consider different approaches for the building process. These are detailed as follows:
+
+### 1. Build from Loops
+
+Conformers are built by using angles from protein chunks of loop regions in folded proteins.
+
+In other words, given a target protein of 100 residues, angles from loop regions are randomly extracted from the database and concatenated until the length of the target protein.
+
+This is the simplest approach that does not consider residue identity; it only considers sequentially integrity, that is, angles used to build conformers are given as chunks of different lengths and NOT as isolated residue angles.
 
 ## User Interface
 
@@ -23,3 +61,11 @@ The following describes examples of usage:
 
 ```
 
+[pdbdownloader]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/blob/master/idpcalc_pdb_downloader.py
+[pdb2dssp]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/blob/master/idpcalc_pdb2dssp.py
+[pdbsplitter]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/
+[pdbidealizor]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/
+[pdbangle]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/
+[dbbuilder]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/
+[rcsb]: https://www.rcsb.org/
+[pisces]: http://dunbrack.fccc.edu/Guoli/pisces_download.php
