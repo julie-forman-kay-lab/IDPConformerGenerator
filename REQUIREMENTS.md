@@ -99,6 +99,8 @@ Additionally to user input, known IDP motifs can be predefined in the program's 
 
 Once the sequence/angle map has been created by the [Angle Search](#angle-search) step, the actual conformer construction can take place.
 
+Conformer construction must be defined by a *reproducible seed*.
+
 #### 1. Random assignment
 
 A conformer can be built by randomly selecting angle *chunks* from the sequence-angle map obtained by the parametrized and curated search step.
@@ -127,20 +129,39 @@ User interface should be that of a shell command-line interface. Graphical inter
 
 ### Usage
 
-The following describes examples of usage:
+The following describes examples of usage/parameters:
 
 ```
-./conformer_generator \
-    -n NUMBER_OF_CONFORMERS_TO_GENERATE \
-    -m MINIMUM_PROTEIN_CHUNK_SIZE \
-    -x MAXIMUM_ALLOWED_MISMATCH \
-    -l MAXIMUM_%_OF_ANGLES_FROM_LOOP_REGIONS \ ?? still considering
-    -h MAXIMUM_%_OF_ANGLES_FROM_HELICES \ ??
-    -e MAXIMUM_%_OF_ANGLES_FROM_SHEETS \ ??
-    -o FOLDER_WHERE_TO_DEPOSIT_THE_STRUCTURES, defaults to CWD
-    
+./idpcalc_conformer_generator \
+    -i S/F INPUT_SEQUENCE \
+    -n # NUMBER_OF_CONFORMERS_TO_GENERATE \
+    -m # MINIMUM_PROTEIN_CHUNK_SIZE \
+    -s B SEARCH_SEQUENCE_IDENTITY \
+    -x % MAXIMUM_ALLOWED_MISMATCH \
+    -ma B ALLOW_MAPPED_MISMATCH \
+    -mm F MISMATCH_MAP \
+    -p F USER_DEFINED_MOTIFS \
+    -h % PURE_HELICAL_CHUNKS_PERCENTAGE \
+    -e % PURE_SHEET_CHUNKS_PERCENTAGE \
+    -l % PURE_LOOP_CHUNK_PERCENTAGE \
+    -w F FORCED_SECONDARY_STRUCTURE_PERCENTAGE \
+    -f B DEACTIVATE_FILTERS
+    -f1 B
+    -f2 B (...) FLAGS for the different filters
+    -o P FOLDER_WHERE_TO_DEPOSIT_THE_STRUCTURES, defaults to CWD
+
+    (other general parameters)
+
+    -t # STRUCTURE_NUMBERING_START \
+    -r # REPRODUCIBILITY_SEED \
 
 ```
+where:
+* `S/F`, string or file
+* `#`, number
+* `B`, boolean
+* `%`, number expressing percentage
+* `P`, path to folder
 
 [pdbdownloader]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/blob/master/idpcalc_pdb_downloader.py
 [pdb2dssp]: https://github.com/joaomcteixeira/IDPCalcPDBDownloader/blob/master/idpcalc_pdb2dssp.py
