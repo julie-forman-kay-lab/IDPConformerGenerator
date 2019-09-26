@@ -56,6 +56,21 @@ We acknowledge that IDP sequence patterns and residue population differs from th
 
 Because, within some contexts, aminoacids can be replaced without expense of the protein's function (in the case under exploration, conformation landscape), it is important to allow mismatch in sequence identity searches. A parameter can be defined to allow the user the specify the maximum amount of mismatch allowed for angle *chunks*; recall the minimum size of residues (angles) *chunks* is also defined by the user.
 
+### 3. Incorporation of sequence motifs
+
+It is well known and acknowledged that sequence motifs directly encode for biological functionality, however, identification of such motifs in native protein sequences is not trivial. It is **not** the current aim of Conformer Generator to search for unknown motifs in intrinsically disordered protein sequences. But, following the lines of the previous steps, there is a need to implement motif search within the wide scope of conformer generation, in order to pull from the database those motif-related angle chunks and use them in the building steps.  
+
+Technically, motif search can be incorporated in the [mismatch search](#allowing-sequence-identity-mismatch) algorithm because it implies the same technical problems: *mismatched identity*. However, there are two considerations that make motif search diverge from *identity mismatch*, these are:
+
+1. some known motifs require high percentage of mismatch, percentages which wouldn't, *a priori*, be allowed in sequence identity searches, and;
+2. the identity matches within motifs are not matches of *random* residues, these are actually well defined matches of commonly repeated residues or residue patterns.
+
+These considerations force the implementation of user-driven motif search in IDPCalc Conformer Generator. In other words, allowing the user the possibility to specify motifs to be searched and queried from the database.
+
+#### predefined motifs
+
+Additionally to user input, known IDP motifs can be predefined in the program's knowledge base. Such motifs would be search in both the input sequence and the database and used if a match is found.
+
 ## User Interface
 
 User interface should be that of a shell command-line interface. Graphical interfaces can be considered at a latter stage.
