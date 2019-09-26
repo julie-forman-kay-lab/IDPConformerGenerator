@@ -42,6 +42,20 @@ In other words, given a target protein of 100 residues, loop regions are sequent
 
 This is the simplest approach that does not consider residue identity; it only considers sequentially integrity, that is, angles used to build conformers are given as *chunks* of different lengths and NOT as isolated residue angles.
 
+### 2. Build from sequence identity
+
+The whole primary sequence of a protein ultimately encodes for its global energy landscape and at certain chemical environment; and, the same is valid at a local level, where portions of the primary sequence encode for particular conformational propensities, locally. Therefore, sequence identity matches, between the input IDP sequence and the database, and consequent found angles, might set a favorable initial ground to define an ensemble starting pool.
+
+IDPCalc Conformer Generator will perform string search to identify sequence matches between the input sequence and the database, extracting the angles herein. The new conformer backbone angles are built from the sequence matching angles similarly to what described in [1. Build from Loops](#1-build-from-loops).
+
+We expect this approach to capture regions that encode for multiple secondary structural elements which combination have functional value; for example, small alpha-helices in between extended loops, strong turns, even small beta-beta patterns.
+
+We acknowledge that IDP sequence patterns and residue population differs from that of folded proteins, however, we do expect a significant amount of matching to render this approach meaningful. **The absence of matching** is, within this context, information reach and can be explorer at latter stages of the conformer generation algorithm.
+
+#### Allowing sequence identify mismatch
+
+Because, within some contexts, aminoacids can be replaced without expense of the protein's function (in the case under exploration, conformation landscape), it is important to allow mismatch in sequence identity searches. A parameter can be defined to allow the user the specify the maximum amount of mismatch allowed for angle *chunks*; recall the minimum size of residues (angles) *chunks* is also defined by the user.
+
 ## User Interface
 
 User interface should be that of a shell command-line interface. Graphical interfaces can be considered at a latter stage.
