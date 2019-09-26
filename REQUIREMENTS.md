@@ -2,7 +2,11 @@
 
 ## Objective
 
-IDPCalc Conformer Generator will consider different approaches for the conformer building process. All the approach share a **common** feature, that angles have to be given in *chunks* of a predefined (user defined) minimum length.
+The aim of IDPCalc Conformer Generator is that generate physical and biologically meaning ensembles of conformers of Intrinsically Disordered Proteins (IDPs) by intelligently narrowing the conformational search space. Selective narrowing is accomplished by curated and directed searching within previously observed conformational occurrences mined from databases. Though, space for *randomness* may be allow.
+
+IDPCalc Conformer Generator implements different parametrized search and construction approaches. Yet, a main idea sets a **common** ground: backbone (*psi*, *phi* and *omega*) angle sets must be provided in *chunks* of a predefined (user defined) minimum length and not individually for each residue.
+
+The following subsections explain and propose the project's implementation.
 
 ## Structural Databases
 
