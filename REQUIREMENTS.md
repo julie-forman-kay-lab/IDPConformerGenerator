@@ -1,6 +1,8 @@
 # Requirements for IDPCalc Conformer Generator
 
-_under construction_
+## Objective
+
+IDPCalc Conformer Generator will consider different approaches for the conformer building process. All the approach share a **common** feature, that angles have to be given in *chunks* of a predefined (user defined) minimum length.
 
 ## Structural Databases
 
@@ -30,25 +32,31 @@ Theses databases will be used by *IDPCalculator Conformer Generator* to build th
 
 ## Conformer Generation Approach
 
-IDPCalc Conformer Generator will consider different approaches for the conformer building process. All the approach share a **common** feature, that angles have to be given in *chunks* of a predefined (user defined) minimum length.
+The overall conformer generation approach can be divided into two steps: 1) Angle search and 2) Conformer construction.
 
-The different building approaches can be detailed as follows:
+Decoupling these two steps is essential to allow individual and specific parametrization of both. We envisage the first step to be the one with which the users will interact the most (parameter modulation), while the second step (conformer construction) will execute predefined algorithms.
 
-### a) Angle Search
+### Angle Search
 
-#### 1. Build from Loops
+The angle search step focus on the search and query of backbone angles from the angle database ([see Structural Databases](#structural-databases)). This search will be defined by input protein sequence and user assigned and builtin parameters.
 
-Under this approach, conformers are built by using angles from protein chunks of loop regions in folded proteins.
+Different search/match approaches are implemented to enrich the quality and variety of the results. The different approaches are described as follows:
 
-In other words, given a target protein of 100 residues, loop regions are sequentially and randomly selected from the database and their set of angles are used to build the conformer backbone. Different loop regions are concatenated until the length of the target protein is fulfilled.
+#### 1. Pure Secondary Structure 
 
-This is the simplest approach that does not consider residue identity; it only considers sequentially integrity, that is, angles used to build conformers are given as *chunks* of different lengths and NOT as isolated residue angles.
+Under this approach, conformers are built by using angles from protein chunks of unique secondary structure regions found in the database. The three different secondary structure types are: helices, sheets and loops. **Initially, and generally**, this approach focused only on **loop** regions, however, it can be abstracted out to include helices and sheets if required.
 
-#### 2. Build from sequence identity
+In other words, given a target protein of 100 residues, unique secondary structure regions (by default *only* loops) are sequentially and randomly selected from the database and their set of angles are used to build the conformer backbone. Different regions are concatenated until the length of the target protein is fulfilled.
+
+This is the simplest approach and does not consider residue identity; it only considers angles *consecutiveness* integrity, that is, angles used to build conformers are given as *chunks* of different lengths and NOT as isolated residue angles.
+
+A parameter is defined to specify the percentage of loop/helices/sheets to be included in the search.
+
+#### 2. Sequence identity match
 
 The whole primary sequence of a protein ultimately encodes for its global energy landscape and at certain chemical environment; and, the same is valid at a local level, where portions of the primary sequence encode for particular conformational propensities, locally. Therefore, sequence identity matches, between the input IDP sequence and the database, and consequent found angles, might set a favorable initial ground to define an ensemble starting pool.
 
-IDPCalc Conformer Generator will perform string search to identify sequence matches between the input sequence and the database, extracting the angles herein. The new conformer backbone angles are built from the sequence matching angles similarly to what described in [1. Build from Loops](#1-build-from-loops).
+IDPCalc Conformer Generator will perform string search to identify sequence matches between the input sequence and the database, extracting the angles herein. The new conformer backbone angles are built from the sequence matching angles similarly to what described in [1. Pure Secondary Structure](#1-pure-secondary-structure).
 
 We expect this approach to capture regions that encode for multiple secondary structural elements which combination have functional value; for example, small alpha-helices in between extended loops, strong turns, even small beta-beta patterns.
 
@@ -60,7 +68,7 @@ Because, within some contexts, aminoacids can be replaced without expense of the
 
 ##### Mapped mismatch
 
-In addition to binary mismatch, i.e. absolute matches or mismatches, a mismatch map needs to be implemented in the knowledge base of IDPCalc Conformer Generator. Mismatch maps specify interchangeable residues pairs: in other words, allowed residues mismatches. These should not be considered as pure matches, neither as pure mismatches.
+In addition to binary mismatch, *i.e.* absolute matches or mismatches, a mismatch map needs to be implemented in the knowledge base of IDPCalc Conformer Generator. Mismatch maps specify interchangeable residues pairs: in other words, allowed residues mismatches. These should not be considered as pure matches, neither as pure mismatches.
 
 A parameter will allow the user to specify the level of matching/mismatching allowed.
 
