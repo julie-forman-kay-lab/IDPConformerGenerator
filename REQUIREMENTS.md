@@ -58,6 +58,10 @@ This is the simplest approach and does not consider residue identity; it only co
 
 A parameter is defined to specify the percentage of loop/helices/sheets to be included in the search.
 
+##### Secondary Structure Propensity
+
+Secondary structure propensity can be forced upon a region by specifying the region, the type and the percentage of that propensity. Angles will be selected from the database and used accordingly during the construction step.
+
 #### 2. Sequence identity match
 
 The whole primary sequence of a protein ultimately encodes for its global energy landscape and at certain chemical environment; and, the same is valid at a local level, where portions of the primary sequence encode for particular conformational propensities, locally. Therefore, sequence identity matches, between the input IDP sequence and the database, and consequent found angles, might set a favorable initial ground to define an ensemble starting pool.
