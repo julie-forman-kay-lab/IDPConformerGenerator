@@ -91,9 +91,17 @@ These considerations force the implementation of user-driven motif search in IDP
 
 Additionally to user input, known IDP motifs can be predefined in the program's knowledge base. Such motifs would be search in both the input sequence and the database and used if a match is found.
 
-### b) Building the Conformers
+### Conformer Construction
 
-.
+Once the sequence/angle map has been created by the [Angle Search](#angle-search) step, the actual conformer construction can take place.
+
+#### 1. Random assignment
+
+A conformer can be built by randomly selecting angle *chunks* from the sequence-angle map obtained by the parametrized and curated search step.
+
+#### 2. Additional approaches
+
+Other approaches can be implemented upon realization during the evolution of the project.
 
 ## User Interface
 
