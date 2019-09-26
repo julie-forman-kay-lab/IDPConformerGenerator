@@ -36,7 +36,7 @@ Theses databases will be used by *IDPCalculator Conformer Generator* to build th
 
 ## Conformer Generation Approach
 
-The overall conformer generation approach can be divided into two steps: 1) Angle search and 2) Conformer construction.
+The overall conformer generation approach can be divided into three steps: 1) Angle search, 2) Conformer construction and 3) Validation and filtering.
 
 Decoupling these two steps is essential to allow individual and specific parametrization of both. We envisage the first step to be the one with which the users will interact the most (parameter modulation), while the second step (conformer construction) will execute predefined algorithms.
 
@@ -106,6 +106,20 @@ A conformer can be built by randomly selecting angle *chunks* from the sequence-
 #### 2. Additional approaches
 
 Other approaches can be implemented upon realization during the evolution of the project.
+
+#### 4. Building Sidechains
+
+*to be discussed.*
+
+### Validation and Filtering
+
+We should expect that the proposed conformer construction algorithm generates conformations of physically impossible occurrence because of, for example, atom clashes.
+
+A post-construction step of **validation** is, therefore, essential to **filter out** those conformations that do not comply with the different builtin checks prior to saving information to disk.
+
+A builtin list of validation checks can be implemented such that only those conformers that pass all the tests are allowed to be written to disk.
+
+A validation list of this kind can be easily expanded in the future to incorporate additional checks and, moreover, the checks can be flagged individually for activation and deactivation through parameters.
 
 ## User Interface
 
