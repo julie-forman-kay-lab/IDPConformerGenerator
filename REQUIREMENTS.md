@@ -40,11 +40,13 @@ Decoupling these two steps is essential to allow individual and specific paramet
 
 The angle search step focus on the search and query of backbone angles from the angle database ([see Structural Databases](#structural-databases)). This search will be defined by input protein sequence and user assigned and builtin parameters.
 
-Different search/match approaches are implemented to enrich the quality and variety of the results. The different approaches are described as follows:
+Different search/match approaches are implemented to enrich the quality and variety of the results. The different approaches are described in the following subsections.
+
+Ultimately, the Angle Search step builds an sequence-angle map (*to be investigated the better approach*) upon which the [Conformer Construction](#conformer-construction) algorithm will operate.
 
 #### 1. Pure Secondary Structure 
 
-Under this approach, conformers are built by using angles from protein chunks of unique secondary structure regions found in the database. The three different secondary structure types are: helices, sheets and loops. **Initially, and generally**, this approach focused only on **loop** regions, however, it can be abstracted out to include helices and sheets if required.
+Under this approach, conformers are built by using angles from protein chunks of unique secondary structure regions found in the database. The three different secondary structure types are: helices, sheets and loops. **Initially, and generally**, this approach focused only on **loop** regions, however, it can be abstracted out to include helices and sheets, if required.
 
 In other words, given a target protein of 100 residues, unique secondary structure regions (by default *only* loops) are sequentially and randomly selected from the database and their set of angles are used to build the conformer backbone. Different regions are concatenated until the length of the target protein is fulfilled.
 
