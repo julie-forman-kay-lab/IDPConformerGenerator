@@ -56,6 +56,14 @@ We acknowledge that IDP sequence patterns and residue population differs from th
 
 Because, within some contexts, aminoacids can be replaced without expense of the protein's function (in the case under exploration, conformation landscape), it is important to allow mismatch in sequence identity searches. A parameter can be defined to allow the user the specify the maximum amount of mismatch allowed for angle *chunks*; recall the minimum size of residues (angles) *chunks* is also defined by the user.
 
+#### Mapped mismatch
+
+In addition to binary mismatch, i.e. absolute matches or mismatches, a mismatch map needs to be implemented in the knowledge base of IDPCalc Conformer Generator. Mismatch maps specify interchangeable residues pairs: in other words, allowed residues mismatches. These should not be considered as pure matches, neither as pure mismatches.
+
+A parameter will allow the user to specify the level of matching/mismatching allowed.
+
+Usage of user defined matching maps will be implemented, where user provided maps update the builtin maps.
+
 ### 3. Incorporation of sequence motifs
 
 It is well known and acknowledged that sequence motifs directly encode for biological functionality, however, identification of such motifs in native protein sequences is not trivial. It is **not** the current aim of Conformer Generator to search for unknown motifs in intrinsically disordered protein sequences. But, following the lines of the previous steps, there is a need to implement motif search within the wide scope of conformer generation, in order to pull from the database those motif-related angle chunks and use them in the building steps.  
