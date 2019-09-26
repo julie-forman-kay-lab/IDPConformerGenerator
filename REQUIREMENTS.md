@@ -28,7 +28,7 @@ The necessary software resources to download and prepare the databases from a *c
 * [idpcalc_confgen_db_builder.py][dbbuilder]
 
 
-Upon building, the three databases will contain the specified information (sequence, DSSP and angles) for the different PDBIDs/ChainIDs (*cullpdb* entries), also, the three databases will be aligned equaly so that indexing information can be used transversely across the DBs. A forth database will link the structural information to the PDB/CHAIN identifier. This construction grants traceability throughout the whole process.
+Upon building, the three databases will contain the specified information (sequence, DSSP and angles) for the different PDBIDs/ChainIDs (*cullpdb* entries), also, the three databases will be aligned equally so that indexing information can be used transversely across the DBs. A forth database will link the structural information to the PDB/CHAIN identifier. This construction grants traceability throughout the whole process.
 
 The four databases (structure plus indexes) might be text files, binary files or [Python pickled objects][pickle], whichever better fits our needs.
 
