@@ -68,21 +68,21 @@ A parameter is defined to specify the percentage of loop/helices/sheets to be in
 
 ##### Secondary Structure Propensity
 
-Secondary structure propensity can be forced upon a region by specifying the region, the type and the percentage of that propensity. Angles will be selected from the database and used accordingly during the construction step.
+Secondary structure propensity can be forced upon a sequence region, and specifying its type and the percentage. Angles will be selected from the database and used accordingly during the construction step.
 
 #### 2. Sequence identity match
 
-The whole primary sequence of a protein ultimately encodes for its global energy landscape and at certain chemical environment; and, the same is valid at a local level, where portions of the primary sequence encode for particular conformational propensities, locally. Therefore, sequence identity matches, between the input IDP sequence and the database, and consequent found angles, might set a favorable initial ground to define an ensemble starting pool.
+The primary sequence of a protein as a whole ultimately encodes for its environment-dependent global energy landscape; and, the same principle is valid at a local level, where portions of the primary sequence encode for particular conformational propensities, locally. Therefore, sequence identity matches between the input IDP sequence and the database, and respective angles, might set a favorable initial ground to define an ensemble starting pool.
 
 IDPCalc Conformer Generator will perform string search to identify sequence matches between the input sequence and the database, extracting the angles herein. The new conformer backbone angles are built from the sequence matching angles similarly to what described in [1. Pure Secondary Structure](#1-pure-secondary-structure).
 
-We expect this approach to capture regions that encode for multiple secondary structural elements which combination have functional value; for example, small alpha-helices in between extended loops, strong turns, even small beta-beta patterns.
+We expect this approach to capture regions that encode simultaneously for multiple secondary structural elements and which combination have functional value; for example, small alpha-helices in between extended loops, strong turns, even small beta-beta patterns.
 
-We acknowledge that IDP sequence patterns and residue population differs from that of folded proteins, however, we do expect a significant amount of matching to render this approach meaningful. **The absence of matching** is, within this context, information reach and can be explorer at latter stages of the conformer generation algorithm.
+We acknowledge that IDP sequence patterns and residue population differs from that of folded proteins, however, we do expect a significant amount of matching to render this approach meaningful. **The absence of matching** is, within this context, information rich and can be explored at latter stages of the conformer generation algorithm.
 
-##### Allowing sequence identify mismatch
+##### Allowing sequence identify mismatches
 
-Because, within some contexts, aminoacids can be replaced without expense of the protein's function (in the case under exploration, conformation landscape), it is important to allow mismatch in sequence identity searches. A parameter can be defined to allow the user the specify the maximum amount of mismatch allowed for angle *chunks*; recall the minimum size of residues (angles) *chunks* is also defined by the user.
+Because, within some contexts, aminoacids can be replaced by others without expense of the protein's function (hence, in the case under exploration, conformation landscape), it is important to allow mismatch in sequence identity searches. A parameter can be defined to allow the user to specify the maximum percentage of mismatch allowed per *chunk*; recall the minimum size of residues (angles) *chunks* is also defined by the user.
 
 ##### Mapped mismatch
 
@@ -96,7 +96,7 @@ Usage of user defined matching maps will be implemented, where user provided map
 
 It is well known and acknowledged that sequence motifs directly encode for biological functionality, however, identification of such motifs in native protein sequences is not trivial. It is **not** the current aim of Conformer Generator to search for unknown motifs in intrinsically disordered protein sequences. But, following the lines of the previous steps, there is a need to implement motif search within the wide scope of conformer generation, in order to pull from the database those motif-related angle chunks and use them in the building steps.  
 
-Technically, motif search can be incorporated in the [mismatch search](#allowing-sequence-identity-mismatch) algorithm because it implies the same technical problems: *mismatched identity*. However, there are two considerations that make motif search diverge from *identity mismatch*, these are:
+Technically, motif search can be incorporated in the [mismatch search](#allowing-sequence-identity-mismatch) algorithm because it is governed by the same technical problems: *mismatched identity*. However, there are two considerations that make motif search diverge from *identity mismatch*, these are:
 
 1. some known motifs require high percentage of mismatch, percentages which wouldn't, *a priori*, be allowed in sequence identity searches, and;
 2. the identity matches within motifs are not matches of *random* residues, these are actually well defined matches of commonly repeated residues or residue patterns.
@@ -109,13 +109,13 @@ Additionally to user input, known IDP motifs can be predefined in the program's 
 
 ### Conformer Construction
 
-Once the sequence/angle map has been created by the [Angle Search](#angle-search) step, the actual conformer construction can take place.
+Once the sequence/angle map has been created, through the [Angle Search](#angle-search) step, the actual conformer construction can take place.
 
-Conformer construction must be defined by a *reproducible seed*.
+Conformer construction must be defined by a *reproducibility seed*.
 
 #### 1. Random assignment
 
-A conformer can be built by randomly selecting angle *chunks* from the sequence-angle map obtained by the parametrized and curated search step.
+A conformer can be built by randomly selecting and combining angle *chunks* from the sequence-angle map obtained by the parametrized and curated search step.
 
 #### 2. Additional approaches
 
@@ -127,7 +127,7 @@ Other approaches can be implemented upon realization during the evolution of the
 
 ### Validation and Filtering
 
-We should expect that the proposed conformer construction algorithm generates conformations of physically impossible occurrence because of, for example, atom clashes.
+We should expect that the proposed conformer construction algorithm generates physically impossible conformations because, for example, of atom clashes.
 
 A post-construction step of **validation** is, therefore, essential to **filter out** those conformations that do not comply with the different builtin checks prior to saving information to disk.
 
