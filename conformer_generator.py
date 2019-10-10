@@ -1,5 +1,6 @@
 from collections import defaultdict
 import logging
+import math
 
 
 class ProteinSearch:
@@ -14,14 +15,15 @@ class ProteinSearch:
             input_pattern,
             primary_seq_db,
             min_seq_chunk_size=3,
+            max_mismatch=0
             ):
         """ search every sequential combination of
          sequences in pattern, inside of word """
 
-        def recursive_search(pattern_index, pattern_size):
+        def recursive_search(pattern_index, pattern_size, mismatch_num):
             """ recursively increase bracket_size
              and search through the primary_seq_db"""
-
+             
             # base case
             if pattern_index + pattern_size > input_pattern_length:
                 return
@@ -33,7 +35,10 @@ class ProteinSearch:
 
             # optimization using dynamic programming
             if current_pattern in result:
-                recursive_search(pattern_index, pattern_size + 1)
+                recursive_search(pattern_index, pattern_size + 1, mismatch_num)
+
+
+            mismatch = math.ceil(((mismatch_num + 1) / (pattern_size)) * 100)
 
             for index in result[previous_pattern]:
 
@@ -41,12 +46,17 @@ class ProteinSearch:
                     character = primary_seq_db[index + pattern_size - 1]
                 except IndexError:  # index is at the end of the sequence
                     continue
-
-                # found a match
-                if current_pattern[-1] == character:
+                
+                # check if the characters are the same, if they're not make sure we're still
+                # under the max_mismatch specified
+                if current_pattern[-1] == character or mismatch <= max_mismatch:
                     if index not in result[current_pattern]:
                         result[current_pattern].append(index)
-                    recursive_search(pattern_index, pattern_size + 1)
+
+                if current_pattern[-1] == character:
+                    recursive_search(pattern_index, pattern_size + 1, mismatch_num)
+                elif mismatch < max_mismatch:
+                    recursive_search(pattern_index, pattern_size + 1, mismatch_num+1)
 
         try:
             primary_seq_db_length = len(primary_seq_db)
@@ -167,3 +177,8 @@ class TestSearch:
 #     # end = time.time()
 #     # stopWatch(end-middle)
 #     print("done")
+
+# ----------------NOTES------------------
+# We don't find every combination of mismatches. we only go far enough until the mismatch has gone 
+# over the max_mismatch and stop, we don't consider situations where there might be a match after,
+# and therefore the percentage of mismatches will lower. Reaosn need to be clear.
