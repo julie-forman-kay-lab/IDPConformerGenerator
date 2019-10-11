@@ -12,6 +12,9 @@ from pathlib import Path
 import sys
 
 from idpconfgen.libs import libcli
+from idpconfgen.libs import libpdb
+
+LOGFILESNAME = 'pdbdownloader'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -78,9 +81,11 @@ def main(
         record_name=('ATOM',),
         ncores=1,
         ):
-
+    
+    logger.init_files(log, LOGFILESNAME)
+    
     with pdblist.open('r') as fh:
-        pdblist = PDBList(fh.readlines())
+        pdblist = libpdb.PDBList(fh.readlines())
 
     print('I am the main of pdbdownloader')
     print(args)
