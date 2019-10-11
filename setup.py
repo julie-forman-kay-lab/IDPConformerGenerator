@@ -80,6 +80,7 @@ setup(
     entry_points={
         'console_scripts': [
             'idpconfgen = idpconfgen.cli:main',
+            'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
         ]
         },
     # cmdclass={'build_ext': optional_build_ext},

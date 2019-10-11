@@ -1,16 +1,21 @@
 """
 IDP CONFORMER GENERATOR
 
-Calculates IDP Confomers
-    from a database of angles
-        and other stuff.
+Generates IDP Conformers by combining observed backbone angles
+    and random distribution.
 
 USAGE:
-    Do this.
-    >>> lalalal
+    For help:
+    >>> idpconfgen -h
+
+    Using PDB Downloader:
+    >>> idpconfgen pdbdl
 
 """
 import argparse
+import sys
+
+from idpconfgen.libs import libcli
 
 from idpconfgen.cli_pdbdownloader import (
     ap as pdbdlap,
@@ -18,17 +23,15 @@ from idpconfgen.cli_pdbdownloader import (
     )
 
 
-# https://stackoverflow.com/questions/14988397/
+# https://stackoverflow.com/questions/14988397
+# https://stackoverflow.com/questions/4042452
 def load_args():
     
-    doclines = __doc__.split('\n')
-    prog_ = doclines[1]
-    des_ = '\n'.join(doclines[3:doclines.index('USAGE:')])
-    usage_ = '\n' + '\n'.join(doclines[doclines.index('USAGE:') + 1:])
-
+    prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
+    
     ap = argparse.ArgumentParser(
          prog=prog_,
-         description=des_,
+         description=description_,
          usage=usage_,
          )
     
@@ -45,17 +48,22 @@ def load_args():
         add_help=False,
         )
     ap_pdbdl.set_defaults(func=pdbdlmain)
+   
+    # prints help if not arguments are passed
+    # < 3 to consider also subroutines.
+    if len(sys.argv) < 3:
+        ap.print_help()
+        ap.exit()
 
     cmd = ap.parse_args()
 
     return cmd
     
 
-def main(cmd):
-    
+def main():
+    cmd = load_args() 
     cmd.func(cmd)    
 
 if __name__ == '__main__':
     
-    cmd = load_args()
-    main(cmd)
+    main()
