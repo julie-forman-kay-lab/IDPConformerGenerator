@@ -1,6 +1,8 @@
 from collections import defaultdict
 import logging
 import math
+import time
+import random
 
 
 class ProteinSearch:
@@ -23,7 +25,7 @@ class ProteinSearch:
         def recursive_search(pattern_index, pattern_size, mismatch_num):
             """ recursively increase bracket_size
              and search through the primary_seq_db"""
-             
+
             # base case
             if pattern_index + pattern_size > input_pattern_length:
                 return
@@ -92,7 +94,7 @@ class ProteinSearch:
                 if minimum_sequence not in self.results:
                     result[minimum_sequence] = indices
                 
-                recursive_search(bracket_index, min_seq_chunk_size + 1)
+                recursive_search(bracket_index, min_seq_chunk_size + 1, 0)
 
         self.proteins_sequences.append(primary_seq_db)
         self.results.append(result)
@@ -138,47 +140,52 @@ class TestSearch:
 
 # -------------- FOR MANUAL TESTING ONLY USE BELOW --------------------
 
-# def string_generator():
-#     string = "GAYHLRHEVKEDMALAAAAAAAPNSLWWITVICIHPCTRWNKTAPEMAQVWWWGVQERMFAWSPMLLLKFFAPLFKGLCFTMRAQPGRAMKQNLVDGEWTRKYVCIRDRKSSNHRSWVSMFNYQLMCSEGATSIRIRPFHWQWPYEWMYHDNYHKSWWLSVEEWCHWFNRNDNGSLNHTMPCRDYCINDASHHKIWHGVILATTTTTTKIHEWHMSVNAWMGLAKLAIMLHHFSNVMGLTQMETLCQHATHEIMFVMWVIDFMNGPAQQHDKDFEDVSEYPKLFQNDPVSPEQYWIGEPDDQLKYTYDITVVFAMNDNMCVTGNPDHIVHHHFKNWANHVNHNPFEQNDDDASYGIKHEQWCYNVDMDVHKGWRWPSFKKYYTTNAEAPNFSDNFISEDQMLEELVDIQD"
-#     randomize = "GAYHLRHEVKEDMNSLWWITVICIHPCTRWNKTAPEMAQVWWWGVQERMFAWSPMLLLKFFAPLFKGLCFTMRAQPGRAMKQNLVDGEWTRKYVCIRDRKSSNHRSWVSMFNYQLMCSEGATSIRIRPFHWQWPYEWMYHDNYHKSWWLSVEEWCHWFNRNDNGSLNHTMPCRDYCINDASHHKIWHGVILATTTTTTKIHEWHMSVNAWMGLAKLAIMLHHFSNVMGLTQMETLCQHATHEIMFVMWVIDFMNGPAQQHDKDFEDVSEYPKLFQNDPVSPEQYWIGEPDDQLKYTYDITVVFAMNDNMCVTGNPDHIVHHHFKNWANHVNHNPFEQNDDDASYGIKHEQWCYNVDMDVHKGWRWPSFKKYYTTNAEAPNFSDNFISEDQMLEELVDIQD"
-#     for _ in range(28000):
-#         string+=(''.join(random.sample(randomize,len(randomize))))
-#     return string
+def string_generator():
+    string = "GAYHLRHEVKEDMALAAAAAAAPNSLWWITVICIHPCTRWNKTAPEMAQVWWWGVQERMFAWSPMLLLKFFAPLFKGLCFTMRAQPGRAMKQNLVDGEWTRKYVCIRDRKSSNHRSWVSMFNYQLMCSEGATSIRIRPFHWQWPYEWMYHDNYHKSWWLSVEEWCHWFNRNDNGSLNHTMPCRDYCINDASHHKIWHGVILATTTTTTKIHEWHMSVNAWMGLAKLAIMLHHFSNVMGLTQMETLCQHATHEIMFVMWVIDFMNGPAQQHDKDFEDVSEYPKLFQNDPVSPEQYWIGEPDDQLKYTYDITVVFAMNDNMCVTGNPDHIVHHHFKNWANHVNHNPFEQNDDDASYGIKHEQWCYNVDMDVHKGWRWPSFKKYYTTNAEAPNFSDNFISEDQMLEELVDIQD"
+    randomize = "GAYHLRHEVKEDMNSLWWITVICIHPCTRWNKTAPEMAQVWWWGVQERMFAWSPMLLLKFFAPLFKGLCFTMRAQPGRAMKQNLVDGEWTRKYVCIRDRKSSNHRSWVSMFNYQLMCSEGATSIRIRPFHWQWPYEWMYHDNYHKSWWLSVEEWCHWFNRNDNGSLNHTMPCRDYCINDASHHKIWHGVILATTTTTTKIHEWHMSVNAWMGLAKLAIMLHHFSNVMGLTQMETLCQHATHEIMFVMWVIDFMNGPAQQHDKDFEDVSEYPKLFQNDPVSPEQYWIGEPDDQLKYTYDITVVFAMNDNMCVTGNPDHIVHHHFKNWANHVNHNPFEQNDDDASYGIKHEQWCYNVDMDVHKGWRWPSFKKYYTTNAEAPNFSDNFISEDQMLEELVDIQD"
+    for _ in range(28000):
+        string+=(''.join(random.sample(randomize,len(randomize))))
+    return string
 
-# def stopWatch(value):
-#     '''From seconds to Days;Hours:Minutes;Seconds'''
+def stopWatch(value):
+    '''From seconds to Days;Hours:Minutes;Seconds'''
 
-#     valueD = (((value/365)/24)/60)
-#     Days = int (valueD)
+    valueD = (((value/365)/24)/60)
+    Days = int (valueD)
 
-#     valueH = (valueD-Days)*365
-#     Hours = int(valueH)
+    valueH = (valueD-Days)*365
+    Hours = int(valueH)
 
-#     valueM = (valueH - Hours)*24
-#     Minutes = int(valueM)
+    valueM = (valueH - Hours)*24
+    Minutes = int(valueM)
 
-#     valueS = (valueM - Minutes)*60
-#     Seconds = int(valueS)
-#     print(Hours, " Hours", Minutes, " Minutes" ,Seconds, " seconds")
+    valueS = (valueM - Minutes)*60
+    Seconds = int(valueS)
+    print(Hours, " Hours", Minutes, " Minutes" ,Seconds, " seconds")
 
-# if __name__ == '__main__':
-#     # 400 residues
-#     input_seq = "YCSMLILDQNWALAAAAAAPSEGSSLRCCGCSNMMLFASFMMCKEYHQQYNWREWKSTNTACCHMWHISKLHGYRVQLDKCDLYHQDDDRTDRYWDIINLADEEIRSRGSPDQKSWCQSMGRYQVWSMQSAWGCLEPSPRKLMEPPYYRGMSKWEKDSKYSNRTMFAPCADRESRYWEMYQRQKIEPKRLDFAQTCRWLTVASRIFTQWICWWPKKQDMPVKISLQMGKGGISEWAVLSALFGQGMNQVKGKMPVKQYCKYNCGWEAYNKSPTWVVKGMAMMQGLTRTGSNDYGHAMWDTLKWEAVFCFRQTRQWRWWIECIGKYWHYWVFYWDVQRLAVTLTRYGRRDYEPGAGWSNQDAVINRFDAYHATFYPAIGEYPSLGGGWAMNQDRQWWQMCFSSCPQGHEM"
+if __name__ == '__main__':
+    # 400 residues
+    input_seq = "YCSMLILDQNWALAAAAAAPSEGSSLRCCGCSNMMLFASFMMCKEYHQQYNWREWKSTNTACCHMWHISKLHGYRVQLDKCDLYHQDDDRTDRYWDIINLADEEIRSRGSPDQKSWCQSMGRYQVWSMQSAWGCLEPSPRKLMEPPYYRGMSKWEKDSKYSNRTMFAPCADRESRYWEMYQRQKIEPKRLDFAQTCRWLTVASRIFTQWICWWPKKQDMPVKISLQMGKGGISEWAVLSALFGQGMNQVKGKMPVKQYCKYNCGWEAYNKSPTWVVKGMAMMQGLTRTGSNDYGHAMWDTLKWEAVFCFRQTRQWRWWIECIGKYWHYWVFYWDVQRLAVTLTRYGRRDYEPGAGWSNQDAVINRFDAYHATFYPAIGEYPSLGGGWAMNQDRQWWQMCFSSCPQGHEM"
 
-#     print("generating random sequence..")
-#     # start = time.time()
-#     # primary_seq_db = string_generator()
-#     # middle = time.time()
-#     # stopWatch(middle-start)
+    print("generating random sequence..")
+    start = time.time()
+    # primary_seq_db = string_generator()
+    middle = time.time()
+    stopWatch(middle-start)
 
-#     search = ProteinSearch()
-#     print("searching..")
-#     search.start_search(input_seq, "")
-#     # end = time.time()
-#     # stopWatch(end-middle)
-#     print("done")
+    search = ProteinSearch()
+    print("searching..")
+    search.start_search("AAACAAACD", "AAAKK", 3, 25)
+    end = time.time()
+    stopWatch(end-middle)
+    print("done")
+
+    print(search.results[-1])
+
+    
 
 # ----------------NOTES------------------
 # We don't find every combination of mismatches. we only go far enough until the mismatch has gone 
 # over the max_mismatch and stop, we don't consider situations where there might be a match after,
-# and therefore the percentage of mismatches will lower. Reaosn need to be clear.
+# and therefore the percentage of mismatches will lower. Reason for this is we shouldn't stop 
+# at an alpha-helix, we should start and end inside of a loop
