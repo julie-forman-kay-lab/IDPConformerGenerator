@@ -25,16 +25,16 @@ long_description = '{}\n{}'.format(
             '',
             read('README.rst'),
             ),
-    re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read(join('docs', 'CHANGELOG.rst')))
+    re.sub(':[a-z]+:`~?(.*?)`', r'``\1``', read(join('CHANGELOG.rst')))
     )
 
 setup(
     name='idpconfgen',
-    version='0.0.3',
+    version='0.0.4',
     description='Generates IDP conformers.',
     long_description=long_description,
     author='Julie Forman-Kay Lab',
-    author_email='joaomcteixeira@gmail.com',
+    author_email='forman@sickkids.ca',
     url='https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader',
     packages=find_packages('src'),
     package_dir={'': 'src'},
@@ -53,7 +53,7 @@ setup(
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
     project_urls={
-        'webpage': 'https://github.com/joaomcteixeira/python-project-skeleton',
+        'webpage': 'https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader',
         # 'Documentation': 'https://python-project-skeleton.readthedocs.io/',
         # 'Changelog': 'https://python-project-skeleton.readthedocs.io/en/latest/changelog.html',
         # 'Issue Tracker': 'https://github.com/joaomcteixeira/python-project-skeleton/issues',
