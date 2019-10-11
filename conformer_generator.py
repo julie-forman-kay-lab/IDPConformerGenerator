@@ -39,26 +39,30 @@ class ProteinSearch:
             if current_pattern in result:
                 recursive_search(pattern_index, pattern_size + 1, mismatch_num)
 
-
-            mismatch = math.ceil(((mismatch_num + 1) / (pattern_size)) * 100)
-
-            for index in result[previous_pattern]:
+            for index, prev_mismatch_num in result[previous_pattern]:
 
                 try:
                     character = primary_seq_db[index + pattern_size - 1]
                 except IndexError:  # index is at the end of the sequence
                     continue
                 
+                mismatch = math.ceil(((prev_mismatch_num + mismatch_num + 1) / (pattern_size)) * 100)
+
                 # check if the characters are the same, if they're not make sure we're still
                 # under the max_mismatch specified
                 if current_pattern[-1] == character or mismatch <= max_mismatch:
-                    if index not in result[current_pattern]:
-                        result[current_pattern].append(index)
 
-                if current_pattern[-1] == character:
-                    recursive_search(pattern_index, pattern_size + 1, mismatch_num)
-                elif mismatch < max_mismatch:
-                    recursive_search(pattern_index, pattern_size + 1, mismatch_num+1)
+                    same_char_bool = 0 if current_pattern[-1] == character else 1
+                    new_mismatch = mismatch_num + prev_mismatch_num
+                    new_result = result[current_pattern]
+                    if not new_result or index not in list(zip(*new_result))[0]:
+                        result[current_pattern].append((index, new_mismatch+same_char_bool))
+
+                    # have we JUST reached the max?
+                    if mismatch == max_mismatch and new_mismatch+same_char_bool != new_mismatch:
+                        continue
+
+                    recursive_search(pattern_index, pattern_size + 1, new_mismatch+same_char_bool)
 
         try:
             primary_seq_db_length = len(primary_seq_db)
@@ -82,7 +86,8 @@ class ProteinSearch:
                 primary_seq_db[bracket_index:bracket_index + min_seq_chunk_size]
             primary_seq_db_dict[minimum_sequence].append(bracket_index)
 
-        for bracket_index in range(input_pattern_length - 2):
+        maximum_allowed_index = input_pattern_length - min_seq_chunk_size
+        for bracket_index in range(maximum_allowed_index + 1):
             minimum_sequence = \
                 input_pattern[bracket_index: bracket_index + min_seq_chunk_size]
 
@@ -92,7 +97,7 @@ class ProteinSearch:
 
                 # has not been seen before
                 if minimum_sequence not in self.results:
-                    result[minimum_sequence] = indices
+                    result[minimum_sequence] = [(index, 0) for index in indices] #initiallize all to 0 mismatches
                 
                 recursive_search(bracket_index, min_seq_chunk_size + 1, 0)
 
@@ -167,20 +172,28 @@ if __name__ == '__main__':
     # 400 residues
     input_seq = "YCSMLILDQNWALAAAAAAPSEGSSLRCCGCSNMMLFASFMMCKEYHQQYNWREWKSTNTACCHMWHISKLHGYRVQLDKCDLYHQDDDRTDRYWDIINLADEEIRSRGSPDQKSWCQSMGRYQVWSMQSAWGCLEPSPRKLMEPPYYRGMSKWEKDSKYSNRTMFAPCADRESRYWEMYQRQKIEPKRLDFAQTCRWLTVASRIFTQWICWWPKKQDMPVKISLQMGKGGISEWAVLSALFGQGMNQVKGKMPVKQYCKYNCGWEAYNKSPTWVVKGMAMMQGLTRTGSNDYGHAMWDTLKWEAVFCFRQTRQWRWWIECIGKYWHYWVFYWDVQRLAVTLTRYGRRDYEPGAGWSNQDAVINRFDAYHATFYPAIGEYPSLGGGWAMNQDRQWWQMCFSSCPQGHEM"
 
+    inputt = "GAYHLRHEVKEDMAMGCIKSKGKDSLSDDGVDLKTQPVRNTERTIYVRDPTSNKQQRPVPESQLLPGQRFQTKDPE"
+
     print("generating random sequence..")
     start = time.time()
-    # primary_seq_db = string_generator()
+    primary_seq_db = string_generator()
     middle = time.time()
     stopWatch(middle-start)
 
     search = ProteinSearch()
     print("searching..")
-    search.start_search("AAACAAACD", "AAAKK", 3, 25)
+    search.start_search(inputt, primary_seq_db, 5, 10)
     end = time.time()
     stopWatch(end-middle)
     print("done")
+    print(len(search.results[-1]))
+    search.start_search(inputt, primary_seq_db, 5, 0)
+    print(len(search.results[-1]))
 
-    print(search.results[-1])
+    print("\ndifference:\n")
+    value = { k : search.results[-1][k] for k in set(search.results[-1]) - set(search.results[-2]) }
+    print(value)
+
 
     
 
