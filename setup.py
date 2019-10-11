@@ -78,9 +78,9 @@ setup(
         #   'setuptools_scm>=3.3.1',
         ],
     entry_points={
-        # 'console_scripts': [
-        #     'nameless = nameless.cli:main',
-        # ]
+        'console_scripts': [
+            'idpconfgen = idpconfgen.cli:main',
+        ]
         },
     # cmdclass={'build_ext': optional_build_ext},
     # ext_modules=[
