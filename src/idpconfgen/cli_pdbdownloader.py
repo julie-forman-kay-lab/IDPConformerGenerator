@@ -23,9 +23,43 @@ ap = argparse.ArgumentParser(
 # https://stackoverflow.com/questions/24180527 
 
 ap.add_argument(
-    'cull',
-    help='The CULL PDB file list.',
+    'pdblist',
+    help='A list of PDBID:CHAIN to download.',
     type=Path,
+    )
+
+ap.add_argument(
+    '-d',
+    '--destination',
+    help=(
+        'Destination folder where PDB files will be stored.'
+        'Defaults to current working directory.'
+        )
+    type=Path,
+    default=Path.cwd(),
+    )
+
+ap.add_argument(
+    '-u',
+    '--update',
+    help='Updates destination folder according to input PDB list.',
+    action='store_true',
+    )
+
+ap.add_argument(
+    '-rn',
+    '--record_name',
+    help='The coordinate PDB record name.',
+    detault=('ATOM',),
+    type=tuple,
+    )
+
+ap.add_argument(
+    '-n',
+    '--ncores',
+    help='Number of cores to use.',
+    type=int,
+    default=1,
     )
 
 
@@ -37,7 +71,17 @@ def load_args():
     return cmd
 
 
-def main(args):
+def main(
+        pdblist,
+        destination=None,
+        update=False,
+        record_name=('ATOM',),
+        ncores=1,
+        ):
+
+    with pdblist.open('r') as fh:
+        pdblist = PDBList(fh.readlines())
+
     print('I am the main of pdbdownloader')
     print(args)
 

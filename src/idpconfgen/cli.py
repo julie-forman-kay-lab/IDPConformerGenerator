@@ -62,7 +62,7 @@ def load_args():
 
 def main():
     cmd = load_args() 
-    cmd.func(cmd)    
+    cmd.func(**vars(cmd))
 
 if __name__ == '__main__':
     
