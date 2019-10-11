@@ -8,9 +8,9 @@ USAGE:
 
 """
 import argparse
-from pathlib import Path
 import sys
 
+from idpconfgen import log, Path
 from idpconfgen.libs import libcli
 from idpconfgen.libs import libpdb
 
@@ -37,7 +37,7 @@ ap.add_argument(
     help=(
         'Destination folder where PDB files will be stored.'
         'Defaults to current working directory.'
-        )
+        ),
     type=Path,
     default=Path.cwd(),
     )
@@ -53,7 +53,7 @@ ap.add_argument(
     '-rn',
     '--record_name',
     help='The coordinate PDB record name.',
-    detault=('ATOM',),
+    default=('ATOM',),
     type=tuple,
     )
 
