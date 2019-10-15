@@ -12,9 +12,10 @@ USAGE:
     >>> idpconfgen pdbdl
 
 """
-import argparse
+#import argparse
 import sys
 
+from idpconfgen import CustomParser
 from idpconfgen.libs import libcli
 
 from idpconfgen.cli_pdbdownloader import (
@@ -29,7 +30,7 @@ def load_args():
     
     prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
     
-    ap = argparse.ArgumentParser(
+    ap = CustomParser(
          prog=prog_,
          description=description_,
          usage=usage_,
@@ -51,7 +52,7 @@ def load_args():
    
     # prints help if not arguments are passed
     # < 3 to consider also subroutines.
-    if len(sys.argv) < 3:
+    if len(sys.argv) < 2:
         ap.print_help()
         ap.exit()
 
@@ -63,6 +64,7 @@ def load_args():
 def main():
     cmd = load_args() 
     cmd.func(**vars(cmd))
+
 
 if __name__ == '__main__':
     

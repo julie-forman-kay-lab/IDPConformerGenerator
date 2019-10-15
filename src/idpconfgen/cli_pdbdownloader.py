@@ -7,10 +7,11 @@ USAGE:
     >>> icgpdbdl CULL
 
 """
-import argparse
+#import argparse
 import sys
 
-from idpconfgen import log, Path
+from idpconfgen import CustomParser, log, Path
+from idpconfgen import logger
 from idpconfgen.libs import libcli
 from idpconfgen.libs import libpdb
 
@@ -18,7 +19,7 @@ LOGFILESNAME = 'pdbdownloader'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
-ap = argparse.ArgumentParser(
+ap = CustomParser(
     prog=_prog,
     description=_des,
     usage=_us,
@@ -67,9 +68,9 @@ ap.add_argument(
 
 
 def load_args():
-    if len(sys.argv) == 1:
-        ap.print_help()
-        ap.exit()
+    #if len(sys.argv) == 1:
+    #    ap.print_help()
+    #    ap.exit()
     cmd = ap.parse_args()
     return cmd
 
@@ -80,6 +81,7 @@ def main(
         update=False,
         record_name=('ATOM',),
         ncores=1,
+        **kwargs
         ):
     
     logger.init_files(log, LOGFILESNAME)
