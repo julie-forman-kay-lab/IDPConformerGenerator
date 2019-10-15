@@ -15,7 +15,7 @@ log.setLevel(logging.DEBUG)
 
 _ch = logging.StreamHandler()
 _ch.setLevel(logging.INFO)
-_ch.setFormatter('%(message)s')
+_ch.setFormatter(logging.Formatter('%(message)s'))
 
 log.addHandler(_ch)
 

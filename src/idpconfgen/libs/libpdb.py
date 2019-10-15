@@ -234,3 +234,111 @@ class PDBID:
         else:
             return name
 
+
+
+class PDBDownloader:
+    def __init__(
+            self,
+            pdb_list,
+            destination,
+            ncores=1,
+            record_name=('ATOM',),
+            **kwargs,
+            ):
+        """
+        
+        destination (folder)
+        """
+        
+        self.pdb_list = pdb_list
+
+        self.destination = Path(destination)
+        self.destination.mkdir(parents=True, exist_ok=True)
+        
+        self.ncores = ncores
+        
+        self.record_name = record_name
+        
+        self.kwargs = kwargs
+        
+        self.prepare_pdb_list()
+        
+        return
+    
+    def prepare_pdb_list(self):
+        
+        self.pdbs_to_download = {}
+        for pdbid in self.pdb_list:
+            pdbentry = self.pdbs_to_download.setdefault(pdbid.name, [])
+            pdbentry.append(pdbid.chain)
+    
+    @record_time()
+    def run(self):
+        log.info(T('starting raw PDB download'))
+        log.info(S(
+            f'{len(self.pdbs_to_download)} PDBs will be downloaded '
+            f'and at least {len(self.pdb_list)} chains will be saved'
+            ))
+        
+        results = ThreadPool(self.ncores).imap_unordered(
+            self._download_single_pdb,
+            self.pdbs_to_download.items(),
+            )
+        
+        for r in results:
+            continue
+    
+    def _download_single_pdb(self, pdbid_and_chains_tuple):
+        
+        pdbname = pdbid_and_chains_tuple[0]
+        chains = pdbid_and_chains_tuple[1]
+        
+        possible_links = [l.format(pdbname) for l in POSSIBLELINKS]
+        
+        with self._attempt_download(pdbname):
+            response = self._download_data(possible_links)
+        
+        try:
+            downloaded_data = response.read()
+        except (AttributeError, UnboundLocalError):  # response is None
+            return
+        
+        pdbdata = PDBDataConstructor(downloaded_data)
+        
+        pdbdata.build()
+        
+        if chains[0] is None:
+            chains = pdbdata.chain_set
+        
+        for chain in chains:
+            
+            pdbdata.add_filter_record_name(self.record_name)
+            pdbdata.add_filter_chain(chain)
+            destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
+            try:
+                pdbdata.write(destination)
+            except EmptyFilterError:
+                log.error(traceback.format_exc())
+                log.error(f'Empty Filter for {destination}')
+            pdbdata.clear_filters()
+        
+    def _download_data(self, possible_links):
+        for weblink in possible_links:
+            try:
+                response = urllib.request.urlopen(weblink)
+            except urllib.error.HTTPError:
+                log.error(S(f'failed from {weblink}'))
+                continue
+            else:
+                log.info(S(f'completed from {weblink}'))
+                return response
+        else:
+            raise DownloadFailedError
+    
+    @contextlib.contextmanager
+    def _attempt_download(self, pdbname):
+        try:
+            yield
+        except DownloadFailedError as e:
+            log.error(S(f'{repr(e)}: FAILED {pdbname}'))
+            return

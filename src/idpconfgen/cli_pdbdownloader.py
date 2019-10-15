@@ -11,7 +11,7 @@ USAGE:
 import sys
 
 from idpconfgen import CustomParser, log, Path
-from idpconfgen import logger
+from idpconfgen.logger import init_files, T, S
 from idpconfgen.libs import libcli
 from idpconfgen.libs import libpdb
 
@@ -68,9 +68,6 @@ ap.add_argument(
 
 
 def load_args():
-    #if len(sys.argv) == 1:
-    #    ap.print_help()
-    #    ap.exit()
     cmd = ap.parse_args()
     return cmd
 
@@ -84,13 +81,43 @@ def main(
         **kwargs
         ):
     
-    logger.init_files(log, LOGFILESNAME)
+    init_files(log, LOGFILESNAME)
     
     with pdblist.open('r') as fh:
         pdblist = libpdb.PDBList(fh.readlines())
-
-    print('I am the main of pdbdownloader')
-    print(args)
+    
+    log.info(T('reading input PDB list'))
+    log.info(S(f'from: {pdblist}'))
+    log.info(S(f'{str(pdblist)}'))
+    log.info(S('done\n'))
+    
+    if destination:
+        pdblist_destination = libpdb.PDBList(glob_folder(destination, '*.pdb'))
+        log.info(T('reading destination folder'))
+        log.info(S(f'from: {destination}'))
+        log.info(S(f'{str(pdblist_destination)}'))
+        log.info(S('done\n'))
+        
+        pdblist_comparison = pdblist.difference(pdblist_destination)
+        log.info(T('Comparison between input and destination'))
+        log.info(S(f'{str(pdblist_comparison)}'))
+        log.info(S('done\n'))
+    
+    if update:
+        pdbdownloader = libpdb.PDBDownloader(
+            pdblist_comparison,
+            destination,
+            record_name=record_name,
+            ncores=ncores,
+            )
+        pdbdownloader.prepare_pdb_list()
+        pdbdownloader.run()
+        pdblist_updated = libpdb.PDBList(glob_folder(destination, '*.pdb'))
+        log.info(T('Reading UPDATED destination'))
+        log.info(S(f'{str(pdblist_updated)}'))
+        log.info(S('done\n'))
+    
+    return
 
 
 def maincli():
