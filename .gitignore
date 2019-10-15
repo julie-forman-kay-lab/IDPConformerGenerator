@@ -9,6 +9,8 @@ __pycache__/
 # vim files
 *.swp
 docshtml/
+*.debug
+*.error
 
 # Distribution / packaging
 .Python
