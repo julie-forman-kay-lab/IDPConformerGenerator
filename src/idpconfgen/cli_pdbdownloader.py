@@ -106,14 +106,7 @@ def main(
     
     init_files(log, LOGFILESNAME)
    
-    pdbids_to_read = []
-    for entry in pdblist:
-        try:
-            with Path(entry).open('r') as fh:
-                pdbids_to_read.extend(fh.readlines())
-        except FileNotFoundError:
-            pdbids_to_read.append(entry)
-    
+    pdbids_to_read = libio.read_pdblist(pdblist)
     pdblist = libpdb.PDBList(pdbids_to_read)
 
     log.info(T('reading input PDB list'))
