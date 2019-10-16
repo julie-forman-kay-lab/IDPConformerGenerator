@@ -7,6 +7,7 @@ import numpy as np
 from pathlib import Path
 import re
 import string
+import traceback
 import urllib.request
 
 from idpconfgen import log
@@ -334,7 +335,7 @@ class PDBData(ABC):
         if datafiltered.strip():
             return datafiltered
         else:
-            raise EmptyFilterError
+            raise EXCPTS.EmptyFilterError
 
 
 class DataFromPDB(PDBData):
@@ -692,8 +693,10 @@ class PDBDownloader:
             try:
                 pdbdata.write(destination)
             except EXCPTS.EmptyFilterError:
-                log.error(traceback.format_exc())
-                log.error(f'Empty Filter for {destination}')
+                log.error(T(f'Empty Filter for {destination}'))
+                log.debug(traceback.format_exc())
+                log.error(S(f'record_name: {self.record_name}'))
+                log.error(S(f'chain filter: {chain}'))
             pdbdata.clear_filters()
         
     def _download_data(self, possible_links):

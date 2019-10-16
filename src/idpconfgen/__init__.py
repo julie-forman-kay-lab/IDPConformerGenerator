@@ -20,6 +20,11 @@ _ch.setFormatter(logging.Formatter('%(message)s'))
 log.addHandler(_ch)
 
 
+class ArgsToTuple(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        namespace.record_name = tuple(values)
+
+
 # https://stackoverflow.com/questions/4042452
 class CustomParser(argparse.ArgumentParser):
     def error(self, message):

@@ -61,11 +61,11 @@ def load_args():
     return cmd
     
 
-def main():
+def maincli():
     cmd = load_args() 
     cmd.func(**vars(cmd))
 
 
 if __name__ == '__main__':
     
-    main()
+    maincli()

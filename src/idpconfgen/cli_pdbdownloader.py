@@ -10,7 +10,7 @@ USAGE:
 #import argparse
 import sys
 
-from idpconfgen import CustomParser, log, Path
+from idpconfgen import CustomParser, ArgsToTuple, log, Path
 from idpconfgen.logger import init_files, T, S
 from idpconfgen.libs import libcli, libpdb, libsearch
 
@@ -55,7 +55,8 @@ ap.add_argument(
     '--record_name',
     help='The coordinate PDB record name.',
     default=('ATOM',),
-    type=tuple,
+    action=ArgsToTuple, 
+    nargs='+',
     )
 
 ap.add_argument(
@@ -123,7 +124,7 @@ def main(
 
 def maincli():
     cmd = load_args()
-    main(cmd)
+    main(**vars(cmd))
 
 
 if __name__ == '__main__':
