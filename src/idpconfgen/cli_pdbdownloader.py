@@ -12,8 +12,8 @@ import sys
 
 from idpconfgen import CustomParser, log, Path
 from idpconfgen.logger import init_files, T, S
-from idpconfgen.libs import libcli
-from idpconfgen.libs import libpdb
+from idpconfgen.libs import libcli, libpdb, libsearch
+
 
 LOGFILESNAME = 'pdbdownloader'
 
@@ -92,7 +92,8 @@ def main(
     log.info(S('done\n'))
     
     if destination:
-        pdblist_destination = libpdb.PDBList(glob_folder(destination, '*.pdb'))
+        pdblist_destination = \
+            libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
         log.info(T('reading destination folder'))
         log.info(S(f'from: {destination}'))
         log.info(S(f'{str(pdblist_destination)}'))
@@ -112,7 +113,7 @@ def main(
             )
         pdbdownloader.prepare_pdb_list()
         pdbdownloader.run()
-        pdblist_updated = libpdb.PDBList(glob_folder(destination, '*.pdb'))
+        pdblist_updated = libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))

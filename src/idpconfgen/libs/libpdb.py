@@ -1,10 +1,54 @@
 """Contain  handlers of PDB information."""
+from abc import ABC, abstractmethod
+import contextlib
 import functools
+from multiprocessing.pool import ThreadPool
+import numpy as np
 from pathlib import Path
 import re
+import string
+import urllib.request
 
 from idpconfgen import log
+from idpconfgen.logger import T, S
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.libs import libtimer
+
+
+PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
+CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
+POSSIBLELINKS = [
+    PDB_WEB_LINK,
+    CIF_WEB_LINK,
+    ]
+
+
+CIF_ATOM_KEYS = [
+    '_atom_site.group_PDB',  # 1 atom HETATM
+    '_atom_site.id',  # 2 atom number
+    '_atom_site.label_atom_id',  # 3 ATOM NAME
+    '_atom_site.label_alt_id',  # altloc
+    '_atom_site.label_comp_id',  # 4 resname
+    '_atom_site.label_asym_id',  # 5 chainid
+    '_atom_site.label_seq_id',  # 6 resnum
+    '_atom_site.label_entity_id',
+    '_atom_site.auth_atom_id',  # 3 ATOM NAME
+    '_atom_site.auth_alt_id',  # altloc
+    '_atom_site.auth_comp_id',  # 4 resname
+    '_atom_site.auth_asym_id',  # 5 chainid
+    '_atom_site.auth_seq_id',  # 6 resnum
+    '_atom_site.auth_entity_id',
+    '_atom_site.pdbx_PDB_ins_code',  # iCode
+    '_atom_site.Cartn_x',  # 7
+    '_atom_site.Cartn_y',  # 8
+    '_atom_site.Cartn_z',  # 9
+    '_atom_site.occupancy',  # 10
+    '_atom_site.B_iso_or_equiv',  # 11
+    '_atom_site.type_symbol',  # 12
+    '_atom_site.pdbx_formal_charge',
+    '_atom_site.pdbx_PDB_model_num',
+    '_atom_site.group_PDB',
+    ]
 
 
 class PDBParams:
@@ -235,6 +279,336 @@ class PDBID:
             return name
 
 
+class PDBData(ABC):
+    
+    def __init__(self):
+        self.clear_filters()
+    
+    def clear_filters(self):
+        """
+        Clears up all the previously defined filters.
+        """
+        self.filters = []
+    
+    @abstractmethod
+    def build(self):
+        """
+        Builds the required data and attributes from the raw input.
+        """
+        return
+    
+    @property
+    @abstractmethod
+    def chain_set(self):
+        """
+        Returns a set of the different chain identifiers contained
+        in the PDB data.
+        """
+        return
+    
+    @property
+    @abstractmethod
+    def filtered(self):
+        return
+    
+    @abstractmethod
+    def add_filter_record_name(self, record_name):
+        return
+    
+    @abstractmethod
+    def add_filter_chain(self, chain):
+        return
+    
+    def write(self, filename):
+        """
+        Writes filtered data to file in PDB format.
+        """
+        data2write = self.join_filtered()
+
+        with open(filename, 'w') as fh:
+            fh.write(data2write + '\n')
+        log.info(S(f'saved: {filename}'))
+   
+    def join_filtered(self):
+        datafiltered = '\n'.join(self.filtered)
+        if datafiltered.strip():
+            return datafiltered
+        else:
+            raise EmptyFilterError
+
+
+class DataFromPDB(PDBData):
+    
+    def __init__(self, data):
+        self.rawdata = data
+        super().__init__()
+    
+    def build(self):
+        self.data = self.rawdata.split('\n')
+        self.read_pdb_data_to_array()
+    
+    def read_pdb_data_to_array(self):
+        """
+        Transforms PDB data into an array.
+        """
+        slicers = list(filter(
+            lambda x: x[0].startswith(tuple(string.ascii_lowercase)),
+            PDBParams.__dict__.items(),
+            ))
+        
+        coordinate_data = list(filter(
+            lambda x: x.startswith(('ATOM', 'HETATM', 'ANISOU')),
+            self.data,
+            ))
+        
+        self.pdb_array_data = np.empty(
+            (len(coordinate_data), len(slicers)),
+            dtype='<U8')
+        
+        for ii, line in enumerate(coordinate_data):
+            for column, slicer_item in enumerate(slicers):
+                self.pdb_array_data[ii, column] = line[slicer_item[1]]
+    
+    @property
+    def chain_set(self):
+        return set(self.pdb_array_data[:, 5])
+        
+    @property
+    def filtered(self):
+        filtered_data = self.data
+        for f in self.filters:
+            filtered_data = filter(f, filtered_data)
+        return filtered_data
+    
+    def add_filter_record_name(self, record_name):
+        self.filters.append(lambda x: x.startswith(record_name))
+    
+    def add_filter_chain(self, chain):
+        self.filters.append(lambda x: self._filter_chain(x, chain))
+    
+    def _filter_chain(self, line, chain):
+        try:
+            return line[21] == chain
+        except IndexError:
+            return False
+
+
+class DataFromCIF(PDBData):
+    
+    def __init__(self, data):
+        
+        self.rawdata = data
+        self._atom_info_keys = CIF_ATOM_KEYS
+        self.pdbdata = {}
+        self._void_translation_table = str.maketrans('?.', '  ')
+        super().__init__()
+    
+    def build(self):
+        self.data = MMCIFDataParser(self.rawdata).pdb_dict
+        self.read_PDB_data()
+        self.all_true = np.repeat(
+            True,
+            len(self.pdbdata['_atom_site.group_PDB']),
+            )
+    
+    def read_PDB_data(self):
+        for key in self._atom_info_keys:
+            try:
+                self.pdbdata[key] = np.array(self.data[key])
+            except KeyError:
+                continue
+    
+    @property
+    def chain_set(self):
+        try:
+            chainset = self.pdbdata['_atom_site.auth_asym_id']
+        except KeyError:
+            chainset = self.pdbdata['_atom_site.label_asym_id']
+        
+        return set(chainset)
+    
+    @property
+    def filtered(self):
+        return self.convert_to_pdb()
+    
+    def add_filter_chain(self, chain):
+        try:
+            chainids = self.pdbdata['_atom_site.auth_asym_id']
+        except KeyError:
+            chainids = self.pdbdata['_atom_site.label_asym_id']
+        
+        self.filters.append(chainids == chain)
+    
+    def add_filter_record_name(self, record_name):
+        self.filters.append(
+            np.isin(
+                self.pdbdata['_atom_site.group_PDB'],
+                np.array(record_name),
+                ),
+            )
+    
+    def convert_to_pdb(self):
+        to_output = self.all_true
+        for bool_array in self.filters:
+            to_output = np.logical_and(to_output, bool_array)
+        
+        line_formatter = (
+            "{:6s}"
+            "{:5d} "
+            "{:<4s}"
+            "{:1s}"
+            "{:3s} "
+            "{:1s}"
+            "{:4d}"
+            "{:1s}   "
+            "{:8.3f}"
+            "{:8.3f}"
+            "{:8.3f}"
+            "{:6.2f}"
+            "{:6.2f}      "
+            "{:<4s}"
+            "{:<2s}"
+            "{:2s}"
+            )
+        
+        pdb_lines = []
+        serial_count = 0
+        for i in range(len(self.all_true)):
+            if not to_output[i]:
+                continue
+            
+            serial_count += 1
+            
+            serial = serial_count
+            chainid = "0"
+            segid = chainid
+            
+            record,\
+                atname,\
+                altloc,\
+                resname,\
+                resnum,\
+                icode,\
+                x,\
+                y,\
+                z,\
+                occ,\
+                bfactor,\
+                element,\
+                charge = self._get_line_elements(i)
+        
+            line = line_formatter.format(
+                record,
+                serial,
+                atname,
+                altloc,
+                resname,
+                chainid,
+                int(resnum),
+                icode,
+                float(x),
+                float(y),
+                float(z),
+                float(occ),
+                float(bfactor),
+                segid,
+                element,
+                charge,
+                )
+            
+            pdb_lines.append(line)
+            
+        return pdb_lines
+    
+    def _get_line_elements(self, i):
+        
+        record = self.pdbdata.get('_atom_site.group_PDB')[i]
+        try:
+            atname = self.pdbdata['_atom_site.auth_atom_id'][i]
+        except KeyError:
+            atname = self.pdbdata['_atom_site.label_atom_id'][i]
+        
+        try:
+            altloc = self.pdbdata['_atom_site.auth_alt_id'][i]
+        except KeyError:
+            altloc = self.pdbdata['_atom_site.label_alt_id'][i]
+        altloc = altloc.translate(self._void_translation_table)
+        
+        try:
+            resname = self.pdbdata['_atom_site.auth_comp_id'][i]
+        except KeyError:
+            resname = self.pdbdata['_atom_site.label_comp_id'][i]
+        
+        try:
+            resnum = self.pdbdata['_atom_site.auth_seq_id'][i]
+        except KeyError:
+            resnum = self.pdbdata['_atom_site.label_seq_id'][i]
+        
+        try:
+            icode = self.pdbdata['_atom_site.pdbx_PDB_ins_code'][i]
+        except KeyError:
+            icode = " "
+        icode = icode.translate(self._void_translation_table)
+        
+        x = self.pdbdata.get('_atom_site.Cartn_x')[i]
+        y = self.pdbdata.get('_atom_site.Cartn_y')[i]
+        z = self.pdbdata.get('_atom_site.Cartn_z')[i]
+        
+        occ = self.pdbdata.get('_atom_site.occupancy')[i]
+        bfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
+        
+        element = self.pdbdata.get('_atom_site.type_symbol')[i]
+        charge = self.pdbdata.get('_atom_site.pdbx_formal_charge')[i]
+        
+        return record, atname, altloc, resname, resnum, icode, x, y, z,\
+            occ, bfactor, element, charge
+
+
+class MMCIFDataParser:
+    def __init__(self, data):
+        self.data = data.split('\n')
+        self.cifatomkeys = CIF_ATOM_KEYS
+        self.read()
+    
+    def read(self):
+        
+        self.pdb_dict = {}
+        found = False
+        for ii, line in enumerate(self.data):
+            if line.startswith('_atom_site.'):
+                found = True
+                self.pdb_dict.setdefault(line.strip(), [])
+            elif found:
+                atom_start_index = ii
+                break
+        
+        for line in self.data[atom_start_index:]:
+            
+            if line.startswith('#'):
+                break
+            ls = line.split()
+            
+            for i, key in enumerate(self.pdb_dict.keys()):
+                self.pdb_dict[key].append(ls[i])
+
+class PDBDataConstructor:
+    
+    def __new__(cls, data):
+        
+        if isinstance(data, bytes):
+            data = data.decode('utf_8')
+        elif isinstance(data, str):
+            pass
+        else:
+            raise NotImplementedError('str or bytes allowed')
+        
+        loop_ = re.compile('[lL][oO][oO][pP]_')
+        if loop_.search(data):
+            return DataFromCIF(data)
+        else:
+            return DataFromPDB(data)
+
+
 
 class PDBDownloader:
     def __init__(
@@ -272,7 +646,7 @@ class PDBDownloader:
             pdbentry = self.pdbs_to_download.setdefault(pdbid.name, [])
             pdbentry.append(pdbid.chain)
     
-    @record_time()
+    @libtimer.record_time()
     def run(self):
         log.info(T('starting raw PDB download'))
         log.info(S(
@@ -317,7 +691,7 @@ class PDBDownloader:
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
             try:
                 pdbdata.write(destination)
-            except EmptyFilterError:
+            except EXCPTS.EmptyFilterError:
                 log.error(traceback.format_exc())
                 log.error(f'Empty Filter for {destination}')
             pdbdata.clear_filters()
@@ -333,12 +707,12 @@ class PDBDownloader:
                 log.info(S(f'completed from {weblink}'))
                 return response
         else:
-            raise DownloadFailedError
+            raise EXCPTS.DownloadFailedError
     
     @contextlib.contextmanager
     def _attempt_download(self, pdbname):
         try:
             yield
-        except DownloadFailedError as e:
+        except EXCPTS.DownloadFailedError as e:
             log.error(S(f'{repr(e)}: FAILED {pdbname}'))
             return
