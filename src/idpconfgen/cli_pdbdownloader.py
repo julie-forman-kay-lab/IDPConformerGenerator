@@ -1,10 +1,26 @@
 """
-PDBDOWNLOADER
+Conformer Generator PDB Downloader.
 
-Downloads structures from RCSB Databank.
+Downloads structures from RCSB Databank provided a list of PDB
+identifiers.
+
+The PDB ID list can be given in the format of a file listing the PDBIDs
+or as a list of arguments passed to the script call.
+
+The following PDBID formats are allowed:
+    
+    - XXXX
+    - XXXXY
+    - XXXX_Y
+
+where, XXXX is the PDB ID code and Y the chain identifier. Y can have
+more then one character, for example, XXXXAB, will select chain 'AB'
+of PDB ID XXXX. Digits are also allowed.
 
 USAGE:
-    >>> icgpdbdl CULL
+    >>> icgpdbdl XXXX
+    >>> icgpdbdl XXXXY -d raw_pdbs
+    >>> icgpdbdl pdb.list -d raw_pdbs -u
 
 """
 #import argparse
@@ -28,8 +44,12 @@ ap = CustomParser(
 
 ap.add_argument(
     'pdblist',
-    help='A list of PDBID:CHAIN to download.',
-    type=Path,
+    help=(
+        'A file path containing a list of PDBID:CHAIN to download.'
+        'PDBID:CHAIN identifiers can be of the form XXXX, XXXXY, '
+        'XXXX_Y. You can combine files with arguments.'
+        ),
+    nargs='+',
     )
 
 ap.add_argument(
@@ -70,6 +90,7 @@ ap.add_argument(
 
 def load_args():
     cmd = ap.parse_args()
+    input(cmd)
     return cmd
 
 
@@ -83,10 +104,17 @@ def main(
         ):
     
     init_files(log, LOGFILESNAME)
+   
+    pdbids_to_read = []
+    for entry in pdblist:
+        try:
+            with Path(entry).open('r') as fh:
+                pdbids_to_read.extend(fh.readlines())
+        except FileNotFoundError:
+            pdbids_to_read.append(entry)
     
-    with pdblist.open('r') as fh:
-        pdblist = libpdb.PDBList(fh.readlines())
-    
+    pdblist = libpdb.PDBList(pdbids_to_read)
+
     log.info(T('reading input PDB list'))
     log.info(S(f'from: {pdblist}'))
     log.info(S(f'{str(pdblist)}'))
