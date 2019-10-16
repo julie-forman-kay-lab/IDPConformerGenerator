@@ -3,11 +3,9 @@ IDP Conformer Generator.
 
 Generates conformers for Intrinsically Disordered Proteins.
 """
-import argparse
 import logging
 import os
 from pathlib import Path as _Path
-import sys
 
 
 log = logging.getLogger(__name__)
@@ -18,19 +16,6 @@ _ch.setLevel(logging.INFO)
 _ch.setFormatter(logging.Formatter('%(message)s'))
 
 log.addHandler(_ch)
-
-
-class ArgsToTuple(argparse.Action):
-    def __call__(self, parser, namespace, values, option_string=None):
-        namespace.record_name = tuple(values)
-
-
-# https://stackoverflow.com/questions/4042452
-class CustomParser(argparse.ArgumentParser):
-    def error(self, message):
-        sys.stderr.write('error: %s\n' % message)
-        self.print_help()
-        sys.exit(2)
 
 
 class Path(type(_Path())):

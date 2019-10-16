@@ -12,10 +12,9 @@ USAGE:
     >>> idpconfgen pdbdl
 
 """
-#import argparse
+import argparse
 import sys
 
-from idpconfgen import CustomParser
 from idpconfgen.libs import libcli
 
 from idpconfgen.cli_pdbdownloader import (
@@ -23,19 +22,19 @@ from idpconfgen.cli_pdbdownloader import (
     main as pdbdlmain,
     )
 
-
 # https://stackoverflow.com/questions/14988397
 # https://stackoverflow.com/questions/4042452
 def load_args():
     
     prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
     
-    ap = CustomParser(
-         prog=prog_,
-         description=description_,
+    ap = libcli.CustomParser(
+         prog='idpconfgen',  # prog_,
+         description=libcli.detailed.format(description_),
          usage=usage_,
+         formatter_class=argparse.RawDescriptionHelpFormatter,
          )
-    
+
     subparsers = ap.add_subparsers(
         title='SUBROUTINES',
         description='DESCRIPTION',
@@ -47,11 +46,14 @@ def load_args():
         help='PDB Downloader',
         parents=[pdbdlap],
         add_help=False,
+        description=libcli.detailed.format(pdbdlap.description),
+        usage=pdbdlap.usage,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
         )
     ap_pdbdl.set_defaults(func=pdbdlmain)
    
     # prints help if not arguments are passed
-    # < 3 to consider also subroutines.
+    # if >2 prints help of subroutines.
     if len(sys.argv) < 2:
         ap.print_help()
         ap.exit()

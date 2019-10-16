@@ -23,10 +23,10 @@ USAGE:
     >>> icgpdbdl pdb.list -d raw_pdbs -u
 
 """
-#import argparse
+import argparse
 import sys
 
-from idpconfgen import CustomParser, ArgsToTuple, log, Path
+from idpconfgen import log, Path
 from idpconfgen.logger import init_files, T, S
 from idpconfgen.libs import libcli, libpdb, libsearch
 
@@ -35,20 +35,17 @@ LOGFILESNAME = 'pdbdownloader'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
-ap = CustomParser(
+ap = libcli.CustomParser(
     prog=_prog,
-    description=_des,
+    description=libcli.detailed.format(_des),
     usage=_us,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 # https://stackoverflow.com/questions/24180527 
 
 ap.add_argument(
     'pdblist',
-    help=(
-        'A file path containing a list of PDBID:CHAIN to download.'
-        'PDBID:CHAIN identifiers can be of the form XXXX, XXXXY, '
-        'XXXX_Y. You can combine files with arguments.'
-        ),
+    help='PDBID:CHAIN identifiers to download.',
     nargs='+',
     )
 
@@ -57,7 +54,7 @@ ap.add_argument(
     '--destination',
     help=(
         'Destination folder where PDB files will be stored.'
-        'Defaults to current working directory.'
+        ' Defaults to current working directory.'
         ),
     type=Path,
     default=Path.cwd(),
@@ -66,16 +63,20 @@ ap.add_argument(
 ap.add_argument(
     '-u',
     '--update',
-    help='Updates destination folder according to input PDB list.',
+    help=(
+        'Updates destination folder according to input PDB list. '
+        'If not provided a comparison between input and destination '
+        'is provided.'
+        ),
     action='store_true',
     )
 
 ap.add_argument(
     '-rn',
     '--record_name',
-    help='The coordinate PDB record name.',
+    help='The coordinate PDB record name. Default: ("ATOM",)',
     default=('ATOM',),
-    action=ArgsToTuple, 
+    action=libcli.ArgsToTuple, 
     nargs='+',
     )
 
