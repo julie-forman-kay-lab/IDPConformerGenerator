@@ -79,7 +79,7 @@ setup(
         ],
     entry_points={
         'console_scripts': [
-            'idpconfgen = idpconfgen.cli:main',
+            'idpconfgen = idpconfgen.cli:maincli',
             'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
         ]
         },
