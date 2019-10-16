@@ -17,10 +17,7 @@ import sys
 
 from idpconfgen.libs import libcli
 
-from idpconfgen.cli_pdbdownloader import (
-    ap as pdbdlap,
-    main as pdbdlmain,
-    )
+from idpconfgen import cli_pdbdownloader as pdbdl
 
 # https://stackoverflow.com/questions/14988397
 # https://stackoverflow.com/questions/4042452
@@ -44,13 +41,13 @@ def load_args():
     ap_pdbdl = subparsers.add_parser(
         'pdbdl',
         help='PDB Downloader',
-        parents=[pdbdlap],
+        parents=[pdbdl.ap],
         add_help=False,
-        description=libcli.detailed.format(pdbdlap.description),
-        usage=pdbdlap.usage,
+        description=libcli.detailed.format(pdbdl._des),
+        usage=pdbdl._us,
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
-    ap_pdbdl.set_defaults(func=pdbdlmain)
+    ap_pdbdl.set_defaults(func=pdbdl.main)
    
     # prints help if not arguments are passed
     # if >2 prints help of subroutines.
