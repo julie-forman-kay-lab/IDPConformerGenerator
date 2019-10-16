@@ -8,7 +8,7 @@ The PDB ID list can be given in the format of a file listing the PDBIDs
 or as a list of arguments passed to the script call.
 
 The following PDBID formats are allowed:
-    
+
     - XXXX
     - XXXXY
     - XXXX_Y
@@ -24,7 +24,6 @@ USAGE:
 
 """
 import argparse
-import sys
 
 from idpconfgen import log, Path
 from idpconfgen.logger import init_files, T, S
@@ -41,7 +40,7 @@ ap = libcli.CustomParser(
     usage=_us,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-# https://stackoverflow.com/questions/24180527 
+# https://stackoverflow.com/questions/24180527
 
 ap.add_argument(
     'pdblist',
@@ -76,7 +75,7 @@ ap.add_argument(
     '--record_name',
     help='The coordinate PDB record name. Default: ("ATOM",)',
     default=('ATOM',),
-    action=libcli.ArgsToTuple, 
+    action=libcli.ArgsToTuple,
     nargs='+',
     )
 
@@ -105,7 +104,7 @@ def main(
         ):
     
     init_files(log, LOGFILESNAME)
-   
+    
     pdbids_to_read = libio.read_pdblist(pdblist)
     pdblist = libpdb.PDBList(pdbids_to_read)
 
@@ -136,7 +135,8 @@ def main(
             )
         pdbdownloader.prepare_pdb_list()
         pdbdownloader.run()
-        pdblist_updated = libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
+        pdblist_updated = \
+            libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))

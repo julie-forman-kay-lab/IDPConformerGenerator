@@ -1,5 +1,5 @@
 """
-IDP CONFORMER GENERATOR
+IDP CONFORMER GENERATOR.
 
 Generates IDP Conformers by combining observed backbone angles
     and random distribution.
@@ -16,21 +16,21 @@ import argparse
 import sys
 
 from idpconfgen.libs import libcli
-
 from idpconfgen import cli_pdbdownloader as pdbdl
+
 
 # https://stackoverflow.com/questions/14988397
 # https://stackoverflow.com/questions/4042452
-def load_args():
+def _load_args():
     
     prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
     
     ap = libcli.CustomParser(
-         prog='idpconfgen',  # prog_,
-         description=libcli.detailed.format(description_),
-         usage=usage_,
-         formatter_class=argparse.RawDescriptionHelpFormatter,
-         )
+        prog='idpconfgen',  # prog_,
+        description=libcli.detailed.format(description_),
+        usage=usage_,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
 
     subparsers = ap.add_subparsers(
         title='SUBROUTINES',
@@ -61,7 +61,12 @@ def load_args():
     
 
 def maincli():
-    cmd = load_args() 
+    """
+    Execute subroutine.
+
+    Arguments are read from user command line input.
+    """
+    cmd = _load_args()
     cmd.func(**vars(cmd))
 
 
