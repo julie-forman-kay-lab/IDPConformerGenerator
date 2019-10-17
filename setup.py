@@ -81,7 +81,7 @@ setup(
         'console_scripts': [
             'idpconfgen = idpconfgen.cli:maincli',
             'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
-        ]
+            ]
         },
     # cmdclass={'build_ext': optional_build_ext},
     # ext_modules=[

@@ -1,5 +1,4 @@
-import os
-
+"""Test I/O lib."""
 from idpconfgen import Path
 from idpconfgen.libs import libio
 
@@ -9,7 +8,6 @@ test_folder = Path(__file__).parents[0]
 
 def test_concatenate_1():
     """Test concatenate entries."""
-    
     user_input = [
         'IDDXCH',
         'somefile_that_does_not_exist.list',

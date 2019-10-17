@@ -1,9 +1,9 @@
-"""Function managing time."""
+"""Manages time."""
 import functools
 import time
 
 from idpconfgen import log
-from idpconfgen.logger import T, S
+from idpconfgen.logger import S
 
 
 def record_time(process_name='', *args, **kwargs):
@@ -26,4 +26,3 @@ def record_time(process_name='', *args, **kwargs):
             return result
         return wrapper
     return decorator
-

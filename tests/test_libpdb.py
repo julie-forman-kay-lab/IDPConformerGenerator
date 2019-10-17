@@ -7,88 +7,107 @@ from idpconfgen.libs.libpdb import (
     PDBIDFactory,
     )
 
+
 class TestPDBID:
+    """Test PDBID class."""
     
     def test_PDBID1(self):
+        """Simplest test."""
         pdbid = PDBID('1ABC', chain='D')
         assert pdbid.name == '1ABC'
     
     def test_PDBID_null_chain(self):
+        """Test without chain id."""
         pdbid = PDBID('1ABC')
         assert pdbid.name == '1ABC'
         assert pdbid.chain is None
     
     def test_PDBID_str(self):
+        """Test parsing underscore."""
         pdbid = PDBID('1ABC', chain='Z')
         assert str(pdbid) == '1ABC_Z'
         
     def test_PDBID_str2(self):
+        """Test string conversion without chain."""
         pdbid = PDBID('1ABC')
         assert str(pdbid) == '1ABC'
     
     def test_repr(self):
+        """Test repr with chain."""
         pdbid = PDBID('1ABC', chain='Z')
         assert repr(pdbid) == "PDBID(name='1ABC', chain='Z')"
     
     def test_repr2(self):
+        """Test repr without chain."""
         pdbid = PDBID('1ABC')
         assert repr(pdbid) == "PDBID(name='1ABC')"
     
     def test_equality(self):
+        """Test equality."""
         pdbid1 = PDBID('1ABC', chain='Z')
         pdbid2 = PDBID('1ABC', chain='Z')
         assert pdbid1 == pdbid2
     
     def test_lower(self):
+        """Test comparison: lower."""
         pdbid1 = PDBID('1ABC', chain='X')
         pdbid2 = PDBID('1ABC', chain='Z')
         assert pdbid1 < pdbid2
     
     def test_higher(self):
+        """Test comparison: higher."""
         pdbid1 = PDBID('1ABC', chain='Z')
         pdbid2 = PDBID('1ABC', chain='X')
         assert pdbid1 > pdbid2
 
 
-
 class TestPDBIDFactory:
+    """Test PDBIDFactory."""
     
     def test_parse1(self):
+        """Test string PDBID input."""
         pdbid0 = PDBIDFactory('1ABC')
         pdbid1 = PDBID('1ABC')
         assert pdbid0 == pdbid1
     
     def test_parse2(self):
+        """Test trailing whitespace."""
         pdbid0 = PDBIDFactory('1ABC ')
         pdbid1 = PDBID('1ABC')
         assert pdbid0 == pdbid1
     
     def test_parse3(self):
+        """Test chain ID one character."""
         pdbid0 = PDBIDFactory('1ABCX')
         pdbid1 = PDBID('1ABC', chain='X')
         assert pdbid0 == pdbid1
     
     def test_parse4(self):
+        """Test long string with more information."""
         pdbid0 = PDBIDFactory('1ABCX            something')
         pdbid1 = PDBID('1ABC', chain='X')
         assert pdbid0 == pdbid1
     
     def test_parse5(self):
+        """Test 3 chars chain ID."""
         pdbid0 = PDBIDFactory('1ABCXYZ')
         pdbid1 = PDBID('1ABC', chain='XYZ')
         assert pdbid0 == pdbid1
     
     def test_parse6(self):
+        """Test newline char."""
         pdbid0 = PDBIDFactory('1ABCXYZ\n')
         pdbid1 = PDBID('1ABC', chain='XYZ')
         assert pdbid0 == pdbid1
     
     def test_parse7(self):
+        """Test path string."""
         pdbid0 = PDBIDFactory('some/folder/PDBs/1ABC_D.pdb')
         pdbid1 = PDBID('1ABC', chain='D')
         assert pdbid0 == pdbid1
 
     def test_parse8(self):
+        """Test path Path."""
         pdbid0 = PDBIDFactory(Path('some', 'fldr', 'PDBs', '1ABC_DEF.pdb'))
         pdbid1 = PDBID('1ABC', chain='DEF')
         assert pdbid0 == pdbid1

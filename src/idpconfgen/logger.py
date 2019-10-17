@@ -3,7 +3,7 @@ import logging
 
 
 class TitleLog:
-    
+   """Format string to title."""
     def __init__(self, msg):
         self.msg = msg.title()
     
@@ -12,6 +12,11 @@ class TitleLog:
 
 
 class SubLog:
+    """
+    Format string to bullet point like structure.
+    
+    This format performs nicely under the `TitleLog` formatting.
+    """
     
     def __init__(self, msg):
         self.msg = msg
@@ -25,7 +30,7 @@ S = SubLog
 
 
 def init_files(log, logfilesname):
-    """Initiates log files.""" 
+    """Initiates log files."""
     debugfile = logging.FileHandler(f'{logfilesname}.debug', mode='w')
     debugfile.setLevel(logging.DEBUG)
     debugfile.setFormatter(logging.Formatter(
