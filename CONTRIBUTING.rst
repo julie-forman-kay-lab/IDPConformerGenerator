@@ -137,13 +137,13 @@ Work on the fix...
 Uniformed Tests
 ---------------
 
-Thanks to `Tox`_ we can have a uniform testing platform where all developers are forced to follow the same rules and, above all, all tests occur in a controlled Python environment.
+Thanks to `Tox`_ we can have an uniform testing platform where all developers are forced to follow the same rules and, above all, all tests occur in a controlled Python environment.
 
 ::
 
-    pip install tox
+    pip install tox tox-conda
     # or
-    conda install tox -c conda-forge
+    conda install tox tox-conda -c conda-forge
 
 
 Before creating a Pull Request from your branch, certify that all the tests pass correctly by running:
@@ -159,6 +159,8 @@ Also, you can run individual environments if you wish to test only specific func
     tox -e check  # code style and file compatibility
     tox -e spell  # spell checks documentation
     tox -e docs  # only builds the documentation
+    # to run only pytest
+    tox -e py37-nocov
 
 
 
