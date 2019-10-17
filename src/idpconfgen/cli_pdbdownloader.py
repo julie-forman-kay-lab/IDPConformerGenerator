@@ -27,7 +27,7 @@ import argparse
 
 from idpconfgen import log, Path
 from idpconfgen.logger import init_files, T, S
-from idpconfgen.libs import libcli, libpdb, libsearch
+from idpconfgen.libs import libcli, libio, libpdb, libfile
 
 
 LOGFILESNAME = 'pdbdownloader'
@@ -88,9 +88,8 @@ ap.add_argument(
     )
 
 
-def load_args():
+def _load_args():
     cmd = ap.parse_args()
-    input(cmd)
     return cmd
 
 
@@ -102,7 +101,7 @@ def main(
         ncores=1,
         **kwargs
         ):
-    
+    """Run main script logic."""
     init_files(log, LOGFILESNAME)
     
     pdbids_to_read = libio.read_pdblist(pdblist)
@@ -115,7 +114,7 @@ def main(
     
     if destination:
         pdblist_destination = \
-            libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
+            libpdb.PDBList(libfile.glob_folder(destination, '*.pdb'))
         log.info(T('reading destination folder'))
         log.info(S(f'from: {destination}'))
         log.info(S(f'{str(pdblist_destination)}'))
@@ -136,7 +135,7 @@ def main(
         pdbdownloader.prepare_pdb_list()
         pdbdownloader.run()
         pdblist_updated = \
-            libpdb.PDBList(libsearch.glob_folder(destination, '*.pdb'))
+            libpdb.PDBList(libfile.glob_folder(destination, '*.pdb'))
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))
@@ -145,7 +144,8 @@ def main(
 
 
 def maincli():
-    cmd = load_args()
+    """Command-line interface entry point."""
+    cmd = _load_args()
     main(**vars(cmd))
 
 
