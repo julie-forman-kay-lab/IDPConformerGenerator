@@ -41,6 +41,7 @@ class TestSearchNoMismatch:
         proteins.start_search("ACDEDHPCTRWNK", "ACDED")
         assert len(proteins.results[-1]) == 6
 
+
 class TestSearchWithMismatch:
 
     def test_mismatch1(self):

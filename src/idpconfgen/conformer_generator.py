@@ -1,8 +1,6 @@
 from collections import defaultdict
 import logging
 import math
-import time
-import random
 
 
 class ProteinSearch:
@@ -46,14 +44,16 @@ class ProteinSearch:
                 except IndexError:  # index is at the end of the sequence
                     continue
                 
-                mismatch = math.ceil(((prev_mismatch_num + 1) / (pattern_size)) * 100)
+                mismatch = math.ceil(((prev_mismatch_num + 1)
+                                        / (pattern_size)) * 100)
 
-                # check if the characters are the same, if they're not make sure we're still
+                # check if the characters are the same,
+                # if they're not make sure we're still
                 # under the max_mismatch specified
                 if current_pattern[-1] == character or mismatch <= max_mismatch:
 
-                    same_char_bool = 0 if current_pattern[-1] == character else 1
-                    new_mismatch = prev_mismatch_num+same_char_bool
+                    same_char_bool = 0 if current_pattern[- 1] == character else 1
+                    new_mismatch = prev_mismatch_num + same_char_bool
                     new_result = result[current_pattern]
                     if not new_result or index not in list(zip(*new_result))[0]:
                         result[current_pattern].append((index, new_mismatch))
@@ -97,7 +97,8 @@ class ProteinSearch:
 
                 # has not been seen before
                 if minimum_sequence not in self.results:
-                    result[minimum_sequence] = [(index, 0) for index in indices] #initiallize all to 0 mismatches
+                    # initiallize all to 0 mismatches
+                    result[minimum_sequence] = [(index, 0) for index in indices]
                 
                 recursive_search(bracket_index, min_seq_chunk_size + 1)
 
@@ -153,11 +154,8 @@ class ProteinSearch:
     # value = { k : search.results[-2][k] for k in set(search.results[-2]) - set(search.results[-1]) }
     # print(value)
 
-
-    
-
 # ----------------NOTES------------------
-# We don't find every combination of mismatches. we only go far enough until the mismatch has gone 
+# We don't find every combination of mismatches. we only go far enough until the mismatch has gone
 # over the max_mismatch and stop, we don't consider situations where there might be a match after,
-# and therefore the percentage of mismatches will lower. Reason for this is we shouldn't stop 
+# and therefore the percentage of mismatches will lower. Reason for this is we shouldn't stop
 # at an alpha-helix, we should start and end inside of a loop
