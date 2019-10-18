@@ -1,16 +1,15 @@
-"""
-Functions and Classes regarding Input/Output.
-"""
+"""Functions and Classes regarding Input/Output."""
 from idpconfgen import Path
 
 
 def concatenate_entries(entry_list):
     """
-    Concatente entries given in a list of entries or file paths with 
-    entry lists.
-    
-    Single entries in the input list are used directly while files 
-    are read and their lines added one by one to the concatenated list.
+    Concatente entries.
+
+    Entries can be given in a list of entries or file paths with
+    entry lists. Single entries in the input list are used directly
+    while files are read and their lines added one by one to the
+    concatenated list.
     
     Notice:
         Does not descriminate between single entries and mispelled

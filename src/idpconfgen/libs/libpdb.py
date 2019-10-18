@@ -54,6 +54,8 @@ CIF_ATOM_KEYS = [
 
 class PDBParams:
     """
+    Namespace for old PDB format.
+
     PDB Format string slicing according to:
     http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """
@@ -76,9 +78,11 @@ class PDBParams:
 
 class PDBIDFactory:
     """
-    Parses input for PDBID instatiation.
+    Parse input for PDBID instatiation.
     
-    Returns a PDBID object.
+    Returns
+    -------
+    PDBID object
     
     (okay... this might not be exactly a factory,
     but I wanted to have a object instantiation interface type
@@ -183,15 +187,16 @@ class PDBList:
         return len(self.set)
     
     def to_tuple(self):
-        """
-        Converts PDBList to sorted tuple.
-        """
+        """Convert PDBList to sorted tuple."""
         return tuple(sorted(self.set))
     
     def difference(self, other):
         """
-        Returns a PDBList that's the set difference between
-        self and other.
+        Difference between self and other.
+
+        Returns
+        -------
+        PDBList
         """
         return PDBList(tuple(self.set.difference(other.set)))
     
@@ -281,7 +286,15 @@ class PDBID:
 
 
 class PDBData(ABC):
-    
+    """
+    Abstract base class for PDB data filters.
+
+
+    PDB data filters do what the name implies, filter PDB data according
+    to some criteria.
+
+    Filters can be accumulated to add restrictions.
+    """
     def __init__(self):
         self.clear_filters()
     
@@ -314,23 +327,42 @@ class PDBData(ABC):
     
     @abstractmethod
     def add_filter_record_name(self, record_name):
+        """Adds a filter for the RECORD NAME."""
         return
     
     @abstractmethod
     def add_filter_chain(self, chain):
+        """Adds a filter for CHAIN ID."""
         return
     
     def write(self, filename):
-        """
-        Writes filtered data to file in PDB format.
-        """
+        """Writes filtered data to file in PDB format."""
         data2write = self.join_filtered()
 
         with open(filename, 'w') as fh:
             fh.write(data2write + '\n')
         log.info(S(f'saved: {filename}'))
    
-    def join_filtered(self):
+    def join_filtered(self, char='\n'):
+        """
+        Join filtered PDB data into a single string.
+        
+        Parameters
+        ----------
+        char : str
+            The character with which perform string join.
+            Defaults to `new_line`.
+
+        Returns
+        -------
+        string
+            A unique string resulting from the filetered data.
+        
+        Raises
+        ------
+        :class:`EmptyFilterError`
+            If resulting string is an empty string.
+        """
         datafiltered = '\n'.join(self.filtered)
         if datafiltered.strip():
             return datafiltered
@@ -566,13 +598,25 @@ class DataFromCIF(PDBData):
 
 
 class MMCIFDataParser:
+    """
+    Quick mmCIF data parser for Proteins.
+    
+    Parameters
+    ----------
+    data : str
+        The structural data contained in mmCIF format.
+    """
     def __init__(self, data):
         self.data = data.split('\n')
         self.cifatomkeys = CIF_ATOM_KEYS
         self.read()
     
     def read(self):
-        
+        """
+        Read data string to pdb_dict attribute.
+
+        Performed at instantiation.
+        """
         self.pdb_dict = {}
         found = False
         for ii, line in enumerate(self.data):
@@ -592,10 +636,24 @@ class MMCIFDataParser:
             for i, key in enumerate(self.pdb_dict.keys()):
                 self.pdb_dict[key].append(ls[i])
 
-class PDBDataConstructor:
+
+class PDBDataFactory:
+    """
+    Create a PDB handler.
+
+    Implements readers for old PDB format and mmCIF.
     
+    Returns the correct PDB handler instance loaded from
+    the PDB data.
+    
+    Parameters
+    ----------
+    data:
+        PDB structural data as string or bytes.
+    """
+
     def __new__(cls, data):
-        
+        """Factor PDB data."""
         if isinstance(data, bytes):
             data = data.decode('utf_8')
         elif isinstance(data, str):
@@ -610,8 +668,35 @@ class PDBDataConstructor:
             return DataFromPDB(data)
 
 
-
 class PDBDownloader:
+    """
+    Control PDB downloading operations.
+
+    Given a list of :class:`PDBID`s downloads those PDB files.
+    
+    Parameters
+    ----------
+    pdb_list : list
+        List of PDBIDs.
+
+    destination : str or Path
+        Destination folder.
+
+    record_name : tuple
+        A tuple containing the atom record names to store from the
+        downloaded PDBs. Record names are as described for the PDB
+        format v3. Usually 'ATOM' and 'HETATM' can be used.
+        Defaults to ('ATOM',)
+
+    ncores : int, optional
+        Number of cores to use during the download phase.
+        All downloads operations are stored in a pool, each core
+        performs a download operation per time grabing those operations
+        from the pool. The more cores the more operations are performed
+        simultaneoursly.
+        Defaults to 1.
+    """
+    
     def __init__(
             self,
             pdb_list,
@@ -620,10 +705,6 @@ class PDBDownloader:
             record_name=('ATOM',),
             **kwargs,
             ):
-        """
-        
-        destination (folder)
-        """
         
         self.pdb_list = pdb_list
 
@@ -641,7 +722,7 @@ class PDBDownloader:
         return
     
     def prepare_pdb_list(self):
-        
+        """Prepare a list with the PDBs to download."""
         self.pdbs_to_download = {}
         for pdbid in self.pdb_list:
             pdbentry = self.pdbs_to_download.setdefault(pdbid.name, [])
@@ -649,6 +730,7 @@ class PDBDownloader:
     
     @libtimer.record_time()
     def run(self):
+        """Run download operation."""
         log.info(T('starting raw PDB download'))
         log.info(S(
             f'{len(self.pdbs_to_download)} PDBs will be downloaded '
@@ -660,7 +742,7 @@ class PDBDownloader:
             self.pdbs_to_download.items(),
             )
         
-        for r in results:
+        for _r in results:
             continue
     
     def _download_single_pdb(self, pdbid_and_chains_tuple):
@@ -678,7 +760,7 @@ class PDBDownloader:
         except (AttributeError, UnboundLocalError):  # response is None
             return
         
-        pdbdata = PDBDataConstructor(downloaded_data)
+        pdbdata = PDBDataFactory(downloaded_data)
         
         pdbdata.build()
         

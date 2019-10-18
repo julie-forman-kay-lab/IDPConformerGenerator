@@ -3,7 +3,7 @@ import logging
 
 
 class TitleLog:
-   """Format string to title."""
+    """Format string to title."""
     def __init__(self, msg):
         self.msg = msg.title()
     
