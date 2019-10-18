@@ -202,7 +202,12 @@ class PDBList:
     
     def write(self, filename='PDBIDs.list'):
         """
-        Writes to filename the PDBIDs in the PDBList.
+        Write to a file the PDBIDs in the PDBList.
+
+        Parameters
+        ----------
+        filename : str, optional
+            The output file name.
         """
         with open(filename, 'w') as fh:
             fh.write('\n'.join(str(pdbid) for pdbid in self.to_tuple()))
@@ -289,7 +294,6 @@ class PDBData(ABC):
     """
     Abstract base class for PDB data filters.
 
-
     PDB data filters do what the name implies, filter PDB data according
     to some criteria.
 
@@ -299,44 +303,41 @@ class PDBData(ABC):
         self.clear_filters()
     
     def clear_filters(self):
-        """
-        Clears up all the previously defined filters.
-        """
+        """Clear up all the previously defined filters."""
         self.filters = []
     
     @abstractmethod
     def build(self):
-        """
-        Builds the required data and attributes from the raw input.
-        """
+        """Build the required data and attributes from the raw input."""
         return
     
     @property
     @abstractmethod
     def chain_set(self):
         """
-        Returns a set of the different chain identifiers contained
-        in the PDB data.
+        Set of PDB chain IDs.
+
+        Considers only Raw data.
         """
         return
     
     @property
     @abstractmethod
-    def filtered(self):
+    def filtered(self):  # noqa: D102
         return
     
     @abstractmethod
     def add_filter_record_name(self, record_name):
-        """Adds a filter for the RECORD NAME."""
+        """Add a filter for the RECORD NAME."""
         return
     
     @abstractmethod
     def add_filter_chain(self, chain):
-        """Adds a filter for CHAIN ID."""
+        """Add a filter for CHAIN ID."""
         return
     
     def write(self, filename):
-        """Writes filtered data to file in PDB format."""
+        """Write filtered data to file in PDB format."""
         data2write = self.join_filtered()
 
         with open(filename, 'w') as fh:
@@ -371,19 +372,26 @@ class PDBData(ABC):
 
 
 class DataFromPDB(PDBData):
+    """
+    Hold structural data from PDB files.
+
+    Parameters
+    ----------
+    data : str
+        Raw structural data from PDB formatted files.
+    """
     
     def __init__(self, data):
         self.rawdata = data
         super().__init__()
     
     def build(self):
+        """Build raw data so that filters can be applied."""
         self.data = self.rawdata.split('\n')
         self.read_pdb_data_to_array()
     
     def read_pdb_data_to_array(self):
-        """
-        Transforms PDB data into an array.
-        """
+        """Transform PDB data into an array."""
         slicers = list(filter(
             lambda x: x[0].startswith(tuple(string.ascii_lowercase)),
             PDBParams.__dict__.items(),
@@ -404,19 +412,30 @@ class DataFromPDB(PDBData):
     
     @property
     def chain_set(self):
+        """All chain IDs present in the raw dataset."""  # noqa: D401
         return set(self.pdb_array_data[:, 5])
         
     @property
     def filtered(self):
+        """
+        Parse the raw data applying the selected filters.
+
+        Returns
+        -------
+        list
+            The data in PDB format after filtering.
+        """
         filtered_data = self.data
         for f in self.filters:
             filtered_data = filter(f, filtered_data)
         return filtered_data
     
     def add_filter_record_name(self, record_name):
+        """Add filter for record names."""
         self.filters.append(lambda x: x.startswith(record_name))
     
     def add_filter_chain(self, chain):
+        """Add filters for chain."""
         self.filters.append(lambda x: self._filter_chain(x, chain))
     
     def _filter_chain(self, line, chain):
@@ -427,6 +446,14 @@ class DataFromPDB(PDBData):
 
 
 class DataFromCIF(PDBData):
+    """
+    Reads structural data for proteins in CIF files.
+
+    Parameters
+    ----------
+    data : str
+        The CIf contained data.
+    """
     
     def __init__(self, data):
         
@@ -437,6 +464,11 @@ class DataFromCIF(PDBData):
         super().__init__()
     
     def build(self):
+        """
+        Build data.
+
+        After data build, filters can be applied.
+        """
         self.data = MMCIFDataParser(self.rawdata).pdb_dict
         self.read_PDB_data()
         self.all_true = np.repeat(
@@ -445,6 +477,7 @@ class DataFromCIF(PDBData):
             )
     
     def read_PDB_data(self):
+        """Read PDB data."""
         for key in self._atom_info_keys:
             try:
                 self.pdbdata[key] = np.array(self.data[key])
@@ -453,6 +486,7 @@ class DataFromCIF(PDBData):
     
     @property
     def chain_set(self):
+        """All the chain ids present in the data set."""
         try:
             chainset = self.pdbdata['_atom_site.auth_asym_id']
         except KeyError:
@@ -462,9 +496,15 @@ class DataFromCIF(PDBData):
     
     @property
     def filtered(self):
+        """Filtered data in PDB format."""  # noqa: D401
         return self.convert_to_pdb()
     
     def add_filter_chain(self, chain):
+        """
+        Add filter for chain identifier.
+
+        Only atoms of the specified chain will be parsed.
+        """
         try:
             chainids = self.pdbdata['_atom_site.auth_asym_id']
         except KeyError:
@@ -473,6 +513,13 @@ class DataFromCIF(PDBData):
         self.filters.append(chainids == chain)
     
     def add_filter_record_name(self, record_name):
+        """
+        Add a filter for the RECORD NAME.
+
+        Usually ATOM and HETATM.
+        http://www.wwpdb.org/documentation/
+            file-format-content/format33/sect9.html
+        """
         self.filters.append(
             np.isin(
                 self.pdbdata['_atom_site.group_PDB'],
@@ -481,6 +528,14 @@ class DataFromCIF(PDBData):
             )
     
     def convert_to_pdb(self):
+        """
+        Convert internal data to PDB format.
+
+        Returns
+        -------
+        list
+            A list of the formatted PDB lines.
+        """
         to_output = self.all_true
         for bool_array in self.filters:
             to_output = np.logical_and(to_output, bool_array)
@@ -606,6 +661,7 @@ class MMCIFDataParser:
     data : str
         The structural data contained in mmCIF format.
     """
+    
     def __init__(self, data):
         self.data = data.split('\n')
         self.cifatomkeys = CIF_ATOM_KEYS
