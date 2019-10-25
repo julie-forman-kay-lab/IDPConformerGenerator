@@ -1,11 +1,7 @@
 """Test libpdb."""
 from pathlib import Path
 
-from idpconfgen.libs.libpdb import (
-    PDBID,
-    PDBList,
-    PDBIDFactory,
-    )
+from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList
 
 
 class TestPDBID:

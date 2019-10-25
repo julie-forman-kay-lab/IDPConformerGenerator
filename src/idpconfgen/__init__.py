@@ -26,12 +26,12 @@ class Path(type(_Path())):
 
     This creates an interface so that if new methods are required
     the Path interface does not need to be refactored across.
-
     """
 
     def str(self):
         """
         Return string version of Path.
+
         Avoids using os.fspath around libs.
         """
         return os.fspath(self)

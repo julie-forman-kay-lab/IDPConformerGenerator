@@ -1,19 +1,19 @@
 """Contain  handlers of PDB information."""
-from abc import ABC, abstractmethod
 import contextlib
 import functools
-from multiprocessing.pool import ThreadPool
-import numpy as np
-from pathlib import Path
 import re
 import string
 import traceback
 import urllib.request
+from abc import ABC, abstractmethod
+from multiprocessing.pool import ThreadPool
 
-from idpconfgen import log
-from idpconfgen.logger import T, S
+import numpy as np
+
+from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libtimer
+from idpconfgen.logger import S, T
 
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
@@ -110,7 +110,7 @@ class PDBIDFactory:
     rgx_XXXX_C = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+(\s|$)')
     
     def __new__(cls, name):
-        """Construct class.""" 
+        """Construct class."""
         if isinstance(name, PDBID):
             return name
 
@@ -127,12 +127,10 @@ class PDBIDFactory:
         
         for regex, parser in pdb_filename_regex.items():
             if regex.search(str(name)):  # in case Path obj
-                break
+                return PDBID(*parser(name))
         else:
             emsg = f"PDB code format not valid: {name}. No regex matches."
             raise EXCPTS.PDBIDFactoryError(emsg)
-        
-        return PDBID(*parser(name))
     
     @staticmethod
     def _parse_XXXX(pdbid):
@@ -161,7 +159,7 @@ class PDBList:
         PDBID objects.
     """
 
-    def __new__(cls, pdb_names):
+    def __new__(cls, pdb_names):  # noqa: D102
         
         try:
             if isinstance(pdb_names, cls):
@@ -173,7 +171,8 @@ class PDBList:
         
     def __init__(self, pdb_names):
         valid_pdb_names = filter(
-            lambda x: not str(x).startswith('#'),  # may receive Paths
+            # str() because may receive Paths
+            lambda x: not str(x).startswith('#'),
             pdb_names,
             )
         self.set = set(PDBIDFactory(element) for element in valid_pdb_names)
@@ -261,6 +260,7 @@ class PDBID:
     chain:
         The chain identifier.
     """
+
     def __init__(self, name, chain=None):
         
         self.name = name.upper()
@@ -318,6 +318,7 @@ class PDBData(ABC):
 
     Filters can be accumulated to add restrictions.
     """
+
     def __init__(self):
         self.clear_filters()
     

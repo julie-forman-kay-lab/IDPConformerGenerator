@@ -5,7 +5,7 @@ For I/O related functions see `libio`.
 """
 import glob
 
-from idpconfgen import log, Path
+from idpconfgen import Path, log
 
 
 def glob_folder(folder, ext):

@@ -15,8 +15,8 @@ USAGE:
 import argparse
 import sys
 
-from idpconfgen.libs import libcli
 from idpconfgen import cli_pdbdownloader as pdbdl
+from idpconfgen.libs import libcli
 
 
 # https://stackoverflow.com/questions/14988397

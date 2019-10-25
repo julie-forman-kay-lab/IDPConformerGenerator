@@ -25,9 +25,9 @@ USAGE:
 """
 import argparse
 
-from idpconfgen import log, Path
-from idpconfgen.logger import init_files, T, S
-from idpconfgen.libs import libcli, libio, libpdb, libfile
+from idpconfgen import Path, log
+from idpconfgen.libs import libcli, libfile, libio, libpdb
+from idpconfgen.logger import S, T, init_files
 
 
 LOGFILESNAME = 'pdbdownloader'
