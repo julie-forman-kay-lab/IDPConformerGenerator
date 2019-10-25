@@ -54,11 +54,10 @@ CIF_ATOM_KEYS = [
 
 class PDBParams:
     """
-    Namespace for old PDB format.
+    Namespace for `old PDB format`_.
 
-    PDB Format string slicing according to:
-    http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
-    """
+    .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+    """  # noqa: E501
 
     line_name = slice(0, 6)
     serial = slice(6, 11)
@@ -78,7 +77,7 @@ class PDBParams:
 
 
 class PDBIDFactory:
-    """
+    r"""
     Parse input for PDBID instatiation.
     
     Parameters
@@ -88,9 +87,9 @@ class PDBIDFactory:
         Possible formats:
 
             - XXXX
-            - XXXXC*
-            - XXXX_C*
-            - *.pdb
+            - XXXXC\*
+            - XXXX_C\*
+            - \*.pdb
 
         where XXXX is the PDBID code, C is the chain ID and * means
         any number of characters. PDB and chaind ID codes are any digits,
@@ -100,9 +99,6 @@ class PDBIDFactory:
     -------
     :class:`PDBID` object.
     
-    (okay... this might not be exactly a factory,
-    but I wanted to have a object instantiation interface type
-    instead of function call)
     """
 
     rgx_XXXX = re.compile(r'^[0-9a-zA-Z]{4}(\s|$)')
@@ -363,7 +359,7 @@ class PDBData(ABC):
         with open(filename, 'w') as fh:
             fh.write(data2write + '\n')
         log.info(S(f'saved: {filename}'))
-   
+
     def join_filtered(self, char='\n'):
         """
         Join filtered PDB data into a single string.
@@ -536,10 +532,10 @@ class DataFromCIF(PDBData):
         """
         Add a filter for the RECORD NAME.
 
-        Usually ATOM and HETATM.
-        http://www.wwpdb.org/documentation/
-            file-format-content/format33/sect9.html
-        """
+        Usually ATOM or/and HETATM. `Read further`_
+        
+        .. _Read further: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
+        """  # noqa: E501
         self.filters.append(
             np.isin(
                 self.pdbdata['_atom_site.group_PDB'],
@@ -748,7 +744,7 @@ class PDBDownloader:
     """
     Control PDB downloading operations.
 
-    Given a list of :class:`PDBID`s downloads those PDB files.
+    Given a list of :class:`PDBID` downloads those PDB files.
     
     Parameters
     ----------

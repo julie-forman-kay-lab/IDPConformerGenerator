@@ -18,9 +18,9 @@ more then one character, for example, XXXXAB, will select chain 'AB'
 of PDB ID XXXX. Digits are also allowed.
 
 USAGE:
-    >>> icgpdbdl XXXX
-    >>> icgpdbdl XXXXY -d raw_pdbs
-    >>> icgpdbdl pdb.list -d raw_pdbs -u
+    $ icgpdbdl XXXX
+    $ icgpdbdl XXXXY -d raw_pdbs
+    $ icgpdbdl pdb.list -d raw_pdbs -u
 
 """
 import argparse
