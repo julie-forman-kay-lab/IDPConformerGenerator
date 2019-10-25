@@ -20,12 +20,20 @@ log.addHandler(_ch)
 
 class Path(type(_Path())):
     """
-    Define a common Path to string interface.
+    A Path object dedicated to this software.
 
-    Avoids using os.fspath around libs.
+    Inherits from pathlib.Path.
+
+    This creates an interface so that if new methods are required
+    the Path interface does not need to be refactored across.
+
     """
+
     def str(self):
-        """Return string version of Path."""
+        """
+        Return string version of Path.
+        Avoids using os.fspath around libs.
+        """
         return os.fspath(self)
 
 
