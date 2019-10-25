@@ -64,6 +64,21 @@ class TestPDBID:
 class TestPDBIDFactory:
     """Test PDBIDFactory."""
     
+    def test_parse_XXXX(self):
+        """Test XXXX parsing."""
+        pdbid, chain = PDBIDFactory._parse_XXXX('1ABC')
+        assert (pdbid, chain) == ('1ABC', None)
+
+    def test_parse_XXXXC(self):
+        """Test XXXXC parsing."""
+        pdbid, chain = PDBIDFactory._parse_XXXXC('1ABCYY2 ')
+        assert (pdbid, chain) == ('1ABC', 'YY2')
+
+    def test_parse_XXXX_C(self):
+        """Test XXXX_C parsing."""
+        pdbid, chain = PDBIDFactory._parse_XXXX_C('1ABC_UUI    something ')
+        assert (pdbid, chain) == ('1ABC', 'UUI')
+
     def test_parse1(self):
         """Test string PDBID input."""
         pdbid0 = PDBIDFactory('1ABC')

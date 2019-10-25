@@ -83,14 +83,18 @@ class PDBIDFactory:
     
     Parameters
     ----------
-    name : str
+    name : str or Path
         The code name or ID that identified the PDB.
         Possible formats:
+
             - XXXX
-            - XXXX (note there is a space here)
             - XXXXC*
-            - XXXXC
             - XXXX_C*
+            - *.pdb
+
+        where XXXX is the PDBID code, C is the chain ID and * means
+        any number of characters. PDB and chaind ID codes are any digits,
+        lower and upper case letters.
 
     Returns
     -------
@@ -101,23 +105,24 @@ class PDBIDFactory:
     instead of function call)
     """
 
-    cull_onlypdbid_regex_single = re.compile(r'^[0-9a-zA-Z]{4}$')
-    cull_onlypdbid_regex = re.compile(r'^[0-9a-zA-Z]{4}[\s\n]')
-    cull_with_chains_regex_single = re.compile(r'^[0-9a-zA-Z]{5,}$')
-    cull_with_chains_regex = re.compile(r'^[0-9a-zA-Z]{5,}[\s\n]')
-    pdb_filename_regex = re.compile(r'[0-9a-zA-Z]{4}_[0-9a-zA-Z]{1,}\.pdb$')
+    rgx_XXXX = re.compile(r'^[0-9a-zA-Z]{4}(\s|$)')
+    rgx_XXXXC = re.compile(r'^[0-9a-zA-Z]{5,}(\s|$)')
+    rgx_XXXX_C = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+(\s|$)')
     
     def __new__(cls, name):
         """Construct class.""" 
         if isinstance(name, PDBID):
             return name
-        
+
+        namep = Path(name)
+        if namep.suffix == '.pdb':
+            name = namep.stem
+
+        # where XXXX is the PDBID and C the chain ID
         pdb_filename_regex = {
-            cls.cull_onlypdbid_regex_single: cls._parse_cull_onlypdbid,
-            cls.cull_onlypdbid_regex: cls._parse_cull_onlypdbid,
-            cls.cull_with_chains_regex_single: cls._parse_cull_with_chains,
-            cls.cull_with_chains_regex: cls._parse_cull_with_chains,
-            cls.pdb_filename_regex: cls._parse_filename_with_chain,
+            cls.rgx_XXXX: cls._parse_XXXX,
+            cls.rgx_XXXXC: cls._parse_XXXXC,
+            cls.rgx_XXXX_C: cls._parse_XXXX_C,
             }
         
         for regex, parser in pdb_filename_regex.items():
@@ -130,17 +135,17 @@ class PDBIDFactory:
         return PDBID(*parser(name))
     
     @staticmethod
-    def _parse_cull_onlypdbid(pdbid):
+    def _parse_XXXX(pdbid):
         return pdbid[:4], None
     
     @staticmethod
-    def _parse_cull_with_chains(pdbid):
+    def _parse_XXXXC(pdbid):
         pdbinfo = pdbid.split()[0]
         return pdbinfo[:4], pdbinfo[4:]
     
     @staticmethod
-    def _parse_filename_with_chain(pdbid):
-        pdbid, chainid = Path(pdbid).stem.split('_')
+    def _parse_XXXX_C(pdbid):
+        pdbid, chainid = pdbid.split()[0].split('_')
         return pdbid, chainid
 
 
