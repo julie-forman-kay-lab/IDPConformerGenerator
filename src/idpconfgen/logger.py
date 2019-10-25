@@ -9,7 +9,7 @@ class TitleLog:
         self.msg = msg.title()
     
     def __str__(self):
-        """String representation of the object."""
+        """Represent object as string."""
         return '\n* {} ...'.format(self.msg)
 
 
@@ -24,7 +24,7 @@ class SubLog:
         self.msg = msg
     
     def __str__(self):
-        """String representation of the object."""
+        """Represent object as string."""
         return '    {}'.format(self.msg)
 
 
