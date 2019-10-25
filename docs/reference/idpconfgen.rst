@@ -1,9 +1,5 @@
 idpconfgen
 ==========
 
-.. testsetup::
-
-    from idpconfgen import *
-
-.. automodule:: idpconfgen
-    :members:
+.. automodule:: idpconfgen.cli_pdbdownloader
+    :members: main
