@@ -4,10 +4,12 @@ import logging
 
 class TitleLog:
     """Format string to title."""
+
     def __init__(self, msg):
         self.msg = msg.title()
     
     def __str__(self):
+        """String representation of the object."""
         return '\n* {} ...'.format(self.msg)
 
 
@@ -15,13 +17,14 @@ class SubLog:
     """
     Format string to bullet point like structure.
     
-    This format performs nicely under the `TitleLog` formatting.
+    This format performs nicely under the :class:`TitleLog` formatting.
     """
     
     def __init__(self, msg):
         self.msg = msg
     
     def __str__(self):
+        """String representation of the object."""
         return '    {}'.format(self.msg)
 
 
@@ -30,7 +33,19 @@ S = SubLog
 
 
 def init_files(log, logfilesname):
-    """Initiates log files."""
+    """
+    Initiate log files.
+    
+    Three log files are created:
+        - .debug
+        - .log
+        - .error
+
+    where, .debug stores all technical details related to debugging
+    routines; .log referes to user directed messages, this is the log
+    the user wants to save for future reference; finally, .error
+    stores errors in runtime that compromise the scientific output.
+    """
     debugfile = logging.FileHandler(f'{logfilesname}.debug', mode='w')
     debugfile.setLevel(logging.DEBUG)
     debugfile.setFormatter(logging.Formatter(
