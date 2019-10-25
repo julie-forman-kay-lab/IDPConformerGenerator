@@ -59,6 +59,7 @@ class PDBParams:
     PDB Format string slicing according to:
     http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """
+
     line_name = slice(0, 6)
     serial = slice(6, 11)
     atom_name = slice(12, 16)
@@ -80,14 +81,26 @@ class PDBIDFactory:
     """
     Parse input for PDBID instatiation.
     
+    Parameters
+    ----------
+    name : str
+        The code name or ID that identified the PDB.
+        Possible formats:
+            - XXXX
+            - XXXX (note there is a space here)
+            - XXXXC*
+            - XXXXC
+            - XXXX_C*
+
     Returns
     -------
-    PDBID object
+    :class:`PDBID` object.
     
     (okay... this might not be exactly a factory,
     but I wanted to have a object instantiation interface type
     instead of function call)
     """
+
     cull_onlypdbid_regex_single = re.compile(r'^[0-9a-zA-Z]{4}$')
     cull_onlypdbid_regex = re.compile(r'^[0-9a-zA-Z]{4}[\s\n]')
     cull_with_chains_regex_single = re.compile(r'^[0-9a-zA-Z]{5,}$')
@@ -95,7 +108,7 @@ class PDBIDFactory:
     pdb_filename_regex = re.compile(r'[0-9a-zA-Z]{4}_[0-9a-zA-Z]{1,}\.pdb$')
     
     def __new__(cls, name):
-       
+        """Construct class.""" 
         if isinstance(name, PDBID):
             return name
         
@@ -142,6 +155,7 @@ class PDBList:
         PDB names can be in the form accepted by PDBIDFactory or
         PDBID objects.
     """
+
     def __new__(cls, pdb_names):
         
         try:
