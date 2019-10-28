@@ -3,14 +3,21 @@ import logging
 
 
 class TitleLog:
-    """Format string to title."""
+    """
+    Format string to title.
+    
+    Example
+    -------
+        >>> TitleLog('error msg: {} {} {}', var1, var2 var3)
+    """
 
-    def __init__(self, msg):
+    def __init__(self, msg, *args):
         self.msg = msg.title()
+        self.args = args
     
     def __str__(self):
         """Represent object as string."""
-        return '\n* {} ...'.format(self.msg)
+        return '\n* {} ...'.format(self.msg.format(*self.args))
 
 
 class SubLog:
@@ -18,14 +25,19 @@ class SubLog:
     Format string to bullet point like structure.
     
     This format performs nicely under the :class:`TitleLog` formatting.
+    
+    Example
+    -------
+        >>> SubLog('error msg: {} {} {}', var1, var2 var3)
     """
     
-    def __init__(self, msg):
+    def __init__(self, msg, *args):
         self.msg = msg
+        self.args = args
     
     def __str__(self):
         """Represent object as string."""
-        return '    {}'.format(self.msg)
+        return '    {}'.format(self.msg.format(*self.args))
 
 
 T = TitleLog
