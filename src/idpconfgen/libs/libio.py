@@ -3,7 +3,7 @@ from idpconfgen import Path
 from idpconfgen.libs import libcheck
 
 
-@libcheck.checkargtype(((list, tuple),))
+@libcheck.argstype(((list, tuple),))
 def concatenate_entries(entry_list):
     """
     Concatente entries.
