@@ -1,9 +1,7 @@
 
 from idpconfgen import Path
 from idpconfgen.cli_pdbdownloader import main
-
-
-file_path = Path(__file__).myparents()
+from . import tcommons
 
 
 class TestCliPDBdl:
@@ -16,6 +14,6 @@ class TestCliPDBdl:
 
         main(
             [self.cull],
-            destination=self.fout,
+            destination=tcommons.folder_output,
             update=True,
             )
