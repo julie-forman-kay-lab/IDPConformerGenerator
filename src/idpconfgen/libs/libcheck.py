@@ -25,7 +25,7 @@ def kwargstype(*types):
     
     def decorator(func):
         
-        @functools.wraps(funcs)
+        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             
             for kv, type_ in zip(kwargs.items(), types):
