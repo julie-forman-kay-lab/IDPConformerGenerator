@@ -1,7 +1,9 @@
 """Functions and Classes regarding Input/Output."""
 from idpconfgen import Path
+from idpconfgen.libs import libcheck
 
 
+@libcheck.checkargtype(((list, tuple),))
 def concatenate_entries(entry_list):
     """
     Concatente entries.
@@ -33,5 +35,5 @@ def concatenate_entries(entry_list):
                 concatenated.extend(fh.readlines())
         except (FileNotFoundError, NotADirectoryError):
             concatenated.append(entry)
-   
+
     return concatenated

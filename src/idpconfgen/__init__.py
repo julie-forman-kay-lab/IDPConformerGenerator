@@ -36,5 +36,8 @@ class Path(type(_Path())):
         """
         return os.fspath(self)
 
+    def myparents(self):
+        return self.resolve().parents[0]
+
 
 __version__ = '0.1.0'
