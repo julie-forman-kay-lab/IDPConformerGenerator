@@ -30,7 +30,7 @@ long_description = '{}\n{}'.format(
 
 setup(
     name='idpconfgen',
-    version='0.0.4',
+    version='0.1.0',
     description='Generates IDP conformers.',
     long_description=long_description,
     author='Julie Forman-Kay Lab',
@@ -78,9 +78,10 @@ setup(
         #   'setuptools_scm>=3.3.1',
         ],
     entry_points={
-        # 'console_scripts': [
-        #     'nameless = nameless.cli:main',
-        # ]
+        'console_scripts': [
+            'idpconfgen = idpconfgen.cli:maincli',
+            'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
+            ]
         },
     # cmdclass={'build_ext': optional_build_ext},
     # ext_modules=[

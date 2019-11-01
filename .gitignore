@@ -6,7 +6,11 @@ __pycache__/
 # C extensions
 *.so
 
+# vim files
+*.swp
 docshtml/
+*.debug
+*.error
 
 # Distribution / packaging
 .Python

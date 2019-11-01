@@ -1,0 +1,1 @@
+"""Multi-core related objects."""
