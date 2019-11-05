@@ -2,7 +2,12 @@
 
 from idpconfgen import Path
 
+
+tests_folder = Path(__file__).myparents()
+
+data_folder = Path(tests_folder, 'data')
+
 folder_output = Path(
-    Path(__file__).myparents(),
+    tests_folder,
     'data_out_scratch',
     )

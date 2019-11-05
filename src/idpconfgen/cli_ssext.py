@@ -1,3 +1,11 @@
+"""
+Extracts secondary structure information from PDBs.
+
+Uses an external third party software.
+
+USAGE:
+    $ idpconfgen ssext [PDBS]
+"""
 import argparse
 
 from idpconfgen import Path, log
@@ -6,6 +14,8 @@ from idpconfgen.logger import S, T, init_files
 
 
 LOGFILESNAME = 'idpconfgen_ssext'
+
+_prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
     prog=_prog,
@@ -72,7 +82,17 @@ def main(
     
     pdbs_paths = libio.read_paths(pdbs)
 
-    ss_ext_exec = 
+    ss_ext_exec = libmulticore.JoinedResults(
+        pdb_paths,
+        ss_cmd,
+        ncores=ncores,
+        task_method=libmulticore.SubprocessTask,
+        results_parser=libparser.DSSPParser,
+        )
+
+    ss_ext_exec.run()
+
+    libparse.save_ss_from_dssp(ss_ext_exec.results)
 
     return
 

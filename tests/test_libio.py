@@ -4,8 +4,7 @@ import pytest
 from idpconfgen import Path
 from idpconfgen.libs import libio
 
-
-test_folder = Path(__file__).parents[0]
+import .tcommons
 
 
 def test_concatenate_1():
@@ -47,3 +46,20 @@ def test_concatenate_typerror_str():
     """Raise TypeError when string is given."""
     with pytest.raises(TypeError):
         libio.concatenate_entries('somestr')
+
+
+def test_read_paths1():
+    """Test single Path in list."""
+    paths = libio.read_paths([
+        Path(tcommons.data_folder, '1A12_A.pdb'),
+        ])
+
+    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+
+
+def test_read_paths2():
+    """Read PDBs in folder."""
+
+    paths = libio.read_paths(tcommons.data_folder, ext='.pdb')
+
+    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]

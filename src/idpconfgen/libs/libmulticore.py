@@ -76,7 +76,7 @@ class SubprocessTask(Task):
                 self.cmd,
                 capture_output=True,
                 )
-            return result.stdout  #.decode('utf8')
+            return result.stdout.decode('utf8')
 
 
 class JoinedResults:
@@ -109,7 +109,7 @@ class JoinedResults:
             w.start()
 
         for input_datum in self.input_data:
-            self.tasks.put(CmdTask(self.cmd, input_datum))
+            self.tasks.put(SubprocessTask(self.cmd, input_datum))
 
         # Adds a poison pill
         for w in self.workers:

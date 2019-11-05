@@ -6,8 +6,7 @@ from . import tcommons
 
 class TestCliPDBdl:
 
-    cull = Path(file_path, 'data', 'cull.list')
-    fout = Path(file_path, 'data_out_scratch')
+    cull = tcommons.data_folder / 'cull.list'
 
     def test_main(self):
         """Test main from cli_pdbdownloader."""
