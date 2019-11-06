@@ -1,6 +1,10 @@
 """Functions and Classes regarding Input/Output."""
+import os
+from functools import partial
+
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
+from idpconfgen.logger import S
 
 
 @libcheck.argstype(((list, tuple),))
@@ -86,19 +90,119 @@ def read_paths(path_bundle):
     return check_file_exist(list_of_paths)
 
 
-def read_paths(path_bundle, ext=None):
+def has_suffix(path, ext=None):
+    # accepts any file
+    #if ext is None:
+    #    return True
+    #else:
+    return ext is None or Path(path).suffix == ext
+
+
+def read_files_recursively(folder, ext=None):
     
+    files_list = []
+    try:
+        for root, subdirs, files in os.walk(folder):
+            
+            only_ext = filter(
+                partial(has_suffix, ext=ext),
+                files,
+                )
+            
+            for file_ in only_ext:
+                files_list.append(Path(root, file_))
+    except TypeError:
+        pass
+    return files_list
+
+
+def add_existent_files(storage, source):
+    """
+    Add files that exist to a list.
+
+    Given a list of `source` Paths, if Path exist adds it to `storage`.
+    """
+    for path in source:
+        if path.is_file():
+            storage.append(path)
+        else:
+            log.info(S('file not found: {}', path.str()))
+
+
+def read_path_bundle(path_bundle, ext=None, listext='.list'):
+    """
+    Read path bundle.
+
+    Read paths encoded in strings, folders or files that are list of files.
+
+    If a string points to an existing file, register that path.
+
+    If a string points to a folder, registers all files in that folder
+        that have extension `ext`, recursively.
+    
+    If a string points to a file with extension `listext`, registers
+        all files refered in the `listext` file that exist in disk.
+    
+    Parameters
+    ----------
+    path_bundle : list-like
+        A list containing strings or paths that point to files or folders.
+    
+    ext : string
+        The file extension to consider. If ``None`` considers any file.
+        Defaults to ``None``.
+
+    listext : string
+        The file extension to consider as a file listing other files.
+        Defaults to ``.list``.
+
+    Returns
+    -------
+    list
+        A list of all the files registered that exist in the disk.
+    """
+   
+    func = add_existent_files
+    hsuffix = has_suffix
+    #path_bundle = list(map(Path, path_bundle))
+
     files = []
+    
+    folders = filter(
+        lambda x: x.is_dir(),
+        path_bundle,
+        )
 
-    for path in path_bundle:
+    extfiles = filter(
+        partial(hsuffix, ext=ext),
+        path_bundle,
+        )
+
+    listfiles = filter(
+        partial(hsuffix, ext=listext),
+        path_bundle,
+        )
+    
+    for folder in folders:
+        files.extend(read_files_recursively(folder, ext=ext))
+
+    func(files, extfiles)
+   
+    for path in listfiles:
+        try:
+            with path.open('r') as fh:
+                possible_files = fh.readlines()
+        except FileNotFoundError:
+            log.info(S('file not found: {}', path))
+            continue
         
-        p = Path(path)
+        files_w_ext = filter(
+            partial(hsuffix, ext=ext),
+            possible_files,
+            )
 
-        if p.is_dir():
-            files.extend(read_files_recursively(p, ext=ext))
-        
-        elif p.suffix == ext:
-            files.append(p)
+        func(files, files_w_ext)
+    
+    return files
 
-        elif p.is_file():
-            files.append(p)
+

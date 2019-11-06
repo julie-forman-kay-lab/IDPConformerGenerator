@@ -4,7 +4,7 @@ import pytest
 from idpconfgen import Path
 from idpconfgen.libs import libio
 
-import .tcommons
+from . import tcommons
 
 
 def test_concatenate_1():
@@ -12,8 +12,8 @@ def test_concatenate_1():
     user_input = [
         'IDDXCH',
         'somefile_that_does_not_exist.list',
-        Path(test_folder, 'data', 'pdblist.list').str(),
-        Path(test_folder, 'data', 'pdblist.list'),
+        Path(tcommons.data_folder, 'pdblist.list').str(),
+        Path(tcommons.data_folder, 'pdblist.list'),
         ]
 
     expected_output = [
@@ -48,9 +48,42 @@ def test_concatenate_typerror_str():
         libio.concatenate_entries('somestr')
 
 
+def test_add_existent_files_1():
+    """Add a file that exists."""
+    l = []
+    tpath = tcommons.tests_folder / '__init__.py'
+    libio.add_existent_files(
+        l,
+        [tpath]
+        )
+
+    assert l == [tpath]
+
+
+def test_add_existent_files_2():
+    """Do not add a file that does not exist."""
+    l = []
+    tpath = tcommons.tests_folder / 'doesnotexist.py'
+    libio.add_existent_files(
+        l,
+        [tpath]
+        )
+
+    assert not(l)
+
+
+def test_read_recursively_1():
+    files = libio.read_files_recursively(
+        tcommons.data_folder,
+        ext='.pdb',
+        )
+
+    assert files == [tcommons.data_folder / '1A12_A.pdb']
+
+
 def test_read_paths1():
     """Test single Path in list."""
-    paths = libio.read_paths([
+    paths = libio.read_path_bundle([
         Path(tcommons.data_folder, '1A12_A.pdb'),
         ])
 
@@ -60,6 +93,6 @@ def test_read_paths1():
 def test_read_paths2():
     """Read PDBs in folder."""
 
-    paths = libio.read_paths(tcommons.data_folder, ext='.pdb')
+    paths = libio.read_path_bundle([tcommons.data_folder], ext='.pdb')
 
     assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
