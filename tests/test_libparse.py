@@ -60,6 +60,7 @@ class TestDSSPParser:
     """Test DSSPParser."""
     dssp_file = tcommons.data_folder / '1ABC_D.dssp'
     dssp_wrong = tcommons.data_folder / 'wrong.dssp'
+    dssp_wrong2 = tcommons.data_folder / 'wrong2.dssp'
     dsspdata = dssp_file.read_text()
 
     def test_dssp1(self):
@@ -96,3 +97,19 @@ class TestDSSPParser:
         data = self.dssp_file.read_text().split('\n')
         index = libparse.DSSPParser._finds_data_index(data)
         assert index == 28
+
+    def test_dssp7(self):
+        """
+        Test wrong ss capturing.
+
+        The input here has the '#' wrongly placed.
+        Captures if any of the registered chars does not belong
+        to the possible DSSP secondary structure chars.
+        """
+        with pytest.raises(EXCPTS.DSSPSecStructError):
+            libparse.DSSPParser(fin=self.dssp_wrong2)
+
+    def test_dssp8(self):
+        """Test file does not exist exception."""
+        with pytest.raises(FileNotFoundError):
+            libparse.DSSPParser(fin='doesnotexist.dssp')

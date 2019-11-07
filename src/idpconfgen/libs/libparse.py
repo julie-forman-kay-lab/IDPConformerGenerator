@@ -13,13 +13,38 @@ class DSSPParser:
     Provides an interface for `DSSP files`_.
 
     .. _DSSP files: https://github.com/cmbi/xssp
+    
+    If neither `fin` nor `data` parameters are given, initiates
+    an data empty parser.
+
+    Parameters
+    ----------
+    fin : str or Path object, optional
+        The path to the dssp text file to read.
+        Defaults to ``None``.
+
+    data : str or list, optional
+        A string containing the dssp file data, or a list of lines
+        of such file.
+        Defaults to ``None``.
+
+    pdbid : any, optional
+        An identification for the DSSP file being parsed.
+        Deafults to None.
+    
+    Attributes
+    ----------
+    ss : array
+        If `data` or `fin` are given :attr:`ss` stores the secondary
+        structure information DSSP Keys of the protein.
+
     """
     
     def __init__(self, *, fin=None, data=None, pdbid=None):
         
         self.pdbid = pdbid
         
-        if fin and Path(fin).exists():
+        if fin:
             self.read_dssp_data(Path(fin).read_text())
         elif data:
             self.read_dssp_data(data)
@@ -27,7 +52,14 @@ class DSSPParser:
             self.data = None
 
     def read_dssp_data(self, data):
-        
+        """
+        Reads DSSP data into the parser object.
+
+        Parameters
+        ----------
+        data : str or list of strings
+            Has the same value as Class parameter `data`.
+        """
         try:
             data = data.split('\n')
         except AttributeError:  # data already a list
@@ -80,14 +112,28 @@ class DSSPParser:
 
 def list_index_to_array(
         list_,
-        index=None,
-        sObj=None,
         start=None,
         stop=None,
         step=None,
+        sObj=None,
+        index=None,
         ):
     """
     Extract slices of strings in lists to an array.
+    
+    At least one the named parameters must be provided.
+    
+    In case more than one parameter set is provided:
+        the `start`, `stop` or `step` trio have the highest priority, 
+        followed by `sObj` and last `index`.
+    
+    Raises
+    ------
+    ValueError
+        If no named parameter is provided.
+
+    ValueError
+        If sObj is provided and is not a ``slice`` object.
     """
      
     if any((i is not None for i in (start, stop, step))):
