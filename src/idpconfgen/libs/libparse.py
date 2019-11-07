@@ -8,6 +8,14 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
 
 
+class DSSPMulticoreMediator:
+    def __new__(cls, subcmd_tuple):
+        return DSSPParser(
+            data=subcmd_tuple[1],
+            pdbid=PDBIDFactory(subcmd_tuple[0]),
+            )
+
+
 class DSSPParser:
     """
     Provides an interface for `DSSP files`_.

@@ -86,8 +86,8 @@ def main(
         pdb_paths,
         ss_cmd,
         ncores=ncores,
-        task_method=libmulticore.SubprocessTask,
-        results_parser=libparser.DSSPParser,
+        task_method=libmulticore.DSSPTask,
+        results_parser=libparser.DSSPMulticoreMediator,
         )
 
     ss_ext_exec.run()

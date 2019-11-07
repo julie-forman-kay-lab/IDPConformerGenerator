@@ -36,7 +36,7 @@ class Task:
 class SubprocessTask(Task):
     
     @libcheck.argstype(Task, (list, str))
-    @libcheck.kwargstype((type(None), list, tuple),)
+    @libcheck.kwargstype((type(None), list, tuple))
     def __init__(self, cmd, input_=None):
         """
         General task operation.
@@ -58,25 +58,46 @@ class SubprocessTask(Task):
             Defaults to None, no input is used.
         """
         try:
-            cmd_exec = cmd.split()
+            self.cmd_exec = cmd.split()
         except AttributeError:  # in case cmd is a list
-            cmd_exec = cmd
+            self.cmd_exec = cmd
+        
+        self.input = input_
 
+
+    def __str__(self):
+        return ' '.join(self.cmd)
+    
+    def __call__(self):
+        self.prepare_cmd()
+        self.execute()
+        return self.result.stdout.decode('utf8')
+
+    def prepare_cmd(self):
         try:
-            self.cmd = cmd_exec.extend(input_)
+            self.cmd = self.cmd_exec.extend(input_)
         except TypeError:  # in case input_ is None
             pass
 
-        def __str__(self):
-            return ' '.join(self.cmd)
+    def execute(self):
+        log.info(S('running', self.cmd))
+        self.result = subprocess.run(
+            self.cmd,
+            capture_output=True,
+            )
 
-        def __call__(self):
-            log.info(S('running', self.cmd))
-            result = subprocess.run(
-                self.cmd,
-                capture_output=True,
-                )
-            return result.stdout.decode('utf8')
+
+class DSSPTask(SubprocessTask):
+   
+    def prepare_cmd(self):
+        self.cmd_exec.extend(['-i', self.input])
+    
+    def __call__(self):
+        self.prepare_cmd()
+        self.execute()
+        return (self.input, self.result.stdout.decode('utf8'))
+
+        
 
 
 class JoinedResults:
@@ -86,20 +107,20 @@ class JoinedResults:
             input_data,
             command,
             ncores=1,
-            task_method=SubprocessTask,
+            TaskMethod=SubprocessTask,
             results_parser=str,
             ):
         self.input_data = input_data
         self.cmd = command
         self.ncores = 1
-        self.task_method = taskmethod
+        self.TaskMethod = TaskMethod
         self.rp = results_parser
         
     def build(self):
         """Build tasks, results and workers."""
         self.tasks = multiprocessing.JoinableQueue()
         self.results = multiprocessing.Queue()
-        self.workers = [Worker(tasks, results) for i in range(self.ncores)]
+        self.workers = [Worker(self.tasks, self.results) for i in range(self.ncores)]
     
     def run(self):
         """Run."""
@@ -109,7 +130,7 @@ class JoinedResults:
             w.start()
 
         for input_datum in self.input_data:
-            self.tasks.put(SubprocessTask(self.cmd, input_datum))
+            self.tasks.put(self.TaskMethod(self.cmd, input_datum))
 
         # Adds a poison pill
         for w in self.workers:
