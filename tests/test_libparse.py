@@ -113,3 +113,9 @@ class TestDSSPParser:
         """Test file does not exist exception."""
         with pytest.raises(FileNotFoundError):
             libparse.DSSPParser(fin='doesnotexist.dssp')
+
+    def test_dssp9(self):
+        """Test FASTA extraction."""
+        dobj = libparse.DSSPParser(fin=self.dssp_file)
+        expected = ['K', 'K', 'V', 'K', 'V', 'S', 'H', 'R', 'S', 'H']
+        assert list(dobj.fasta) == expected

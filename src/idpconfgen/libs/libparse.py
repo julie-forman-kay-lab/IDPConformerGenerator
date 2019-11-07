@@ -76,6 +76,7 @@ class DSSPParser:
 
         #self.data = self._finds_data_index(data)
         self.read_sec_structure()
+        self.read_fasta()
 
     def read_sec_structure(self):
         """
@@ -85,6 +86,14 @@ class DSSPParser:
         """
         self.ss = list_index_to_array(self.data, index=16)
         self._confirm_ss_data(self.ss)
+    
+    def read_fasta(self):
+        """
+        Reads FASTA (primary sequence) information from DSSP data.
+
+        Assigns :attr:`fasta`.
+        """
+        self.fasta = list_index_to_array(self.data, index=13)
 
     @staticmethod
     def _confirm_ss_data(data):
