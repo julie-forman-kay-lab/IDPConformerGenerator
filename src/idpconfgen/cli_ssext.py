@@ -9,7 +9,7 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libmulticore, libparser
+from idpconfgen.libs import libcli, libio, libmulticore, libparse
 from idpconfgen.logger import S, T, init_files
 
 
