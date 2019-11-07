@@ -9,7 +9,7 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio
+from idpconfgen.libs import libcli, libio, libmulticore, libparser
 from idpconfgen.logger import S, T, init_files
 
 
@@ -80,7 +80,7 @@ def main(
     
     init_files()
     
-    pdbs_paths = libio.read_paths(pdbs)
+    pdbs_paths = libio.read_path_bundle(pdbs)
 
     ss_ext_exec = libmulticore.JoinedResults(
         pdb_paths,

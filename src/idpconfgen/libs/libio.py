@@ -91,15 +91,50 @@ def read_paths(path_bundle):
 
 
 def has_suffix(path, ext=None):
-    # accepts any file
-    #if ext is None:
-    #    return True
-    #else:
-    return ext is None or Path(path).suffix == ext
+    """
+    Evaluate file suffix according to `ext` condition.
+
+    Parameters
+    ----------
+    path : str of Path
+        The file path.
+
+    ext : str
+        The file extension.
+        Can be dotted '.' (.csv) or plain (csv).
+
+    Return
+    ------
+    True
+        Always if `ext` is None.
+        If path suffix equals `ext`. 
+
+    False
+        Otherwise
+
+    """
+    return ext is None or Path(path).suffix == '.{}'.format(ext.lstrip('.'))
 
 
-def read_files_recursively(folder, ext=None):
+def list_files_recursively(folder, ext=None):
+    """
+    List files recursively from source folder.
     
+    Parameters
+    ----------
+    folder : string or Path
+        The folder from where to start searching.
+
+    ext : string
+        The file extension to consider.
+        Files without the defined `ext` will be ignored.
+        Defaults to ``None``, all files are considered.
+
+    Returns
+    -------
+    unsorted list
+        Of the file paths relative to the source `folder`.
+    """
     files_list = []
     try:
         for root, subdirs, files in os.walk(folder):
@@ -126,7 +161,7 @@ def add_existent_files(storage, source):
         if path.is_file():
             storage.append(path)
         else:
-            log.info(S('file not found: {}', path.str()))
+            log.error(S('file not found: {}', path.str()))
 
 
 def read_path_bundle(path_bundle, ext=None, listext='.list'):
@@ -184,7 +219,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
         )
     
     for folder in folders:
-        files.extend(read_files_recursively(folder, ext=ext))
+        files.extend(list_files_recursively(folder, ext=ext))
 
     func(files, extfiles)
    
@@ -193,7 +228,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
             with path.open('r') as fh:
                 possible_files = fh.readlines()
         except FileNotFoundError:
-            log.info(S('file not found: {}', path))
+            log.error(S('file not found: {}', path))
             continue
         
         files_w_ext = filter(

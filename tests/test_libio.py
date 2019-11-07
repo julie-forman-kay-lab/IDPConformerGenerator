@@ -72,13 +72,90 @@ def test_add_existent_files_2():
     assert not(l)
 
 
-def test_read_recursively_1():
-    files = libio.read_files_recursively(
+def test_has_suffix_1():
+    """Test ext is None."""
+    assert libio.has_suffix('file') is True
+
+
+def test_has_suffix_2():
+    """Test ext is equals file."""
+    assert libio.has_suffix('file.pdb', ext='.pdb') is True
+
+
+def test_has_suffix_3():
+    """Test ext is differs file."""
+    assert libio.has_suffix('file.csv', ext='.pdb') is False
+
+
+def test_has_suffix_4():
+    """Test ext is None when file has ext."""
+    assert libio.has_suffix('file.csv') is True
+
+
+def test_has_suffix_5():
+    """Test ext differs without dot."""
+    assert libio.has_suffix('file.csv', ext='pdb') is False
+
+
+def test_has_suffix_6():
+    """Test ext correct without dot."""
+    assert libio.has_suffix('file.csv', ext='csv') is True
+
+
+def test_list_recursively_1():
+    files = libio.list_files_recursively(
         tcommons.data_folder,
         ext='.pdb',
         )
 
     assert files == [tcommons.data_folder / '1A12_A.pdb']
+
+
+def test_list_files_recursively_1():
+    """Test None extention."""
+    files = libio.list_files_recursively(
+        tcommons.data_folder,
+        )
+    
+    expected = [tcommons.data_folder.joinpath(p) for p in [
+            '1A12_A.dssp',
+            '1A12_A.pdb',
+            'cull.list',
+            'pdblist.list',
+            ]
+            ]
+    
+    assert sorted(files) == sorted(expected)
+
+
+def test_list_files_recursively_2():
+    """Test pdb extention."""
+    files = libio.list_files_recursively(
+        tcommons.data_folder,
+        ext='pdb',
+        )
+    
+    expected = [tcommons.data_folder.joinpath(p) for p in [
+            '1A12_A.pdb',
+            ]
+            ]
+    
+    assert sorted(files) == sorted(expected)
+
+
+def test_list_files_recursively_3():
+    """Test .pdb."""
+    files = libio.list_files_recursively(
+        tcommons.data_folder,
+        ext='.pdb',
+        )
+    
+    expected = [tcommons.data_folder.joinpath(p) for p in [
+            '1A12_A.pdb',
+            ]
+            ]
+
+    assert sorted(files) == sorted(expected)
 
 
 def test_read_paths1():
