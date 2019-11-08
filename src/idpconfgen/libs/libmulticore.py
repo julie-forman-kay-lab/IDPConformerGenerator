@@ -113,19 +113,11 @@ class DSSPTask(SubprocessTask):
             input_ = [input_]
 
         super().__init__(cmd, input_=input_)
-
-
-
-    #def prepare_cmd(self):
-    #    """Prepares command by adding '-i' and input string."""
-    #    self.cmd_exec.extend(['-i', self.input])
     
     def __call__(self):
         self.prepare_cmd()
         self.execute()
         return (self.input, self.result.stdout.decode('utf8'))
-
-        
 
 
 class JoinedResults:
