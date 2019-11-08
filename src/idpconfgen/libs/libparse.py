@@ -6,7 +6,7 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
-from idpconfgen.libs import libpdb
+from idpconfgen.libs import libcheck, libpdb
 
 
 class DSSPMulticoreMediator:
@@ -190,3 +190,32 @@ def list_index_to_array(
         array[i] = line[index]
     
     return array
+
+
+@libcheck.kwargstype((str, Path))
+def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
+    """
+    Exports secondary structure information from :class:`DSSPParser` results.
+
+    Parameters
+    ----------
+    dssp_task_results : multiple :class:`DSSPParser`
+    """
+    
+    output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
+    
+    opath = Path(output)
+    opath.myparents().mkdir(parents=True)
+    opath.write_text('\n'.join(output_data) + '\n')
+
+
+def _concatenate_ss_from_dsspparsers(dsspparsers):
+    output = []
+    for dsspparser in dsspparsers:
+        output.append(
+            '{}|{}'.format(
+                dsspparser.pdbid,
+                ''.join(dsspparser.ss),
+                )
+            )
+    return output

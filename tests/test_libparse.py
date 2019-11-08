@@ -181,3 +181,41 @@ class TestDSSPMediator:
             ))
 
         assert dssp_parser == dssp_mediated
+
+
+class Test_dssp_ss_saver:
+    
+    dssp_fileD = tcommons.data_folder / '1ABC_D.dssp'
+    dssp_fileE = tcommons.data_folder / '1ABC_E.dssp'
+    
+    obj1 = libparse.DSSPParser(
+        fin=dssp_fileD,
+        pdbid='1ABC_D',
+        )
+    obj2 = libparse.DSSPParser(
+        fin=dssp_fileE,
+        pdbid='1ABC_E',
+        )
+    
+    def test_concat_dsspparsers_1(self):
+        """Test concatenation of DSSPParsers."""
+
+        output = libparse._concatenate_ss_from_dsspparsers([
+            self.obj1,
+            self.obj2,
+            ])
+
+        expected = ['1ABC_D| HGIBE TS ', '1ABC_E| HGIBE TS']
+        assert expected == output
+
+    def test_export_ss(self):
+        libparse.export_ss_from_DSSP(self.obj1, self.obj2,
+            output=tcommons.folder_output / 'dssp.database'
+            )
+    
+        ofile = Path(tcommons.folder_output / 'dssp.database')
+        results = ofile.read_text()
+
+        expected = '1ABC_D| HGIBE TS \n1ABC_E| HGIBE TS\n'
+        assert expected == results
+
