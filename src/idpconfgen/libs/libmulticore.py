@@ -87,7 +87,7 @@ class SubprocessTask(Task):
         try:
             self.cmd = self.cmd_exec + self.input
         except TypeError:  # in case input_ is None
-            pass
+            self.cmd = self.cmd_exec
 
     def execute(self):
         log.info(S('running', self.cmd))
@@ -99,10 +99,26 @@ class SubprocessTask(Task):
 
 class DSSPTask(SubprocessTask):
     """Subprocess Task for DSSP third party executable."""
-   
-    def prepare_cmd(self):
-        """Prepares command by adding '-i' and input string."""
-        self.cmd_exec.extend(['-i', self.input])
+    
+    @libcheck.argstype(Task, (list, str), (list, str))
+    def __init__(self, cmd, input_):
+        # forces input_ to be positional parameter in subclass DSSPTask
+        
+        try:
+            cmd.append('-i')
+        except AttributeError:
+            cmd = [cmd, '-i']
+
+        if isinstance(input_, str):
+            input_ = [input_]
+
+        super().__init__(cmd, input_=input_)
+
+
+
+    #def prepare_cmd(self):
+    #    """Prepares command by adding '-i' and input string."""
+    #    self.cmd_exec.extend(['-i', self.input])
     
     def __call__(self):
         self.prepare_cmd()
