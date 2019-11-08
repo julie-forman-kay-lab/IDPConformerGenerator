@@ -6,13 +6,14 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
+from idpconfgen.libs import libpdb
 
 
 class DSSPMulticoreMediator:
     def __new__(cls, subcmd_tuple):
         return DSSPParser(
             data=subcmd_tuple[1],
-            pdbid=PDBIDFactory(subcmd_tuple[0]),
+            pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
             )
 
 
@@ -58,6 +59,14 @@ class DSSPParser:
             self.read_dssp_data(data)
         else:
             self.data = None
+
+    def __eq__(self, other):
+        is_equal = [
+            self.data == other.data,
+            self.pdbid == other.pdbid,
+            ]
+
+        return all(is_equal)
 
     def read_dssp_data(self, data):
         """

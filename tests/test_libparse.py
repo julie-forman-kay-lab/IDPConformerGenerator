@@ -12,7 +12,7 @@ import pytest
 from idpconfgen import Path
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
-from idpconfgen.libs import libparse
+from idpconfgen.libs import libparse, libpdb
 
 from . import tcommons
 
@@ -59,6 +59,7 @@ class TestLITA():
 class TestDSSPParser:
     """Test DSSPParser."""
     dssp_file = tcommons.data_folder / '1ABC_D.dssp'
+    dssp_file2 = tcommons.data_folder / '1ABC_E.dssp'
     dssp_wrong = tcommons.data_folder / 'wrong.dssp'
     dssp_wrong2 = tcommons.data_folder / 'wrong2.dssp'
     dsspdata = dssp_file.read_text()
@@ -119,3 +120,64 @@ class TestDSSPParser:
         dobj = libparse.DSSPParser(fin=self.dssp_file)
         expected = ['K', 'K', 'V', 'K', 'V', 'S', 'H', 'R', 'S', 'H']
         assert list(dobj.fasta) == expected
+
+    def test_dssp10(self):
+        """Test equality with pdbid None."""
+
+        dobj1 = libparse.DSSPParser(fin=self.dssp_file)
+        dobj2 = libparse.DSSPParser(fin=self.dssp_file)
+
+        assert dobj1 == dobj2
+
+    def test_dssp11(self):
+        """Test equality with pdbid."""
+
+        dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
+        dobj2 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
+
+        assert dobj1 == dobj2
+    
+    def test_dssp12(self):
+        """Test differ with pdbid different."""
+
+        dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
+        dobj2 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1XXX')
+
+        assert dobj1 != dobj2
+
+    def test_dssp13(self):
+        """Test differ with data different."""
+
+        dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
+        dobj2 = libparse.DSSPParser(fin=self.dssp_file2, pdbid='1ABC')
+
+        assert dobj1 != dobj2
+
+
+class TestDSSPMediator:
+    
+    dssp_file = tcommons.data_folder / '1ABC_D.dssp'
+    pdb_file = tcommons.data_folder / '1A12.pdb'
+    dsspdata = dssp_file.read_text()
+
+    def test_dsspmediator_0(self):
+        
+        dssp_mediated = libparse.DSSPMulticoreMediator((
+            self.pdb_file,
+            self.dsspdata,
+            ))
+        assert isinstance(dssp_mediated, libparse.DSSPParser)
+    
+    def test_dsspmediator_1(self):
+        
+        dssp_parser = libparse.DSSPParser(
+            data=self.dsspdata,
+            pdbid=libpdb.PDBIDFactory(self.pdb_file),
+            )
+
+        dssp_mediated = libparse.DSSPMulticoreMediator((
+            self.pdb_file,
+            self.dsspdata,
+            ))
+
+        assert dssp_parser == dssp_mediated
