@@ -1,6 +1,7 @@
 """Multi-core related objects."""
 import subprocess
 
+from idpconfgen import Path, log
 from idpconfgen.logger import S, T
 from idpconfgen.libs import libcheck
 
@@ -66,7 +67,16 @@ class SubprocessTask(Task):
 
 
     def __str__(self):
-        return ' '.join(self.cmd)
+        try:
+            return ' '.join(self.cmd)
+        except AttributeError:
+            return repr(self)
+
+    def __repr__(self):
+        return '{}({})'.format(
+            __class__.__name__,
+            ','.join('{}={}'.format(k, v) for k, v in self.__dict__.items()),
+            )
     
     def __call__(self):
         self.prepare_cmd()
@@ -75,7 +85,7 @@ class SubprocessTask(Task):
 
     def prepare_cmd(self):
         try:
-            self.cmd = self.cmd_exec.extend(input_)
+            self.cmd = self.cmd_exec + self.input
         except TypeError:  # in case input_ is None
             pass
 
@@ -88,8 +98,10 @@ class SubprocessTask(Task):
 
 
 class DSSPTask(SubprocessTask):
+    """Subprocess Task for DSSP third party executable."""
    
     def prepare_cmd(self):
+        """Prepares command by adding '-i' and input string."""
         self.cmd_exec.extend(['-i', self.input])
     
     def __call__(self):
