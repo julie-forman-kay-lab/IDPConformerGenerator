@@ -118,7 +118,10 @@ def test_list_files_recursively_1():
         )
     
     expected = [tcommons.data_folder.joinpath(p) for p in [
-            '1A12_A.dssp',
+            '1ABC_D.dssp',
+            '1ABC_E.dssp',
+            'wrong.dssp',
+            'wrong2.dssp',
             '1A12_A.pdb',
             'cull.list',
             'pdblist.list',
