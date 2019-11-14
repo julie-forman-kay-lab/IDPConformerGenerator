@@ -32,10 +32,9 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-c',
-    '--ss_cmd',
+    'ss_cmd',
     help='The path to the DSSP executable file.',
-    default=None,
+    nargs=1,
     )
 
 ap.add_argument(
@@ -78,7 +77,7 @@ def main(
         ):
     """Run main cli logic."""
     
-    init_files()
+    init_files(log, LOGFILESNAME)
     
     pdbs_paths = libio.read_path_bundle(pdbs)
 
@@ -92,7 +91,7 @@ def main(
 
     ss_ext_exec.run()
 
-    libparse.save_ss_from_dssp(ss_ext_exec.results)
+    libparse.export_ss_from_DSSP(ss_ext_exec.results)
 
     return
 
