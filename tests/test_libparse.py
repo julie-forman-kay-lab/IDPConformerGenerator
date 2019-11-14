@@ -81,6 +81,11 @@ class TestDSSPParser:
         """Test initiation from file."""
         libparse.DSSPParser(fin=self.dssp_file)
 
+    def test_dssp3_1(self):
+        """Test initiation from data."""
+        lines = Path(self.dssp_file).read_text().split('\n')
+        libparse.DSSPParser(data=lines)
+
     def test_dssp4(self):
         """Test secondary structure parsing."""
         dobj = libparse.DSSPParser(fin=self.dssp_file)
