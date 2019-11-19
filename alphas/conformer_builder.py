@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from collections import defaultdict, deque
 import copy
 import logging
@@ -477,17 +476,12 @@ class ConformerBuilder:
         n = 0
         while not self.is_bb_complete() and n < 100_000:
             n += 1
-           
-            # when KDTrees are implemented than we can use
-            # a .load() to retrieve the last state
-            self.register.save(self.conformer)
+
 
             build_angles = self.angledb.get_fragment()
-            
             # Python now gives you ordered values =)
             # order of addition is remembered
             for residue_angles in build_angles.values():
-
                 try:
                     self.add_coord(
                         residue_angles,
@@ -516,10 +510,59 @@ class ConformerBuilder:
                     residue_angles,
                     Catom,
                     )
+
+            try:
+                # last state
+                last_conformer = self.register.load()    
+            except IndexError:
+                # register is empty
+                self.register.save(self.conformer)
+                continue
+
+            clash_found = self.clash_found(self.conformer, last_conformer)
+            if not clash_found:
+                # no clashes, save this loop
+                self.register.save(self.conformer)
+
         else:
             if n > 100_000:
                 raise StopIteration('run above 100k cycles!!!!')
 
+    def clash_found(self, current_conformer, last_conformer):
+        # VDW = {"CA":1.7,"C":1.7,"N":1.55,"O":1.52}
+        VDW = np.array([3.2, 3.2, 3.1, 3.04])
+        
+        current_chain = current_conformer.coords
+        last_chain = last_conformer.coords
+        # compare the new loop with everything we had so far and make sure
+        # no clashes exist
+        for seen_index in range(0, len(last_chain)-1):
+            
+            previous_coords = np.array(list(last_chain[seen_index].values()))
+
+            for new_index in range(len(last_chain)+2, len(current_chain)):
+                new_coords = np.array(list(current_chain[new_index].values()))
+
+                try:
+                    distances = np.linalg.norm(new_coords-previous_coords, axis=1)
+                    clashes = any(distances < VDW)
+                except ValueError:
+                    # we are at the last new_index, therefore its made up of only 3 atoms
+                    try:
+                        distances = np.linalg.norm(new_coords-previous_coords[:-1], axis=1)
+                    except ValueError:
+                        # COO
+                        continue
+                    clashes = any(distances < VDW[:-1])
+                if clashes:
+                    return True
+
+        return False
+
+
+
+
+    
     def save(self, filename='conformer_gen.pdb'):
         self.conformer.save(filename)
 
@@ -981,11 +1024,11 @@ def get_kdtree( UDICT, start, stop ):
 
 if __name__ == '__main__':
 
-    loop_pickle = LoopDataBase('LOOPS.pickle4')
-    rosetta_db = read_rosetta_db('l-caa')
+    loop_pickle = LoopDataBase('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/LOOPS.pickle4')
+    rosetta_db = read_rosetta_db('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/l-caa')
     
-    #input_sequence = "MDEYSPKRHDVAQLKFLCESLYDEGIATLGDSHHGWVNDPTSAVNLQLNDLIEHIASFVMSFKIKYPDDGDLSELVEEYLDDTYTLFSSYGINDPELQRWQKTKERLFRLFSGEYISTLMKT"
-    input_sequence = "PDEDRLSPLHSVAAA"
+    input_sequence = "MDEYSPKRHDVAQLKFLCESLYDEGIATLGDSHHGWVNDPTSAVNLQLNDLIEHIASFVMSFKIKYPDDGDLSELVEEYLDDTYTLFSSYGINDPELQRWQKTKERLFRLFSGEYISTLMKT"
+    # input_sequence = "PDEDRLSPLHSVAAA"
     #input_sequence = "PDEDRLSPLHSV"
     #input_sequence = "D"
     
