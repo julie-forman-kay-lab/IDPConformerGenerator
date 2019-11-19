@@ -1024,8 +1024,8 @@ def get_kdtree( UDICT, start, stop ):
 
 if __name__ == '__main__':
 
-    loop_pickle = LoopDataBase('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/LOOPS.pickle4')
-    rosetta_db = read_rosetta_db('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/l-caa')
+    loop_pickle = LoopDataBase('LOOPS.pickle4')
+    rosetta_db = read_rosetta_db('l-caa')
     
     input_sequence = "MDEYSPKRHDVAQLKFLCESLYDEGIATLGDSHHGWVNDPTSAVNLQLNDLIEHIASFVMSFKIKYPDDGDLSELVEEYLDDTYTLFSSYGINDPELQRWQKTKERLFRLFSGEYISTLMKT"
     # input_sequence = "PDEDRLSPLHSVAAA"
