@@ -154,8 +154,7 @@ class JoinedResults:
             w.start()
 
         for input_datum in self.input_data:
-            self.tasks.put(
-                self.TaskMethod(self.cmd, input_datum))
+            self.tasks.put(self.TaskMethod(self.cmd, input_datum))
 
         # Adds a poison pill
         for w in self.workers:
