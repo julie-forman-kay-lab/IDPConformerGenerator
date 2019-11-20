@@ -167,4 +167,3 @@ class JoinedResults:
         while numjobs:
             self.results.append(self.rp(self.queue_results.get()))
             numjobs -= 1
-        print(self.results)
