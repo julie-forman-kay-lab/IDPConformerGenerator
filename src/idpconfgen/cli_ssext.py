@@ -26,15 +26,15 @@ ap = libcli.CustomParser(
 # https://stackoverflow.com/questions/24180527
 
 ap.add_argument(
-    'pdbs',
-    help='PDB file list.',
-    nargs='+',
-    )
-
-ap.add_argument(
     'ss_cmd',
     help='The path to the DSSP executable file.',
     nargs=1,
+    )
+
+ap.add_argument(
+    'pdbs',
+    help='PDB file list.',
+    nargs='+',
     )
 
 ap.add_argument(
