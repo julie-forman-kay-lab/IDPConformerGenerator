@@ -144,7 +144,6 @@ class JoinedResults:
             ):
         self.input_data = input_data
         self.cmd = command
-        assert isinstance(self.cmd, str), '{}'.format(type(self.cmd))
         self.ncores = ncores
         self.TaskMethod = TaskMethod
         self.rp = results_parser
