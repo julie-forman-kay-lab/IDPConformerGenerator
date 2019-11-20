@@ -76,31 +76,34 @@ class TestSubprocessTask:
         sub()
 
 
-def test_DSSPTask_1():
-    """Test DSSPTask init."""
-    LM.DSSPTask('dssp', '1XXX.pbd')
+class TestDSSPTask:
+   
 
+    @pytest.mark.parametrize(
+        'in1,in2',
+        [
+            ('dssp', '1XXX.pdb'),
+            (['dssp'], '1XXX.pdb'),
+            ],
+        )
+    def test_DSSPTask_1(self, in1, in2):
+        """Test DSSPTask init."""
+        LM.DSSPTask(in1, in2)
 
-def test_DSSPTask_1_1():
-    """Test cmd list."""
-    LM.DSSPTask(['dssp'], '1XXX.pbd')
-
-
-def test_DSSPTask_2():
-    """Test raises ValueError when input is missing."""
-    with pytest.raises(TypeError):
-        LM.DSSPTask('dssp')
-        
-
-def test_DSSPTask_3():
-    """Test DSSPTask prepare_cmd."""
-    dssptask = LM.DSSPTask('dssp', '1XXX.pdb')
-    dssptask.prepare_cmd()
-    assert dssptask.cmd == ['dssp', '-i', '1XXX.pdb']
-
-
-def test_DSSPTask_4():
-    """Test DSSPTask prepare_cmd from list."""
-    dssptask = LM.DSSPTask(['dssp'], '1XXX.pdb')
-    dssptask.prepare_cmd()
-    assert dssptask.cmd == ['dssp', '-i', '1XXX.pdb']
+    def test_DSSPTask_2(self):
+        """Test raises ValueError when input is missing."""
+        with pytest.raises(TypeError):
+            LM.DSSPTask('dssp')
+  
+    @pytest.mark.parametrize(
+        'in1,in2,expected',
+        [
+            ('dssp', '1XXX.pdb', ['dssp', '-i', '1XXX.pdb']),
+            (['dssp'], '1XXX.pdb', ['dssp', '-i', '1XXX.pdb']),
+            ]
+        )
+    def test_DSSPTask_3(self, in1, in2, expected):
+        """Test DSSPTask prepare_cmd."""
+        dssptask = LM.DSSPTask(in1, in2)
+        dssptask.prepare_cmd()
+        assert dssptask.cmd == expected
