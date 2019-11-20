@@ -35,6 +35,7 @@ class TestSubprocessTask:
 
 
     def test_SubprocessTask_3(self):
+        """Test execute."""
         sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
         sub.prepare_cmd()
         sub.execute()
@@ -44,7 +45,7 @@ class TestSubprocessTask:
         """Test result is CompletedProcess."""
         sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
         sub()
-        assert isinstance(sub.result, subprocess.CompletedProcess) 
+        assert isinstance(sub.result, subprocess.CompletedProcess)
 
 
     def test_SubprocessTask_5(self):
@@ -57,8 +58,9 @@ class TestSubprocessTask:
     def test_SubprocessTask_6(self):
         """Test repr()."""
         sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
-        assert repr(sub) == "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
-            tcommons.data_folder.str())
+        assert repr(sub) == \
+            "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
+                tcommons.data_folder.str())
 
 
     def test_SubprocessTask_7(self):
