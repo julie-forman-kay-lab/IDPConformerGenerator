@@ -223,8 +223,9 @@ class Test_dssp_ss_saver:
 
         expected = ['1ABC_D| HGIBE TS ', '1ABC_E| HGIBE TS']
         assert expected == output
-
-    def test_export_ss(self):
+    
+    def test_export_ss_1(self):
+        """Test export ss structure."""
         libparse.export_ss_from_DSSP(self.obj1, self.obj2,
             output=tcommons.folder_output / 'dssp.database'
             )
@@ -234,4 +235,11 @@ class Test_dssp_ss_saver:
 
         expected = '1ABC_D| HGIBE TS \n1ABC_E| HGIBE TS\n'
         assert expected == results
-
+    
+    def test_export_ss_2(self):
+        """Test export ss to sys.stdout."""
+        libparse.export_ss_from_DSSP(
+            self.obj1,
+            self.obj2,
+            output=None,
+            )
