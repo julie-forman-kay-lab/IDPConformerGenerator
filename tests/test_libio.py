@@ -36,16 +36,31 @@ def test_concatenate_1():
     assert expected_output == output
 
 
-def test_concatenate_typerror_path():
-    """Raise TypeError when Path is given."""
+@pytest.mark.parametrize('in1', ['string', 1, 1.0, Path('somepath')])
+def test_concatenate_2(in1):
     with pytest.raises(TypeError):
-        libio.concatenate_entries(Path('somepath'))
+        libio.concatenate_entries(in1)
 
 
-def test_concatenate_typerror_str():
-    """Raise TypeError when string is given."""
+def test_check_file_exists_1():
+    """Test with a file that exists."""
+    result = libio.check_file_exist([tcommons.data_folder / '1A12_A.pdb'])
+    assert (True, []) == result
+
+
+def test_check_file_exists_2():
+    """Test with a file that do not exist."""
+    result = libio.check_file_exist([
+        tcommons.data_folder / '1A12_A.pdb',
+        'donotexist',
+        ])
+    assert (False, ['donotexist']) == result
+
+
+@pytest.mark.parametrize('in1', [1, 1.0, 's', Path('p')])
+def test_check_file_exists_typeerror(in1):
     with pytest.raises(TypeError):
-        libio.concatenate_entries('somestr')
+        libio.check_file_exist(in1)
 
 
 @pytest.mark.parametrize(
@@ -188,16 +203,3 @@ def test_read_path_bundle_3():
     assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
 
-def test_file_exists_1():
-    """Test with a file that exists."""
-    result = libio.check_file_exist([tcommons.data_folder / '1A12_A.pdb'])
-    assert (True, [])
-
-
-def test_file_exists_2():
-    """Test with a file that do not exist."""
-    result = libio.check_file_exist([
-        tcommons.data_folder / '1A12_A.pdb',
-        'donotexist',
-        ])
-    assert (False, ['donotexist'])
