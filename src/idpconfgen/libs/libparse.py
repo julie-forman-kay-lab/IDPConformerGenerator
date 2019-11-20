@@ -219,4 +219,7 @@ def _concatenate_ss_from_dsspparsers(dsspparsers):
                 ''.join(dsspparser.ss),
                 )
             )
+    
+    output.sort(key=lambda x: x.split('|')[0])
+
     return output

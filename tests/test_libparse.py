@@ -167,7 +167,7 @@ class TestDSSPMediator:
 
     def test_dsspmediator_0(self):
         
-        dssp_mediated = libparse.DSSPMulticoreMediator((
+        dssp_mediated = libparse.DSSPParser.from_data_id_tuple((
             self.pdb_file,
             self.dsspdata,
             ))
@@ -180,7 +180,7 @@ class TestDSSPMediator:
             pdbid=libpdb.PDBIDFactory(self.pdb_file),
             )
 
-        dssp_mediated = libparse.DSSPMulticoreMediator((
+        dssp_mediated = libparse.DSSPParser.from_data_id_tuple((
             self.pdb_file,
             self.dsspdata,
             ))
@@ -208,6 +208,17 @@ class Test_dssp_ss_saver:
         output = libparse._concatenate_ss_from_dsspparsers([
             self.obj1,
             self.obj2,
+            ])
+
+        expected = ['1ABC_D| HGIBE TS ', '1ABC_E| HGIBE TS']
+        assert expected == output
+
+    def test_concat_dsspparsers_2(self):
+        """Test concatenation of DSSPParsers sorted output."""
+
+        output = libparse._concatenate_ss_from_dsspparsers([
+            self.obj2,
+            self.obj1,
             ])
 
         expected = ['1ABC_D| HGIBE TS ', '1ABC_E| HGIBE TS']
