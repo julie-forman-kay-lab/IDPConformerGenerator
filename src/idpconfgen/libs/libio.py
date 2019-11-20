@@ -4,7 +4,7 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
-from idpconfgen.logger import S
+from idpconfgen.logger import S, T
 
 
 @libcheck.argstype(((list, tuple),))
@@ -66,7 +66,7 @@ def check_file_exist(files_list):
     log.info(T('checking files exist'))
 
     files_not_found = list(filter(
-        lambda x: Path(x).exists(),
+        lambda x: not Path(x).exists(),
         files_list))
     
     for file_ in files_not_found:
@@ -136,18 +136,15 @@ def list_files_recursively(folder, ext=None):
         Of the file paths relative to the source `folder`.
     """
     files_list = []
-    try:
-        for root, subdirs, files in os.walk(folder):
-            
-            only_ext = filter(
-                partial(has_suffix, ext=ext),
-                files,
-                )
-            
-            for file_ in only_ext:
-                files_list.append(Path(root, file_))
-    except TypeError:
-        pass
+    for root, subdirs, files in os.walk(folder):
+        
+        only_ext = filter(
+            partial(has_suffix, ext=ext),
+            files,
+            )
+        
+        for file_ in only_ext:
+            files_list.append(Path(root, file_))
     return files_list
 
 
@@ -156,12 +153,15 @@ def add_existent_files(storage, source):
     Add files that exist to a list.
 
     Given a list of `source` Paths, if Path exist adds it to `storage`.
+    
+    Adds Path instances.
     """
     for path in source:
-        if path.is_file():
-            storage.append(path)
+        p = Path(path)
+        if p.is_file():
+            storage.append(p)
         else:
-            log.error(S('file not found: {}', path.str()))
+            log.error(S('file not found: {}', p.str()))
 
 
 def read_path_bundle(path_bundle, ext=None, listext='.list'):
@@ -204,7 +204,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     files = []
     
     folders = filter(
-        lambda x: x.is_dir(),
+        lambda x: Path(x).is_dir(),
         path_bundle,
         )
 

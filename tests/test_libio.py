@@ -48,16 +48,18 @@ def test_concatenate_typerror_str():
         libio.concatenate_entries('somestr')
 
 
-def test_add_existent_files_1():
+@pytest.mark.parametrize(
+    'input_',
+    [
+        tcommons.tests_folder / '__init__.py',
+        (tcommons.tests_folder / '__init__.py').str(),
+        ],
+    )
+def test_add_existent_files_1(input_):
     """Add a file that exists."""
     l = []
-    tpath = tcommons.tests_folder / '__init__.py'
-    libio.add_existent_files(
-        l,
-        [tpath]
-        )
-
-    assert l == [tpath]
+    libio.add_existent_files(l, [input_])
+    assert l == [Path(input_)]
 
 
 def test_add_existent_files_2():
@@ -112,7 +114,7 @@ def test_list_recursively_1():
 
 
 def test_list_files_recursively_1():
-    """Test None extention."""
+    """Test None as  extention."""
     files = libio.list_files_recursively(
         tcommons.data_folder,
         )
@@ -161,7 +163,7 @@ def test_list_files_recursively_3():
     assert sorted(files) == sorted(expected)
 
 
-def test_read_paths1():
+def test_read_path_bundle_1():
     """Test single Path in list."""
     paths = libio.read_path_bundle([
         Path(tcommons.data_folder, '1A12_A.pdb'),
@@ -170,9 +172,32 @@ def test_read_paths1():
     assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
 
-def test_read_paths2():
+def test_read_path_bundle_2():
     """Read PDBs in folder."""
 
     paths = libio.read_path_bundle([tcommons.data_folder], ext='.pdb')
 
     assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+
+
+def test_read_path_bundle_3():
+    """Read PDBs in folder from string."""
+
+    paths = libio.read_path_bundle([tcommons.data_folder.str()], ext='.pdb')
+
+    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+
+
+def test_file_exists_1():
+    """Test with a file that exists."""
+    result = libio.check_file_exist([tcommons.data_folder / '1A12_A.pdb'])
+    assert (True, [])
+
+
+def test_file_exists_2():
+    """Test with a file that do not exist."""
+    result = libio.check_file_exist([
+        tcommons.data_folder / '1A12_A.pdb',
+        'donotexist',
+        ])
+    assert (False, ['donotexist'])
