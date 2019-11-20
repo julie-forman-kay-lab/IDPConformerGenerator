@@ -206,7 +206,7 @@ def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
     
     opath = Path(output)
-    opath.myparents().mkdir(parents=True)
+    opath.myparents().mkdir(parents=True, exist_ok=True)
     opath.write_text('\n'.join(output_data) + '\n')
 
 
