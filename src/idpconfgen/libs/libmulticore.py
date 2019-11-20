@@ -36,16 +36,16 @@ class Task:
 
 
 class SubprocessTask(Task):
-    
+   
     @libcheck.argstype(Task, (list, str))
     @libcheck.kwargstype((type(None), list, tuple))
-    def __init__(self, cmd, input_=None):
+    def __init__(self, cmd_exec, input_=None):
         """
         General task operation.
 
         Parameters
         ----------
-        cmd : str or list
+        cmd_exec : str or list
             The command to execute. Options to the command
             should be given here, and two formats are possible,
             as string or as list. If string, string is split into
@@ -59,17 +59,8 @@ class SubprocessTask(Task):
             A list containing whatever input the command must receive.
             Defaults to None, no input is used.
         """
-        try:
-            self.cmd_exec = cmd.split()
-        except AttributeError:  # in case cmd is a list
-            # corrects for cases where cmd is ['ls -ltr'] for example
-            # see tests/test_multicore.py
-            self.cmd_exec = []
-            for iitem in cmd:
-                self.cmd_exec.extend(iitem.split())
-        
+        self.cmd_exec = cmd_exec
         self.input = input_
-
 
     def __str__(self):
         try:
@@ -80,13 +71,30 @@ class SubprocessTask(Task):
     def __repr__(self):
         return '{}({})'.format(
             __class__.__name__,
-            ','.join('{}={}'.format(k, v) for k, v in self.__dict__.items()),
+            ','.join('{}={}'.format(
+                k.lstrip('_'),
+                v) for k, v in self.__dict__.items()),
             )
-    
+  
     def __call__(self):
         self.prepare_cmd()
         self.execute()
         return self.result.stdout.decode('utf8')
+
+    @property
+    def cmd_exec(self):
+        return self._cmd_exec
+
+    @cmd_exec.setter
+    def cmd_exec(self, command):
+        try:
+            self._cmd_exec = command.split()
+        except AttributeError:  # in case cmd is a list
+            # corrects for cases where cmd is ['ls -ltr'] for example
+            # see tests/test_multicore.py
+            self._cmd_exec = []
+            for iitem in command:
+                self._cmd_exec.extend(iitem.split())
 
     def prepare_cmd(self):
         try:
@@ -100,7 +108,6 @@ class SubprocessTask(Task):
             self.cmd,
             capture_output=True,
             )
-
 
 class DSSPTask(SubprocessTask):
     """Subprocess Task for DSSP third party executable."""
