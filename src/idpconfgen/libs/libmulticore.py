@@ -62,7 +62,11 @@ class SubprocessTask(Task):
         try:
             self.cmd_exec = cmd.split()
         except AttributeError:  # in case cmd is a list
-            self.cmd_exec = cmd
+            # corrects for cases where cmd is ['ls -ltr'] for example
+            # see tests/test_multicore.py
+            self.cmd_exec = []
+            for iitem in cmd:
+                self.cmd_exec.extend(iitem.split())
         
         self.input = input_
 
