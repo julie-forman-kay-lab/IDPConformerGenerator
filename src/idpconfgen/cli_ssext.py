@@ -76,7 +76,7 @@ def main(
         **kwargs,
         ):
     """Run main cli logic."""
-    
+
     init_files(log, LOGFILESNAME)
     
     pdbs_paths = libio.read_path_bundle(pdbs)
@@ -90,7 +90,7 @@ def main(
         )
 
     ss_ext_exec.run()
-    libparse.export_ss_from_DSSP(*ss_ext_exec.results)
+    libparse.export_ss_from_DSSP(*ss_ext_exec.results, output=output)
 
     return
 

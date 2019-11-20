@@ -1,6 +1,8 @@
 """
 Contain different parsing strategies for different files.
 """
+import sys
+
 import numpy as np
 
 from idpconfgen import Path, log
@@ -193,7 +195,7 @@ def list_index_to_array(
     return array
 
 
-@libcheck.kwargstype((str, Path))
+@libcheck.kwargstype((str, Path, type(None)))
 def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     """
     Exports secondary structure information from :class:`DSSPParser` results.
@@ -205,9 +207,14 @@ def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     
     output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
     
-    opath = Path(output)
-    opath.myparents().mkdir(parents=True, exist_ok=True)
-    opath.write_text('\n'.join(output_data) + '\n')
+    output_data = '\n'.join(output_data) + '\n'
+    
+    if output:
+        opath = Path(output)
+        opath.myparents().mkdir(parents=True, exist_ok=True)
+        opath.write_text(output_data)
+    else:
+        sys.stdout.write(output_data)
 
 
 def _concatenate_ss_from_dsspparsers(dsspparsers):
