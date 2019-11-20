@@ -28,7 +28,7 @@ ap = libcli.CustomParser(
 ap.add_argument(
     'ss_cmd',
     help='The path to the DSSP executable file.',
-    nargs=1,
+    type=str,
     )
 
 ap.add_argument(
@@ -69,8 +69,8 @@ def maincli():
 
 
 def main(
-        pdbs,
         ss_cmd,
+        pdbs,
         output=None,
         ncores=1,
         **kwargs,
@@ -82,16 +82,15 @@ def main(
     pdbs_paths = libio.read_path_bundle(pdbs)
 
     ss_ext_exec = libmulticore.JoinedResults(
-        pdb_paths,
+        pdbs,
         ss_cmd,
         ncores=ncores,
-        task_method=libmulticore.DSSPTask,
-        results_parser=libparser.DSSPMulticoreMediator,
+        TaskMethod=libmulticore.DSSPTask,
+        results_parser=libparse.DSSPParser.from_data_id_tuple,
         )
 
     ss_ext_exec.run()
-
-    libparse.export_ss_from_DSSP(ss_ext_exec.results)
+    libparse.export_ss_from_DSSP(*ss_ext_exec.results)
 
     return
 

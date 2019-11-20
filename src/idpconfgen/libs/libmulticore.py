@@ -1,4 +1,5 @@
 """Multi-core related objects."""
+import multiprocessing
 import subprocess
 
 from idpconfgen import Path, log
@@ -6,13 +7,13 @@ from idpconfgen.logger import S, T
 from idpconfgen.libs import libcheck
 
 
-class Worker:
+class Worker(multiprocessing.Process):
     
-    def __init___(self, task_queue, result_queue, timeout=10):
+    def __init__(self, task_queue, result_queue, timeout=10):
         
         # super().__init__(self) ?
         multiprocessing.Process.__init__(self)
-        self.task_queque = task_queue
+        self.task_queue = task_queue
         self.result_queue = result_queue
         self.timeout = timeout
 
@@ -24,7 +25,7 @@ class Worker:
                 log.info(S('exiting: {}', proc_name))
                 self.task_queue.task_done()
                 break
-            result = next_tasks()
+            result = next_task()
             self.task_queue.task_done()
             self.result_queue.put(result)
         return
@@ -90,7 +91,7 @@ class SubprocessTask(Task):
             self.cmd = self.cmd_exec
 
     def execute(self):
-        log.info(S('running', self.cmd))
+        log.info(S('running {}', self.cmd))
         self.result = subprocess.run(
             self.cmd,
             capture_output=True,
@@ -100,7 +101,7 @@ class SubprocessTask(Task):
 class DSSPTask(SubprocessTask):
     """Subprocess Task for DSSP third party executable."""
     
-    @libcheck.argstype(Task, (list, str), (list, str))
+    @libcheck.argstype(Task, (list, str), str)
     def __init__(self, cmd, input_):
         # forces input_ to be positional parameter in subclass DSSPTask
         
@@ -109,15 +110,15 @@ class DSSPTask(SubprocessTask):
         except AttributeError:
             cmd = [cmd, '-i']
 
-        if isinstance(input_, str):
-            input_ = [input_]
+        self.pdb_path = input_
+        input_ = [input_]
 
         super().__init__(cmd, input_=input_)
     
     def __call__(self):
         self.prepare_cmd()
         self.execute()
-        return (self.input, self.result.stdout.decode('utf8'))
+        return (self.pdb_path, self.result.stdout.decode('utf8'))
 
 
 class JoinedResults:
@@ -132,6 +133,7 @@ class JoinedResults:
             ):
         self.input_data = input_data
         self.cmd = command
+        assert isinstance(self.cmd, str), '{}'.format(type(self.cmd))
         self.ncores = 1
         self.TaskMethod = TaskMethod
         self.rp = results_parser
@@ -139,8 +141,10 @@ class JoinedResults:
     def build(self):
         """Build tasks, results and workers."""
         self.tasks = multiprocessing.JoinableQueue()
-        self.results = multiprocessing.Queue()
-        self.workers = [Worker(self.tasks, self.results) for i in range(self.ncores)]
+        self.queue_results = multiprocessing.Queue()
+        self.workers = \
+            [Worker(self.tasks, self.queue_results)
+                for i in range(self.ncores)]
     
     def run(self):
         """Run."""
@@ -150,16 +154,18 @@ class JoinedResults:
             w.start()
 
         for input_datum in self.input_data:
-            self.tasks.put(self.TaskMethod(self.cmd, input_datum))
+            self.tasks.put(
+                self.TaskMethod(self.cmd, input_datum))
 
         # Adds a poison pill
         for w in self.workers:
-            tasks.put(None)
+            self.tasks.put(None)
 
-        tasks.join()
+        self.tasks.join()
 
         numjobs = len(self.input_data)
         self.results = []
         while numjobs:
-            self.results.append(self.rp(self.results.get()))
+            self.results.append(self.rp(self.queue_results.get()))
             numjobs -= 1
+        print(self.results)

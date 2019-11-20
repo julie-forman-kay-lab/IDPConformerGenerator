@@ -9,12 +9,6 @@ from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcheck, libpdb
 
 
-class DSSPMulticoreMediator:
-    def __new__(cls, subcmd_tuple):
-        return DSSPParser(
-            data=subcmd_tuple[1],
-            pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
-            )
 
 
 class DSSPParser:
@@ -111,6 +105,13 @@ class DSSPParser:
         Assigns :attr:`fasta`.
         """
         self.fasta = list_index_to_array(self.data, index=13)
+    
+    @classmethod
+    def from_data_id_tuple(cls, subcmd_tuple):
+        return cls(
+            pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
+            data=subcmd_tuple[1],
+            )
 
     @staticmethod
     def _confirm_ss_data(data):
