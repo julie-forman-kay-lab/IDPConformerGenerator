@@ -1,5 +1,6 @@
 """Test libs for multicore operations."""
 import pytest
+import multiprocessing
 import subprocess
 
 from idpconfgen.libs import libmulticore as LM
@@ -77,7 +78,6 @@ class TestSubprocessTask:
 
 
 class TestDSSPTask:
-   
 
     @pytest.mark.parametrize(
         'in1,in2',
@@ -107,3 +107,64 @@ class TestDSSPTask:
         dssptask = LM.DSSPTask(in1, in2)
         dssptask.prepare_cmd()
         assert dssptask.cmd == expected
+
+    def test_DSSPTask_pdb_path(self):
+        dssptask = LM.DSSPTask('dssp', '1XXX.pdb')
+        assert dssptask.pdb_path == '1XXX.pdb'
+
+    def test_DSSPTask_call(self):
+        dssptask = LM.DSSPTask('ls', '-ltr')
+        dssptask()
+
+
+class TestWorker:
+
+    def test_worker_1(self):
+        LM.Worker(None, None)
+
+    def test_worker_2(self):
+        with pytest.raises(TypeError):
+            LM.Worker()
+
+    def test_worker_3(self):
+        """Test Worker run."""
+        tasks = multiprocessing.JoinableQueue()
+        queue = multiprocessing.Queue()
+        workers = [LM.Worker(tasks, queue, timeout=1)]
+        for w in workers:
+            w.start()
+        tasks.put(LM.SubprocessTask('ls -ltr'))
+        tasks.put(None)
+        tasks.join()
+        numjobs = 1
+        while numjobs:
+            queue.get()
+            numjobs -= 1
+
+
+class TestJoinedResults:
+    
+    def test_init(self):
+        jr = LM.JoinedResults(
+            '-ltr',
+            'ls',
+            ncores=7,
+            TaskMethod=LM.Task,
+            results_parser=int)
+        assert jr.input_data == '-ltr'
+        assert jr.cmd == 'ls'
+        assert jr.ncores == 7
+        assert jr.TaskMethod == LM.Task
+        assert jr.rp == int
+
+    def test_build(self):
+        jr = LM.JoinedResults('-ltr', 'ls', ncores=7)
+        jr.build()
+        assert isinstance(jr.tasks, multiprocessing.queues.JoinableQueue)
+        assert isinstance(jr.queue_results, multiprocessing.queues.Queue)
+        assert len(jr.workers) == 7
+        assert all(isinstance(w, LM.Worker) for w in jr.workers)
+
+    def test_run(self):
+        jr = LM.JoinedResults('-ltr', 'ls', ncores=7)
+        jr.run()
