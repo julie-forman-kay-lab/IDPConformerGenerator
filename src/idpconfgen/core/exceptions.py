@@ -5,7 +5,7 @@ from idpconfgen import contactus as CONTACTUS
 class IDPConfGenException(Exception):
     """Base class exception for IDPConfGen."""
 
-    errmsg = 'The following error as occurred: {}.' + CONTACTUS.contact_message
+    errmsg = 'An error as occurred: {}. ' + CONTACTUS.contact_message
 
     def __init__(self, *args):
         self.args = args or ['']
@@ -14,7 +14,7 @@ class IDPConfGenException(Exception):
         """Represent exception as string."""
         return self.errmsg.format(*self.args)
 
-    def __repr(self):
+    def __repr__(self):
         """Represent exception."""
         return f'{self.__class__.__name__}: {self}'
 
@@ -42,3 +42,7 @@ class DSSPParserError(IDPConfGenException):
 
 class DSSPSecStructError(IDPConfGenException):
     errmsg = 'Values differ from possible DSSP secondary structure keys.'
+
+
+class DSSPInputMissing(IDPConfGenException):
+    errmsg = 'One of the two required positional arguments is missing.'
