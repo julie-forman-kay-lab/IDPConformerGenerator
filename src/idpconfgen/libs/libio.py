@@ -143,20 +143,22 @@ def add_existent_files(storage, source):
     Adds Path instances.
     """
     for path in source:
-        p = Path(path)
+        p = Path(path).resolve()
         if p.is_file():
             storage.append(p)
         else:
             log.error(S('file not found: {}', p.str()))
 
 
-def read_path_bundle(path_bundle, ext=None, listext='.list'):
+@libcheck.argstype((list, tuple),)
+def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     """
     Read path bundle.
 
     Read paths encoded in strings, folders or files that are list of files.
 
-    If a string points to an existing file, register that path.
+    If a string or Path object points to an existing file,
+        register that path.
 
     If a string points to a folder, registers all files in that folder
         that have extension `ext`, recursively.
@@ -170,12 +172,12 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
         A list containing strings or paths that point to files or folders.
     
     ext : string
-        The file extension to consider. If ``None`` considers any file.
+        The file extension to consider. If ``None`` considers all files.
         Defaults to ``None``.
 
     listext : string
         The file extension to consider as a file listing other files.
-        Defaults to ``.list``.
+        Defaults to ``.flist``.
 
     Returns
     -------
@@ -212,7 +214,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     for path in listfiles:
         try:
             with path.open('r') as fh:
-                possible_files = fh.readlines()
+                possible_files = [l.strip() for l in fh.readlines()]
         except FileNotFoundError:
             log.error(S('file not found: {}', path))
             continue
@@ -224,7 +226,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
 
         func(files, files_w_ext)
     
-    return files
+    return sorted(p for p in files if p.suffix != listext)
 
 
 def glob_folder(folder, ext):

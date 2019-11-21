@@ -5,6 +5,8 @@ from idpconfgen import Path
 
 tests_folder = Path(__file__).myparents()
 
+project_folder = tests_folder.parents[0]
+
 data_folder = Path(tests_folder, 'data')
 
 folder_output = Path(

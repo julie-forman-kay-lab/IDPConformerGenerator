@@ -142,6 +142,7 @@ def test_list_files_recursively_1():
             '1A12_A.pdb',
             'cull.list',
             'pdblist.list',
+            'path_bundle.flist',
             ]
             ]
     
@@ -178,29 +179,96 @@ def test_list_files_recursively_3():
     assert sorted(files) == sorted(expected)
 
 
-def test_read_path_bundle_1():
-    """Test single Path in list."""
-    paths = libio.read_path_bundle([
-        Path(tcommons.data_folder, '1A12_A.pdb'),
-        ])
+@pytest.mark.parametrize('in1', ['a', Path('a')])
+def test_read_path_bundle_typeerror(in1):
+    with pytest.raises(TypeError):
+        libio.read_path_bundle(in1)
 
-    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+@pytest.mark.parametrize(
+    'in1,ext,expected',
+    [
+        (
+            [tcommons.data_folder],
+            None,
+            [
+                Path(tcommons.data_folder, '1A12_A.pdb'),
+                Path(tcommons.data_folder, '1ABC_D.dssp'),
+                Path(tcommons.data_folder, '1ABC_E.dssp'),
+                Path(tcommons.data_folder, 'cull.list'),
+                Path(tcommons.data_folder, 'pdblist.list'),
+                Path(tcommons.data_folder, 'wrong.dssp'),
+                Path(tcommons.data_folder, 'wrong2.dssp'),
+                ]
+            ),
+        (
+            [
+                tcommons.data_folder,
+                Path(tcommons.data_folder, 'path_bundle.flist'),
+                ],
+            None,
+            [
+                Path(tcommons.project_folder, 'setup.py'),
+                Path(tcommons.data_folder, '1A12_A.pdb'),
+                Path(tcommons.data_folder, '1ABC_D.dssp'),
+                Path(tcommons.data_folder, '1ABC_E.dssp'),
+                Path(tcommons.data_folder, 'cull.list'),
+                Path(tcommons.data_folder, 'pdblist.list'),
+                Path(tcommons.data_folder, 'wrong.dssp'),
+                Path(tcommons.data_folder, 'wrong2.dssp'),
+                ]
+            ),
+        (
+            [Path(tcommons.data_folder, 'path_bundle.flist')],
+            None,
+            [
+                Path(tcommons.project_folder, 'setup.py'),
+                ]
+            ),
+        (
+            [tcommons.data_folder],
+            '.pdb',
+            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            ),
+        (
+            [tcommons.data_folder],
+            'pdb',
+            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            ),
+        (
+            [tcommons.data_folder],
+            '.none',
+            [],
+            ),
+        ]
+    )
+def test_read_bundle_inputs(in1,ext,expected):
+    assert expected == libio.read_path_bundle(in1, ext=ext)
 
 
-def test_read_path_bundle_2():
-    """Read PDBs in folder."""
+#def test_read_path_bundle_1():
+#    """Test single Path in list."""
+#    paths = libio.read_path_bundle([
+#        Path(tcommons.data_folder, '1A12_A.pdb'),
+#        ])
+#
+#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+#
+#
+#def test_read_path_bundle_2():
+#    """Read PDBs in folder."""
+#
+#    paths = libio.read_path_bundle([tcommons.data_folder], ext='.pdb')
+#
+#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
+#
+#
+#def test_read_path_bundle_3():
+#    """Read PDBs in folder from string."""
+#
+#    paths = libio.read_path_bundle([tcommons.data_folder.str()], ext='.pdb')
+#
+#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
-    paths = libio.read_path_bundle([tcommons.data_folder], ext='.pdb')
-
-    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
-
-
-def test_read_path_bundle_3():
-    """Read PDBs in folder from string."""
-
-    paths = libio.read_path_bundle([tcommons.data_folder.str()], ext='.pdb')
-
-    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
 @pytest.mark.parametrize(
     'in1,ext,expected',
