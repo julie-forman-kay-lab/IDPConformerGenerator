@@ -1,4 +1,5 @@
 """Functions and Classes regarding Input/Output."""
+import glob
 import os
 from functools import partial
 
@@ -24,13 +25,13 @@ def concatenate_entries(entry_list):
 
     Parameters
     ----------
-    pdblist : lits
-        List containing PDBID:CHAIN identifiers of file list.
+    entry_list : lits
+        List containing strings or file paths
 
     Returns
     -------
     list
-        Concatenated entries.
+        Concatenated strings plus lines in files.
     """
     concatenated = []
     for entry in entry_list:
@@ -42,7 +43,7 @@ def concatenate_entries(entry_list):
 
     return concatenated
 
-
+@libcheck.argstype(list)
 def check_file_exist(files_list):
     """
     Confirms all files in a list exist.
@@ -73,21 +74,6 @@ def check_file_exist(files_list):
         log.info(S('File NOT found: {}', file_))
     
     return not bool(files_not_found), files_not_found
-
-
-def read_paths(path_bundle):
-    """
-    Reads paths from string bundle.
-
-    String bundle can be list of strings or strings in files.
-
-    Tandens the usage of :func:`concatenate_entries` and
-    :func:`check_file_exists`.
-
-    Returns the result from :func:`check_file_exists`.
-    """
-    list_of_paths = concatenate_entries(path_bundle)
-    return check_file_exist(list_of_paths)
 
 
 def has_suffix(path, ext=None):
@@ -241,3 +227,27 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     return files
 
 
+def glob_folder(folder, ext):
+    """
+    List files with extention `ext` in `folder`.
+
+    Does NOT perform recursive search.
+
+    Parameters
+    ----------
+    folder : str
+        The path to the folder to investigate.
+
+    ext : str
+        The file extention. Can be with or without the dot [.]
+        preffix.
+
+    Returns
+    -------
+    list of Path objects
+        SORTED list of matching results.
+    """
+    ext = f"*.{ext.strip().lstrip('*').lstrip('.')}"
+    files = sorted(glob.glob(Path(folder, ext).str()))
+    log.debug(f'folder {folder} read {len(files)} files with extension {ext}')
+    return [Path(p) for p in files]

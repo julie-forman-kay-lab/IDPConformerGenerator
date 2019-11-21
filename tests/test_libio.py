@@ -202,4 +202,32 @@ def test_read_path_bundle_3():
 
     assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
-
+@pytest.mark.parametrize(
+    'in1,ext,expected',
+    [
+        (
+            tcommons.data_folder,
+            '.pdb',
+            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            ),
+        (
+            tcommons.data_folder,
+            'pdb',
+            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            ),
+        (
+            tcommons.data_folder,
+            '.dssp',
+            [
+                Path(tcommons.data_folder, '1ABC_D.dssp'),
+                Path(tcommons.data_folder, '1ABC_E.dssp'),
+                Path(tcommons.data_folder, 'wrong.dssp'),
+                Path(tcommons.data_folder, 'wrong2.dssp'),
+                ],
+            ),
+        (tcommons.data_folder, '.none', []),
+        ]
+    )
+def test_glob_folder(in1,ext,expected):
+    assert expected == libio.glob_folder(in1,ext)
+    
