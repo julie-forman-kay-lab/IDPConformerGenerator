@@ -6,7 +6,7 @@ from . import tcommons
 
 class TestCliPDBdl:
 
-    cull = tcommons.data_folder / 'cull.list'
+    cull = Path(tcommons.data_folder, 'cull.list')
 
     def test_main(self):
         """Test main from cli_pdbdownloader."""
