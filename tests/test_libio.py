@@ -38,6 +38,7 @@ def test_concatenate_1():
 
 @pytest.mark.parametrize('in1', ['string', 1, 1.0, Path('somepath')])
 def test_concatenate_2(in1):
+    """Test raises TypeError."""
     with pytest.raises(TypeError):
         libio.concatenate_entries(in1)
 
@@ -59,6 +60,7 @@ def test_check_file_exists_2():
 
 @pytest.mark.parametrize('in1', [1, 1.0, 's', Path('p')])
 def test_check_file_exists_typeerror(in1):
+    """Test raises TypeError."""
     with pytest.raises(TypeError):
         libio.check_file_exist(in1)
 
@@ -72,21 +74,17 @@ def test_check_file_exists_typeerror(in1):
     )
 def test_add_existent_files_1(input_):
     """Add a file that exists."""
-    l = []
-    libio.add_existent_files(l, [input_])
-    assert l == [Path(input_)]
+    files = []
+    libio.add_existent_files(files, [input_])
+    assert files == [Path(input_)]
 
 
 def test_add_existent_files_2():
     """Do not add a file that does not exist."""
-    l = []
-    tpath = tcommons.tests_folder / 'doesnotexist.py'
-    libio.add_existent_files(
-        l,
-        [tpath]
-        )
-
-    assert not(l)
+    files = []
+    tpath = Path(tcommons.tests_folder, 'doesnotexist.py')
+    libio.add_existent_files(files, [tpath])
+    assert not(files)
 
 
 def test_has_suffix_1():
@@ -120,12 +118,13 @@ def test_has_suffix_6():
 
 
 def test_list_recursively_1():
+    """Test finds .pdb files."""
     files = libio.list_files_recursively(
         tcommons.data_folder,
         ext='.pdb',
         )
 
-    assert files == [tcommons.data_folder / '1A12_A.pdb']
+    assert files == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
 
 def test_list_files_recursively_1():
@@ -134,7 +133,8 @@ def test_list_files_recursively_1():
         tcommons.data_folder,
         )
     
-    expected = [tcommons.data_folder.joinpath(p) for p in [
+    expected = [
+        tcommons.data_folder.joinpath(p) for p in [
             '1ABC_D.dssp',
             '1ABC_E.dssp',
             'wrong.dssp',
@@ -144,7 +144,7 @@ def test_list_files_recursively_1():
             'pdblist.list',
             'path_bundle.flist',
             ]
-            ]
+        ]
     
     assert sorted(files) == sorted(expected)
 
@@ -156,10 +156,7 @@ def test_list_files_recursively_2():
         ext='pdb',
         )
     
-    expected = [tcommons.data_folder.joinpath(p) for p in [
-            '1A12_A.pdb',
-            ]
-            ]
+    expected = [tcommons.data_folder.joinpath(p) for p in ['1A12_A.pdb']]
     
     assert sorted(files) == sorted(expected)
 
@@ -170,19 +167,16 @@ def test_list_files_recursively_3():
         tcommons.data_folder,
         ext='.pdb',
         )
-    
-    expected = [tcommons.data_folder.joinpath(p) for p in [
-            '1A12_A.pdb',
-            ]
-            ]
-
+    expected = [tcommons.data_folder.joinpath(p) for p in ['1A12_A.pdb']]
     assert sorted(files) == sorted(expected)
 
 
 @pytest.mark.parametrize('in1', ['a', Path('a')])
 def test_read_path_bundle_typeerror(in1):
+    """Test read_path_bundle raises TypeError."""
     with pytest.raises(TypeError):
         libio.read_path_bundle(in1)
+
 
 @pytest.mark.parametrize(
     'in1,ext,expected',
@@ -242,33 +236,9 @@ def test_read_path_bundle_typeerror(in1):
             ),
         ]
     )
-def test_read_bundle_inputs(in1,ext,expected):
+def test_read_bundle_inputs(in1, ext, expected):
+    """Test read_bundle multiple inputs."""
     assert expected == libio.read_path_bundle(in1, ext=ext)
-
-
-#def test_read_path_bundle_1():
-#    """Test single Path in list."""
-#    paths = libio.read_path_bundle([
-#        Path(tcommons.data_folder, '1A12_A.pdb'),
-#        ])
-#
-#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
-#
-#
-#def test_read_path_bundle_2():
-#    """Read PDBs in folder."""
-#
-#    paths = libio.read_path_bundle([tcommons.data_folder], ext='.pdb')
-#
-#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
-#
-#
-#def test_read_path_bundle_3():
-#    """Read PDBs in folder from string."""
-#
-#    paths = libio.read_path_bundle([tcommons.data_folder.str()], ext='.pdb')
-#
-#    assert paths == [Path(tcommons.data_folder, '1A12_A.pdb')]
 
 
 @pytest.mark.parametrize(
@@ -297,6 +267,6 @@ def test_read_bundle_inputs(in1,ext,expected):
         (tcommons.data_folder, '.none', []),
         ]
     )
-def test_glob_folder(in1,ext,expected):
-    assert expected == libio.glob_folder(in1,ext)
-    
+def test_glob_folder(in1, ext, expected):
+    """Test glob folder function."""
+    assert expected == libio.glob_folder(in1, ext)

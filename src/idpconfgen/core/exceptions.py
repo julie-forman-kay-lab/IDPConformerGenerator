@@ -33,16 +33,23 @@ class DownloadFailedError(IDPConfGenException):
 
 class EmptyFilterError(IDPConfGenException):
     """Raise when PDB data filtering returns an empty selection."""
+
     errmsg = 'Filter returns empty selection.'
 
 
 class DSSPParserError(IDPConfGenException):
+    """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'Error while parsing {}'
 
 
 class DSSPSecStructError(IDPConfGenException):
+    """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'Values differ from possible DSSP secondary structure keys.'
 
 
 class DSSPInputMissing(IDPConfGenException):
+    """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'One of the two required positional arguments is missing.'

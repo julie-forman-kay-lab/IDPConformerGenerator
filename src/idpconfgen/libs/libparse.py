@@ -1,16 +1,12 @@
-"""
-Contain different parsing strategies for different files.
-"""
+"""Contain different parsing strategies for different files."""
 import sys
 
 import numpy as np
 
-from idpconfgen import Path, log
+from idpconfgen import Path
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcheck, libpdb
-
-
 
 
 class DSSPParser:
@@ -66,7 +62,7 @@ class DSSPParser:
 
     def read_dssp_data(self, data):
         """
-        Reads DSSP data into the parser object.
+        Read DSSP data into the parser object.
 
         Parameters
         ----------
@@ -85,9 +81,8 @@ class DSSPParser:
         except IndexError as err:
             raise EXCPTS.DSSPParserError(self.pdbid) from err
             
-        self.data = data[data_header_index  + 1:]  # data starts afterthe header
+        self.data = data[data_header_index + 1:]  # data starts afterthe header
 
-        #self.data = self._finds_data_index(data)
         self.read_sec_structure()
         self.read_fasta()
 
@@ -102,7 +97,7 @@ class DSSPParser:
     
     def read_fasta(self):
         """
-        Reads FASTA (primary sequence) information from DSSP data.
+        Read FASTA (primary sequence) information from DSSP data.
 
         Assigns :attr:`fasta`.
         """
@@ -110,6 +105,11 @@ class DSSPParser:
     
     @classmethod
     def from_data_id_tuple(cls, subcmd_tuple):
+        """
+        Initiate from a tuple.
+
+        Tuple of type (PDBID, DSSP DATA).
+        """
         return cls(
             pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
             data=subcmd_tuple[1],
@@ -153,7 +153,7 @@ def list_index_to_array(
     At least one the named parameters must be provided.
     
     In case more than one parameter set is provided:
-        the `start`, `stop` or `step` trio have the highest priority, 
+        the `start`, `stop` or `step` trio have the highest priority,
         followed by `sObj` and last `index`.
     
     Raises
@@ -164,7 +164,6 @@ def list_index_to_array(
     ValueError
         If sObj is provided and is not a ``slice`` object.
     """
-     
     if any((i is not None for i in (start, stop, step))):
         index = slice(start, stop, step)
     
@@ -198,13 +197,12 @@ def list_index_to_array(
 @libcheck.kwargstype((str, Path, type(None)))
 def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     """
-    Exports secondary structure information from :class:`DSSPParser` results.
+    Export secondary structure information from :class:`DSSPParser` results.
 
     Parameters
     ----------
     dssp_task_results : multiple :class:`DSSPParser`
     """
-    
     output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
     
     output_data = '\n'.join(output_data) + '\n'

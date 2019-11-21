@@ -4,6 +4,7 @@ from idpconfgen.libs import libcli
 
 
 class TestParseDoc:
+    """Test parsing docstring from cli scripts."""
 
     docstring = """
 Program Name
@@ -22,10 +23,12 @@ USAGE:
     prog, des, usage = libcli.parse_doc_params(docstring)
 
     def test_prog(self):
+        """Test prog string description."""
         expected_prog = "Program Name"
         assert expected_prog == self.prog
 
     def test_description(self):
+        """Test description string description."""
         expected = (
             'DESCRIPTION:\n'
             '    \n'
@@ -36,6 +39,7 @@ USAGE:
         assert expected == self.des
 
     def test_usage(self):
+        """Test usage string description."""
         expected = (
             '\n'
             '    $ use the program this way\n'

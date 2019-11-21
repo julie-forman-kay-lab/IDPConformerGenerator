@@ -3,9 +3,11 @@ import pytest
 
 from idpconfgen.libs import libcheck
 
-@libcheck.argstype(int, (float,int))
+
+@libcheck.argstype(int, (float, int))
 @libcheck.kwargstype(str)
 def dummy_function(arg1, arg2, arg3='string'):
+    """Print valid types."""
     print(arg1, arg2, arg3)
 
 

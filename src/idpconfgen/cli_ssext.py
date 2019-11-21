@@ -64,6 +64,11 @@ def _load_args():
 
 
 def maincli():
+    """
+    Execute main client function.
+
+    Reads command line arguments and executes logic.
+    """
     cmd = _load_args()
     main(**vars(cmd))
 
@@ -75,12 +80,33 @@ def main(
         ncores=1,
         **kwargs,
         ):
-    """Run main cli logic."""
+    """
+    Run main cli logic.
 
+    Parameters
+    ----------
+    ss_cmd : str or Path
+        The command to run with subprocess module.
+
+    pdbs : list
+        A list of paths to PDB files or PDB file lists.
+
+    output : string or Path, optional
+        If given prints output to that file, else prints to console.
+        Defaults to `None`.
+
+    ncores : int
+        The numbers of cores to use.
+    """
+    log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
     
-    pdbs_paths = libio.read_path_bundle(pdbs)
+    log.info(T('reading input paths'))
+    pdbs = libio.read_path_bundle(pdbs)
+    log.info(S('done'))
 
+    log.info(T('preparing task execution'))
+    log.info(S('for {} cores', ncores))
     ss_ext_exec = libmulticore.JoinedResults(
         pdbs,
         ss_cmd,
@@ -88,14 +114,15 @@ def main(
         TaskMethod=libmulticore.DSSPTask,
         results_parser=libparse.DSSPParser.from_data_id_tuple,
         )
-
+    log.info(S('executing...'))
     ss_ext_exec.run()
+    
+    log.info(T('exporting output to: {}', output))
     libparse.export_ss_from_DSSP(*ss_ext_exec.results, output=output)
 
+    log.info(S('All done. Thanks!'))
     return
 
 
 if __name__ == '__main__':
-
     maincli()
-

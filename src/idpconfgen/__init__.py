@@ -37,6 +37,7 @@ class Path(type(_Path())):
         return os.fspath(self)
 
     def myparents(self):
+        """Return the Path to the parent folder resolved to absolute."""
         return self.resolve().parents[0]
 
 

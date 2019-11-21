@@ -43,10 +43,11 @@ def concatenate_entries(entry_list):
 
     return concatenated
 
+
 @libcheck.argstype(list)
 def check_file_exist(files_list):
     """
-    Confirms all files in a list exist.
+    Confirm all files in a list exist.
     
     Logs each entry for each file not found.
 
@@ -93,7 +94,7 @@ def has_suffix(path, ext=None):
     ------
     True
         Always if `ext` is None.
-        If path suffix equals `ext`. 
+        If path suffix equals `ext`.
 
     False
         Otherwise
@@ -122,7 +123,7 @@ def list_files_recursively(folder, ext=None):
         Of the file paths relative to the source `folder`.
     """
     files_list = []
-    for root, subdirs, files in os.walk(folder):
+    for root, _subdirs, files in os.walk(folder):
         
         only_ext = filter(
             partial(has_suffix, ext=ext),
@@ -182,12 +183,10 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     Returns
     -------
     list
-        A list of all the files registered that exist in the disk.
+        A sorted list of all the files registered that exist in the disk.
     """
-   
     func = add_existent_files
     hsuffix = has_suffix
-    #path_bundle = list(map(Path, path_bundle))
 
     files = []
     

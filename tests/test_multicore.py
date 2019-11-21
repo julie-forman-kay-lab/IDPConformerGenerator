@@ -7,12 +7,15 @@ from idpconfgen.libs import libmulticore as LM
 
 from . import tcommons
 
+
 def test_Task_1():
+    """Test Task initiation."""
     LM.Task()
 
 
 class TestSubprocessTask:
-    
+    """Test SubprocessTask."""
+
     @pytest.mark.parametrize(
         'in1,in2,expected',
         [
@@ -25,51 +28,47 @@ class TestSubprocessTask:
         )
     def test_SubprocessTask_1(self, in1, in2, expected):
         """Test cmd_exec from string."""
-        sub = LM.SubprocessTask(in1,  in2)
+        sub = LM.SubprocessTask(in1, in2)
         assert sub.cmd_exec == expected
 
     def test_SubprocessTask_2(self):
         """Test prepare_cmd()."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
         sub.prepare_cmd()
         assert sub.cmd == ['ls', tcommons.data_folder.str()]
 
-
     def test_SubprocessTask_3(self):
         """Test execute."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
         sub.prepare_cmd()
         sub.execute()
 
-
     def test_SubprocessTask_4(self):
         """Test result is CompletedProcess."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
         sub()
         assert isinstance(sub.result, subprocess.CompletedProcess)
 
-
     def test_SubprocessTask_5(self):
         """Test string before prepare_cmd()."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
-        assert str(sub) == "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
-            tcommons.data_folder.str())
-
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        expected = "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
+            tcommons.data_folder.str()
+            )
+        assert str(sub) == expected
 
     def test_SubprocessTask_6(self):
         """Test repr()."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
         assert repr(sub) == \
             "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
                 tcommons.data_folder.str())
 
-
     def test_SubprocessTask_7(self):
         """Test str() after prepare_cmd()."""
-        sub = LM.SubprocessTask('ls',  [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
         sub.prepare_cmd()
         assert str(sub) == 'ls {}'.format(tcommons.data_folder.str())
-
 
     def test_SubprocessTask_8(self):
         """Test input None."""
@@ -78,6 +77,7 @@ class TestSubprocessTask:
 
 
 class TestDSSPTask:
+    """Test dedicated DSSP Task."""
 
     @pytest.mark.parametrize(
         'in1,in2',
@@ -109,20 +109,25 @@ class TestDSSPTask:
         assert dssptask.cmd == expected
 
     def test_DSSPTask_pdb_path(self):
+        """Test DSSPTask pdb_path attribute."""
         dssptask = LM.DSSPTask('dssp', '1XXX.pdb')
         assert dssptask.pdb_path == '1XXX.pdb'
 
     def test_DSSPTask_call(self):
+        """Test DSSPTask call dunder."""
         dssptask = LM.DSSPTask('ls', '-ltr')
         dssptask()
 
 
 class TestWorker:
+    """Test Worker."""
 
     def test_worker_1(self):
+        """Test Worker init."""
         LM.Worker(None, None)
 
     def test_worker_2(self):
+        """Test Worker raises TypeError."""
         with pytest.raises(TypeError):
             LM.Worker()
 
@@ -130,7 +135,7 @@ class TestWorker:
         """Test Worker run."""
         tasks = multiprocessing.JoinableQueue()
         queue = multiprocessing.Queue()
-        workers = [LM.Worker(tasks, queue, timeout=1)]
+        workers = [LM.Worker(tasks, queue)]
         for w in workers:
             w.start()
         tasks.put(LM.SubprocessTask('ls -ltr'))
@@ -143,8 +148,10 @@ class TestWorker:
 
 
 class TestJoinedResults:
-    
+    """Test JoinedResults multicore operator."""
+
     def test_init(self):
+        """Test JoinedResults inits with correct attributes."""
         jr = LM.JoinedResults(
             '-ltr',
             'ls',
@@ -158,6 +165,7 @@ class TestJoinedResults:
         assert jr.rp == int
 
     def test_build(self):
+        """Test JoinedResults build() method."""
         jr = LM.JoinedResults('-ltr', 'ls', ncores=7)
         jr.build()
         assert isinstance(jr.tasks, multiprocessing.queues.JoinableQueue)
@@ -166,5 +174,6 @@ class TestJoinedResults:
         assert all(isinstance(w, LM.Worker) for w in jr.workers)
 
     def test_run(self):
+        """Test JoinedResults run() method."""
         jr = LM.JoinedResults('-ltr', 'ls', ncores=7)
         jr.run()

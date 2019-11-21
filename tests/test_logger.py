@@ -17,6 +17,7 @@ def test_init_files():
 
 
 def test_T():
+    """Test T formatter."""
     logmsg = T('my title {}', 'IDP')
     assert str(logmsg) == '\n* My Title IDP ...'
 
@@ -33,7 +34,7 @@ def test_T():
             ),
         ],
     )
-def test_S(msg,args,spacer,indent,expected):
+def test_S(msg, args, spacer, indent, expected):
+    """Test S formatter."""
     sobj = S(msg, args, spacer=spacer, indent=indent)
     assert str(sobj) == expected
-    

@@ -1,24 +1,16 @@
-"""
-Test data file parsers.
-
-Parsers are coded in libparse.
-
-Currently tests:
-
-    - DSSPParser
-"""
+"""Test data file parsers."""
 import pytest
 
 from idpconfgen import Path
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libparse, libpdb
 
 from . import tcommons
 
 
 class TestLITA():
-    
+    """Test list index to array."""
+
     data = [
         'i like to program in python',
         'u like to program in java',
@@ -58,6 +50,7 @@ class TestLITA():
 
 class TestDSSPParser:
     """Test DSSPParser."""
+
     dssp_file = tcommons.data_folder / '1ABC_D.dssp'
     dssp_file2 = tcommons.data_folder / '1ABC_E.dssp'
     dssp_wrong = tcommons.data_folder / 'wrong.dssp'
@@ -65,11 +58,11 @@ class TestDSSPParser:
     dsspdata = dssp_file.read_text()
 
     def test_dssp1(self):
-        """Test initiation empty args.""" 
+        """Test initiation empty args."""
         libparse.DSSPParser()
     
     def test_dssp1_1(self):
-        """Test pdbid attribute.""" 
+        """Test pdbid attribute."""
         dobj = libparse.DSSPParser(pdbid='1ABC')
         assert dobj.pdbid == '1ABC'
 
@@ -96,7 +89,7 @@ class TestDSSPParser:
     def test_dssp5(self):
         """Test DSSPParserError."""
         with pytest.raises(EXCPTS.DSSPParserError):
-            dobj = libparse.DSSPParser(fin=self.dssp_wrong)
+            libparse.DSSPParser(fin=self.dssp_wrong)
 
     def test_dssp6(self):
         """Test find index."""
@@ -128,7 +121,6 @@ class TestDSSPParser:
 
     def test_dssp10(self):
         """Test equality with pdbid None."""
-
         dobj1 = libparse.DSSPParser(fin=self.dssp_file)
         dobj2 = libparse.DSSPParser(fin=self.dssp_file)
 
@@ -136,7 +128,6 @@ class TestDSSPParser:
 
     def test_dssp11(self):
         """Test equality with pdbid."""
-
         dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
         dobj2 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
 
@@ -144,7 +135,6 @@ class TestDSSPParser:
     
     def test_dssp12(self):
         """Test differ with pdbid different."""
-
         dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
         dobj2 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1XXX')
 
@@ -152,7 +142,6 @@ class TestDSSPParser:
 
     def test_dssp13(self):
         """Test differ with data different."""
-
         dobj1 = libparse.DSSPParser(fin=self.dssp_file, pdbid='1ABC')
         dobj2 = libparse.DSSPParser(fin=self.dssp_file2, pdbid='1ABC')
 
@@ -160,13 +149,19 @@ class TestDSSPParser:
 
 
 class TestDSSPMediator:
+    """
+    Test DSSP Mediator.
     
-    dssp_file = tcommons.data_folder / '1ABC_D.dssp'
-    pdb_file = tcommons.data_folder / '1A12.pdb'
+    DSSPMediator takes the output from the DSSPTask and passes it
+    to the DSSPParser.
+    """
+
+    dssp_file = Path(tcommons.data_folder, '1ABC_D.dssp')
+    pdb_file = Path(tcommons.data_folder, '1A12.pdb')
     dsspdata = dssp_file.read_text()
 
     def test_dsspmediator_0(self):
-        
+        """Test DSSPParser is returned."""
         dssp_mediated = libparse.DSSPParser.from_data_id_tuple((
             self.pdb_file,
             self.dsspdata,
@@ -174,7 +169,7 @@ class TestDSSPMediator:
         assert isinstance(dssp_mediated, libparse.DSSPParser)
     
     def test_dsspmediator_1(self):
-        
+        """Test mediated is of correct type and form."""
         dssp_parser = libparse.DSSPParser(
             data=self.dsspdata,
             pdbid=libpdb.PDBIDFactory(self.pdb_file),
@@ -189,7 +184,8 @@ class TestDSSPMediator:
 
 
 class Test_dssp_ss_saver:
-    
+    """Test dssp secondary structure saver."""
+
     dssp_fileD = tcommons.data_folder / '1ABC_D.dssp'
     dssp_fileE = tcommons.data_folder / '1ABC_E.dssp'
     
@@ -204,7 +200,6 @@ class Test_dssp_ss_saver:
     
     def test_concat_dsspparsers_1(self):
         """Test concatenation of DSSPParsers."""
-
         output = libparse._concatenate_ss_from_dsspparsers([
             self.obj1,
             self.obj2,
@@ -215,7 +210,6 @@ class Test_dssp_ss_saver:
 
     def test_concat_dsspparsers_2(self):
         """Test concatenation of DSSPParsers sorted output."""
-
         output = libparse._concatenate_ss_from_dsspparsers([
             self.obj2,
             self.obj1,
@@ -226,11 +220,13 @@ class Test_dssp_ss_saver:
     
     def test_export_ss_1(self):
         """Test export ss structure."""
-        libparse.export_ss_from_DSSP(self.obj1, self.obj2,
-            output=tcommons.folder_output / 'dssp.database'
+        libparse.export_ss_from_DSSP(
+            self.obj1,
+            self.obj2,
+            output=Path(tcommons.folder_output, 'dssp.database'),
             )
     
-        ofile = Path(tcommons.folder_output / 'dssp.database')
+        ofile = Path(tcommons.folder_output, 'dssp.database')
         results = ofile.read_text()
 
         expected = '1ABC_D| HGIBE TS \n1ABC_E| HGIBE TS\n'

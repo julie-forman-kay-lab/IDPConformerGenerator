@@ -68,9 +68,9 @@ def _load_args():
         ap.exit()
 
     cmd = ap.parse_args()
-
+   
     return cmd
-    
+   
 
 def maincli():
     """
