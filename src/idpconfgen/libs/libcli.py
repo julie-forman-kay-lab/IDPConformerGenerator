@@ -41,9 +41,9 @@ def parse_doc_params(docstring):
     tuple
         (prog, description, usage)
     """
-    doclines = docstring.split('\n')
-    prog = doclines[1]
-    description = '\n'.join(doclines[3:doclines.index('USAGE:')])
-    usage = '\n' + '\n'.join(doclines[doclines.index('USAGE:') + 1:])
+    doclines = docstring.lstrip().split('\n')
+    prog = doclines[0]
+    description = '\n'.join(doclines[2:doclines.index('USAGE:')])
+    usage = '\n'.join(doclines[doclines.index('USAGE:') + 1:])
      
     return prog, description, usage
