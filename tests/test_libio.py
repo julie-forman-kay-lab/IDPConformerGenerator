@@ -204,6 +204,7 @@ def test_read_path_bundle_typeerror(in1):
             [
                 tcommons.data_folder,
                 Path(tcommons.data_folder, 'path_bundle.flist'),
+                Path(tcommons.data_folder, 'noexist_bundle.flist'),
                 ],
             None,
             [
