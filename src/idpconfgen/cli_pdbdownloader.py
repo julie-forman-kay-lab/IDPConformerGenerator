@@ -26,7 +26,7 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libfile, libio, libpdb
+from idpconfgen.libs import libcli, libio, libpdb
 from idpconfgen.logger import S, T, init_files
 
 
@@ -114,7 +114,7 @@ def main(
     
     if destination:
         pdblist_destination = \
-            libpdb.PDBList(libfile.glob_folder(destination, '*.pdb'))
+            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
         log.info(T('reading destination folder'))
         log.info(S(f'from: {destination}'))
         log.info(S(f'{str(pdblist_destination)}'))
@@ -135,7 +135,7 @@ def main(
         pdbdownloader.prepare_pdb_list()
         pdbdownloader.run()
         pdblist_updated = \
-            libpdb.PDBList(libfile.glob_folder(destination, '*.pdb'))
+            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))
