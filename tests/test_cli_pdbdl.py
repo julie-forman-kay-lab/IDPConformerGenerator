@@ -2,6 +2,7 @@
 
 from idpconfgen import Path
 from idpconfgen.cli_pdbdownloader import main
+
 from . import tcommons
 
 

@@ -1,8 +1,8 @@
 """Test logger."""
 import pytest
 
-from idpconfgen import log, Path
-from idpconfgen.logger import init_files, S, T
+from idpconfgen import Path, log
+from idpconfgen.logger import S, T, init_files
 
 
 def test_init_files():

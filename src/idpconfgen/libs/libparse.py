@@ -4,8 +4,8 @@ import sys
 import numpy as np
 
 from idpconfgen import Path
-from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core import definitions as DEFS
+from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libcheck, libpdb
 
 

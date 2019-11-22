@@ -2,9 +2,9 @@
 import multiprocessing
 import subprocess
 
-from idpconfgen import log, Path
-from idpconfgen.logger import S
+from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
+from idpconfgen.logger import S
 
 
 class Worker(multiprocessing.Process):

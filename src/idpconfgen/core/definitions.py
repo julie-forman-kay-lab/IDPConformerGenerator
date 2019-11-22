@@ -1,6 +1,7 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
 
+
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
     ahelix='H',

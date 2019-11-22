@@ -1,7 +1,8 @@
 """Test libs for multicore operations."""
-import pytest
 import multiprocessing
 import subprocess
+
+import pytest
 
 from idpconfgen.libs import libmulticore as LM
 
