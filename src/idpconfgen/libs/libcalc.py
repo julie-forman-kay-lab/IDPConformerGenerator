@@ -16,8 +16,6 @@ def make_axis_vectors(A, B, C):
     Make axis vectors.
     
     For np.array([x,y,z]) of connected atoms A->B->C.
-    
-    Credits to @RobertVernon.
 
     Example:
         >>> av = np.array([0.000, 0.000, 0.000])
@@ -72,7 +70,9 @@ def RT_to_plane(A, B, C):
     Where, A->B determine the X axis, Y is the normal vector to the ABC
         plane, and A is defined at 0,0,0.
 
-    Uses make_axis_vectors()
+    .. seealso::
+
+        :func:`make_axis_vectors`
 
     Parameters
     ----------
@@ -82,8 +82,8 @@ def RT_to_plane(A, B, C):
 
     Returns
     -------
-    tuple
-        Rotational matrix and A
+    np.array of shape (3,3)
+        Rotational matrix
     """
     parallel_ABC, AB_vect, perpendicular = make_axis_vectors(A, B, C)
     b = np.array([AB_vect, -perpendicular, parallel_ABC])
@@ -96,9 +96,23 @@ def RT_to_plane(A, B, C):
 def make_coord(theta, phi, distance, parent, xaxis, yaxis):
     """
     Makes a new coordinate in space.
+    
+    .. seealso::
+        
+        :func:`make_coord_from_angles`, :func:`RT_to_plane`.
 
     Parameters
     ----------
+    theta : float
+        The angle in radians between `parent` and `yaxis`.
+
+    phi : float
+        The torsion angles in radians between `parent-xaxis-yaxis`
+        plane and new coordinate.
+
+    distance : float
+        The distance between `parent` and the new coordinate.
+
     parent : np.array of shape (3,)
         The coordinate in space of the parent atom (point). The parent
         atom is the one that preceeds the newly added coordinate.
@@ -125,6 +139,13 @@ def make_coord(theta, phi, distance, parent, xaxis, yaxis):
 def make_coord_from_angles(theta, phi, distance):
     """
     Make axis components from angles.
+    
+    Performs: 
+        np.array([
+            distance * math.cos(phi),
+            distance * math.sin(phi) * math.cos(theta),
+            distance * math.sin(phi) * math.sin(theta),
+            ])
 
     Returns
     -------
