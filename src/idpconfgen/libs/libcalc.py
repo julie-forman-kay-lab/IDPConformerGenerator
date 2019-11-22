@@ -1,4 +1,6 @@
 """Mathemical calculations."""
+import math
+
 import numpy as np
 
 
@@ -63,8 +65,7 @@ def make_axis_vectors(A, B, C):
     return parallel_ABC, AB_vect, perpendicular
 
 
-
-def RT_to_plane(A, B, C):# PARENT, XAXIS, PLANE
+def RT_to_plane(A, B, C):
     """
     Define rotations and translation matrices for planar orientation.
 
@@ -76,7 +77,8 @@ def RT_to_plane(A, B, C):# PARENT, XAXIS, PLANE
     Parameters
     ----------
     A, B, C: np.array of shape (3,)
-        The 3D coordinates.
+        The 3D coordinates, where A is the parent coordinate,
+        B is the Xaxis and C the Yaxis.
 
     Returns
     -------
@@ -88,10 +90,10 @@ def RT_to_plane(A, B, C):# PARENT, XAXIS, PLANE
     
     v = AXIS_111
     
-    return np.dot(b, v), A
+    return np.dot(b, v)
 
 
-def make_coord(theta, phi, rad, parent, xaxis, yaxis):
+def make_coord(theta, phi, distance, parent, xaxis, yaxis):
     """
     Makes a new coordinate in space.
 
@@ -114,12 +116,23 @@ def make_coord(theta, phi, rad, parent, xaxis, yaxis):
     np.array of shape (3,)
         The new coordinate in space.
     """
-    new_coord = np.array([
-        rad * math.cos(phi),
-        rad * math.sin(phi) * math.cos(theta),
-        rad * math.sin(phi) * math.sin(theta),
-        ])
-
-    rotation, translation = RT_to_plane(parent, xaxis, yaxis)
+    new_coord = make_coord_from_angles(theta, phi, distance)
+    rotation = RT_to_plane(parent, xaxis, yaxis)
     new_coord = np.dot(new_coord, rotation.T)
-    return new_coord + translation
+    return new_coord + parent
+
+
+def make_coord_from_angles(theta, phi, distance):
+    """
+    Make axis components from angles.
+
+    Returns
+    -------
+    np.array of shape (3,)
+    """
+
+    return np.array([
+        distance * math.cos(phi),
+        distance * math.sin(phi) * math.cos(theta),
+        distance * math.sin(phi) * math.sin(theta),
+        ])
