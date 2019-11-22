@@ -22,8 +22,8 @@ backbone_seed = [
             np.array([1.458, 0.000, 0.000]),
             np.array([2.009, 1.420, 0.000]),
             (
-                np.array([ 0.,  0., -1.]),
-                np.array([-1.,  0.,  0.]),
+                np.array([0., 0., -1.]),
+                np.array([-1., 0., 0.]),
                 np.array([-0., -1., -0.]),
                 ),
             ),
@@ -32,9 +32,9 @@ backbone_seed = [
             np.array([1.000, 1.000, 1.000]),
             np.array([1.000, 1.000, 1.000]),
             (
-                np.array([ 0.,  0., 0.]),
-                np.array([ 0.,  0., 0.]),
-                np.array([ 0.,  0., 0.]),
+                np.array([0., 0., 0.]),
+                np.array([0., 0., 0.]),
+                np.array([0., 0., 0.]),
                 ),
             ),
         ],
@@ -54,8 +54,8 @@ def test_make_axis_vectors_1(av, bv, cv, expected):
             np.array([2.009, 1.420, 0.000]),
             (
                 np.array([
-                    [-1.,  0., 0.],
-                    [0.,  1.,  0.],
+                    [-1., 0., 0.],
+                    [0., 1., 0.],
                     [0., 0., -1.],
                     ])
                 ),
@@ -66,6 +66,7 @@ def test_RT_to_plane(av, bv, cv, expected):
     """Test RT to plane."""
     result = libcalc.RT_to_plane(av, bv, cv)
     assert np.all(np.equal(result, expected))
+
 
 @pytest.mark.parametrize(
     'theta,phi,distance,expected',

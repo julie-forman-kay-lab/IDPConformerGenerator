@@ -5,10 +5,10 @@ import numpy as np
 
 
 AXIS_111 = np.array([
-        [1.0, 0.0, 0.0],
-        [0.0, 1.0, 0.0],
-        [0.0, 0.0, 1.0],
-        ])
+    [1.0, 0.0, 0.0],
+    [0.0, 1.0, 0.0],
+    [0.0, 0.0, 1.0],
+    ])
 
 
 def make_axis_vectors(A, B, C):
@@ -17,12 +17,15 @@ def make_axis_vectors(A, B, C):
     
     For np.array([x,y,z]) of connected atoms A->B->C.
 
-    Example:
+    Example
+    -------
         >>> av = np.array([0.000, 0.000, 0.000])
         >>> bv = np.array([1.458, 0.000, 0.000])
         >>> cv = np.array([2.009, 1.420, 0.000])
         >>> make_axis_vectors(av, bv, cv)
-        >>> (array([ 0.,  0., -1.]), array([-1.,  0.,  0.]), array([-0., -1., -0.]))
+        >>> (array([ 0.,  0., -1.]),
+        >>>  array([-1.,  0.,  0.]),
+        >>>  array([-0., -1., -0.]))
 
     Parameters
     ----------
@@ -95,7 +98,7 @@ def RT_to_plane(A, B, C):
 
 def make_coord(theta, phi, distance, parent, xaxis, yaxis):
     """
-    Makes a new coordinate in space.
+    Make a new coordinate in space.
     
     .. seealso::
         
@@ -140,7 +143,7 @@ def make_coord_from_angles(theta, phi, distance):
     """
     Make axis components from angles.
     
-    Performs: 
+    Performs:
         np.array([
             distance * math.cos(phi),
             distance * math.sin(phi) * math.cos(theta),
@@ -151,7 +154,6 @@ def make_coord_from_angles(theta, phi, distance):
     -------
     np.array of shape (3,)
     """
-
     return np.array([
         distance * math.cos(phi),
         distance * math.sin(phi) * math.cos(theta),
