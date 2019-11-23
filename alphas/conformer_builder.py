@@ -492,7 +492,7 @@ class ConformerBuilder:
                     log.info('Reached the end of the sequence.')
                     log.info(f'Is sequence complete?: {self.is_bb_complete()}')
                     self.add_COO()
-                    break
+                    return
 
                 self.add_coord(
                     residue_angles,
@@ -513,17 +513,21 @@ class ConformerBuilder:
 
             try:
                 # last state
-                last_conformer = self.register.load()    
+                last_conformer = self.register.load()
             except IndexError:
                 # register is empty
                 self.register.save(self.conformer)
                 continue
 
             validator = ClashValidator()
-            clash_found = validator.clash_found(self.conformer, last_conformer)
+            clash_found = validator.clash_found(self.conformer.coords, last_conformer.coords)
             if not clash_found:
                 # no clashes, save this loop
                 self.register.save(self.conformer)
+            else:
+                self.register.save(last_conformer)
+                print("here", len(last_conformer.coords), len(self.conformer.coords))
+                self.conformer = last_conformer
 
         else:
             if n > 100_000:
@@ -1007,6 +1011,8 @@ if __name__ == '__main__':
         loop_pickle,
         )
     
+    print(len(builder.conformer.coords))
     builder.build_bb()
+    print(len(builder.conformer.coords))
     builder.save('conformer_gen.pdb')
 
