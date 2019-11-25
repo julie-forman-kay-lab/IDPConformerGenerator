@@ -318,6 +318,7 @@ class ConformerBuilder:
         self.register = StateHolder()
         self.basedb = basedb
         self.angledb = angledb
+        self.clash_validator = ClashValidator()
     
     @property
     def seq(self):
@@ -519,8 +520,7 @@ class ConformerBuilder:
                 self.register.save(self.conformer)
                 continue
 
-            validator = ClashValidator()
-            clash_found = validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
+            clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
             if not clash_found:
                 # no clashes, save this loop
                 self.register.save(self.conformer)
@@ -1010,8 +1010,6 @@ if __name__ == '__main__':
         loop_pickle,
         )
     
-    print(len(builder.conformer.coords))
     builder.build_bb()
-    print(len(builder.conformer.coords))
     builder.save('conformer_gen.pdb')
 

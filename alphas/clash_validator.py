@@ -32,6 +32,7 @@ class ClashValidator:
         clashes = (distances < allowed_distances)
         for row in clashes:
             if any(row):
+                self.clashes += 1
                 return True
         return False
 
@@ -60,6 +61,7 @@ class ClashValidator:
                     clashes = distances < allowed_distances
                     for row in clashes:
                         if any(row):
+                            self.clashes += 1
                             return True
                 except ValueError:
                         # we are at the last new_index, therefore its made up of only 3 atoms
@@ -67,5 +69,6 @@ class ClashValidator:
                         clashes = distances < allowed_distances[:-1].T
                         for row in clashes:
                             if any(row):
+                                self.clashes += 1
                                 return True
         return False
