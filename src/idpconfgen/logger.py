@@ -31,13 +31,17 @@ class SubLog:
         >>> SubLog('error msg: {} {} {}', var1, var2 var3)
     """
     
-    def __init__(self, msg, *args):
+    def __init__(self, msg, *args, spacer=' ', indent=4):
         self.msg = msg
         self.args = args
+        self.indent = spacer * indent
     
     def __str__(self):
         """Represent object as string."""
-        return '    {}'.format(self.msg.format(*self.args))
+        return '{}{}'.format(
+            self.indent,
+            self.msg.format(*self.args),
+            )
 
 
 T = TitleLog

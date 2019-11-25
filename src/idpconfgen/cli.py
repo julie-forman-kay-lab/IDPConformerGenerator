@@ -16,6 +16,7 @@ import argparse
 import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
+from idpconfgen import cli_ssext as ssext
 from idpconfgen.libs import libcli
 
 
@@ -49,6 +50,17 @@ def _load_args():
         )
     ap_pdbdl.set_defaults(func=pdbdl.main)
    
+    ap_ssext = subparsers.add_parser(
+        'ssext',
+        help='PDB Downloader',
+        parents=[ssext.ap],
+        add_help=False,
+        description=libcli.detailed.format(ssext._des),
+        usage=ssext._us,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    ap_ssext.set_defaults(func=ssext.main)
+    
     # prints help if not arguments are passed
     # if >2 prints help of subroutines.
     if len(sys.argv) < 2:
@@ -56,9 +68,9 @@ def _load_args():
         ap.exit()
 
     cmd = ap.parse_args()
-
+   
     return cmd
-    
+   
 
 def maincli():
     """

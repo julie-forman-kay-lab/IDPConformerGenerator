@@ -1,21 +1,20 @@
+"""Test client for PDB Downloader."""
 
 from idpconfgen import Path
 from idpconfgen.cli_pdbdownloader import main
 
-
-file_path = Path(__file__).myparents()
+from . import tcommons
 
 
 class TestCliPDBdl:
+    """Test client for PDB Downloader."""
 
-    cull = Path(file_path, 'data', 'cull.list')
-    fout = Path(file_path, 'data_out_scratch')
+    cull = Path(tcommons.data_folder, 'cull.list')
 
     def test_main(self):
         """Test main from cli_pdbdownloader."""
-
         main(
             [self.cull],
-            destination=self.fout,
+            destination=tcommons.folder_output,
             update=True,
             )
