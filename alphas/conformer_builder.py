@@ -520,13 +520,12 @@ class ConformerBuilder:
                 continue
 
             validator = ClashValidator()
-            clash_found = validator.clash_found(self.conformer.coords, last_conformer.coords)
+            clash_found = validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
             if not clash_found:
                 # no clashes, save this loop
                 self.register.save(self.conformer)
             else:
                 self.register.save(last_conformer)
-                print("here", len(last_conformer.coords), len(self.conformer.coords))
                 self.conformer = last_conformer
 
         else:
