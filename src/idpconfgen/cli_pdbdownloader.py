@@ -104,7 +104,7 @@ def main(
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
     
-    pdbids_to_read = libio.read_pdblist(pdblist)
+    pdbids_to_read = libio.concatenate_entries(pdblist)
     pdblist = libpdb.PDBList(pdbids_to_read)
 
     log.info(T('reading input PDB list'))

@@ -1,4 +1,6 @@
 """Test I/O lib."""
+import pytest
+
 from idpconfgen import Path
 from idpconfgen.libs import libio
 
@@ -33,3 +35,15 @@ def test_concatenate_1():
     output = libio.concatenate_entries(user_input)
 
     assert expected_output == output
+
+
+def test_concatenate_typerror_path():
+    """Raise TypeError when Path is given."""
+    with pytest.raises(TypeError):
+        libio.concatenate_entries(Path('somepath'))
+
+
+def test_concatenate_typerror_str():
+    """Raise TypeError when string is given."""
+    with pytest.raises(TypeError):
+        libio.concatenate_entries('somestr')
