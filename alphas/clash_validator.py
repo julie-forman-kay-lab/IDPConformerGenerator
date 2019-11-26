@@ -17,7 +17,7 @@ class ClashValidator:
         
         # concatenate every residue containing four atoms into one numpy array
         last_chain_vector = np.concatenate([np.array(list(atom.values())) for atom in last_chain[:-2]]) #ORIGINAL
-        current_chain_vector = np.concatenate([np.array(list(atom.values())) for atom in current_chain[len(last_chain)+1:]]) #ORIGINAL
+        current_chain_vector = np.concatenate([np.array(list(atom.values())) for atom in current_chain[len(last_chain):]]) #ORIGINAL
 
         # get the euclidean distance between each atom
         distances = distance.cdist(last_chain_vector, current_chain_vector, 'euclidean')

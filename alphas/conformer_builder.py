@@ -346,14 +346,15 @@ class ConformerBuilder:
         """
         bbatoms = self._bbatoms
 
-        is_bb_complete = [
-            len(conformer) == len(self.seq),
+        is_bb_complete_ = [
+            len(self.conformer.coords) == len(self.seq),
             all(
                 bbatoms.issubset(res_coords.keys())
                     for res_coords in self.conformer.coords
                 ),
+            len(self.seq) * 4 + 1 == sum(1 for res in self.conformer.coords for atom in res.keys())
             ]
-        return all(is_bb_complete)
+        return all(is_bb_complete_)
     
     def get_residue_type(self, pos):
         """
@@ -475,7 +476,7 @@ class ConformerBuilder:
     
     def build_bb(self):
         n = 0
-        while not self.is_bb_complete() and n < 100_000:
+        while not self.is_bb_complete() and n < 100:
             n += 1
 
 
@@ -491,9 +492,9 @@ class ConformerBuilder:
                         )
                 except SequenceIndexError:
                     log.info('Reached the end of the sequence.')
-                    log.info(f'Is sequence complete?: {self.is_bb_complete()}')
                     self.add_COO()
-                    return
+                    log.info(f'Is sequence complete?: {self.is_bb_complete()}')
+                    break
 
                 self.add_coord(
                     residue_angles,
@@ -520,11 +521,17 @@ class ConformerBuilder:
                 self.register.save(self.conformer)
                 continue
 
-            clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
+            try:
+                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
+            except ValueError:
+                # adding COO
+                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords[:-1])
+
             if not clash_found:
                 # no clashes, save this loop
                 self.register.save(self.conformer)
             else:
+                # Dont save it if it clashes on COO
                 self.register.save(last_conformer)
                 self.conformer = last_conformer
 
