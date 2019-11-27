@@ -92,15 +92,7 @@ class ConformerTemplate:
         coord : numpy.array of shape (3,) dtype=np.float32
             A Numpy array with the XYZ space coordinates of the atom.
         """
-
-        # -1 because we are 0-indexed
-        index = residue_index * DEFS.num_bb_atoms
-        try:
-            index += DEFS.backbone_atoms.index(atom_name)
-        except ValueError:  # we are adding carboxyl oxygen
-            index = -1
-
-        self.coords[index,:] = coords
+        self.coords[self._get_index(residue_index, atom_name),:] = coords
     
     def is_complete(self):
         return not np.any(np.isnan(self.coords))
@@ -119,3 +111,17 @@ class ConformerTemplate:
             else:
                 raise ValueError('seq aminoacids codes are not valid')
         return sequence
+
+    @staticmethod
+    def _get_index(residue_index, atom_name):
+        try:
+            index = DEFS.backbone_atoms.index(atom_name)
+        except ValueError:  # we are adding carboxyl oxygen, are we?
+            if atom_name == DEFS.COO_atom:
+                return -1
+            else:
+                raise ValueError('atom_name not valid: {!r}'.format(atom_name))
+        else:
+            index += residue_index * DEFS.num_bb_atoms
+            return index
+        

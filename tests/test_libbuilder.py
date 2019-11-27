@@ -78,6 +78,29 @@ class TestConformerTemplate:
         ct = LB.ConformerTemplate('MARVEL')
         with pytest.raises(AttributeError):
             ct.atomnames = 1
+    
+    @pytest.mark.parametrize(
+        'resind,aname,expected',
+        [
+            (0, 'N', 0),
+            (0, 'CA', 1),
+            (10, 'C', 42),
+            (321321, DEFS.COO_atom, -1),
+            ],
+        )
+    def test_get_index(self, resind, aname, expected):
+        result = LB.ConformerTemplate._get_index(resind, aname)
+        assert result == expected
+   
+    @pytest.mark.parametrize(
+        'resind,aname,error',
+        [
+            (0, 'Z', ValueError),
+            ],
+        )
+    def test_get_index_Errors(self, resind, aname, error):
+        with pytest.raises(error):
+            LB.ConformerTemplate._get_index(resind, aname)
 
     @pytest.mark.parametrize(
         'resindex,atomname,coords,realindex',
