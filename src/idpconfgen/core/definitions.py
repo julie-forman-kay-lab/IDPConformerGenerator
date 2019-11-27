@@ -55,3 +55,8 @@ aa3to1 = {
     'VAL': 'V'}
 
 aa1to3 = {v:k for k, v in aa3to1.items()}
+
+CA_radius = 1.7
+C_radius = 1.7
+N_radius = 1.55
+O_radius = 1.52
