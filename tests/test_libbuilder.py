@@ -95,3 +95,24 @@ class TestConformerTemplate:
         coords = np.array(coords)
         ct.add_atom_coords(resindex, atomname, coords)
         assert all(np.equal(ct.coords[realindex], coords))
+
+    @pytest.mark.parametrize(
+        'seq',
+        [
+            ('MARVEL'),
+            ],
+        )
+    def test_is_complete(self, seq):
+        ct = LB.ConformerTemplate(seq)
+        for i in range(len(seq)):
+            for c in DEFS.backbone_atoms:
+                ct.add_atom_coords(i, c, np.array([1.000, 1.000, 1.000]))
+        else:
+            ct.add_atom_coords(0, DEFS.COO_atom, np.array([1.00, 1.00, 1.00]))
+
+        assert ct.is_complete()
+    
+    def test_is_complete_manual(self):
+        ct = LB.ConformerTemplate('MAV')
+        ct._coords[:] = 1
+        assert ct.is_complete()

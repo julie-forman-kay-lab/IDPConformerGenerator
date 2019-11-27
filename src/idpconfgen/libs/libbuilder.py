@@ -101,7 +101,9 @@ class ConformerTemplate:
             index = -1
 
         self.coords[index,:] = coords
-
+    
+    def is_complete(self):
+        return not np.any(np.isnan(self.coords))
 
     @staticmethod
     def _parse_seq(seq):
