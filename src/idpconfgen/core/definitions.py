@@ -120,6 +120,7 @@ N_atom_NeRF = Atom(N_name, -1, -1, -1)
 CA_atom_NeRF = Atom(CA_name, 0, -1, -1)
 C_atom_NeRF = Atom(C_name, 0, 0, -1)
 O_atom_NeRF = Atom(O_name, 0, 0, 1)
+NeRF_building_order = [N_atom_NeRF, O_atom_NeRF, CA_atom_NeRF, C_atom_NeRF]
 
 backbone_atoms = (N_name, CA_name, C_name, O_name)
 num_bb_atoms = len(backbone_atoms)
