@@ -53,3 +53,5 @@ aa3to1 = {
     'TRP': 'W',
     'TYR': 'Y',
     'VAL': 'V'}
+
+aa1to3 = {v:k for k, v in aa3to1.items()}
