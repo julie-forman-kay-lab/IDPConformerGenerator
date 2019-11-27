@@ -60,7 +60,9 @@ class TestConformerTemplate:
         )
     def test_property_coords(self, in1):
         ct = LB.ConformerTemplate(in1)
-        assert ct.coords.size == len(in1) * len(DEFS.backbone_atoms) + 1
+        num_of_residues = len(in1) * len(DEFS.backbone_atoms) + 1
+        assert ct.coords.size == num_of_residues * 3
+        assert ct.coords.shape == (num_of_residues, 3)
 
     def test_property_coords_AttributeError(self):
         ct = LB.ConformerTemplate('MSME')

@@ -14,10 +14,16 @@ class ConformerTemplate:
     def __init__(self, seq):
         
         self._seq = self._parse_seq(seq)
-        self._coords = np.full(
-            len(self.seq) * len(DEFS.backbone_atoms) + 1, # the oxygen from COO
+        
+        # 1 is for the additional oxygen atom in the C-term carboxyl
+        num_of_atoms = (len(self.seq) * len(DEFS.backbone_atoms) + 1)
+
+        coords = np.full(
+            3 * num_of_atoms,
             np.nan,
             )
+
+        self._coords = coords.reshape(num_of_atoms, 3)
 
     @property
     def seq(self):
