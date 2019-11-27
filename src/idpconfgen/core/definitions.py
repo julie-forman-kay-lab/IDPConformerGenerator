@@ -67,4 +67,10 @@ N_seed = np.array([0.000, 0.000, 0.000], dtype=np.float32)
 CA_seed = np.array([1.458, 0.000, 0.000], dtype=np.float32)
 C_seed = np.array([2.009, 1.420, 0.000], dtype=np.float32)
 
-backbone_atoms = ('N', 'CA', 'C', 'O')
+N_atom = 'N'
+CA_atom = 'CA'
+C_atom = 'C'
+O_atom = 'O'
+COO_atom = 'O1'
+
+backbone_atoms = (N_atom, CA_atom, C_atom, O_atom)
