@@ -116,3 +116,12 @@ class TestConformerTemplate:
         ct = LB.ConformerTemplate('MAV')
         ct._coords[:] = 1
         assert ct.is_complete()
+
+    def test_is_complete_false_1(self):
+        ct = LB.ConformerTemplate('MAV')
+        assert not ct.is_complete()
+
+    def test_is_complete_false_2(self):
+        ct = LB.ConformerTemplate('MAV')
+        ct._coords[:3, :] = 1
+        assert not ct.is_complete()
