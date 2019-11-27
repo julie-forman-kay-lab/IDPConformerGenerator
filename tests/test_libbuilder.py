@@ -68,3 +68,12 @@ class TestConformerTemplate:
         ct = LB.ConformerTemplate('MSME')
         with pytest.raises(AttributeError):
             ct.coords = 1
+
+    def test_property_atomnames(self):
+        ct = LB.ConformerTemplate('MARVEL')
+        assert ct.atomnames.shape == (6 * 4,)
+
+    def test_property_atomnames_AttributeError(self):
+        ct = LB.ConformerTemplate('MARVEL')
+        with pytest.raises(AttributeError):
+            ct.atomnames = 1

@@ -24,14 +24,60 @@ class ConformerTemplate:
             )
 
         self._coords = coords.reshape(num_of_atoms, 3)
+        
+        self._atomnames = \
+            np.array(
+                DEFS.backbone_atoms * len(self.seq),
+                dtype='<U1',
+                )
 
     @property
     def seq(self):
+        """
+        The aminoacid sequence that represents the conformer.
+
+        Is a tuple of aminoacids represented by 3-letter codes.
+        """
         return self._seq
 
     @property
     def coords(self):
+        """
+        The XYZ coordinates that define the conformer.
+
+        Is an Numpy array of length N * 4 + 1, where N is the length
+        of the :attr:`seq` of the conformer, 4 is the number of backbone
+        atoms (N, CA, C, O) and 1 accounts for the terminal oxygen
+        of the carboxyl group.
+        """
         return self._coords
+    
+    @property
+    def atomnames(self):
+        """
+        An array of the backbone atom names.
+
+        Does not include the terminal oxygen atom from the carboxyl group,
+        therefore:
+
+        :attr:`atomnames`.size == :attr:`coords`.shape[0] - 1
+        """
+        return self._atomnames
+
+    def get_coord(self, residue_pos, atomname):
+        """
+        Return the XYZ coordinates for atom in residue position.
+
+        Parameters
+        ----------
+        residue_pos : int
+            The residue position with the :attr:`seq`.
+            Position is 0-indexed.
+
+        atomname : str
+            The atom name. For example ``N``, ``C``.
+        """
+
 
     @staticmethod
     def _parse_seq(seq):
