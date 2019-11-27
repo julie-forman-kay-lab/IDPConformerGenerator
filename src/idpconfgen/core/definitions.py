@@ -1,6 +1,7 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
 
+import numpy as np
 
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
@@ -60,3 +61,8 @@ CA_radius = 1.7
 C_radius = 1.7
 N_radius = 1.55
 O_radius = 1.52
+
+#back bone seed coordinates
+N_seed = np.array([0.000, 0.000, 0.000], dtype=np.float32)
+CA_seed = np.array([1.458, 0.000, 0.000], dtype=np.float32)
+C_seed = np.array([2.009, 1.420, 0.000], dtype=np.float32)
