@@ -1,4 +1,6 @@
 """Library for the Conformer builder."""
+import numpy as np
+
 from idpconfgen.core import definitions as DEFS
 
 
@@ -12,10 +14,18 @@ class ConformerTemplate:
     def __init__(self, seq):
         
         self._seq = self._parse_seq(seq)
+        self._coords = np.full(
+            len(self.seq) * len(DEFS.backbone_atoms) + 1, # the oxygen from COO
+            np.nan,
+            )
 
     @property
     def seq(self):
         return self._seq
+
+    @property
+    def coords(self):
+        return self._coords
 
     @staticmethod
     def _parse_seq(seq):

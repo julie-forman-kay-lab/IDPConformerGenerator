@@ -1,6 +1,7 @@
 """Test libbuilder."""
 import pytest
 
+from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libbuilder as LB
 
 
@@ -40,6 +41,28 @@ class TestConformerTemplate:
             LB.ConformerTemplate._parse_seq(in1)
 
     def test_property_seq(self):
-        ct = LB.ConformerTemplate('MAVERL')
-        assert ct.seq == ('MET', 'ALA', 'VAL', 'GLU', 'ARG', 'LEU')
+        ct = LB.ConformerTemplate('MARVEL')
+        assert ct.seq == ('MET', 'ALA', 'ARG', 'VAL', 'GLU', 'LEU')
         assert isinstance(ct.seq, tuple)
+    
+    def test_property_seq_AttributeError(self):
+        ct = LB.ConformerTemplate('MARVEL')
+        with pytest.raises(AttributeError):
+            ct.seq = 1
+    
+    @pytest.mark.parametrize(
+        'in1',
+        [
+            ('M'),
+            ('MARVEL'),
+            ('MEGAPRTEIN')
+            ],
+        )
+    def test_property_coords(self, in1):
+        ct = LB.ConformerTemplate(in1)
+        assert ct.coords.size == len(in1) * len(DEFS.backbone_atoms) + 1
+
+    def test_property_coords_AttributeError(self):
+        ct = LB.ConformerTemplate('MSME')
+        with pytest.raises(AttributeError):
+            ct.coords = 1
