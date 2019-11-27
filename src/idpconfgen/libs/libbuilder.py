@@ -77,7 +77,7 @@ class ConformerTemplate:
         atomname : str
             The atom name. For example ``N``, ``C``.
         """
-        return
+        return self.coords[self._get_index(residue_pos, atomname)]
 
     def add_atom_coords(self, residue_index, atom_name, coords):
         """

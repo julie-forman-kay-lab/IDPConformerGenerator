@@ -148,3 +148,18 @@ class TestConformerTemplate:
         ct = LB.ConformerTemplate('MAV')
         ct._coords[:3, :] = 1
         assert not ct.is_complete()
+    
+    @pytest.mark.parametrize(
+        'resind,aname',
+        [
+            (0, 'N'),
+            (0, DEFS.COO_atom),
+            ],
+        )
+    def test_get_coords(self, resind, aname):
+        ct = LB.ConformerTemplate('MAV')
+        coords = np.array([1., 2., 0.7])
+        ct.add_atom_coords(resind, aname, coords)
+        result = ct.get_coord(resind, aname)
+        assert result.shape == coords.shape
+        assert np.all(np.equal(result, coords))
