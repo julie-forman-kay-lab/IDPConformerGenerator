@@ -27,4 +27,4 @@ def test_bb_atoms_len():
 
 
 def test_bb_atoms():
-    assert DEFS.backbone == ('N', 'CA', 'C', 'O')
+    assert DEFS.backbone_atoms == ('N', 'CA', 'C', 'O')
