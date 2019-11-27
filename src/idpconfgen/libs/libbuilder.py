@@ -27,7 +27,7 @@ class ConformerTemplate:
         
         self._atomnames = \
             np.array(
-                DEFS.backbone_atoms * len(self.seq) + (DEFS.COO_atom,),
+                DEFS.backbone_atoms * len(self.seq) + (DEFS.COO_name,),
                 dtype='<U1',
                 )
 
@@ -93,7 +93,7 @@ class ConformerTemplate:
             A Numpy array with the XYZ space coordinates of the atom.
         """
         self.coords[self._get_index(residue_index, atom_name),:] = coords
-    
+
     def is_complete(self):
         return not np.any(np.isnan(self.coords))
 
@@ -117,11 +117,90 @@ class ConformerTemplate:
         try:
             index = DEFS.backbone_atoms.index(atom_name)
         except ValueError:  # we are adding carboxyl oxygen, are we?
-            if atom_name == DEFS.COO_atom:
+            if atom_name == DEFS.COO_name:
                 return -1
             else:
                 raise ValueError('atom_name not valid: {!r}'.format(atom_name))
         else:
             index += residue_index * DEFS.num_bb_atoms
             return index
+
+
+class ConformerBuilderNeRF:
+    """
+    Conformer builder.
+    """
+    def __init__(
+            self,
+            conformer,
+            angledb,
+            frag_size=None,
+            ):
+        self._conformer = conformer
+        self._angledb = angledb
+        self.frag_size = frag_size
+    
+    @property
+    def conformer(self):
+        return self._conformer
+
+    @property
+    def angledb(self):
+        return self._angledb
+
+    def _make_coord(self, atomname):
         
+        parent_coord = self.conformer.get_coord(
+            residue_index + atom.poff,
+            atom.name,
+            )
+
+        xaxis_coord = self.conformer.get_coord(
+            residue_index + atom.xoff,
+            atom.name,
+            )
+
+        yaxis_coord = self.conformer.get_coord(
+            residue_index + atom.yoff,
+            atom.name,
+            )
+
+
+
+    def build(self):
+        resindx = 0  # starts at 1 because the 0 is made by the seed coords
+
+        while not self.conformer.is_complete():
+            
+            fragment_angles = self.angledb.get_fragment(size=self.frag_size)
+            
+            for residue_angles in fragment_angles:
+                
+                resindx += 1
+                
+                for atom in DEFS.NeRF_building_order:
+                
+                    coords = self.make_coord(
+                        residue_angles,
+                        atom,
+                        resindx,
+                        )
+
+                    self.conformer.add_atom_coords(
+                        residue_index=resindx,
+                        atom_name=atom,
+                        coords=coords,
+                        )
+
+
+
+
+
+
+
+
+
+
+
+
+

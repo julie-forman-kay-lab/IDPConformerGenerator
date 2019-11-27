@@ -163,3 +163,9 @@ class TestConformerTemplate:
         result = ct.get_coord(resind, aname)
         assert result.shape == coords.shape
         assert np.all(np.equal(result, coords))
+
+
+class TestBuilder:
+    
+    def test_init(self):
+        LB.ConformerBuilder(None, None)
