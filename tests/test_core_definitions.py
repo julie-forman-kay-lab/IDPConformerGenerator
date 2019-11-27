@@ -20,3 +20,11 @@ def test_aa_letters():
     )
 def test_bb_seed(in1, in2):
     assert all(i - j < 0.00001 for i, j in zip(list(in1), in2))
+
+
+def test_bb_atoms_len():
+    assert len(DEFS.backbone_atoms) == 4
+
+
+def test_bb_atoms():
+    assert DEFS.backbone == ('N', 'CA', 'C', 'O')

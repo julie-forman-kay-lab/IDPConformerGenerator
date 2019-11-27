@@ -66,3 +66,5 @@ O_radius = 1.52
 N_seed = np.array([0.000, 0.000, 0.000], dtype=np.float32)
 CA_seed = np.array([1.458, 0.000, 0.000], dtype=np.float32)
 C_seed = np.array([2.009, 1.420, 0.000], dtype=np.float32)
+
+backbone_atoms = ('N', 'CA', 'C', 'O')
