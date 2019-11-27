@@ -71,6 +71,7 @@ N_atom = 'N'
 CA_atom = 'CA'
 C_atom = 'C'
 O_atom = 'O'
-COO_atom = 'O1'
+COO_atom = 'X'
 
 backbone_atoms = (N_atom, CA_atom, C_atom, O_atom)
+num_bb_atoms = len(backbone_atoms)

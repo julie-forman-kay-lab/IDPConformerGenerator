@@ -1,4 +1,5 @@
 """Test libbuilder."""
+import numpy as np
 import pytest
 
 from idpconfgen.core import definitions as DEFS
@@ -71,9 +72,26 @@ class TestConformerTemplate:
 
     def test_property_atomnames(self):
         ct = LB.ConformerTemplate('MARVEL')
-        assert ct.atomnames.shape == (6 * 4,)
+        assert ct.atomnames.shape == (ct.coords.shape[0],)
 
     def test_property_atomnames_AttributeError(self):
         ct = LB.ConformerTemplate('MARVEL')
         with pytest.raises(AttributeError):
             ct.atomnames = 1
+
+    @pytest.mark.parametrize(
+        'resindex,atomname,coords,realindex',
+        [
+            (0, 'N', [1.000, 1.000, 1.000], 0),
+            (5, 'CA', [1.123, 2.134, 0.321], 5 * 4 + 1),
+            (3, 'O', [0.001, 0.230, 0.543], 3 * 4 + 3),
+            (5, DEFS.COO_atom, [1.000, 1.030, 1.040], -1),
+            (0, DEFS.COO_atom, [1.000, 1.030, 1.040], -1),
+            ],
+        )
+    def test_add_cooords(self,resindex, atomname, coords, realindex):
+        ct = LB.ConformerTemplate('MARVEL')
+
+        coords = np.array(coords)
+        ct.add_atom_coords(resindex, atomname, coords)
+        assert all(np.equal(ct.coords[realindex], coords))

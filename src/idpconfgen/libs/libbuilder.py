@@ -16,7 +16,7 @@ class ConformerTemplate:
         self._seq = self._parse_seq(seq)
         
         # 1 is for the additional oxygen atom in the C-term carboxyl
-        num_of_atoms = (len(self.seq) * len(DEFS.backbone_atoms) + 1)
+        num_of_atoms = len(self.seq) * DEFS.num_bb_atoms + 1
 
         coords = np.full(
             3 * num_of_atoms,
@@ -27,7 +27,7 @@ class ConformerTemplate:
         
         self._atomnames = \
             np.array(
-                DEFS.backbone_atoms * len(self.seq),
+                DEFS.backbone_atoms * len(self.seq) + (DEFS.COO_atom,),
                 dtype='<U1',
                 )
 
@@ -77,6 +77,30 @@ class ConformerTemplate:
         atomname : str
             The atom name. For example ``N``, ``C``.
         """
+        return
+
+    def add_atom_coords(self, residue_index, atom_name, coords):
+        """
+        Parameters
+        ----------
+        residue_index : int
+            The residue 0-index according to :attr:`seq` length.
+
+        atom_name : str
+            The atom name. For example ``N``, ``CA``.
+
+        coord : numpy.array of shape (3,) dtype=np.float32
+            A Numpy array with the XYZ space coordinates of the atom.
+        """
+
+        # -1 because we are 0-indexed
+        index = residue_index * DEFS.num_bb_atoms
+        try:
+            index += DEFS.backbone_atoms.index(atom_name)
+        except ValueError:  # we are adding carboxyl oxygen
+            index = -1
+
+        self.coords[index,:] = coords
 
 
     @staticmethod
