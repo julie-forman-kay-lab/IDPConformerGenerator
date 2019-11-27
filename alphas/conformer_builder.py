@@ -476,9 +476,8 @@ class ConformerBuilder:
     
     def build_bb(self):
         n = 0
-        while not self.is_bb_complete() and n < 100:
+        while not self.is_bb_complete() and n < 100_0:
             n += 1
-
 
             build_angles = self.angledb.get_fragment()
             # Python now gives you ordered values =)
@@ -521,19 +520,24 @@ class ConformerBuilder:
                 self.register.save(self.conformer)
                 continue
 
+            coo_only = False
             try:
                 clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
             except ValueError:
-                # adding COO
+                # added COO only
                 clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords[:-1])
+                coo_only = True
 
             if not clash_found:
                 # no clashes, save this loop
                 self.register.save(self.conformer)
             else:
-                # Dont save it if it clashes on COO
-                self.register.save(last_conformer)
+                # Dont save the last_conformer if it clashes on COO only
+                # Another issue: last_conformer could be set up to always
+                # find a clash on any new loop. 
+                # These two issues will be resolved with the same solution
                 self.conformer = last_conformer
+                self.register.save(last_conformer)
 
         else:
             if n > 100_000:

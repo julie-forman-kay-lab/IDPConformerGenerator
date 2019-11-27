@@ -14,10 +14,10 @@ class ClashValidator:
         each atom within current_chain and last_chain using
         numpy.
         """
-        
+
         # concatenate every residue containing four atoms into one numpy array
-        last_chain_vector = np.concatenate([np.array(list(atom.values())) for atom in last_chain[:-2]]) #ORIGINAL
-        current_chain_vector = np.concatenate([np.array(list(atom.values())) for atom in current_chain[len(last_chain):]]) #ORIGINAL
+        last_chain_vector = np.array([atoms_array for residue in last_chain[:-2] for atoms_array in residue.values()])
+        current_chain_vector = np.array([atoms_array for residue in current_chain[len(last_chain):] for atoms_array in residue.values()])
 
         # get the euclidean distance between each atom
         distances = distance.cdist(last_chain_vector, current_chain_vector, 'euclidean')
@@ -30,8 +30,7 @@ class ClashValidator:
         allowed_distances = np.tile(allowed_distances, (math.ceil(x/4), math.ceil(y/4)))[:,:y] 
 
         clashes = (distances < allowed_distances)
-        for row in clashes:
-            if any(row):
+        if np.any(clashes):
                 self.clashes += 1
                 return True
         return False
@@ -59,16 +58,14 @@ class ClashValidator:
                 try:
                     distances = distance.cdist(previous_coords, new_coords, 'euclidean')
                     clashes = distances < allowed_distances
-                    for row in clashes:
-                        if any(row):
-                            self.clashes += 1
-                            return True
+                    if np.any(clashes):
+                        self.clashes += 1
+                        return True
                 except ValueError:
                         # we are at the last new_index, therefore its made up of only 3 atoms
                         distances = distance.cdist(previous_coords, new_coords, 'euclidean')
                         clashes = distances < allowed_distances[:-1].T
-                        for row in clashes:
-                            if any(row):
-                                self.clashes += 1
-                                return True
+                        if np.any(clashes):
+                            self.clashes += 1
+                            return True
         return False
