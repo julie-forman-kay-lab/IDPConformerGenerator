@@ -2,9 +2,11 @@
 import numpy as np
 import pytest
 
+from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libbuilder as LB
 
+from . import tcommons
 
 class TestConformerTemplate:
     
@@ -188,3 +190,18 @@ def test_Conformer_Builder_integration_1():
     builder = LB.ConformerBuilderNeRF(conf, None)
     assert coords1 is not conf.coords
     assert not np.all(np.equal(coords1, conf.coords))
+
+
+class TestFragLoopDB:
+    def test_init(self):
+        LB.FragmentAngleDB()
+
+    def test_static_read_text(self):
+        data = LB.FragmentAngleDB.read_text_file(
+            Path(tcommons.data_folder, 'LVALL_sample')
+            )
+        assert len(data) == 3
+        assert len(data[0]) == 12 
+        assert len(data[1]) == 10 
+        assert len(data[2]) == 9
+        assert all(isinstance(i, str) for b in data for i in b)

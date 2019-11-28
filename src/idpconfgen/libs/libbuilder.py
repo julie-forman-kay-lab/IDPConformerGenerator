@@ -1,7 +1,12 @@
 """Library for the Conformer builder."""
+import math
+from collections import namedtuple
+
 import numpy as np
 
 from idpconfgen.core import definitions as DEFS
+from idpconfgen.core import interfaces as ITF
+from idpconfgen.libs import libutil as UTIL
 
 
 class ConformerTemplate:
@@ -202,13 +207,228 @@ class ConformerBuilderNeRF:
 
 
 
+     
 
 
+class FragmentAngleDB(ITF.Prototype):
+    
+    """
+    Database for fragment angles.
+
+    Loads angles from a file (text or pickle) of the following format::
+
+        12asA  P L   101  229   98  -79.590   -2.188  179.809
+        12asA  D L   102  228   99 -103.843   11.688  162.288
+        12asA  E L   103  227  100  -58.624  134.132 -167.362
+        12asA  D L   104  226  101  -85.815  -40.242  172.548
+
+        16pkA  Y L   249  166  249  -83.645  148.597  176.997
+        16pkA  S L   250  165  250  -81.829  132.302 -177.161
+        16pkA  I L   251  164  251 -116.621    4.225  178.907
+        16pkA  G L   252  163  252   57.598 -128.309 -178.929
+        16pkA  K L   253  162  253  -97.343   16.681 -177.532
+    
+    Read from files with :attr:`from_file`.
+
+    Attributes
+    ----------
+    db : database
+    """
+    @property
+    def db(self):
+        """
+        Database attribute.
+        """
+        return self._db
+
+    def get_pure_fragment(self):
+        """
+        Retrieve a random fragment from the fragment database.
+        
+        The fragment is in its pure form.
+
+        .. seealso:: :attr:`get_angle_fragment`  
+    
+        """
+        return random.sample(self.db, 1)[0]
+
+    def get_angle_fragment(self, fragsize=None):
+        """
+        Select a random element from population.
+
+        In our case selects a random loop from loop DB.
+        """
+        sliceObj = UTIL.random_fragment(fragsize)
+        frag = self.get_random_fragment()
+        return self._transform_frag2dict(frag[sliceObj])
+    
+    def _transform_frag2dict(self, fragment):
+        """
+        Transform a fragment form the fragment database (:attr:`self.db`)
+        to a res:angle dictionary.
+        
+        For the N-term residue the first PHI angle is discarded.
+        The last PSI and OMEGA angles, are stored and not returned.
+        This is such because these angles will only be used if
+        an additional fragment is required in the building process.
+        Therefore, on the second fragment the first PHI residue is
+        combined with the last OMEGA and PSI from the previous fragment.
+
+        This strategy abstracts the building process and avoids the need
+        to build the first fragment separately and to rebuild the whole
+        conformer from scratch at each fragment addition.
+
+        Parameters
+        ----------
+        fragment
+            A :attr:`self.db` fragment given by :method:`get_pure_fragment`.
+
+        Returns
+        -------
+        dict
+            Contains PHI, PSI and OMEGA angles per key that are required
+            to build an amino-acid. The returned dictionary has
+            one key, starting at 0, for each residue to be built.
+            
+            {0: {
+                'PHI': float,
+                'PSI': float,
+                'OMEGA': float,
+                },
+            1: {
+                'PHI': float,
+                'PSI': float,
+                'OMEGA': float,
+                },
+            }
+        """
+        build_angles = defaultdict(dict)
+        
+        try:
+            build_angles[-1] = self.last
+            is_first = False
+        except AttributeError:
+            is_first = True
+
+        for residue in enumerate(fragment):
+            build_angles[i - 1]['PHI'] = residue.phi
+            build_angles[i]['PSI'] = residue.psi
+            build_angles[i]['OMEGA'] = residue.omega
+        else:
+            self.last = build_angles.pop(i)
+
+        if is_first:
+            # EYES OPEN: this pops key -1, NOT the last position
+            build_angles.pop(-1)
+
+        return build_angles
+    
+    @classmethod
+    def from_file(cls, fname):
+        try:
+            data = cls.read_txt_file(fname)
+        except UnicodeDecodeError:
+            data = cls.from_pickle(fname)
+
+        parsed = self._parse_raw_data(data)
+        c = cls()
+        c._db = parsed
+        return c
+    
+    @staticmethod
+    def read_pickle(fname):
+        """
+        Loads loop database from pickle file.
+        
+        Required format:
+            [
+                [
+                    '12asA  P L   101  229   98  -79.590   -2.188  179.809'
+                    '12asA  D L   102  228   99 -103.843   11.688  162.288'
+                    '12asA  E L   103  227  100  -58.624  134.132 -167.362'
+                    '12asA  D L   104  226  101  -85.815  -40.242  172.548'
+                    ],
+                (...)
+                ]
+             
+        Parameters
+        ----------
+        database_file : pickle
+            Pickle file
+        """
+        with open(database_file, 'rb') as fh:
+             data = pickle.load(fh)
+        return data
+
+    @staticmethod
+    def read_text_file(fname):
+        """
+        Loads database from text file.
+        
+        Required Format:
+            
+            12asA  P L   101  229   98  -79.590   -2.188  179.809
+            12asA  D L   102  228   99 -103.843   11.688  162.288
+            12asA  E L   103  227  100  -58.624  134.132 -167.362
+            12asA  D L   104  226  101  -85.815  -40.242  172.548
 
 
+            12asA  G L   156  174  153   68.074   16.392 -175.411
+            12asA  L L   157  173  154  -81.735  119.822 -176.938
+            12asA  A L   158  172  155  -71.433  133.117 -172.298
+            12asA  I L   165  165  162 -101.494  150.487 -174.989
 
 
+            16pkA  Y L   249  166  249  -83.645  148.597  176.997
+            16pkA  S L   250  165  250  -81.829  132.302 -177.161
+            16pkA  I L   251  164  251 -116.621    4.225  178.907
+            16pkA  G L   252  163  252   57.598 -128.309 -178.929
+            16pkA  K L   253  162  253  -97.343   16.681 -177.532
+            16pkA  S L   254  161  254  -64.590  147.146  179.504
+
+        Parameters
+        ----------
+        fname : str or Path
+            Path to text file angle DB.
+        """
+        with open(fname, 'r') as fh:
+            blocks = fh.read().strip().split('\n\n\n')
+
+        data = []
+        for block in blocks:
+            data.append(block.split('\n'))
+       
+        return data
+
+    @staticmethod
+    def _parse_raw_data(data):
+        parsed_data = []
+        for block in data:
+            parsed_block = []
+            for line in block:
+                ls = line.split()
+                parsed_block.append(
+                    ResidueAngle(
+                        pdbid=ls[0],
+                        letter=ls[1],
+                        dssp=ls[2],
+                        phi=math.radians(float(ls[6])),
+                        psi=math.radians(float(ls[7])),
+                        omega=math.radians(float(ls[8])),
+                        )
+                    )
+            parse_data.append(parsed_block)
+        return parsed_data
 
 
-
-
+ResidueAngle = namedtuple(
+    'ResidueAngle',
+    [
+        'pdbid',
+        'letter',
+        'dssp',
+        'phi',
+        'psi',
+        'omega',
+        ]
+    )
