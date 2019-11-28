@@ -1,11 +1,12 @@
 """Objects interfaces."""
+from copy import deepcopy
 
 
-class _ComponentWithBackReference:
+class ComponentWithBackReference:
     """
     https://refactoring.guru/design-patterns/prototype/python/example
     """
-    def __init__(self, protopype):
+    def __init__(self, prototype):
         self._prototype = prototype
 
     @property
@@ -18,7 +19,12 @@ class _ComponentWithBackReference:
 
 
 class Prototype:
-    """Prototype interface."""
+    """
+    Prototype interface.
+
+    See example:
+        https://refactoring.guru/design-patterns/prototype/python/example
+    """
     def __init__(self):
         self._circular_reference = None
 
@@ -26,7 +32,15 @@ class Prototype:
     def circular_reference(self):
         return self._circular_reference
 
-    @property
+    @circular_reference.setter
     def circular_reference(self, value):
-        assert isinstance(value, _ComponentWithBackReference)
+        assert isinstance(value, ComponentWithBackReference)
         self._circular_reference = value
+
+    def clone(self):
+        """
+        Clones object.
+        """
+        self.circular_reference = deepcopy(self.circular_reference)
+        self.circular_reference.prototype = self
+        return deepcopy(self)
