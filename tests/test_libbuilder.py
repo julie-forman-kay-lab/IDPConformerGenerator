@@ -177,3 +177,14 @@ class TestBuilder:
     
     def test_init(self):
         LB.ConformerBuilderNeRF(None, None)
+
+    
+def test_Conformer_Builder_integration_1():
+    conf = LB.ConformerTemplate('MARVEL')
+    builder = LB.ConformerBuilderNeRF(conf, None)
+    conf.add_atom_coords(0, 'N', np.array([1., 1., 1.,]))
+    coords1 = conf.coords
+    conf = LB.ConformerTemplate('MARVEL')
+    builder = LB.ConformerBuilderNeRF(conf, None)
+    assert coords1 is not conf.coords
+    assert not np.all(np.equal(coords1, conf.coords))
