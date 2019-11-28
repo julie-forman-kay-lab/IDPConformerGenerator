@@ -33,6 +33,8 @@ def test_random_fragment(in1, fragsize, expected):
     3: list with fragsize is None, should return whole list
     4: empty list with fragsize is None, should return empty list
     5: empty list with fragsize is None, should return empty list
+    6: functionality for strings
+    7: functionality for tuples
     """
     result = UTIL.random_fragment(in1, fragsize)
     assert len(in1[result]) == expected
@@ -55,6 +57,8 @@ def test_random_fragment_errors(in1, fragsize, error):
     -----------
     1: Empty list with fragsize > 0
     2: list with fragsize > len(list)
+    3: int
+    4: float
     """
     with pytest.raises(error):
         UTIL.random_fragment(in1, fragsize)
