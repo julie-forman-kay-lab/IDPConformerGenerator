@@ -8,19 +8,19 @@ class ClashValidator:
     def __init__(self):
         self.clashes = 0
 
-    def clash_found_vectorized(self, current_chain, last_chain):
+    def clash_found_vectorized(self, new_chain, last_chain):
         """
         This method calculates every possible distance between 
-        each atom within current_chain and last_chain using
+        each atom within new_chain and last_chain using
         numpy.
         """
 
         # concatenate every residue containing four atoms into one numpy array
         last_chain_vector = np.array([atoms_array for residue in last_chain[:-2] for atoms_array in residue.values()])
-        current_chain_vector = np.array([atoms_array for residue in current_chain[len(last_chain):] for atoms_array in residue.values()])
+        new_chain_vector = np.array([atoms_array for residue in new_chain for atoms_array in residue.values()])
 
         # get the euclidean distance between each atom
-        distances = distance.cdist(last_chain_vector, current_chain_vector, 'euclidean')
+        distances = distance.cdist(last_chain_vector, new_chain_vector, 'euclidean')
 
         # VDW = {"N":1.55, "CA":1.7, "C":1.7, "O":1.52}
         VDW = np.array([1.55, 1.7, 1.7, 1.52])
@@ -35,11 +35,11 @@ class ClashValidator:
                 return True
         return False
 
-    def clash_found(self, current_chain, last_chain):
+    def clash_found(self, new_chain, last_chain):
         """
         This method is the same as clash_found_vectorized but manually
         does the work. Ie iterates once over last_chain and for every
-        value, it iterates once over current_chain and calculates
+        value, it iterates once over new_chain and calculates
         the necessary distances.
 
         """
@@ -52,8 +52,8 @@ class ClashValidator:
             
             previous_coords = np.array(list(last_chain[seen_index].values()))
 
-            for new_index in range(len(last_chain)+1, len(current_chain)):
-                new_coords = np.array(list(current_chain[new_index].values()))
+            for new_index in range(0, len(new_chain)):
+                new_coords = np.array(list(new_chain[new_index].values()))
 
                 try:
                     distances = distance.cdist(previous_coords, new_coords, 'euclidean')

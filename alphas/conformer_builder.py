@@ -520,13 +520,11 @@ class ConformerBuilder:
                 self.register.save(self.conformer)
                 continue
 
-            coo_only = False
             try:
-                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords)
+                clash_found = self.clash_validator.clash_found(self.conformer.coords[len(last_conformer):], last_conformer.coords)
             except ValueError:
                 # added COO only
-                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords, last_conformer.coords[:-1])
-                coo_only = True
+                clash_found = self.clash_validator.clash_found(self.conformer.coords[-1:], last_conformer.coords[:-1])
 
             if not clash_found:
                 # no clashes, save this loop
