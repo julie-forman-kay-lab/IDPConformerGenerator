@@ -186,11 +186,19 @@ class ConformerBuilderNeRF:
                         resindx,
                         )
 
-                    self.conformer.add_atom_coords(
-                        residue_index=resindx,
-                        atom_name=atom,
-                        coords=coords,
-                        )
+                    try:
+                        self.conformer.add_atom_coords(
+                            residue_index=resindx,
+                            atom_name=atom,
+                            coords=coords,
+                            )
+                    except IndexError:
+                        coo_coord = self.make_COO_coord()
+                        self.conformer.add_atom_coords(
+                            residue_index=resindx - 1,
+                            atom_name=DEFS.COO_name,
+                            coords=coo_coord,
+                            )
 
 
 

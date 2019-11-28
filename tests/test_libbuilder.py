@@ -85,7 +85,7 @@ class TestConformerTemplate:
             (0, 'N', 0),
             (0, 'CA', 1),
             (10, 'C', 42),
-            (321321, DEFS.COO_atom, -1),
+            (321321, DEFS.COO_name, -1),
             ],
         )
     def test_get_index(self, resind, aname, expected):
@@ -99,6 +99,9 @@ class TestConformerTemplate:
             ],
         )
     def test_get_index_Errors(self, resind, aname, error):
+        """
+        1: tests against a wrong atom name.
+        """
         with pytest.raises(error):
             LB.ConformerTemplate._get_index(resind, aname)
 
@@ -108,16 +111,21 @@ class TestConformerTemplate:
             (0, 'N', [1.000, 1.000, 1.000], 0),
             (5, 'CA', [1.123, 2.134, 0.321], 5 * 4 + 1),
             (3, 'O', [0.001, 0.230, 0.543], 3 * 4 + 3),
-            (5, DEFS.COO_atom, [1.000, 1.030, 1.040], -1),
-            (0, DEFS.COO_atom, [1.000, 1.030, 1.040], -1),
+            (5, DEFS.COO_name, [1.000, 1.030, 1.040], -1),
+            (0, DEFS.COO_name, [1.000, 1.030, 1.040], -1),
             ],
         )
-    def test_add_cooords(self,resindex, atomname, coords, realindex):
+    def test_add_coords(self,resindex, atomname, coords, realindex):
         ct = LB.ConformerTemplate('MARVEL')
 
         coords = np.array(coords)
         ct.add_atom_coords(resindex, atomname, coords)
         assert all(np.equal(ct.coords[realindex], coords))
+
+    def test_add_coords_resindx_error(self):
+        ct = LB.ConformerTemplate('MARVEL')
+        with pytest.raises(IndexError):
+            ct.add_atom_coords(10, 'N', np.array([1., 1., 1.]))
 
     @pytest.mark.parametrize(
         'seq',
@@ -131,7 +139,7 @@ class TestConformerTemplate:
             for c in DEFS.backbone_atoms:
                 ct.add_atom_coords(i, c, np.array([1.000, 1.000, 1.000]))
         else:
-            ct.add_atom_coords(0, DEFS.COO_atom, np.array([1.00, 1.00, 1.00]))
+            ct.add_atom_coords(0, DEFS.COO_name, np.array([1.00, 1.00, 1.00]))
 
         assert ct.is_complete()
     
@@ -153,7 +161,7 @@ class TestConformerTemplate:
         'resind,aname',
         [
             (0, 'N'),
-            (0, DEFS.COO_atom),
+            (0, DEFS.COO_name),
             ],
         )
     def test_get_coords(self, resind, aname):
@@ -168,4 +176,4 @@ class TestConformerTemplate:
 class TestBuilder:
     
     def test_init(self):
-        LB.ConformerBuilder(None, None)
+        LB.ConformerBuilderNeRF(None, None)
