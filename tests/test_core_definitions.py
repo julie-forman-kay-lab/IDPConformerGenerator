@@ -4,6 +4,26 @@ import pytest
 from idpconfgen.core import definitions as DEFS
 
 
+def test_Atom1():
+    a = DEFS.Atom('N', 1, 0, -1)
+    assert a.name == 'N'
+    assert a.poff == 1
+    assert a.xoff == 0
+    assert a.yoff == -1
+
+
+def test_Atom2_AttributeError():
+    a = DEFS.Atom('N', 1, 0, -1)
+    with pytest.raises(AttributeError):
+        a.name = 'Z'
+    with pytest.raises(AttributeError):
+        a.poff = 0
+    with pytest.raises(AttributeError):
+        a.xoff = 1
+    with pytest.raises(AttributeError):
+        a.yoff = 2
+
+
 def test_aa_letters():
     assert len(DEFS.aa3to1) == len(DEFS.aa1to3)
     assert list(DEFS.aa3to1.keys()) == list(DEFS.aa1to3.values())

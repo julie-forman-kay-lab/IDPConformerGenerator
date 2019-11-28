@@ -33,10 +33,10 @@ class Atom:
         The residue index where the yaxis atom wil be taken.
     """
     def __init__(self, name, parentoff, xoff, yoff):
-        self.name = name
-        self.poff = parentoff
-        self.xoff = xoff
-        self.yoff = yoff
+        self._name = name
+        self._poff = parentoff
+        self._xoff = xoff
+        self._yoff = yoff
     
     def __repr__(self):
         kwargs = ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
@@ -45,6 +45,23 @@ class Atom:
             kwargs,
             )
         return rpr
+
+    @property
+    def name(self):
+        return self._name
+
+    @property
+    def poff(self):
+        return self._poff
+
+    @property
+    def xoff(self):
+        return self._xoff
+
+    @property
+    def yoff(self):
+        return self._yoff
+
 
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
