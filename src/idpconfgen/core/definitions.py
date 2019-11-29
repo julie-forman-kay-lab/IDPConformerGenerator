@@ -1,7 +1,11 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
+from pathlib import Path
 
 import numpy as np
+
+data_folder = Path(__file__.resolve().parents()[1], 'data')
+
 
 class AtomNeRF:
     """
@@ -75,6 +79,7 @@ class AtomNeRF:
     @property
     def resindx(self):
         return self._resindx
+
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
     ahelix='H',
