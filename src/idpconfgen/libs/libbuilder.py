@@ -132,6 +132,60 @@ class ConformerTemplate:
             return index
 
 
+class ConformerNeRF(ConformerTemplate):
+    """Conformer template specific for NeRF building algorithm."""
+    
+    def __init__(self, *args, init_residue_index=0, **kwargs):
+        self._current_residue_index = init_residue_index
+        super().__init__(*args, **kwargs)
+    
+    @property
+    def current_residue_index(self):
+        return self._current_residue_index
+
+    def increment_residue(self):
+        self._current_residue_index += 1
+    
+    def decrement_residue(self):
+        self._current_residue_index -= 1
+
+    def add_coord_NtoC(self, atom, coord):
+        """
+        Add atom coord considering N-term to C-term building.
+
+        Parameters
+        ----------
+        atom : :class:`AtomNeRF`
+            The atom to add to the conformer.
+
+        coords : Numpy array of shape (3,)
+            The XYZ coordinates
+        """
+        self.add_atom_coords(
+            self._current_residue_index + atom.resindx,
+            atom.name,
+            coord,
+            )
+
+    def add_coord_CtoN(self, atom, coord):
+        """
+        Add atom coord considering C-term to N-term building.
+
+        Parameters
+        ----------
+        atom : :class:`AtomNeRF`
+            The atom to add to the conformer.
+
+        coords : Numpy array of shape (3,)
+            The XYZ coordinates
+        """
+        self.add_atom_coords(
+            self._current_residue_index - atom.resindx,
+            atom.name,
+            coord,
+            )
+
+
 class ConformerBuilderNeRF:
     """
     Conformer builder.
@@ -140,12 +194,20 @@ class ConformerBuilderNeRF:
             self,
             conformer,
             angledb,
+            rosettadb,
             frag_size=None,
             ):
         self._conformer = conformer
         self._angledb = angledb
+        self._rosettadb = rosetabd
         self.frag_size = frag_size
-    
+        
+        self.db_atom_map = {
+            'UPPER': DEFS.N_name,
+            'LOWER': DEFS.C_name,
+            }
+
+
     @property
     def conformer(self):
         return self._conformer
@@ -153,28 +215,40 @@ class ConformerBuilderNeRF:
     @property
     def angledb(self):
         return self._angledb
+    
+    @property
+    def rosettadb(self):
+        return self._rosettadb
 
     def _make_coord(self, atomname):
         
+        rosetta_atom = \
+            # example:    [            'ALA'                  ][ 'UPPER'  ]
+            # returns a RosettaAtomData type
+            self.rosettadb[self.conformer.current_residue_type][atom.rname]
+        
+        theta = angles.get(rosetta_atom.polar_theta, rosetta_atom.polar_theta)
+
         parent_coord = self.conformer.get_coord(
-            residue_index + atom.poff,
+            self.conformer.current_residue_index + atom.poff,
             atom.name,
             )
 
         xaxis_coord = self.conformer.get_coord(
-            residue_index + atom.xoff,
+            self.conformer.current_residue_index + atom.xoff,
             atom.name,
             )
 
         yaxis_coord = self.conformer.get_coord(
-            residue_index + atom.yoff,
+            self.conformer.current_residue_index + atom.yoff,
             atom.name,
             )
 
+        coord = LIBCALC.makecoord
 
 
     def build(self):
-        resindx = 0  # starts at 1 because the 0 is made by the seed coords
+        #resindx = 0  # starts at 1 because the 0 is made by the seed coords
 
         while not self.conformer.is_complete():
             
@@ -182,20 +256,21 @@ class ConformerBuilderNeRF:
             
             for residue_angles in fragment_angles:
                 
-                resindx += 1
+                # resindx += 1  # is this then necessary???????
+                self.conformer.increment_residue()
                 
-                for atom in DEFS.NeRF_building_order:
+                for atom_nerf in DEFS.NeRF_building_order:
                 
                     coords = self.make_coord(
                         residue_angles,
-                        atom,
-                        resindx,
+                        atom_nerf,
                         )
 
                     try:
-                        self.conformer.add_atom_coords(
-                            residue_index=resindx,
-                            atom_name=atom,
+                        self.conformer.add_coord_NtoC(
+                        #self.conformer.add_atom_coords(
+                            #residue_index=resindx,
+                            atom=atom_nerf,
                             coords=coords,
                             )
                     except IndexError:
@@ -436,3 +511,95 @@ ResidueAngle = namedtuple(
         'omega',
         ]
     )
+
+
+class RosettaAtomData:
+    """
+    Rosetta atom data for building.
+
+    Required atom information to perform the angle to coordinate
+    transformation using the NeRF algorithm. Data was extracted from
+    the Rosetta Commons suite.
+    """
+    def __init__(
+            self,
+            polar_theta=None,
+            polar_phi=None,
+            polar_r=None,
+            parent_atom=None,
+            xaxis_atom=None,
+            yaxis_atom=None,
+            ):
+        self.polar_theta = polar_theta
+        self.polar_phi = polar_phi
+        self.polar_r = polar_r
+        self.parent_atom = parent_atom
+        self.xaxis_atom = xaxis_atom
+        self.yaxis_atom = yaxis_atom
+    
+    def __repr__(self):
+        kwargs = ', '.join(
+            f'{key}={val!r}' for key, val in self.__dict__.items()
+            )
+        rpr = '{}({})'.format(
+            __class__.__name__,
+            kwargs,
+            )
+        return rpr
+
+    def __str__(self):
+            return repr(self)
+
+
+def read_rosetta_db(folder, ext='.params'):
+    """
+    Read ROSETTA DB parameters need for conformer building.
+
+    folder path -> dict
+    """
+    rosetta_db = {}
+    for aa in DEFS.aa3to1.keys():
+
+        afile = Path(DEFS.data_folder, aa).with_suffix(ext).open().readlines()
+        
+        rosetta_db[aa] = {}
+
+        icoor_filter = filter(
+            lambda x: x.startswith('ICOOR_INTERNAL'),
+            afile,
+            )
+
+        for a in icoor_filter:
+            
+            current = RosettaAtomData()
+            l = a.split()
+
+            atom = l[1]
+            current.polar_theta = math.radians(float(l[2]))
+            current.polar_phi = math.radians(float(l[3]))
+            current.polar_r = float(l[4])
+
+            current.parent_atom = l[5]
+            current.xaxis_atom = l[6]
+            current.yaxis_atom = l[7]
+
+            # Handles special cases
+            if atom == "CA":
+                # this replaces the 180.000 in the .params file
+                current.polar_phi = math.radians(58.300)
+                current.polar_theta = "OMEGA"
+
+                current.parent_atom = "N"
+                current.xaxis_atom = "C"
+                current.yaxis_atom = "CA"
+            
+            elif atom == "UPPER":
+                current.polar_theta = "PSI"
+                
+            elif atom == "C":
+                current.polar_theta = "PHI"
+
+            rosetta_db[aa][atom] = current
+
+    return rosetta_db
+
