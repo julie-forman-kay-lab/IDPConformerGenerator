@@ -4,7 +4,8 @@ from pathlib import Path
 
 import numpy as np
 
-data_folder = Path(__file__.resolve().parents()[1], 'data')
+_file_path = Path(__file__).resolve()
+data_folder = Path(_file_path.parents[1], 'data')
 
 
 class AtomNeRF:
@@ -150,11 +151,21 @@ C_name = 'C'
 O_name = 'O'
 COO_name = 'X'
 
+# to build forward
 N_atom_NeRF = AtomNeRF(N_name, -1, -1, -1, 0)
 CA_atom_NeRF = AtomNeRF(CA_name, 0, -1, -1, 0)
 C_atom_NeRF = AtomNeRF(C_name, 0, 0, -1, 0)
 O_atom_NeRF = AtomNeRF(O_name, 0, 0, 1, -1)
 NeRF_building_order = [N_atom_NeRF, O_atom_NeRF, CA_atom_NeRF, C_atom_NeRF]
+
+# to build backwards
+N_atom_NeRF_b = AtomNeRF(N_name, 1, 1, 1, 0)
+CA_atom_NeRF_b = AtomNeRF(CA_name, 0, 1, 1, 0)
+C_atom_NeRF_b = AtomNeRF(C_name, 0, 0, 1, 0)
+O_atom_NeRF_b = AtomNeRF(O_name, 0, 0, -1, 1)
+NeRF_building_order_CtoN = \
+    [N_atom_NeRF_b, O_atom_NeRF_b, CA_atom_NeRF_b, C_atom_NeRF_b]
+
 
 backbone_atoms = (N_name, CA_name, C_name, O_name)
 num_bb_atoms = len(backbone_atoms)

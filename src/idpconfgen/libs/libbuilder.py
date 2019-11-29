@@ -196,12 +196,23 @@ class ConformerBuilderNeRF:
             angledb,
             rosettadb,
             frag_size=None,
+            reverse_build=False,
             ):
         self._conformer = conformer
         self._angledb = angledb
-        self._rosettadb = rosetabd
+        self._rosettadb = rosettadb
         self.frag_size = frag_size
-        
+        self.reverse_build = reverse_build
+
+        if reverse_build:  # build from C to N
+            self.increment_conformer_residue = self._conformer.decrement_residue
+            self.building_order = DEFS.NeRF_building_order_CtoN
+            self.get_fragment = self.angledb.get_fragment_reversed
+        else:  # build from N to C
+            self.increment_conformer_residue = self._conformer.increment_residue
+            self.building_order = DEFS.NeRF_building_order
+            self.get_fragment = self.angledb.get_fragment
+
         self.db_atom_map = {
             'UPPER': DEFS.N_name,
             'LOWER': DEFS.C_name,
@@ -220,46 +231,19 @@ class ConformerBuilderNeRF:
     def rosettadb(self):
         return self._rosettadb
 
-    def _make_coord(self, atomname):
-        
-        rosetta_atom = \
-            # example:    [            'ALA'                  ][ 'UPPER'  ]
-            # returns a RosettaAtomData type
-            self.rosettadb[self.conformer.current_residue_type][atom.rname]
-        
-        theta = angles.get(rosetta_atom.polar_theta, rosetta_atom.polar_theta)
-
-        parent_coord = self.conformer.get_coord(
-            self.conformer.current_residue_index + atom.poff,
-            atom.name,
-            )
-
-        xaxis_coord = self.conformer.get_coord(
-            self.conformer.current_residue_index + atom.xoff,
-            atom.name,
-            )
-
-        yaxis_coord = self.conformer.get_coord(
-            self.conformer.current_residue_index + atom.yoff,
-            atom.name,
-            )
-
-        coord = LIBCALC.makecoord
-
 
     def build(self):
         #resindx = 0  # starts at 1 because the 0 is made by the seed coords
 
         while not self.conformer.is_complete():
             
-            fragment_angles = self.angledb.get_fragment(size=self.frag_size)
+            fragment_angles = self.get_fragment(size=self.frag_size)
             
             for residue_angles in fragment_angles:
                 
-                # resindx += 1  # is this then necessary???????
-                self.conformer.increment_residue()
+                self.increment_conformer_residue()
                 
-                for atom_nerf in DEFS.NeRF_building_order:
+                for atom_nerf in self.building_order:
                 
                     coords = self.make_coord(
                         residue_angles,
@@ -281,6 +265,56 @@ class ConformerBuilderNeRF:
                             coords=coo_coord,
                             )
 
+    def _make_coord(self, residue_angles, atom):
+        
+        # example:    self.rosettadb['ALA']['UPPER']
+        # returns a RosettaAtomData type
+        rosetta_atom = \
+            self.rosettadb[self.conformer.current_residue_type][atom.rname]
+        
+        theta = residue_angles.get(
+            rosetta_atom.polar_theta,
+            rosetta_atom.polar_theta,
+            )
+
+        parent_coord, xaxis_coord, yaxis_coord = self._get_coords(atom)
+
+        coord = LIBCALC.makecoord
+
+    def _make_coord_CtoN(self, residue_angles, atom):
+        
+        # example:    self.rosettadb['ALA']['UPPER']
+        # returns a RosettaAtomData type
+        #rosetta_atom = \
+        #    self.rosettadb[self.conformer.current_residue_type][atom.rname]
+        
+        #theta = residue_angles.get(
+        #    rosetta_atom.polar_theta,
+        #    rosetta_atom.polar_theta,
+        #    )
+
+        parent_coord, xaxis_coord, yaxis_coord = \
+            self._get_coords(atom, reverse=-1)
+
+        #coord = LIBCALC.makecoord
+
+    def _get_coords(self, atom):
+        """atom is a :class:`Atom_NeRF`."""
+
+        parent_coord = self.conformer.get_coord(
+            self.conformer.current_residue_index + atom.poff,
+            atom.name,
+            )
+
+        xaxis_coord = self.conformer.get_coord(
+            self.conformer.current_residue_index + atom.xoff,
+            atom.name,
+            )
+
+        yaxis_coord = self.conformer.get_coord(
+            self.conformer.current_residue_index + atom.yoff,
+            atom.name,
+            )
 
 
 class FragmentDBABC(ABC):
