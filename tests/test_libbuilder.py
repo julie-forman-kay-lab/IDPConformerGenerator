@@ -192,12 +192,17 @@ def test_Conformer_Builder_integration_1():
     assert not np.all(np.equal(coords1, conf.coords))
 
 
+def test_fragment_ABC():
+    with pytest.raises(TypeError):
+        LB.FragmentDBABC()
+
+
 class TestFragLoopDB:
     def test_init(self):
-        LB.FragmentAngleDB()
+        LB.FragmentAngleDBNeRF()
 
     def test_static_read_text(self):
-        data = LB.FragmentAngleDB.read_text_file(
+        data = LB.FragmentAngleDBNeRF.read_text_file(
             Path(tcommons.data_folder, 'LVALL_sample')
             )
         assert len(data) == 3
@@ -209,11 +214,11 @@ class TestFragLoopDB:
 
     def tests_static_parse_raw_data(self):
         """Test data parsing to fragment blocks."""
-        data = LB.FragmentAngleDB.read_text_file(
+        data = LB.FragmentAngleDBNeRF.read_text_file(
             Path(tcommons.data_folder, 'LVALL_sample')
             )
 
-        parsed_data = LB.FragmentAngleDB._parse_raw_data(data)
+        parsed_data = LB.FragmentAngleDBNeRF._parse_raw_data(data)
         assert len(parsed_data[0]) == 12
         assert len(parsed_data[0][0]) == 6
         assert all(isinstance(i, LB.ResidueAngle) for i in parsed_data[0])
@@ -229,8 +234,8 @@ class TestFragLoopDB:
         )
     def test_from_file(self, fname):
         """Test read from file."""
-        fragdb = LB.FragmentAngleDB.from_file(fname)
-        assert isinstance(fragdb, LB.FragmentAngleDB)
+        fragdb = LB.FragmentAngleDBNeRF.from_file(fname)
+        assert isinstance(fragdb, LB.FragmentAngleDBNeRF)
 
 
 class TestResidueAngleTuple:

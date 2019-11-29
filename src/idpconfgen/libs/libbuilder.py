@@ -1,4 +1,5 @@
 """Library for the Conformer builder."""
+from abc import ABC, abstractmethod
 import math
 from collections import namedtuple
 
@@ -207,12 +208,14 @@ class ConformerBuilderNeRF:
 
 
 
-     
+class FragmentDBABC(ABC):
+    
+    @abstractmethod
+    def get_pure_fragment(self):
+        return
 
 
-
-
-class FragmentAngleDB(ITF.Prototype):
+class FragmentAngleDBNeRF(FragmentDBABC, ITF.Prototype):
     """
     Database for fragment angles.
 
