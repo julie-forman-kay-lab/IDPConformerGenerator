@@ -5,15 +5,16 @@ from idpconfgen.core import definitions as DEFS
 
 
 def test_Atom1():
-    a = DEFS.Atom('N', 1, 0, -1)
+    a = DEFS.AtomNeRF('N', 1, 0, -1, 0)
     assert a.name == 'N'
     assert a.poff == 1
     assert a.xoff == 0
     assert a.yoff == -1
+    assert a.resindx == 0
 
 
 def test_Atom2_AttributeError():
-    a = DEFS.Atom('N', 1, 0, -1)
+    a = DEFS.AtomNeRF('N', 1, 0, -1, 0)
     with pytest.raises(AttributeError):
         a.name = 'Z'
     with pytest.raises(AttributeError):
@@ -22,6 +23,8 @@ def test_Atom2_AttributeError():
         a.xoff = 1
     with pytest.raises(AttributeError):
         a.yoff = 2
+    with pytest.raises(AttributeError):
+        a.resindx = 0
 
 
 def test_aa_letters():

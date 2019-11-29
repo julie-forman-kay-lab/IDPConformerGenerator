@@ -3,9 +3,9 @@ from argparse import Namespace
 
 import numpy as np
 
-class Atom:
+class AtomNeRF:
     """
-    Defines an atom building block.
+    Defines an atom building block for NeRF algorithm.
 
     Atoms building blocks are used during the confomer construction.
     
@@ -14,7 +14,12 @@ class Atom:
     Reference Frame building protocol. 0 means the reference atom is taken
     from the same residue where the Atom is going to the inserted.
     Likewise, -1 means from the previous residue and 1 from the next
-    residue.
+    residue. Same applies for the `resindx` parameter, where indexes
+    refer to the building progress: 0 the current residue being built,
+    -1 the previously built residue and 1 the following residue.
+
+    There is no differentiation from N to C building or C to N building,
+    that is done at the level of the ConformerNeRF and BuilderNeRF.
 
     See :class:`ConformerBuilder`
 
@@ -31,12 +36,17 @@ class Atom:
     
     yoff
         The residue index where the yaxis atom wil be taken.
+
+    resindx
+        The residue index relative to the building process where to
+        add the atom.
     """
-    def __init__(self, name, parentoff, xoff, yoff):
+    def __init__(self, name, parentoff, xoff, yoff, resindx):
         self._name = name
         self._poff = parentoff
         self._xoff = xoff
         self._yoff = yoff
+        self._resindx = resindx
     
     def __repr__(self):
         kwargs = ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
@@ -62,7 +72,9 @@ class Atom:
     def yoff(self):
         return self._yoff
 
-
+    @property
+    def resindx(self):
+        return self._resindx
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
     ahelix='H',
@@ -133,10 +145,10 @@ C_name = 'C'
 O_name = 'O'
 COO_name = 'X'
 
-N_atom_NeRF = Atom(N_name, -1, -1, -1)
-CA_atom_NeRF = Atom(CA_name, 0, -1, -1)
-C_atom_NeRF = Atom(C_name, 0, 0, -1)
-O_atom_NeRF = Atom(O_name, 0, 0, 1)
+N_atom_NeRF = AtomNeRF(N_name, -1, -1, -1, 0)
+CA_atom_NeRF = AtomNeRF(CA_name, 0, -1, -1, 0)
+C_atom_NeRF = AtomNeRF(C_name, 0, 0, -1, 0)
+O_atom_NeRF = AtomNeRF(O_name, 0, 0, 1, -1)
 NeRF_building_order = [N_atom_NeRF, O_atom_NeRF, CA_atom_NeRF, C_atom_NeRF]
 
 backbone_atoms = (N_name, CA_name, C_name, O_name)
