@@ -205,3 +205,44 @@ class TestFragLoopDB:
         assert len(data[1]) == 10 
         assert len(data[2]) == 9
         assert all(isinstance(i, str) for b in data for i in b)
+        assert len(data[0][0].split()) == 9
+
+    def tests_static_parse_raw_data(self):
+        """Test data parsing to fragment blocks."""
+        data = LB.FragmentAngleDB.read_text_file(
+            Path(tcommons.data_folder, 'LVALL_sample')
+            )
+
+        parsed_data = LB.FragmentAngleDB._parse_raw_data(data)
+        assert len(parsed_data[0]) == 12
+        assert len(parsed_data[0][0]) == 6
+        assert all(isinstance(i, LB.ResidueAngle) for i in parsed_data[0])
+        assert isinstance(parsed_data[0][0].phi, float)
+        assert isinstance(parsed_data[0][0].psi, float)
+        assert isinstance(parsed_data[0][0].omega, float)
+    
+    @pytest.mark.parametrize(
+        'fname',
+        [
+            (Path(tcommons.data_folder, 'LVALL_sample')),
+            ],
+        )
+    def test_from_file(self, fname):
+        """Test read from file."""
+        fragdb = LB.FragmentAngleDB.from_file(fname)
+        assert isinstance(fragdb, LB.FragmentAngleDB)
+
+
+class TestResidueAngleTuple:
+    """Test ResidueAngle Tuple."""    
+
+    resang = LB.ResidueAngle('1XXX', 'A', 'L', 1.0, 2.0, 3.0)
+
+    def test_attributes(self):
+        assert self.resang.pdbid == '1XXX'
+        assert self.resang.letter == 'A'
+        assert self.resang.dssp == 'L'
+        assert self.resang.phi == 1.0
+        assert self.resang.psi == 2.0
+        assert self.resang.omega == 3.0
+

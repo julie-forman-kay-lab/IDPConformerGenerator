@@ -210,8 +210,9 @@ class ConformerBuilderNeRF:
      
 
 
+
+
 class FragmentAngleDB(ITF.Prototype):
-    
     """
     Database for fragment angles.
 
@@ -326,11 +327,11 @@ class FragmentAngleDB(ITF.Prototype):
     @classmethod
     def from_file(cls, fname):
         try:
-            data = cls.read_txt_file(fname)
+            data = cls.read_text_file(fname)
         except UnicodeDecodeError:
             data = cls.from_pickle(fname)
 
-        parsed = self._parse_raw_data(data)
+        parsed = cls._parse_raw_data(data)
         c = cls()
         c._db = parsed
         return c
@@ -417,7 +418,7 @@ class FragmentAngleDB(ITF.Prototype):
                         omega=math.radians(float(ls[8])),
                         )
                     )
-            parse_data.append(parsed_block)
+            parsed_data.append(parsed_block)
         return parsed_data
 
 
