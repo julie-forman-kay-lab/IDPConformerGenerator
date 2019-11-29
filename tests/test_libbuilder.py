@@ -175,6 +175,18 @@ class TestConformerTemplate:
         assert np.all(np.equal(result, coords))
 
 
+class TestConformerNeRF:
+   
+    @pytest.mark.parametrize(
+        'seq',
+        [
+            ('MARVEL'),
+            ],
+        )
+    def test_init(self, seq):
+        LB.ConformerNeRF(seq)
+
+
 class TestBuilder:
     
     def test_init(self):
