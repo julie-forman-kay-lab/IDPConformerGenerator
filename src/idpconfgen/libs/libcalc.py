@@ -66,9 +66,9 @@ def make_axis_vectors(A, B, C):
     return parallel_ABC, AB_vect, perpendicular
 
 
-def RT_to_plane(A, B, C):
+def rotation_to_plane(A, B, C):
     """
-    Define rotations and translation matrices for planar orientation.
+    Define rotations matricex for planar orientation.
 
     Where, A->B determine the X axis, Y is the normal vector to the ABC
         plane, and A is defined at 0,0,0.
@@ -93,7 +93,7 @@ def RT_to_plane(A, B, C):
     
     v = AXIS_111
     
-    return np.dot(b, v)
+    return np.dot(b, v).T
 
 
 def make_coord(theta, phi, distance, parent, xaxis, yaxis):
@@ -102,7 +102,7 @@ def make_coord(theta, phi, distance, parent, xaxis, yaxis):
     
     .. seealso::
         
-        :func:`make_coord_from_angles`, :func:`RT_to_plane`.
+        :func:`make_coord_from_angles`, :func:`rotation_to_plane`.
 
     Parameters
     ----------
@@ -134,7 +134,7 @@ def make_coord(theta, phi, distance, parent, xaxis, yaxis):
         The new coordinate in space.
     """
     new_coord = make_coord_from_angles(theta, phi, distance)
-    rotation = RT_to_plane(parent, xaxis, yaxis)
+    rotation = rotation_to_plane(parent, xaxis, yaxis)
     new_coord = np.dot(new_coord, rotation.T)
     return new_coord + parent
 
