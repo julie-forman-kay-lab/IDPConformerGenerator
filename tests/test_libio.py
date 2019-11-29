@@ -143,6 +143,7 @@ def test_list_files_recursively_1():
             'cull.list',
             'pdblist.list',
             'path_bundle.flist',
+            'LVALL_sample',
             ]
         ]
     
@@ -188,6 +189,7 @@ def test_read_path_bundle_typeerror(in1):
                 Path(tcommons.data_folder, '1A12_A.pdb'),
                 Path(tcommons.data_folder, '1ABC_D.dssp'),
                 Path(tcommons.data_folder, '1ABC_E.dssp'),
+                Path(tcommons.data_folder, 'LVALL_sample'),
                 Path(tcommons.data_folder, 'cull.list'),
                 Path(tcommons.data_folder, 'pdblist.list'),
                 Path(tcommons.data_folder, 'wrong.dssp'),
@@ -206,6 +208,7 @@ def test_read_path_bundle_typeerror(in1):
                 Path(tcommons.data_folder, '1A12_A.pdb'),
                 Path(tcommons.data_folder, '1ABC_D.dssp'),
                 Path(tcommons.data_folder, '1ABC_E.dssp'),
+                Path(tcommons.data_folder, 'LVALL_sample'),
                 Path(tcommons.data_folder, 'cull.list'),
                 Path(tcommons.data_folder, 'pdblist.list'),
                 Path(tcommons.data_folder, 'wrong.dssp'),
