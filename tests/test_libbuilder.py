@@ -190,16 +190,16 @@ class TestConformerNeRF:
 class TestBuilder:
     
     def test_init(self):
-        LB.ConformerBuilderNeRF(None, None)
+        LB.ConformerBuilderNeRF(None, None, None)
 
     
 def test_Conformer_Builder_integration_1():
     conf = LB.ConformerTemplate('MARVEL')
-    builder = LB.ConformerBuilderNeRF(conf, None)
+    builder = LB.ConformerBuilderNeRF(conf, None, None)
     conf.add_atom_coords(0, 'N', np.array([1., 1., 1.,]))
     coords1 = conf.coords
     conf = LB.ConformerTemplate('MARVEL')
-    builder = LB.ConformerBuilderNeRF(conf, None)
+    builder = LB.ConformerBuilderNeRF(conf, None, None)
     assert coords1 is not conf.coords
     assert not np.all(np.equal(coords1, conf.coords))
 
@@ -263,3 +263,21 @@ class TestResidueAngleTuple:
         assert self.resang.psi == 2.0
         assert self.resang.omega == 3.0
 
+class TestRosettaAtom:
+    """Test RosettaAtom class to represent atoms from Rosetta building DB."""
+
+    ra = LB.RosettaAtomData(1, 2, 3, 4, 5, 6)
+
+    @pytest.mark.parametrize(
+        'attr1,expected',
+        [
+            (ra.polar_theta, 1),
+            (ra.polar_phi, 2),
+            (ra.polar_r, 3),
+            (ra.parent_atom, 4),
+            (ra.xaxis_atom, 5),
+            (ra.yaxis_atom, 6),
+            ],
+        )
+    def test_polar_theta(self, attr1, expected):
+        assert attr1 == expected

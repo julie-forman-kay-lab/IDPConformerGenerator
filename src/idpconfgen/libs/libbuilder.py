@@ -18,9 +18,9 @@ class ConformerTemplate:
         system.
     """
     def __init__(self, seq):
-        
+         
         self._seq = self._parse_seq(seq)
-        
+         
         # 1 is for the additional oxygen atom in the C-term carboxyl
         num_of_atoms = len(self.seq) * DEFS.num_bb_atoms + 1
 
@@ -31,11 +31,15 @@ class ConformerTemplate:
 
         self._coords = coords.reshape(num_of_atoms, 3)
         
+        # this will need to be updated if we incorporated sidechains
         self._atomnames = \
             np.array(
                 DEFS.backbone_atoms * len(self.seq) + (DEFS.COO_name,),
                 dtype='<U1',
                 )
+         
+        # backbone mask does not account for O from (COO)
+        self.bb_mask = np.isin(self.atom_names, DEFS.backbone_atoms)
 
     @property
     def seq(self):
@@ -101,7 +105,25 @@ class ConformerTemplate:
         self.coords[self._get_index(residue_index, atom_name),:] = coords
 
     def is_complete(self):
+        """
+        Evaluate if conformer is complete.
+
+        True if all atoms in conformer coords array have assigned
+        coordinates.
+        """
         return not np.any(np.isnan(self.coords))
+
+    def is_bb_complete(self):
+        """
+        True if all backbone atoms are assigned coordinates.
+
+        .. note::
+            
+            Additional oxygen from terminal carboxyl group does not
+            count as backbone atom.
+
+        """
+        return not np.any(np.isnan(self.coords[self.bb_mask,:]))
 
     @staticmethod
     def _parse_seq(seq):
@@ -148,6 +170,7 @@ class ConformerNeRF(ConformerTemplate):
     
     def decrement_residue(self):
         self._current_residue_index -= 1
+    
 
     def add_coord_NtoC(self, atom, coord):
         """
@@ -198,6 +221,7 @@ class ConformerBuilderNeRF:
             frag_size=None,
             reverse_build=False,
             ):
+        #
         self._conformer = conformer
         self._angledb = angledb
         self._rosettadb = rosettadb
@@ -231,42 +255,56 @@ class ConformerBuilderNeRF:
     def rosettadb(self):
         return self._rosettadb
 
+    def build_backbone(self):
+        """Build backbone of conformer."""
+        while True: #  not self.conformer.is_bb_complete():
+            try:
+                self._build_backbone()
+            except StopIteration:
+                pass
+    
+    def _build_backbone(self):
 
-    def build(self):
-        #resindx = 0  # starts at 1 because the 0 is made by the seed coords
+        fragment_angles = self.get_fragment(size=self.frag_size)
+         
+        for residue_angles in fragment_angles:
+            
+            #if self.conformer.is_bb_complete():
+            #    raise StopIteration
 
-        while not self.conformer.is_complete():
+            # this can be incremented directly in the first run
+            # because the first residue of the conformer template
+            # is already created by the seed coordinates
+            self.increment_conformer_residue()
             
-            fragment_angles = self.get_fragment(size=self.frag_size)
-            
-            for residue_angles in fragment_angles:
+            for atom_nerf in self.building_order:
                 
-                self.increment_conformer_residue()
-                
-                for atom_nerf in self.building_order:
-                
+                if self._valid_to_build(
+                        self.conformer.current_residue_index_resindx,
+                        atom_nerf.name
+                        ):
+
                     coords = self.make_coord(
                         residue_angles,
                         atom_nerf,
                         )
 
-                    try:
-                        self.conformer.add_coord_NtoC(
-                        #self.conformer.add_atom_coords(
-                            #residue_index=resindx,
-                            atom=atom_nerf,
-                            coords=coords,
-                            )
-                    except IndexError:
-                        coo_coord = self.make_COO_coord()
-                        self.conformer.add_atom_coords(
-                            residue_index=resindx - 1,
-                            atom_name=DEFS.COO_name,
-                            coords=coo_coord,
-                            )
+                    self.conformer.add_atom_coords(
+                        residue_index= (
+                            self.conformer.current_residue_index_resindx
+                            + atom_nerg.resindx
+                            ),
+                        atom=atom_nerf.name,
+                        coords=coords,
+                        )
+                else:
+                    raise StopIteration
+
+    def _valid_to_build(self, index, atom_name):
+        return np.all(np.isnan(self.conformer.get_coord(index, atom_name)))
 
     def _make_coord(self, residue_angles, atom):
-        
+         
         # example:    self.rosettadb['ALA']['UPPER']
         # returns a RosettaAtomData type
         rosetta_atom = \
