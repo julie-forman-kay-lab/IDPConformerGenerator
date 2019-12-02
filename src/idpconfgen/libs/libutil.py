@@ -4,11 +4,24 @@ import random
 
 def random_fragment(iterable, fragsize=None):
     """
-    Generate a slice object to get a fragment of `fragsize` iterable.
+    Generate a slice object that reflects a random fragment from iterable.
     
-    (iterable, int -> slice)
+    (iterable, int -> slice object)
     
-    If `fragsize` is ``None``, returns a full range slice object.
+    Parameters
+    ----------
+    iterable : iterable-type
+        An interable: string, list, tuple, etc.
+
+    fragsize : int or NoneType
+        The size of the fragment to generate.
+
+    Returns
+    -------
+    slice object
+        A slice object reflecting a random fragment of the `iterable`
+        of size `fragsize`.
+        If `fragsize` is ``None``, returns a full range slice object.
     """
     
     # this is separate from the try: block to account input of for types
