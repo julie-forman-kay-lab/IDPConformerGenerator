@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.spatial import distance
+from scipy.spatial import KDTree
 from numpy import array
 import math
 
@@ -35,37 +36,35 @@ class ClashValidator:
                 return True
         return False
 
-    def clash_found(self, new_chain, last_chain):
+    def clash_found_kdtree(self, new_chain,last_chain ):
         """
-        This method is the same as clash_found_vectorized but manually
-        does the work. Ie iterates once over last_chain and for every
-        value, it iterates once over new_chain and calculates
-        the necessary distances.
+        Abstract and pretend all molecules are one. This will make things a lot faster
+        """
+        # concatenate every residue containing four atoms into one numpy array
+        last_chain_vector = np.array([atoms_array for residue in last_chain[:-2] for atoms_array in residue.values()])
+        new_chain_vector = np.array([atoms_array for residue in new_chain for atoms_array in residue.values()])
 
-        """
+        last_chain_kdtree = KDTree(last_chain_vector)
+        new_chain_kdtree = KDTree(new_chain_vector)
+
+        # VDW = {"N":1.55, "CA":1.7, "C":1.7, "O":1.52}
         VDW = np.array([1.55, 1.7, 1.7, 1.52])
         allowed_distances = np.add.outer(VDW,VDW)
 
-        # compare the new loop with everything we had so far and make sure
-        # no clashes exist
-        for seen_index in range(0, len(last_chain)-2):
-            
-            previous_coords = np.array(list(last_chain[seen_index].values()))
+        # VDW = {"N":1.55, "CA":1.7, "C":1.7, "O":1.52}
+        clashes = last_chain_kdtree.sparse_distance_matrix(new_chain_kdtree, 3.4) #maximum value to consider
+        for indices, distance in zip(clashes.keys(),clashes.values()):
+            if distance <= 3.04:
+                # we don't care what the atoms are, this is a clash
+                return True
 
-            for new_index in range(0, len(new_chain)):
-                new_coords = np.array(list(new_chain[new_index].values()))
+            row = indices[0] % 4
+            column = indices[1] % 4
 
-                try:
-                    distances = distance.cdist(previous_coords, new_coords, 'euclidean')
-                    clashes = distances < allowed_distances
-                    if np.any(clashes):
-                        self.clashes += 1
-                        return True
-                except ValueError:
-                        # we are at the last new_index, therefore its made up of only 3 atoms
-                        distances = distance.cdist(previous_coords, new_coords, 'euclidean')
-                        clashes = distances < allowed_distances[:-1].T
-                        if np.any(clashes):
-                            self.clashes += 1
-                            return True
+            if distance <= allowed_distances[row, column]:
+                return True
+        
         return False
+
+
+        print(clashes)
