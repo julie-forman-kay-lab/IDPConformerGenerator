@@ -5,6 +5,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import interfaces as ITF
 from idpconfgen.libs import libutil as UTIL
@@ -42,7 +43,7 @@ class ConformerTemplate:
                 )
          
         # backbone mask does not account for O from (COO)
-        self.bb_mask = np.isin(self.atom_names, DEFS.backbone_atoms)
+        self.bb_mask = np.isin(self.atomnames, DEFS.backbone_atoms)
 
     @property
     def seq(self):
@@ -157,7 +158,7 @@ class ConformerTemplate:
             return index
 
 
-class AtomNeRF(DEFS.ReprClean):
+class AtomNeRF(ITF.ReprClean):
     """
     Defines an atom building block for NeRF algorithm.
 
@@ -235,10 +236,10 @@ class AtomNeRF(DEFS.ReprClean):
 
 
 # to build forward
-N_atom_NeRF = AtomNeRF('UPPER', DEFS.N_name, -1, -1, -1, 0)
-CA_atom_NeRF = AtomNeRF('CA', DEFS.CA_name, 0, -1, -1, 0)
-C_atom_NeRF = AtomNeRF('C', DEFS.C_name, 0, 0, -1, 0)
-O_atom_NeRF = AtomNeRF('O', DEFS.O_name, 0, 0, 1, -1)
+N_atom_NeRF = AtomNeRF(DEFS.N_name, 'UPPER', -1, -1, -1, 0)
+CA_atom_NeRF = AtomNeRF(DEFS.CA_name, 'CA', 0, -1, -1, 0)
+C_atom_NeRF = AtomNeRF(DEFS.C_name, 'C', 0, 0, -1, 0)
+O_atom_NeRF = AtomNeRF(DEFS.O_name, 'O', 0, 0, 1, -1)
 NeRF_building_order_NtoC = [
     N_atom_NeRF,
     O_atom_NeRF,
@@ -247,10 +248,10 @@ NeRF_building_order_NtoC = [
     ]
 
 # to build backwards
-N_atom_NeRF_b = AtomNeRF('N', DEFS.N_name, 1, 1, 1, 0)
-CA_atom_NeRF_b = AtomNeRF('CA', DEFS.CA_name, 0, 1, 1, 0)
-C_atom_NeRF_b = AtomNeRF('LOWER', DEFS.C_name, 0, 0, 1, 0)
-O_atom_NeRF_b = AtomNeRF('O', DEFS.O_name, 0, 0, -1, 0)
+N_atom_NeRF_b = AtomNeRF(DEFS.N_name, 'N', 1, 1, 1, 0)
+CA_atom_NeRF_b = AtomNeRF(DEFS.CA_name, 'CA', 0, 1, 1, 0)
+C_atom_NeRF_b = AtomNeRF(DEFS.C_name, 'LOWER', 0, 0, 1, 0)
+O_atom_NeRF_b = AtomNeRF(DEFS.O_name, 'O', 0, 0, -1, 0)
 NeRF_building_order_CtoN = [
     C_atom_NeRF_b,
     CA_atom_NeRF_b,
@@ -259,46 +260,152 @@ NeRF_building_order_CtoN = [
     ]
 
 
-class ConformerNeRF(ConformerTemplate):
-    """Conformer template specific for NeRF building algorithm."""
-    
-    #def __init__(self, *args, init_residue_index=0, **kwargs):
-        #self._current_residue_index = init_residue_index
-        #super().__init__(*args, **kwargs)
-    
-    #@property
-    #def current_residue_index(self):
-    #    return self._current_residue_index
+class FragmentAngleDBNeRF(ITF.Prototype):
+    """Data base of angles from loop fragments."""     
+     
+    def __new__(cls, *args, **kwargs):
+        if args and Path(args[0]).exists():
+            return cls.from_file(args[0])
+        else:
+            errmsg = 'use {}.from_file method to initiate from a file.'
+            raise NotImplementedError(errmsg.format(cls.__class__.__name__))
 
-    #def increment_residue(self):
-    #    self._current_residue_index += 1
-    #
-    #def decrement_residue(self):
-    #   self._current_residue_index -= 1
-
-    def add_coord(self, atom, coord):
+    def get_angle_fragment(self, fragsize=None):
         """
-        Adds atom (:class:`AtomNeRF`) with `coord` to the conformer.
-
-        Coord is a added at the :attr:`current_residue_index`, the
-        nature of `atom` defines if coords is being built from NtoC
-        or from CtoN.
-
+        Return a random fragment from database.
+        
         Parameters
         ----------
-        atom : :class:`AtomNeRF`
-            The atom to add to the conformer.
+        fragsize : int or None, optional
+            If give, returns a random slice of size `fragsize` from
+            the randomly selected fragment.
 
-        coords : Numpy array of shape (3,)
-            The XYZ coordinates
+        Returns
+        -------
+        dict
+            A dictionary containing the residue angle requirements
+            to build a full residue with the scope of
+            :class:`ConformerBuilderNeRF`.
+
+            .. seealso::
+                
+                :method:`transform_frag2dict`
         """
-        self.add_atom_coords(
-            self._current_residue_index + atom.resindx,
-            atom.name,
-            coord,
-            )
 
-    #def add_coord_CtoN(self, atom, coord):
+        frag = self._fragdb.get_angle_fragment(fragsize)
+        return self.transform_frag2dict(frag)
+
+    def transform_frag2dict(self, fragment):
+        """
+        Transform a fragment form the fragment database (:attr:`self.fragdb`)
+        to a res:angle dictionary.
+        
+        For the N-term residue the first PHI angle is discarded.
+        The last PSI and OMEGA angles, are stored and not returned.
+        This is such because these angles will only be used if
+        an additional fragment is required in the building process.
+        Therefore, on the second fragment the first PHI residue is
+        combined with the last OMEGA and PSI from the previous fragment.
+
+        This strategy abstracts the building process and avoids the need
+        to build the first fragment separately and to rebuild the whole
+        conformer from scratch at each fragment addition.
+        
+        Parameters
+        ----------
+        fragment
+            An angle fragment list given by
+            :method:`self.fragdb.get_pure_fragment`.
+
+        Returns
+        -------
+        dict
+            Contains PHI, PSI and OMEGA angles per key that are required
+            to build an amino-acid. The returned dictionary has
+            one key, starting at 0, for each residue to be built.
+            
+            {0: {
+                'PHI': float,
+                'PSI': float,
+                'OMEGA': float,
+                },
+            1: {
+                'PHI': float,
+                'PSI': float,
+                'OMEGA': float,
+                },
+            }
+        """
+        build_angles = defaultdict(dict)
+        
+        try:
+            build_angles[-1] = self.last
+            is_first = False
+        except AttributeError:
+            is_first = True
+
+        for residue in enumerate(fragment):
+            build_angles[i - 1]['PHI'] = residue.phi
+            build_angles[i]['PSI'] = residue.psi
+            build_angles[i]['OMEGA'] = residue.omega
+        else:
+            self.last = build_angles.pop(i)
+
+        if is_first:
+            # EYES OPEN: this pops key -1, NOT the last position
+            build_angles.pop(-1)
+
+        return build_angles
+    
+    @classmethod
+    def from_file(cls, fname):
+        fragdb = LFRAG.FragmentAngleDB.from_file(fname)
+        c = cls()
+        c._fragdb = fragdb
+        return c
+
+
+
+#class ConformerNeRF(ConformerTemplate):
+#    """Conformer template specific for NeRF building algorithm."""
+#    
+#    #def __init__(self, *args, init_residue_index=0, **kwargs):
+#        #self._current_residue_index = init_residue_index
+#        #super().__init__(*args, **kwargs)
+#    
+#    #@property
+#    #def current_residue_index(self):
+#    #    return self._current_residue_index
+#
+#    #def increment_residue(self):
+#    #    self._current_residue_index += 1
+#    #
+#    #def decrement_residue(self):
+#    #   self._current_residue_index -= 1
+#
+#    def add_coord(self, atom, coord):
+#        """
+#        Adds atom (:class:`AtomNeRF`) with `coord` to the conformer.
+#
+#        Coord is a added at the :attr:`current_residue_index`, the
+#        nature of `atom` defines if coords is being built from NtoC
+#        or from CtoN.
+#
+#        Parameters
+#        ----------
+#        atom : :class:`AtomNeRF`
+#            The atom to add to the conformer.
+#
+#        coords : Numpy array of shape (3,)
+#            The XYZ coordinates
+#        """
+#        self.add_atom_coords(
+#            self._current_residue_index + atom.resindx,
+#            atom.name,
+#            coord,
+#            )
+#
+#    #def add_coord_CtoN(self, atom, coord):
     #    """
     #    Add atom coord considering C-term to N-term building.
 
@@ -345,12 +452,12 @@ class ConformerBuilderNeRF:
         else:  # build from N to C
             self.increment_conformer_residue = self.increment_residue
             self.building_order = NeRF_building_order_NtoC
-            self.get_fragment = self.angledb.get_fragment
+            self.get_fragment = self.angledb.get_angle_fragment
 
-        self.db_atom_map = {
-            DEFS.N_name: 'UPPER': DEFS.N_name,
-            'LOWER': DEFS.C_name,
-            }
+        #self.db_atom_map = {
+        #    DEFS.N_name: 'UPPER': DEFS.N_name,
+        #    'LOWER': DEFS.C_name,
+        #    }
 
     @property
     def current_residue_index(self):
@@ -513,222 +620,6 @@ class ConformerBuilderNeRF:
             )
 
         return parent_coord, xaxis_coord, yaxis_coord
-
-
-class FragmentDBABC(ABC):
-    """Provide abstract interface for FragmengDB."""
-    @abstractmethod
-    def get_pure_fragment(self):
-        return
-
-
-class FragmentAngleDBNeRF(FragmentDBABC, ITF.Prototype):
-    """
-    Database for fragment angles.
-
-    Loads angles from a file (text or pickle) of the following format::
-
-        12asA  P L   101  229   98  -79.590   -2.188  179.809
-        12asA  D L   102  228   99 -103.843   11.688  162.288
-        12asA  E L   103  227  100  -58.624  134.132 -167.362
-        12asA  D L   104  226  101  -85.815  -40.242  172.548
-
-        16pkA  Y L   249  166  249  -83.645  148.597  176.997
-        16pkA  S L   250  165  250  -81.829  132.302 -177.161
-        16pkA  I L   251  164  251 -116.621    4.225  178.907
-        16pkA  G L   252  163  252   57.598 -128.309 -178.929
-        16pkA  K L   253  162  253  -97.343   16.681 -177.532
-    
-    Read from files with :method:`from_file`.
-
-    Attributes
-    ----------
-    db : database
-    """
-    @property
-    def db(self):
-        """
-        Database attribute.
-        """
-        return self._db
-
-    def get_pure_fragment(self):
-        """
-        Retrieve a random fragment from the fragment database.
-        
-        The fragment is in its pure form.
-
-        .. seealso:: :attr:`get_angle_fragment`  
-    
-        """
-        return random.sample(self.db, 1)[0]
-
-    def get_angle_fragment(self, fragsize=None):
-        """
-        Select a random element from population.
-
-        In our case selects a random loop from loop DB.
-        """
-        sliceObj = UTIL.random_fragment(fragsize)
-        frag = self.get_random_fragment()
-        return self._transform_frag2dict(frag[sliceObj])
-    
-    def _transform_frag2dict(self, fragment):
-        """
-        Transform a fragment form the fragment database (:attr:`self.db`)
-        to a res:angle dictionary.
-        
-        For the N-term residue the first PHI angle is discarded.
-        The last PSI and OMEGA angles, are stored and not returned.
-        This is such because these angles will only be used if
-        an additional fragment is required in the building process.
-        Therefore, on the second fragment the first PHI residue is
-        combined with the last OMEGA and PSI from the previous fragment.
-
-        This strategy abstracts the building process and avoids the need
-        to build the first fragment separately and to rebuild the whole
-        conformer from scratch at each fragment addition.
-        Parameters
-        ----------
-        fragment
-            A :attr:`self.db` fragment given by :method:`get_pure_fragment`.
-
-        Returns
-        -------
-        dict
-            Contains PHI, PSI and OMEGA angles per key that are required
-            to build an amino-acid. The returned dictionary has
-            one key, starting at 0, for each residue to be built.
-            
-            {0: {
-                'PHI': float,
-                'PSI': float,
-                'OMEGA': float,
-                },
-            1: {
-                'PHI': float,
-                'PSI': float,
-                'OMEGA': float,
-                },
-            }
-        """
-        build_angles = defaultdict(dict)
-        
-        try:
-            build_angles[-1] = self.last
-            is_first = False
-        except AttributeError:
-            is_first = True
-
-        for residue in enumerate(fragment):
-            build_angles[i - 1]['PHI'] = residue.phi
-            build_angles[i]['PSI'] = residue.psi
-            build_angles[i]['OMEGA'] = residue.omega
-        else:
-            self.last = build_angles.pop(i)
-
-        if is_first:
-            # EYES OPEN: this pops key -1, NOT the last position
-            build_angles.pop(-1)
-
-        return build_angles
-    
-    @classmethod
-    def from_file(cls, fname):
-        try:
-            data = cls.read_text_file(fname)
-        except UnicodeDecodeError:
-            data = cls.from_pickle(fname)
-
-        parsed = cls._parse_raw_data(data)
-        c = cls()
-        c._db = parsed
-        return c
-    
-    @staticmethod
-    def read_pickle(fname):
-        """
-        Loads loop database from pickle file.
-        
-        Required format:
-            [
-                [
-                    '12asA  P L   101  229   98  -79.590   -2.188  179.809'
-                    '12asA  D L   102  228   99 -103.843   11.688  162.288'
-                    '12asA  E L   103  227  100  -58.624  134.132 -167.362'
-                    '12asA  D L   104  226  101  -85.815  -40.242  172.548'
-                    ],
-                (...)
-                ]
-             
-        Parameters
-        ----------
-        database_file : pickle
-            Pickle file
-        """
-        with open(database_file, 'rb') as fh:
-             data = pickle.load(fh)
-        return data
-
-    @staticmethod
-    def read_text_file(fname):
-        """
-        Loads database from text file.
-        
-        Required Format:
-            
-            12asA  P L   101  229   98  -79.590   -2.188  179.809
-            12asA  D L   102  228   99 -103.843   11.688  162.288
-            12asA  E L   103  227  100  -58.624  134.132 -167.362
-            12asA  D L   104  226  101  -85.815  -40.242  172.548
-
-
-            12asA  G L   156  174  153   68.074   16.392 -175.411
-            12asA  L L   157  173  154  -81.735  119.822 -176.938
-            12asA  A L   158  172  155  -71.433  133.117 -172.298
-            12asA  I L   165  165  162 -101.494  150.487 -174.989
-
-
-            16pkA  Y L   249  166  249  -83.645  148.597  176.997
-            16pkA  S L   250  165  250  -81.829  132.302 -177.161
-            16pkA  I L   251  164  251 -116.621    4.225  178.907
-            16pkA  G L   252  163  252   57.598 -128.309 -178.929
-            16pkA  K L   253  162  253  -97.343   16.681 -177.532
-            16pkA  S L   254  161  254  -64.590  147.146  179.504
-
-        Parameters
-        ----------
-        fname : str or Path
-            Path to text file angle DB.
-        """
-        with open(fname, 'r') as fh:
-            blocks = fh.read().strip().split('\n\n\n')
-
-        data = []
-        for block in blocks:
-            data.append(block.split('\n'))
-       
-        return data
-
-    @staticmethod
-    def _parse_raw_data(data):
-        parsed_data = []
-        for block in data:
-            parsed_block = []
-            for line in block:
-                ls = line.split()
-                parsed_block.append(
-                    ResidueAngle(
-                        pdbid=ls[0],
-                        letter=ls[1],
-                        dssp=ls[2],
-                        phi=math.radians(float(ls[6])),
-                        psi=math.radians(float(ls[7])),
-                        omega=math.radians(float(ls[8])),
-                        )
-                    )
-            parsed_data.append(parsed_block)
-        return parsed_data
 
 
 ResidueAngle = namedtuple(
