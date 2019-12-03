@@ -1,13 +1,14 @@
 """Library for the Conformer builder."""
 from abc import ABC, abstractmethod
 import math
-from collections import namedtuple
+from collections import defaultdict, namedtuple
 
 import numpy as np
 
 from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import interfaces as ITF
+from idpconfgen.libs import libfragment as LF
 from idpconfgen.libs import libutil as UTIL
 
 
@@ -260,15 +261,25 @@ NeRF_building_order_CtoN = [
     ]
 
 
-class FragmentAngleDBNeRF(ITF.Prototype):
+
+class FragDBNeRFFactory:
+    
+    def __init__(self):
+        self._fragdb = None
+    
+    def read_fragdb(self, fname):
+        self._fragdb = LF.FragmentAngleDB.from_file(fname)
+    
+    def get_db_for_nerf(self):
+        fragnerf = FragmentAngleDBNeRF(self._fragdb)
+        return fragnerf
+
+
+class FragmentAngleDBNeRF:
     """Data base of angles from loop fragments."""     
-     
-    def __new__(cls, *args, **kwargs):
-        if args and Path(args[0]).exists():
-            return cls.from_file(args[0])
-        else:
-            errmsg = 'use {}.from_file method to initiate from a file.'
-            raise NotImplementedError(errmsg.format(cls.__class__.__name__))
+    
+    def __init__(self, fragmentdb):
+        self._fragdb = fragmentdb
 
     def get_angle_fragment(self, fragsize=None):
         """
@@ -344,7 +355,7 @@ class FragmentAngleDBNeRF(ITF.Prototype):
         except AttributeError:
             is_first = True
 
-        for residue in enumerate(fragment):
+        for i, residue in enumerate(fragment):
             build_angles[i - 1]['PHI'] = residue.phi
             build_angles[i]['PSI'] = residue.psi
             build_angles[i]['OMEGA'] = residue.omega
@@ -357,12 +368,6 @@ class FragmentAngleDBNeRF(ITF.Prototype):
 
         return build_angles
     
-    @classmethod
-    def from_file(cls, fname):
-        fragdb = LFRAG.FragmentAngleDB.from_file(fname)
-        c = cls()
-        c._fragdb = fragdb
-        return c
 
 
 
@@ -620,19 +625,6 @@ class ConformerBuilderNeRF:
             )
 
         return parent_coord, xaxis_coord, yaxis_coord
-
-
-ResidueAngle = namedtuple(
-    'ResidueAngle',
-    [
-        'pdbid',
-        'letter',
-        'dssp',
-        'phi',
-        'psi',
-        'omega',
-        ]
-    )
 
 
 class RosettaAtomData:

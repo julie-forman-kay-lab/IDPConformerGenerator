@@ -2,9 +2,11 @@
 import numpy as np
 import pytest
 
+
 from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libbuilder as LB
+from idpconfgen.libs import libfragment as LF
 
 from . import tcommons
 
@@ -226,11 +228,51 @@ class TestConformerTemplate:
 
 class TestFragmentAngleDB:
     """Test dedicated Fragment Angle DB for NeRF protocol."""
-
-    def test_NotImplementedError(self):
-        with pytest.raises(NotImplementedError):
-            LB.FragmentAngleDBNeRF()
     
+    fragdb = LF.FragmentAngleDB.from_file(
+        Path(tcommons.data_folder, 'LVALL_sample')
+        )
+    
+    def test_init(self):
+        LB.FragmentAngleDBNeRF(self.fragdb)
+
+    @pytest.mark.parametrize(
+        'in1,expected',
+        [
+            (
+                [
+                    LF.ResidueAngle(
+                        pdbid='XXX',
+                        letter='A',
+                        dssp='L',
+                        phi=1.0,
+                        psi=2.0,
+                        omega=3.0,
+                        ),
+                    LF.ResidueAngle(
+                        pdbid='XXZ',
+                        letter='R',
+                        dssp='L',
+                        phi=4.0,
+                        psi=5.0,
+                        omega=6.0,
+                        ),
+                    ],
+                {
+                    0: {
+                        'PHI': 4.0,
+                        'PSI': 2.0,
+                        'OMEGA': 3.0,
+                        },
+                    }
+                ),
+            ],
+        )
+    def test_transform_frag2dict(self, in1, expected):
+        fdb = LB.FragmentAngleDBNeRF(self.fragdb)
+        result = fdb.transform_frag2dict(in1)
+        assert dict(result) == expected
+
 #class TestConformerNeRF:
 #   
 #    @pytest.mark.parametrize(
@@ -265,45 +307,6 @@ class TestFragmentAngleDB:
 #        LB.FragmentDBABC()
 #
 #
-#class TestFragLoopDB:
-#    def test_init(self):
-#        LB.FragmentAngleDBNeRF()
-#
-#    def test_static_read_text(self):
-#        data = LB.FragmentAngleDBNeRF.read_text_file(
-#            Path(tcommons.data_folder, 'LVALL_sample')
-#            )
-#        assert len(data) == 3
-#        assert len(data[0]) == 12 
-#        assert len(data[1]) == 10 
-#        assert len(data[2]) == 9
-#        assert all(isinstance(i, str) for b in data for i in b)
-#        assert len(data[0][0].split()) == 9
-#
-#    def tests_static_parse_raw_data(self):
-#        """Test data parsing to fragment blocks."""
-#        data = LB.FragmentAngleDBNeRF.read_text_file(
-#            Path(tcommons.data_folder, 'LVALL_sample')
-#            )
-#
-#        parsed_data = LB.FragmentAngleDBNeRF._parse_raw_data(data)
-#        assert len(parsed_data[0]) == 12
-#        assert len(parsed_data[0][0]) == 6
-#        assert all(isinstance(i, LB.ResidueAngle) for i in parsed_data[0])
-#        assert isinstance(parsed_data[0][0].phi, float)
-#        assert isinstance(parsed_data[0][0].psi, float)
-#        assert isinstance(parsed_data[0][0].omega, float)
-#    
-#    @pytest.mark.parametrize(
-#        'fname',
-#        [
-#            (Path(tcommons.data_folder, 'LVALL_sample')),
-#            ],
-#        )
-#    def test_from_file(self, fname):
-#        """Test read from file."""
-#        fragdb = LB.FragmentAngleDBNeRF.from_file(fname)
-#        assert isinstance(fragdb, LB.FragmentAngleDBNeRF)
 #
 #
 #class TestResidueAngleTuple:
