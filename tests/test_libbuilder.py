@@ -9,27 +9,52 @@ from idpconfgen.libs import libbuilder as LB
 from . import tcommons
 
 
-def test_Atom1():
-    a = LB.AtomNeRF('N', 1, 0, -1, 0)
-    assert a.name == 'N'
-    assert a.poff == 1
-    assert a.xoff == 0
-    assert a.yoff == -1
-    assert a.resoff == 0
+class TestAtomNeRF:
+    """Test AtomNeRF object."""
+    def test_Atom1(self):
+        a = LB.AtomNeRF('N', 'UPPER', 1, 0, -1, 0)
+        assert a.name == 'N'
+        assert a.rosetta_name == 'UPPER'
+        assert a.poff == 1
+        assert a.xoff == 0
+        assert a.yoff == -1
+        assert a.resoff == 0
 
 
-def test_Atom2_AttributeError():
-    a = LB.AtomNeRF('N', 1, 0, -1, 0)
-    with pytest.raises(AttributeError):
-        a.name = 'Z'
-    with pytest.raises(AttributeError):
-        a.poff = 0
-    with pytest.raises(AttributeError):
-        a.xoff = 1
-    with pytest.raises(AttributeError):
-        a.yoff = 2
-    with pytest.raises(AttributeError):
-        a.resoff = 0
+    def test_Atom2_AttributeError(self):
+        a = LB.AtomNeRF('N', 'UPPER', 1, 0, -1, 0)
+        with pytest.raises(AttributeError):
+            a.name = 'Z'
+        with pytest.raises(AttributeError):
+            a.rosetta_name = 'Z'
+        with pytest.raises(AttributeError):
+            a.poff = 0
+        with pytest.raises(AttributeError):
+            a.xoff = 1
+        with pytest.raises(AttributeError):
+            a.yoff = 2
+        with pytest.raises(AttributeError):
+            a.resoff = 0
+
+
+    def test_NeRF_building_order_NtoC(self):
+        exp = [
+            LB.N_atom_NeRF,
+            LB.O_atom_NeRF,
+            LB.CA_atom_NeRF,
+            LB.C_atom_NeRF,
+            ]
+        assert exp == LB.NeRF_building_order_NtoC
+
+
+    def test_NeRF_building_order_CtoN(self):
+        exp = [
+            LB.C_atom_NeRF_b,
+            LB.CA_atom_NeRF_b,
+            LB.O_atom_NeRF_b,
+            LB.N_atom_NeRF_b,
+            ]
+        assert exp == LB.NeRF_building_order_CtoN
 
 
 class TestConformerTemplate:
@@ -199,109 +224,116 @@ class TestConformerTemplate:
         assert np.all(np.equal(result, coords))
 
 
-class TestConformerNeRF:
-   
-    @pytest.mark.parametrize(
-        'seq',
-        [
-            ('MARVEL'),
-            ],
-        )
-    def test_init(self, seq):
-        LB.ConformerNeRF(seq)
+class TestFragmentAngleDB:
+    """Test dedicated Fragment Angle DB for NeRF protocol."""
 
-
-class TestBuilder:
+    def test_NotImplementedError(self):
+        with pytest.raises(NotImplementedError):
+            LB.FragmentAngleDBNeRF()
     
-    def test_init(self):
-        LB.ConformerBuilderNeRF(None, None, None)
+#class TestConformerNeRF:
+#   
+#    @pytest.mark.parametrize(
+#        'seq',
+#        [
+#            ('MARVEL'),
+#            ],
+#        )
+#    def test_init(self, seq):
+#        LB.ConformerNeRF(seq)
+#
 
-    
-def test_Conformer_Builder_integration_1():
-    conf = LB.ConformerTemplate('MARVEL')
-    builder = LB.ConformerBuilderNeRF(conf, None, None)
-    conf.add_atom_coords(0, 'N', np.array([1., 1., 1.,]))
-    coords1 = conf.coords
-    conf = LB.ConformerTemplate('MARVEL')
-    builder = LB.ConformerBuilderNeRF(conf, None, None)
-    assert coords1 is not conf.coords
-    assert not np.all(np.equal(coords1, conf.coords))
-
-
-def test_fragment_ABC():
-    with pytest.raises(TypeError):
-        LB.FragmentDBABC()
-
-
-class TestFragLoopDB:
-    def test_init(self):
-        LB.FragmentAngleDBNeRF()
-
-    def test_static_read_text(self):
-        data = LB.FragmentAngleDBNeRF.read_text_file(
-            Path(tcommons.data_folder, 'LVALL_sample')
-            )
-        assert len(data) == 3
-        assert len(data[0]) == 12 
-        assert len(data[1]) == 10 
-        assert len(data[2]) == 9
-        assert all(isinstance(i, str) for b in data for i in b)
-        assert len(data[0][0].split()) == 9
-
-    def tests_static_parse_raw_data(self):
-        """Test data parsing to fragment blocks."""
-        data = LB.FragmentAngleDBNeRF.read_text_file(
-            Path(tcommons.data_folder, 'LVALL_sample')
-            )
-
-        parsed_data = LB.FragmentAngleDBNeRF._parse_raw_data(data)
-        assert len(parsed_data[0]) == 12
-        assert len(parsed_data[0][0]) == 6
-        assert all(isinstance(i, LB.ResidueAngle) for i in parsed_data[0])
-        assert isinstance(parsed_data[0][0].phi, float)
-        assert isinstance(parsed_data[0][0].psi, float)
-        assert isinstance(parsed_data[0][0].omega, float)
-    
-    @pytest.mark.parametrize(
-        'fname',
-        [
-            (Path(tcommons.data_folder, 'LVALL_sample')),
-            ],
-        )
-    def test_from_file(self, fname):
-        """Test read from file."""
-        fragdb = LB.FragmentAngleDBNeRF.from_file(fname)
-        assert isinstance(fragdb, LB.FragmentAngleDBNeRF)
-
-
-class TestResidueAngleTuple:
-    """Test ResidueAngle Tuple."""    
-
-    resang = LB.ResidueAngle('1XXX', 'A', 'L', 1.0, 2.0, 3.0)
-
-    def test_attributes(self):
-        assert self.resang.pdbid == '1XXX'
-        assert self.resang.letter == 'A'
-        assert self.resang.dssp == 'L'
-        assert self.resang.phi == 1.0
-        assert self.resang.psi == 2.0
-        assert self.resang.omega == 3.0
-
-class TestRosettaAtom:
-    """Test RosettaAtom class to represent atoms from Rosetta building DB."""
-
-    ra = LB.RosettaAtomData(1, 2, 3, 4, 5, 6)
-
-    @pytest.mark.parametrize(
-        'attr1,expected',
-        [
-            (ra.polar_theta, 1),
-            (ra.polar_phi, 2),
-            (ra.polar_r, 3),
-            (ra.parent_atom, 4),
-            (ra.xaxis_atom, 5),
-            (ra.yaxis_atom, 6),
-            ],
-        )
-    def test_polar_theta(self, attr1, expected):
-        assert attr1 == expected
+#class TestBuilder:
+#    
+#    def test_init(self):
+#        LB.ConformerBuilderNeRF(None, None, None)
+#
+#    
+##def test_Conformer_Builder_integration_1():
+##    conf = LB.ConformerTemplate('MARVEL')
+##    builder = LB.ConformerBuilderNeRF(conf, None, None)
+##    conf.add_atom_coords(0, 'N', np.array([1., 1., 1.,]))
+##    coords1 = conf.coords
+##    conf = LB.ConformerTemplate('MARVEL')
+##    builder = LB.ConformerBuilderNeRF(conf, None, None)
+##    assert coords1 is not conf.coords
+##    assert not np.all(np.equal(coords1, conf.coords))
+#
+#
+#def test_fragment_ABC():
+#    with pytest.raises(TypeError):
+#        LB.FragmentDBABC()
+#
+#
+#class TestFragLoopDB:
+#    def test_init(self):
+#        LB.FragmentAngleDBNeRF()
+#
+#    def test_static_read_text(self):
+#        data = LB.FragmentAngleDBNeRF.read_text_file(
+#            Path(tcommons.data_folder, 'LVALL_sample')
+#            )
+#        assert len(data) == 3
+#        assert len(data[0]) == 12 
+#        assert len(data[1]) == 10 
+#        assert len(data[2]) == 9
+#        assert all(isinstance(i, str) for b in data for i in b)
+#        assert len(data[0][0].split()) == 9
+#
+#    def tests_static_parse_raw_data(self):
+#        """Test data parsing to fragment blocks."""
+#        data = LB.FragmentAngleDBNeRF.read_text_file(
+#            Path(tcommons.data_folder, 'LVALL_sample')
+#            )
+#
+#        parsed_data = LB.FragmentAngleDBNeRF._parse_raw_data(data)
+#        assert len(parsed_data[0]) == 12
+#        assert len(parsed_data[0][0]) == 6
+#        assert all(isinstance(i, LB.ResidueAngle) for i in parsed_data[0])
+#        assert isinstance(parsed_data[0][0].phi, float)
+#        assert isinstance(parsed_data[0][0].psi, float)
+#        assert isinstance(parsed_data[0][0].omega, float)
+#    
+#    @pytest.mark.parametrize(
+#        'fname',
+#        [
+#            (Path(tcommons.data_folder, 'LVALL_sample')),
+#            ],
+#        )
+#    def test_from_file(self, fname):
+#        """Test read from file."""
+#        fragdb = LB.FragmentAngleDBNeRF.from_file(fname)
+#        assert isinstance(fragdb, LB.FragmentAngleDBNeRF)
+#
+#
+#class TestResidueAngleTuple:
+#    """Test ResidueAngle Tuple."""    
+#
+#    resang = LB.ResidueAngle('1XXX', 'A', 'L', 1.0, 2.0, 3.0)
+#
+#    def test_attributes(self):
+#        assert self.resang.pdbid == '1XXX'
+#        assert self.resang.letter == 'A'
+#        assert self.resang.dssp == 'L'
+#        assert self.resang.phi == 1.0
+#        assert self.resang.psi == 2.0
+#        assert self.resang.omega == 3.0
+#
+#class TestRosettaAtom:
+#    """Test RosettaAtom class to represent atoms from Rosetta building DB."""
+#
+#    ra = LB.RosettaAtomData(1, 2, 3, 4, 5, 6)
+#
+#    @pytest.mark.parametrize(
+#        'attr1,expected',
+#        [
+#            (ra.polar_theta, 1),
+#            (ra.polar_phi, 2),
+#            (ra.polar_r, 3),
+#            (ra.parent_atom, 4),
+#            (ra.xaxis_atom, 5),
+#            (ra.yaxis_atom, 6),
+#            ],
+#        )
+#    def test_polar_theta(self, attr1, expected):
+#        assert attr1 == expected
