@@ -8,78 +8,15 @@ _file_path = Path(__file__).resolve()
 data_folder = Path(_file_path.parents[1], 'data')
 
 
-class AtomNeRF:
-    """
-    Defines an atom building block for NeRF algorithm.
-
-    Atoms building blocks are used during the confomer construction.
-    
-    The offset attributes (`_off`) refer to the residues from which
-    the frame atoms will be read according to the Natural Extension
-    Reference Frame building protocol. 0 means the reference atom is taken
-    from the same residue where the Atom is going to the inserted.
-    Likewise, -1 means from the previous residue and 1 from the next
-    residue. Same applies for the `resindx` parameter, where indexes
-    refer to the building progress: 0 the current residue being built,
-    -1 the previously built residue and 1 the following residue.
-
-    There is no differentiation from N to C building or C to N building,
-    that is done at the level of the ConformerNeRF and BuilderNeRF.
-
-    See :class:`ConformerBuilder`
-
-    Attributes
-    ----------
-    name
-        The name of the atom when built in the conformer.
-
-    parentoff
-        The residue index where the parent atom will be taken.
-
-    xoff
-        The residue index where the xaxis atom wil be taken.
-    
-    yoff
-        The residue index where the yaxis atom wil be taken.
-
-    resindx
-        The residue index relative to the building process where to
-        add the atom.
-    """
-    def __init__(self, name, parentoff, xoff, yoff, resindx):
-        self._name = name
-        self._poff = parentoff
-        self._xoff = xoff
-        self._yoff = yoff
-        self._resindx = resindx
-    
+class ReprClean:
+    """Baseclass for repr method."""
     def __repr__(self):
-        kwargs = ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
-        rpr = '{}({})'.format(
-            __class__.__name__,
-            kwargs,
-            )
+        kwargs = \
+            ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
+        rpr = '{}({})'.format(__class__.__name__, kwargs)
         return rpr
 
-    @property
-    def name(self):
-        return self._name
 
-    @property
-    def poff(self):
-        return self._poff
-
-    @property
-    def xoff(self):
-        return self._xoff
-
-    @property
-    def yoff(self):
-        return self._yoff
-
-    @property
-    def resindx(self):
-        return self._resindx
 
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
@@ -150,21 +87,6 @@ CA_name = 'CA'
 C_name = 'C'
 O_name = 'O'
 COO_name = 'X'
-
-# to build forward
-N_atom_NeRF = AtomNeRF(N_name, -1, -1, -1, 0)
-CA_atom_NeRF = AtomNeRF(CA_name, 0, -1, -1, 0)
-C_atom_NeRF = AtomNeRF(C_name, 0, 0, -1, 0)
-O_atom_NeRF = AtomNeRF(O_name, 0, 0, 1, -1)
-NeRF_building_order = [N_atom_NeRF, O_atom_NeRF, CA_atom_NeRF, C_atom_NeRF]
-
-# to build backwards
-N_atom_NeRF_b = AtomNeRF(N_name, 1, 1, 1, 0)
-CA_atom_NeRF_b = AtomNeRF(CA_name, 0, 1, 1, 0)
-C_atom_NeRF_b = AtomNeRF(C_name, 0, 0, 1, 0)
-O_atom_NeRF_b = AtomNeRF(O_name, 0, 0, -1, 0)
-NeRF_building_order_CtoN = \
-    [C_atom_NeRF_b, CA_atom_NeRF_b, O_atom_NeRF_b, N_atom_NeRF_b]
 
 
 backbone_atoms = (N_name, CA_name, C_name, O_name)
