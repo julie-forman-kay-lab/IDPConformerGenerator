@@ -2,6 +2,15 @@
 from copy import deepcopy
 
 
+class ReprClean:
+    """Baseclass for repr method."""
+    def __repr__(self):
+        kwargs = \
+            ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
+        rpr = '{}({})'.format(__class__.__name__, kwargs)
+        return rpr
+
+
 class ComponentWithBackReference:
     """
     https://refactoring.guru/design-patterns/prototype/python/example
@@ -44,3 +53,5 @@ class Prototype:
         self.circular_reference = deepcopy(self.circular_reference)
         self.circular_reference.prototype = self
         return deepcopy(self)
+
+

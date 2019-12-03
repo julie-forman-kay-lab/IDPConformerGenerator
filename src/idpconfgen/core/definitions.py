@@ -8,16 +8,6 @@ _file_path = Path(__file__).resolve()
 data_folder = Path(_file_path.parents[1], 'data')
 
 
-class ReprClean:
-    """Baseclass for repr method."""
-    def __repr__(self):
-        kwargs = \
-            ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
-        rpr = '{}({})'.format(__class__.__name__, kwargs)
-        return rpr
-
-
-
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(
     ahelix='H',
