@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 from collections import defaultdict, deque
 import copy
 import logging
@@ -9,9 +8,9 @@ import pickle
 import pprint
 import random
 import sys
-
 import numpy as np
-from numpy import array
+from clash_validator import ClashValidator
+
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
@@ -319,6 +318,7 @@ class ConformerBuilder:
         self.register = StateHolder()
         self.basedb = basedb
         self.angledb = angledb
+        self.clash_validator = ClashValidator()
     
     @property
     def seq(self):
@@ -346,14 +346,15 @@ class ConformerBuilder:
         """
         bbatoms = self._bbatoms
 
-        is_bb_complete = [
-            len(conformer) == len(self.seq),
+        is_bb_complete_ = [
+            len(self.conformer.coords) == len(self.seq),
             all(
                 bbatoms.issubset(res_coords.keys())
                     for res_coords in self.conformer.coords
                 ),
+            len(self.seq) * 4 + 1 == sum(1 for res in self.conformer.coords for atom in res.keys())
             ]
-        return all(is_bb_complete)
+        return all(is_bb_complete_)
     
     def get_residue_type(self, pos):
         """
@@ -475,19 +476,13 @@ class ConformerBuilder:
     
     def build_bb(self):
         n = 0
-        while not self.is_bb_complete() and n < 100_000:
+        while not self.is_bb_complete() and n < 100_0:
             n += 1
-           
-            # when KDTrees are implemented than we can use
-            # a .load() to retrieve the last state
-            self.register.save(self.conformer)
 
             build_angles = self.angledb.get_fragment()
-            
             # Python now gives you ordered values =)
             # order of addition is remembered
             for residue_angles in build_angles.values():
-
                 try:
                     self.add_coord(
                         residue_angles,
@@ -496,8 +491,8 @@ class ConformerBuilder:
                         )
                 except SequenceIndexError:
                     log.info('Reached the end of the sequence.')
-                    log.info(f'Is sequence complete?: {self.is_bb_complete()}')
                     self.add_COO()
+                    log.info(f'Is sequence complete?: {self.is_bb_complete()}')
                     break
 
                 self.add_coord(
@@ -516,10 +511,36 @@ class ConformerBuilder:
                     residue_angles,
                     Catom,
                     )
+
+            try:
+                # last state
+                last_conformer = self.register.load()
+            except IndexError:
+                # register is empty
+                self.register.save(self.conformer)
+                continue
+
+            try:
+                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords[len(last_conformer):], last_conformer.coords)
+            except ValueError:
+                # added COO only
+                clash_found = self.clash_validator.clash_found_vectorized(self.conformer.coords[-1:], last_conformer.coords[:-1])
+
+            if not clash_found:
+                # no clashes, save this loop
+                self.register.save(self.conformer)
+            else:
+                # Dont save the last_conformer if it clashes on COO only
+                # Another issue: last_conformer could be set up to always
+                # find a clash on any new loop. 
+                # These two issues will be resolved with the same solution
+                self.conformer = last_conformer
+                self.register.save(last_conformer)
+
         else:
             if n > 100_000:
                 raise StopIteration('run above 100k cycles!!!!')
-
+    
     def save(self, filename='conformer_gen.pdb'):
         self.conformer.save(filename)
 
@@ -981,11 +1002,11 @@ def get_kdtree( UDICT, start, stop ):
 
 if __name__ == '__main__':
 
-    loop_pickle = LoopDataBase('LOOPS.pickle4')
-    rosetta_db = read_rosetta_db('l-caa')
+    loop_pickle = LoopDataBase('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/LOOPS.pickle4')
+    rosetta_db = read_rosetta_db('/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/l-caa')
     
-    #input_sequence = "MDEYSPKRHDVAQLKFLCESLYDEGIATLGDSHHGWVNDPTSAVNLQLNDLIEHIASFVMSFKIKYPDDGDLSELVEEYLDDTYTLFSSYGINDPELQRWQKTKERLFRLFSGEYISTLMKT"
-    input_sequence = "PDEDRLSPLHSVAAA"
+    input_sequence = "MDEYSPKRHDVAQLKFLCESLYDEGIATLGDSHHGWVNDPTSAVNLQLNDLIEHIASFVMSFKIKYPDDGDLSELVEEYLDDTYTLFSSYGINDPELQRWQKTKERLFRLFSGEYISTLMKT"
+    # input_sequence = "PDEDRLSPLHSVAAA"
     #input_sequence = "PDEDRLSPLHSV"
     #input_sequence = "D"
     
