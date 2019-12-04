@@ -472,6 +472,7 @@ class ConformerBuilderNeRF:
         self._angledb = angledb
         self._rosettadb = rosettadb
         self.frag_size = frag_size
+        self._previous_fragment_index = deque()
         # to clean: self.reverse_build = reverse_build
         self._current_residue_index = start_residue_index
 
@@ -552,10 +553,17 @@ class ConformerBuilderNeRF:
         self._current_residue_index -= 1
    
     def register_previous_index(self):
-        self._previous_fragment_index = self._current_residue_index
+        self._previous_fragment_index.append(self._current_residue_index)
 
     def restore_previous_index(self):
-        self._current_residue_index = self._previous_fragment_index
+        self._current_residue_index = self._previous_fragment_index.pop()
+    
+    def restore_two_states(self):
+        # because we are looking for speed enhancement I avoid here
+        # using condictionals for workflow and instead define a new
+        # method for the case to rever back two states
+        self._previous_fragment_index.pop()
+        self.restore_previous_index()
 
     def build_backbone(self):
         """Build backbone of conformer."""
@@ -575,13 +583,20 @@ class ConformerBuilderNeRF:
             except ClashError:
                 self.restore_previous_index()
                 self.conformer.clean_coords(
-                    #from_residue=self.current_residue_index,
-                    #from_atom=DEFS.O_name,
                     from_residue=self.clean_from_residue,
                     from_atom=self.clean_from_atom,
                     to_residue=self.clean_to_residue,
                     to_atom=self.clean_to_atom,
                     )
+            except RepetitiveClashError:
+                self.restore_two_states()
+                self.conformer.clean_coords(
+                    from_residue=self.clean_from_residue,
+                    from_atom=self.clean_from_atom,
+                    to_residue=self.clean_to_residue,
+                    to_atom=self.clean_to_atom,
+                    )
+
 
     def _build_backbone_fragment(self):
 
