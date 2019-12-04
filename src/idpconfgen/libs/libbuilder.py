@@ -446,6 +446,7 @@ class ConformerBuilderNeRF:
         self._conformer = conformer
         self._angledb = angledb
         self._rosettadb = rosettadb
+        
         self.frag_size = frag_size
         self.reverse_build = reverse_build
         self._current_residue_index = start_residue_index
@@ -493,6 +494,21 @@ class ConformerBuilderNeRF:
             :func:`read_rosetta_db`
         """
         return self._rosettadb
+    
+    @property
+    def frag_size(self):
+        return self._frag_size
+
+    @frag_size.setter
+    def frag_size(self, value):
+        # +1 is intrinsic to this protocol
+        # see tests/test_libbuilder.TestFragmentAngleDB.test_transform_frag2dict
+        # therefore, to build a fragment of 5 residues we need to
+        # request a fragment of 6 to the FragmentAngleDB.
+        if value > 0:
+            self._frag_size = int(value) + 1
+        else:
+            raise ValueError(f'value must be a positive number: {value}')
 
     def increment_residue(self):
         self._current_residue_index += 1

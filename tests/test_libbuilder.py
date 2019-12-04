@@ -266,6 +266,59 @@ class TestFragmentAngleDB:
                         },
                     }
                 ),
+            (
+                [
+                    LF.ResidueAngle(
+                        pdbid='XXX',
+                        letter='A',
+                        dssp='L',
+                        phi=1.0,
+                        psi=2.0,
+                        omega=3.0,
+                        ),
+                    LF.ResidueAngle(
+                        pdbid='XXZ',
+                        letter='R',
+                        dssp='L',
+                        phi=4.0,
+                        psi=5.0,
+                        omega=6.0,
+                        ),
+                    LF.ResidueAngle(
+                        pdbid='XXX',
+                        letter='A',
+                        dssp='L',
+                        phi=7.0,
+                        psi=8.0,
+                        omega=9.0,
+                        ),
+                    LF.ResidueAngle(
+                        pdbid='XXZ',
+                        letter='R',
+                        dssp='L',
+                        phi=10.0,
+                        psi=11.0,
+                        omega=12.0,
+                        ),
+                    ],
+                {
+                    0: {
+                        'PHI': 4.0,
+                        'PSI': 2.0,
+                        'OMEGA': 3.0,
+                        },
+                    1: {
+                        'PHI': 7.0,
+                        'PSI': 5.0,
+                        'OMEGA': 6.0,
+                        },
+                    2: {
+                        'PHI': 10.0,
+                        'PSI': 8.0,
+                        'OMEGA': 9.0,
+                        },
+                    }
+                ),
             ],
         )
     def test_transform_frag2dict(self, in1, expected):
