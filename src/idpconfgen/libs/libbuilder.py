@@ -129,6 +129,25 @@ class ConformerTemplate:
 
         """
         return not np.any(np.isnan(self.coords[self.bb_mask,:]))
+    
+    def clean_coords(
+            self,
+            *,
+            from_residue=None,
+            from_atom=None,
+            to_residue=None,
+            to_atom=None,
+            ):
+        """
+        Restore atom coordinates to np.nan.
+
+        Parameters
+        ----------
+        """
+        from_index = self._get_index(from_residue, from_atom)
+        to_index = self._get_index(to_residue, to_atom)
+        # remember index from None are None
+        self.coords[from_index:to_index,:] = np.nan
 
     @staticmethod
     def _parse_seq(seq):
@@ -149,14 +168,22 @@ class ConformerTemplate:
     def _get_index(residue_index, atom_name):
         try:
             index = DEFS.backbone_atoms.index(atom_name)
-        except ValueError:  # we are adding carboxyl oxygen, are we?
+        except ValueError:
+            # ValueError occurs when adding the oxygen for the last
+            # carboxyl group or when atom_name is None
             if atom_name == DEFS.COO_name:
                 return -1
+            elif atom_name is None:
+                atom_name = 0
             else:
                 raise ValueError('atom_name not valid: {!r}'.format(atom_name))
         else:
-            index += residue_index * DEFS.num_bb_atoms
-            return index
+            try:
+                index += residue_index * DEFS.num_bb_atoms
+            except TypeError:  # residue_index is None
+                return None
+            else:
+                return index
 
 
 class AtomNeRF(ITF.ReprClean):
@@ -259,7 +286,6 @@ NeRF_building_order_CtoN = [
     O_atom_NeRF_b,
     N_atom_NeRF_b,
     ]
-
 
 
 class FragDBNeRFFactory:
@@ -370,7 +396,6 @@ class FragmentAngleDBNeRF:
     
 
 
-
 #class ConformerNeRF(ConformerTemplate):
 #    """Conformer template specific for NeRF building algorithm."""
 #    
@@ -446,19 +471,29 @@ class ConformerBuilderNeRF:
         self._conformer = conformer
         self._angledb = angledb
         self._rosettadb = rosettadb
-        
         self.frag_size = frag_size
-        self.reverse_build = reverse_build
+        # to clean: self.reverse_build = reverse_build
         self._current_residue_index = start_residue_index
 
         if reverse_build:  # build from C to N
             self.increment_conformer_residue = self.decrement_residue
             self.building_order = NeRF_building_order_CtoN
             self.get_fragment = self.angledb.get_fragment_reversed
+            #
+            self._clean_from_residue = None
+            self._clean_from_atom = None
+            self._clean_to_residue = self.current_residue_index
+            self._clean_to_atom = DEFS.N_name
+
         else:  # build from N to C
             self.increment_conformer_residue = self.increment_residue
             self.building_order = NeRF_building_order_NtoC
             self.get_fragment = self.angledb.get_angle_fragment
+            #
+            self._clean_from_residue = self.current_residue_index
+            self._clean_from_atom = DEFS.O_name
+            self._clean_to_residue = None
+            self._clean_to_atom = None
 
         #self.db_atom_map = {
         #    DEFS.N_name: 'UPPER': DEFS.N_name,
@@ -515,16 +550,40 @@ class ConformerBuilderNeRF:
     
     def decrement_residue(self):
         self._current_residue_index -= 1
-    
+   
+    def register_previous_index(self):
+        self._previous_fragment_index = self._current_residue_index
+
+    def restore_previous_index(self):
+        self._current_residue_index = self._previous_fragment_index
+
     def build_backbone(self):
         """Build backbone of conformer."""
         while True: #  not self.conformer.is_bb_complete():
-            try:
-                self._build_backbone()
-            except StopIteration:
-                pass
 
-    def _build_backbone(self):
+            self.register_previous_index()
+
+            try:
+                self._build_backbone_fragment()
+            except StopIteration:
+                # do the logic on building COO if that is the case
+                pass
+            
+            try:
+                self.validate_new_fragment()
+
+            except ClashError:
+                self.restore_previous_index()
+                self.conformer.clean_coords(
+                    #from_residue=self.current_residue_index,
+                    #from_atom=DEFS.O_name,
+                    from_residue=self.clean_from_residue,
+                    from_atom=self.clean_from_atom,
+                    to_residue=self.clean_to_residue,
+                    to_atom=self.clean_to_atom,
+                    )
+
+    def _build_backbone_fragment(self):
 
         fragment_angles = self.get_fragment(size=self.frag_size)
          
@@ -643,7 +702,7 @@ class ConformerBuilderNeRF:
         return parent_coord, xaxis_coord, yaxis_coord
 
 
-class RosettaAtomData:
+class RosettaAtomData(ITF.ReprClean):
     """
     Rosetta atom data for building.
 
@@ -667,16 +726,6 @@ class RosettaAtomData:
         self.xaxis_atom = xaxis_atom
         self.yaxis_atom = yaxis_atom
     
-    def __repr__(self):
-        kwargs = ', '.join(
-            f'{key}={val!r}' for key, val in self.__dict__.items()
-            )
-        rpr = '{}({})'.format(
-            __class__.__name__,
-            kwargs,
-            )
-        return rpr
-
     def __str__(self):
             return repr(self)
 
