@@ -393,65 +393,6 @@ class FragmentAngleDBNeRF:
             build_angles.pop(-1)
 
         return build_angles
-    
-
-
-#class ConformerNeRF(ConformerTemplate):
-#    """Conformer template specific for NeRF building algorithm."""
-#    
-#    #def __init__(self, *args, init_residue_index=0, **kwargs):
-#        #self._current_residue_index = init_residue_index
-#        #super().__init__(*args, **kwargs)
-#    
-#    #@property
-#    #def current_residue_index(self):
-#    #    return self._current_residue_index
-#
-#    #def increment_residue(self):
-#    #    self._current_residue_index += 1
-#    #
-#    #def decrement_residue(self):
-#    #   self._current_residue_index -= 1
-#
-#    def add_coord(self, atom, coord):
-#        """
-#        Adds atom (:class:`AtomNeRF`) with `coord` to the conformer.
-#
-#        Coord is a added at the :attr:`current_residue_index`, the
-#        nature of `atom` defines if coords is being built from NtoC
-#        or from CtoN.
-#
-#        Parameters
-#        ----------
-#        atom : :class:`AtomNeRF`
-#            The atom to add to the conformer.
-#
-#        coords : Numpy array of shape (3,)
-#            The XYZ coordinates
-#        """
-#        self.add_atom_coords(
-#            self._current_residue_index + atom.resindx,
-#            atom.name,
-#            coord,
-#            )
-#
-#    #def add_coord_CtoN(self, atom, coord):
-    #    """
-    #    Add atom coord considering C-term to N-term building.
-
-    #    Parameters
-    #    ----------
-    #    atom : :class:`AtomNeRF`
-    #        The atom to add to the conformer.
-
-    #    coords : Numpy array of shape (3,)
-    #        The XYZ coordinates
-    #    """
-    #    self.add_atom_coords(
-    #        self._current_residue_index - atom.resindx,
-    #        atom.name,
-    #        coord,
-    #        )
 
 
 class ConformerBuilderNeRF:
@@ -495,11 +436,6 @@ class ConformerBuilderNeRF:
             self._clean_from_atom = DEFS.O_name
             self._clean_to_residue = None
             self._clean_to_atom = None
-
-        #self.db_atom_map = {
-        #    DEFS.N_name: 'UPPER': DEFS.N_name,
-        #    'LOWER': DEFS.C_name,
-        #    }
 
     @property
     def current_residue_index(self):
@@ -604,9 +540,6 @@ class ConformerBuilderNeRF:
          
         for residue_angles in fragment_angles:
 
-            #if self.conformer.is_bb_complete():
-            #    raise StopIteration
-
             # this can be incremented directly in the first run
             # because the first residue of the conformer template
             # is already created by the seed coordinates
@@ -673,24 +606,6 @@ class ConformerBuilderNeRF:
             )
 
         return coord
-
-    #def _make_coord_CtoN(self, residue_angles, atom):
-    #    
-    #    # example:    self.rosettadb['ALA']['UPPER']
-    #    # returns a RosettaAtomData type
-    #    #rosetta_atom = \
-    #    #    self.rosettadb[self.conformer.current_residue_type][atom.rname]
-    #    
-    #    #theta = residue_angles.get(
-    #    #    rosetta_atom.polar_theta,
-    #    #    rosetta_atom.polar_theta,
-    #    #    )
-
-    #    parent_coord, xaxis_coord, yaxis_coord = \
-    #        self._get_coords(atom, reverse=-1)
-
-    #    coord = LIBCALC.make_coord(
-            
 
     def _get_coords_from_conformer(self, atom_to_build, rosetta_atom):
         """
