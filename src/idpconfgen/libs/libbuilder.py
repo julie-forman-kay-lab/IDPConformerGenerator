@@ -1,7 +1,7 @@
 """Library for the Conformer builder."""
 from abc import ABC, abstractmethod
 import math
-from collections import defaultdict, namedtuple
+from collections import defaultdict, deque, namedtuple
 
 import numpy as np
 
