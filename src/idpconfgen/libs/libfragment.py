@@ -1,4 +1,5 @@
 import math
+import pickle
 import random
 from abc import ABC, abstractmethod
 from collections import namedtuple
@@ -28,8 +29,12 @@ class ResidueAngle:
         self.psi = psi
         self.omega = omega
     
+    def __eq__(self, other):
+        return all(vs == vo
+            for vs, vo in zip(self.__dict__.values(), other.__dict__.values()))
+
     def __str__(self):
-        return '{:>5}  {} {} {:>4} {:>4} {:>4} {:>7.3f} {:>7.3f} {:>7.3f}'.format(
+        return '{:>5}  {} {} {:>4} {:>4} {:>4} {:>8.3f} {:>8.3f} {:>8.3f}'.format(
             self.pdbid,
             self.residue,
             self.dssp,
@@ -89,6 +94,28 @@ class FragmentAngleDB(FragmentDBABC):
     ----------
     db : database
     """
+    
+    def __len__(self):
+        return len(self.db)
+
+    def __eq__(self, other):
+        is_eq = all((
+            len(self) == len(other),
+            self.total_len() == other.total_len(),
+            all(sres == ores for sfrags, ofrags in zip(self.db, other.db)\
+                for sres, ores in zip(sfrags, ofrags)),
+            ))
+        return is_eq
+    
+    def total_len(self):
+        """
+        The total length of the fragment db.
+
+        Total length counts the sum of all residue entries from all the
+        fragments in the db.
+        """
+        return sum(len(fragment) for fragment in self.db)
+
     @property
     def db(self):
         """
@@ -117,14 +144,23 @@ class FragmentAngleDB(FragmentDBABC):
         frag = self.get_pure_fragment()
         return frag[sliceObj]
     
+    def pickle_db(self, fname='fragment_angle_db.pickle'):
+        """
+        Save current db to a pickle file.
+
+        Saved pickle file can later be read with .from_file() method.
+        """
+        with open(fname, 'wb') as fh:
+            pickle.dump(self.db, fh)
+
     @classmethod
     def from_file(cls, fname):
         try:
             data = cls.read_text_file(fname)
+            parsed = cls._parse_raw_data(data)
         except UnicodeDecodeError:
-            data = cls.from_pickle(fname)
+            parsed = cls.read_pickle(fname)
 
-        parsed = cls._parse_raw_data(data)
         c = cls()
         c._db = parsed
         return c
@@ -150,7 +186,7 @@ class FragmentAngleDB(FragmentDBABC):
         database_file : pickle
             Pickle file
         """
-        with open(database_file, 'rb') as fh:
+        with open(fname, 'rb') as fh:
              data = pickle.load(fh)
         return data
 

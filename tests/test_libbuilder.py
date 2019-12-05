@@ -243,7 +243,7 @@ class TestFragmentAngleDB:
                 [
                     LF.ResidueAngle(
                         pdbid='XXX',
-                        letter='A',
+                        residue='A',
                         dssp='L',
                         phi=1.0,
                         psi=2.0,
@@ -251,7 +251,7 @@ class TestFragmentAngleDB:
                         ),
                     LF.ResidueAngle(
                         pdbid='XXZ',
-                        letter='R',
+                        residue='R',
                         dssp='L',
                         phi=4.0,
                         psi=5.0,
@@ -270,7 +270,7 @@ class TestFragmentAngleDB:
                 [
                     LF.ResidueAngle(
                         pdbid='XXX',
-                        letter='A',
+                        residue='A',
                         dssp='L',
                         phi=1.0,
                         psi=2.0,
@@ -278,7 +278,7 @@ class TestFragmentAngleDB:
                         ),
                     LF.ResidueAngle(
                         pdbid='XXZ',
-                        letter='R',
+                        residue='R',
                         dssp='L',
                         phi=4.0,
                         psi=5.0,
@@ -286,7 +286,7 @@ class TestFragmentAngleDB:
                         ),
                     LF.ResidueAngle(
                         pdbid='XXX',
-                        letter='A',
+                        residue='A',
                         dssp='L',
                         phi=7.0,
                         psi=8.0,
@@ -294,7 +294,7 @@ class TestFragmentAngleDB:
                         ),
                     LF.ResidueAngle(
                         pdbid='XXZ',
-                        letter='R',
+                        residue='R',
                         dssp='L',
                         phi=10.0,
                         psi=11.0,
