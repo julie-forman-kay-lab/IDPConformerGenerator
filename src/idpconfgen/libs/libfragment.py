@@ -4,16 +4,20 @@ import random
 from abc import ABC, abstractmethod
 from collections import namedtuple
 
+from idpconfgen import Path
+from idpconfgen.core import interfaces as ITF
 from idpconfgen.libs import libutil as UTIL
 
-class ResidueAngle:
+
+class ResidueAngle(ITF.ReprClean):
     def __init__(self,
+            *,
             pdbid=None,
             residue=None,
+            dssp=None,
             pdb_res_1=None,
             pdb_res_2=None,
             pdb_res_3=None,
-            dssp=None,
             phi=None,
             psi=None,
             omega=None,
@@ -34,35 +38,20 @@ class ResidueAngle:
             for vs, vo in zip(self.__dict__.values(), other.__dict__.values()))
 
     def __str__(self):
-        return '{:>5}  {} {} {:>4} {:>4} {:>4} {:>8.3f} {:>8.3f} {:>8.3f}'.format(
+        s = '{:>5}  {} {} {:>4} {:>4} {:>4} {:>8.3f} {:>8.3f} {:>8.3f}'
+        return s.format(
             self.pdbid,
             self.residue,
             self.dssp,
-            self.pdb_res_1,
-            self.pdb_res_2,
-            self.pdb_res_3,
+            str(self.pdb_res_1),
+            str(self.pdb_res_2),
+            str(self.pdb_res_3),
             self.phi * 180 / math.pi,
             self.psi * 180 / math.pi,
             self.omega * 180 / math.pi,
             )
-    
-    def __repr__(self):
-        return str(self)
 
-
-#ResidueAngle = namedtuple(
-#    'ResidueAngle',
-#    [
-#        'pdbid',
-#        'letter',
-#        'dssp',
-#        'phi',
-#        'psi',
-#        'omega',
-#        ]
-#    )
-
-
+   
 class FragmentDBABC(ABC):
     """Provide abstract interface for FragmengDB."""
 
@@ -144,14 +133,16 @@ class FragmentAngleDB(FragmentDBABC):
         frag = self.get_pure_fragment()
         return frag[sliceObj]
     
-    def pickle_db(self, fname='fragment_angle_db.pickle'):
+    def save_pickle_db(self, fname='fragment_angle_db.pickle'):
         """
         Save current db to a pickle file.
 
         Saved pickle file can later be read with .from_file() method.
         """
-        with open(fname, 'wb') as fh:
-            pickle.dump(self.db, fh)
+        p = Path(fname)
+        pickle.dump(self.db, p.open('wb'))
+        #with p.write_bytes as fh:
+        #    pickle.dump(self.db, fh)
 
     @classmethod
     def from_file(cls, fname):

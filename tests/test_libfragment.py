@@ -1,10 +1,68 @@
 """Test lib fragment."""
+import copy
+
 import pytest
 
 from idpconfgen import Path
 from idpconfgen.libs import libfragment as LF
 
 from . import tcommons
+
+
+class TestResidueAngle:
+    """Test ResidueAngle."""
+
+    def test_init(self):
+        LF.ResidueAngle()
+
+    def test_repr(self):
+        result = repr(LF.ResidueAngle())
+        expected = (
+            'ResidueAngle('
+            'pdbid=None, '
+            'residue=None, '
+            'dssp=None, '
+            'pdb_res_1=None, '
+            'pdb_res_2=None, '
+            'pdb_res_3=None, '
+            'phi=None, '
+            'psi=None, '
+            'omega=None'
+            ')'
+            )
+        assert result == expected
+
+    def test_equality(self):
+        a = LF.ResidueAngle(
+            pdbid='XXZ',
+            residue='R',
+            dssp='L',
+            phi=10.0,
+            psi=11.0,
+            omega=12.0,
+            )
+        b = LF.ResidueAngle(
+            pdbid='XXZ',
+            residue='R',
+            dssp='L',
+            phi=10.0,
+            psi=11.0,
+            omega=12.0,
+            )
+        assert a == b
+
+    def test_string(self):
+        a = LF.ResidueAngle(
+            pdbid='XXZ',
+            residue='R',
+            dssp='L',
+            phi=0.0,
+            psi=1.0,
+            omega=3.141,
+            )
+        s = '  XXZ  R L None None None    0.000   57.296  179.966'
+        # this is definitively dangerous!!
+        assert s == str(a)
 
 
 class TestFragmentABC:
@@ -63,6 +121,10 @@ class TestFragmentAngleDB:
     def test_property_db(self, fname):
         fragdb = LF.FragmentAngleDB.from_file(fname)
         assert fragdb._db is fragdb.db
+        assert len(fragdb) == len(fragdb.db)
+        fragdb2 = copy.deepcopy(fragdb)
+        assert fragdb2 == fragdb
+        assert fragdb is not fragdb2
 
     @pytest.mark.parametrize(
         'fname',
@@ -106,3 +168,13 @@ class TestFragmentAngleDB:
         fragment = fragdb.get_angle_fragment(fragsize=0)
         assert isinstance(fragment, list)
         assert len(fragment) == 0
+
+    def test_save_pickle_db(self):
+        a = LF.FragmentAngleDB.from_file(
+            Path(tcommons.data_folder, 'LVALL_sample')
+            )
+        
+        dest_pickle = Path(tcommons.folder_output, 'dummypickle')
+        a.save_pickle_db(dest_pickle)
+        b = LF.FragmentAngleDB.from_file(dest_pickle)
+        assert a == b

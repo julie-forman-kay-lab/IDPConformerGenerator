@@ -7,7 +7,7 @@ class ReprClean:
     def __repr__(self):
         kwargs = \
             ', '.join(f'{key}={val!r}' for key, val in self.__dict__.items())
-        rpr = '{}({})'.format(__class__.__name__, kwargs)
+        rpr = '{}({})'.format(self.__class__.__name__, kwargs)
         return rpr
 
 
