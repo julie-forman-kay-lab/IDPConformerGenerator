@@ -3,39 +3,23 @@ import pickle
 import random
 from abc import ABC, abstractmethod
 from collections import namedtuple
+from typing import NamedTuple
 
 from idpconfgen import Path
 from idpconfgen.core import interfaces as ITF
 from idpconfgen.libs import libutil as UTIL
 
 
-class ResidueAngle(ITF.ReprClean):
-    def __init__(self,
-            *,
-            pdbid=None,
-            residue=None,
-            dssp=None,
-            pdb_res_1=None,
-            pdb_res_2=None,
-            pdb_res_3=None,
-            phi=None,
-            psi=None,
-            omega=None,
-            ):
-        #
-        self.pdbid = pdbid
-        self.residue = residue
-        self.dssp = dssp
-        self.pdb_res_1 = pdb_res_1
-        self.pdb_res_2 = pdb_res_2
-        self.pdb_res_3 = pdb_res_3
-        self.phi = phi
-        self.psi = psi
-        self.omega = omega
-    
-    def __eq__(self, other):
-        return all(vs == vo
-            for vs, vo in zip(self.__dict__.values(), other.__dict__.values()))
+class ResidueAngle(NamedTuple):
+    pdbid: str
+    residue: str
+    dssp: str
+    phi: float
+    psi: float
+    omega: float
+    pdb_res_1: str = 'None'
+    pdb_res_2: str = 'None'
+    pdb_res_3: str = 'None'
 
     def __str__(self):
         s = '{:>5}  {} {} {:>4} {:>4} {:>4} {:>8.3f} {:>8.3f} {:>8.3f}'
@@ -51,16 +35,51 @@ class ResidueAngle(ITF.ReprClean):
             self.omega * 180 / math.pi,
             )
 
+
+#class _ResidueAngle(ITF.ReprClean):
+#    def __init__(self,
+#            *,
+#            pdbid=None,
+#            residue=None,
+#            dssp=None,
+#            pdb_res_1=None,
+#            pdb_res_2=None,
+#            pdb_res_3=None,
+#            phi=None,
+#            psi=None,
+#            omega=None,
+#            ):
+#        #
+#        self.pdbid = pdbid
+#        self.residue = residue
+#        self.dssp = dssp
+#        self.pdb_res_1 = pdb_res_1
+#        self.pdb_res_2 = pdb_res_2
+#        self.pdb_res_3 = pdb_res_3
+#        self.phi = phi
+#        self.psi = psi
+#        self.omega = omega
+#    
+#    def __eq__(self, other):
+#        return all(vs == vo
+#            for vs, vo in zip(self.__dict__.values(), other.__dict__.values()))
+#
+#    def __str__(self):
+#        s = '{:>5}  {} {} {:>4} {:>4} {:>4} {:>8.3f} {:>8.3f} {:>8.3f}'
+#        return s.format(
+#            self.pdbid,
+#            self.residue,
+#            self.dssp,
+#            str(self.pdb_res_1),
+#            str(self.pdb_res_2),
+#            str(self.pdb_res_3),
+#            self.phi * 180 / math.pi,
+#            self.psi * 180 / math.pi,
+#            self.omega * 180 / math.pi,
+#            )
+
    
-class FragmentDBABC(ABC):
-    """Provide abstract interface for FragmengDB."""
-
-    @abstractmethod
-    def get_pure_fragment(self):
-        return
-
-
-class FragmentAngleDB(FragmentDBABC):
+class FragmentAngleDB:
     """
     Database for fragment angles.
 
@@ -83,18 +102,28 @@ class FragmentAngleDB(FragmentDBABC):
     ----------
     db : database
     """
-    
+    def __init__(self):
+        self._idx = 0
+
     def __len__(self):
         return len(self.db)
 
     def __eq__(self, other):
-        is_eq = all((
-            len(self) == len(other),
-            self.total_len() == other.total_len(),
-            all(sres == ores for sfrags, ofrags in zip(self.db, other.db)\
-                for sres, ores in zip(sfrags, ofrags)),
-            ))
-        return is_eq
+        return self.db == other.db
+
+    def __iter__(self):
+        self._idx = 0
+        return self
+
+    def __next__(self):
+        if self._idx < len(self):
+            self._idx += 1
+            return self.db[self._idx - 1]
+        else:
+            raise StopIteration
+
+    def __getitem__(self, index):
+        return self.db[index]
     
     def total_len(self):
         """
@@ -129,8 +158,8 @@ class FragmentAngleDB(FragmentDBABC):
 
         In our case selects a random loop from loop DB.
         """
-        sliceObj = UTIL.random_fragment(self.db, fragsize)
         frag = self.get_pure_fragment()
+        sliceObj = UTIL.random_fragment(frag, fragsize)
         return frag[sliceObj]
     
     def save_pickle_db(self, fname='fragment_angle_db.pickle'):
@@ -140,6 +169,7 @@ class FragmentAngleDB(FragmentDBABC):
         Saved pickle file can later be read with .from_file() method.
         """
         p = Path(fname)
+        p.resolve().parents[0].mkdir(parents=True, exist_ok=True)
         pickle.dump(self.db, p.open('wb'))
         #with p.write_bytes as fh:
         #    pickle.dump(self.db, fh)
