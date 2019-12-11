@@ -2,6 +2,7 @@
 from abc import ABC, abstractmethod
 import math
 from collections import defaultdict, deque, namedtuple
+from typing import NamedTuple
 
 import numpy as np
 
@@ -186,7 +187,7 @@ class ConformerTemplate:
                 return index
 
 
-class AtomNeRF(ITF.ReprClean):
+class AtomNeRF(NamedTuple):
     """
     Defines an atom building block for NeRF algorithm.
 
@@ -217,7 +218,7 @@ class AtomNeRF(ITF.ReprClean):
             For example, N is UPPER in NtoC building and C is LOWER
             in CtoN building.
 
-    parentoff
+    poff
         The residue index where the parent atom will be taken.
 
     xoff
@@ -230,38 +231,12 @@ class AtomNeRF(ITF.ReprClean):
         The residue index offset relative to the building process
         where to add the atom. See :class:`ConformerNerf`.
     """
-    def __init__(self, name, rosetta_name, parentoff, xoff, yoff, resoff):
-        self._name = name
-        self._rosetta_name = rosetta_name
-        self._poff = parentoff
-        self._xoff = xoff
-        self._yoff = yoff
-        self._resoff = resoff
-    
-    @property
-    def name(self):
-        return self._name
-    
-    @property
-    def rosetta_name(self):
-        return self._rosetta_name
-
-    @property
-    def poff(self):
-        return self._poff
-
-    @property
-    def xoff(self):
-        return self._xoff
-
-    @property
-    def yoff(self):
-        return self._yoff
-
-    @property
-    def resoff(self):
-        return self._resoff
-
+    name: str
+    rosetta_name: str
+    poff: int
+    xoff: int
+    yoff: int
+    resoff: int
 
 # to build forward
 N_atom_NeRF = AtomNeRF(DEFS.N_name, 'UPPER', -1, -1, -1, 0)
