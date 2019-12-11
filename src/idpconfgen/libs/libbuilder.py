@@ -264,14 +264,28 @@ NeRF_building_order_CtoN = [
 
 
 class FragDBNeRFFactory:
-    
+    """
+    Factory for FragmentAngleDBNeRF.
+
+    Generates equal and independent copies of FragmentAngleDBNeRF.
+    """
     def __init__(self):
         self._fragdb = None
     
     def read_fragdb(self, fname):
+        """
+        Reads an angle database from a file.
+        """
         self._fragdb = LF.FragmentAngleDB.from_file(fname)
     
     def get_db_for_nerf(self):
+        """
+        Create a :class:`FragmentAngleDBNeRF`.
+
+        DB is created from a previously loaded fragment angle file.
+
+        Returns the new DB object.
+        """
         fragnerf = FragmentAngleDBNeRF(self._fragdb)
         return fragnerf
 
@@ -281,6 +295,9 @@ class FragmentAngleDBNeRF:
     
     def __init__(self, fragmentdb):
         self._fragdb = fragmentdb
+
+    def __eq__(self, other):
+        return self._fragdb == other._fragdb
 
     def get_angle_fragment(self, fragsize=None):
         """

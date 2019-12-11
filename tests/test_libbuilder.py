@@ -352,6 +352,40 @@ class TestFragmentAngleDBNeRF:
         result = fdb.transform_frag2dict(in1)
         assert dict(result) == expected
 
+
+class TestFragDBNeRFFactory:
+    """Test FragDBNeRFFactory."""
+    @pytest.fixture
+    def file_LVALL_sample(self):
+        """Path to a angle db TXT file."""
+        return Path(tcommons.data_folder, 'LVALL_sample')
+    
+    @pytest.fixture
+    def factory_init(self):
+        """Tests factory initiation without arguments."""
+        return LB.FragDBNeRFFactory()
+
+    def test_read_from_file(self, factory_init, file_LVALL_sample):
+        """
+        Test reading from txt file.
+        
+        This reads a angle DB file to a LF.FragmentAngleDB obj
+        and assigns it to attribute fragdb.
+        """
+        factory_init.read_fragdb(file_LVALL_sample)
+        assert isinstance(factory_init._fragdb, LF.FragmentAngleDB)
+   
+    
+    def test_get_a_frag_db(self, factory_init, file_LVALL_sample):
+        """Test production of a new fragment angle database."""
+        factory_init.read_fragdb(file_LVALL_sample)
+        a = factory_init.get_db_for_nerf()
+        b = factory_init.get_db_for_nerf()
+        assert a is not b
+        assert a == b
+
+
+
 #class TestConformerNeRF:
 #   
 #    @pytest.mark.parametrize(
