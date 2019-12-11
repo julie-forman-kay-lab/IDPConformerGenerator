@@ -61,6 +61,11 @@ class TestAtomNeRF:
 
 class TestConformerTemplate:
     """Test base Conformer Template."""
+
+    @pytest.fixture
+    def conformer_template_marvel(self):
+        return LB.ConformerTemplate('MARVEL')
+
     @pytest.mark.parametrize(
         'in1,expected',
         [
@@ -81,6 +86,7 @@ class TestConformerTemplate:
             ],
         )
     def test_parse_seq(self, in1, expected):
+        """Test _parse_seq with different inputs."""
         assert LB.ConformerTemplate._parse_seq(in1) == expected
 
     @pytest.mark.parametrize(
@@ -91,18 +97,24 @@ class TestConformerTemplate:
             ],
         )
     def test_parse_errors(self, in1, error):
+        """Test errors on _parse_seq."""
         with pytest.raises(error):
             LB.ConformerTemplate._parse_seq(in1)
 
-    def test_property_seq(self):
-        ct = LB.ConformerTemplate('MARVEL')
+    def test_property_seq(self, conformer_template_marvel):
+        """Test ConformerTemplate seq values."""
+        ct = conformer_template_marvel
         assert ct.seq == ('MET', 'ALA', 'ARG', 'VAL', 'GLU', 'LEU')
+
+    def test_seq_type(self, conformer_template_marvel):
+        """Test ConformerTemplate seq is tuple type."""
+        ct = conformer_template_marvel
         assert isinstance(ct.seq, tuple)
     
-    def test_property_seq_AttributeError(self):
-        ct = LB.ConformerTemplate('MARVEL')
+    def test_property_seq_AttributeError(self, conformer_template_marvel):
+        """Test AttributeError on attribute assignement .seq."""
         with pytest.raises(AttributeError):
-            ct.seq = 1
+            conformer_template_marvel.seq = 1
     
     @pytest.mark.parametrize(
         'in1',
@@ -113,24 +125,27 @@ class TestConformerTemplate:
             ],
         )
     def test_property_coords(self, in1):
+        """Test property coords."""
         ct = LB.ConformerTemplate(in1)
         num_of_residues = len(in1) * len(DEFS.backbone_atoms) + 1
         assert ct.coords.size == num_of_residues * 3
         assert ct.coords.shape == (num_of_residues, 3)
 
     def test_property_coords_AttributeError(self):
+        """Test AttributeError on attribute assignement .coords."""
         ct = LB.ConformerTemplate('MSME')
         with pytest.raises(AttributeError):
             ct.coords = 1
 
-    def test_property_atomnames(self):
-        ct = LB.ConformerTemplate('MARVEL')
+    def test_property_atomnames(self, conformer_template_marvel):
+        """Test atomnames."""
+        ct = conformer_template_marvel
         assert ct.atomnames.shape == (ct.coords.shape[0],)
 
-    def test_property_atomnames_AttributeError(self):
-        ct = LB.ConformerTemplate('MARVEL')
+    def test_property_atomnames_AttributeError(self, conformer_template_marvel):
+        """Test atomnames AttributeError on assignment."""
         with pytest.raises(AttributeError):
-            ct.atomnames = 1
+            conformer_template_marvel.atomnames = 1
     
     @pytest.mark.parametrize(
         'resind,aname,expected',
@@ -142,6 +157,7 @@ class TestConformerTemplate:
             ],
         )
     def test_get_index(self, resind, aname, expected):
+        """Test _get_index static method."""
         result = LB.ConformerTemplate._get_index(resind, aname)
         assert result == expected
    
@@ -169,16 +185,18 @@ class TestConformerTemplate:
             ],
         )
     def test_add_coords(self,resindex, atomname, coords, realindex):
+        """Test adding coords."""
         ct = LB.ConformerTemplate('MARVEL')
 
         coords = np.array(coords)
         ct.add_atom_coords(resindex, atomname, coords)
         assert all(np.equal(ct.coords[realindex], coords))
 
-    def test_add_coords_resindx_error(self):
-        ct = LB.ConformerTemplate('MARVEL')
+    def test_add_coords_resindx_error(self, conformer_template_marvel):
+        """Test IndexError on adding coords outside range."""
         with pytest.raises(IndexError):
-            ct.add_atom_coords(10, 'N', np.array([1., 1., 1.]))
+            conformer_template_marvel.add_atom_coords(
+                10, 'N', np.array([1., 1., 1.]))
 
     @pytest.mark.parametrize(
         'seq',
@@ -187,6 +205,7 @@ class TestConformerTemplate:
             ],
         )
     def test_is_complete(self, seq):
+        """Test conformer is complete."""
         ct = LB.ConformerTemplate(seq)
         for i in range(len(seq)):
             for c in DEFS.backbone_atoms:
@@ -197,15 +216,18 @@ class TestConformerTemplate:
         assert ct.is_complete()
     
     def test_is_complete_manual(self):
+        """Test is complete assigning manually."""
         ct = LB.ConformerTemplate('MAV')
         ct._coords[:] = 1
         assert ct.is_complete()
 
     def test_is_complete_false_1(self):
+        """Test is not complete assessement no coords. """
         ct = LB.ConformerTemplate('MAV')
         assert not ct.is_complete()
 
     def test_is_complete_false_2(self):
+        """Test is not complete assessement some coords. """
         ct = LB.ConformerTemplate('MAV')
         ct._coords[:3, :] = 1
         assert not ct.is_complete()
@@ -226,8 +248,12 @@ class TestConformerTemplate:
         assert np.all(np.equal(result, coords))
 
 
-class TestFragmentAngleDB:
-    """Test dedicated Fragment Angle DB for NeRF protocol."""
+class TestFragmentAngleDBNeRF:
+    """
+    Test dedicated Fragment Angle DB for NeRF protocol.
+    
+    Tests on FragmentAngleDB are in tests_libfragment.py
+    """
     
     fragdb = LF.FragmentAngleDB.from_file(
         Path(tcommons.data_folder, 'LVALL_sample')

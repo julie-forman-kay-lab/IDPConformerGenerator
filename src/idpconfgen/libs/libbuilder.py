@@ -608,6 +608,9 @@ class ConformerBuilderNeRF:
 
 
 class RosettaAtomData(ITF.ReprClean):
+    # RosettaAtomData does not inhering from typing.NamedTuple
+    # because currently .polar_theta can be either float or str.
+    # .. TODO: change this.
     """
     Rosetta atom data for building.
 
