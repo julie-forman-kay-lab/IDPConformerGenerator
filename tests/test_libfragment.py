@@ -1,6 +1,5 @@
 """Test lib fragment."""
 import copy
-from typing import NamedTuple
 
 import pytest
 
@@ -15,6 +14,7 @@ class TestResidueAngle:
     
     @pytest.fixture
     def residue_angle_a(self):
+        """Example fixture of a ResidueAngle object."""
         return LF.ResidueAngle(
             pdbid='XXZ',
             residue='R',
@@ -26,6 +26,7 @@ class TestResidueAngle:
     
     @pytest.fixture
     def residue_angle_b(self):
+        """Example fixture of a ResidueAngle object."""
         return LF.ResidueAngle(
             pdbid='XXZ',
             residue='R',
@@ -35,12 +36,29 @@ class TestResidueAngle:
             omega=12.0,
             )
 
-    def test_init(self):
+    @pytest.fixture
+    def residue_angle_c(self):
+        """Example fixture of a ResidueAngle object."""
+        return LF.ResidueAngle(
+            pdbid='AAZ',
+            residue='R',
+            dssp='L',
+            phi=10.0,
+            psi=11.0,
+            omega=12.0,
+            )
+
+    def test_init_TypeError(self):
+        """Test init class with empty args raises TypeError."""
         with pytest.raises(TypeError):
             LF.ResidueAngle()
     
     def test_equality(self, residue_angle_a, residue_angle_b):
+        """Test equality between two objects."""
         assert residue_angle_a == residue_angle_b
+
+    def test_inequality(self, residue_angle_a, residue_angle_c):
+        assert residue_angle_a != residue_angle_c
 
     def test_string(self, residue_angle_a):
         s = '  XXZ  R L None None None  572.958  630.254  687.549'
@@ -53,6 +71,7 @@ class TestFragmentAngleDB:
     
     @pytest.fixture
     def file_LVALL_sample(self):
+        """Path to a angle db TXT file."""
         return Path(tcommons.data_folder, 'LVALL_sample')
 
     def test_init(self):
@@ -61,201 +80,122 @@ class TestFragmentAngleDB:
     
     @pytest.fixture
     def data_text_file(self, file_LVALL_sample):
+        """Read the example file into a list of lists of strings."""
         return LF.FragmentAngleDB.read_text_file(file_LVALL_sample)
     
     def test_static_read_text_len_1(self, data_text_file):
+        """Test number of fragments of strings."""
         assert len(data_text_file) == 3
 
     def test_static_read_text_len_2(self, data_text_file):
+        """Test length of the first fragment of strings."""
         assert len(data_text_file[0]) == 12
 
     def test_static_read_text_len_3(self, data_text_file):
+        """Test length of the second fragment of strings."""
         assert len(data_text_file[1]) == 10
 
     def test_static_read_text_len_4(self, data_text_file):
-        assert len(data_text_file[1]) == 10
-
-    def test_static_read_text_len_5(self, data_text_file):
+        """Test length of the third fragment of strings."""
         assert len(data_text_file[2]) == 9
 
-    def test_static_read_text_6(self, data_text_file):
+    def test_static_read_text_5(self, data_text_file):
+        """Test all items in fragment of strings are strings."""
         assert all(isinstance(i, str) for b in data_text_file for i in b)
     
-    def test_static_read_text_7(self, data_text_file):
+    def test_static_read_text_6(self, data_text_file):
+        """Test length of residue string after split."""
         assert len(data_text_file[0][0].split()) == 9
     
     @pytest.fixture
     def fragmentdb(self, file_LVALL_sample):
+        """Read example file to a FragmentAngleDB object."""
         return LF.FragmentAngleDB.from_file(file_LVALL_sample)
     
     def test_fragnentdb_db_0(self, fragmentdb):
+        """Test class type."""
         assert isinstance(fragmentdb, LF.FragmentAngleDB)
 
     def test_fragnentdb_db_1(self, fragmentdb):
+        """Test size of the first fragment."""
         assert len(fragmentdb[0]) == 12
     
     def test_fragnentdb_db_2(self, fragmentdb):
+        """Test all elements of a fragment are ResidueAngle instances."""
         assert all(isinstance(i, LF.ResidueAngle) for i in fragmentdb[0])
 
     def test_fragnentdb_db_3(self, fragmentdb):
+        """Test phi attribute is read as float."""
         assert isinstance(fragmentdb[0][0].phi, float)
     
     def test_fragnentdb_db_4(self, fragmentdb):
+        """Test psi attribute is read as float."""
         assert isinstance(fragmentdb[0][0].psi, float)
 
     def test_fragnentdb_db_5(self, fragmentdb):
+        """Test omega attribute is read as float."""
         assert isinstance(fragmentdb[0][0].omega, float)
 
     def test_fragmentdb_db_6(self, fragmentdb):
+        """Test .db attribute property."""
         assert fragmentdb._db is fragmentdb.db
   
     def test_fragmentdb_db_7(self, fragmentdb):
+        """Test length evaluation of FragmentAngleDB."""
         assert len(fragmentdb) == len(fragmentdb.db)
 
     def test_fragmentdb_db_8(self, fragmentdb):
+        """Test deep copy executes properly."""
         fragmentdb2 = copy.deepcopy(fragmentdb)
         assert fragmentdb2 == fragmentdb
         assert fragmentdb2 is not fragmentdb
     
     def test_fragmentdb_db_9(self, fragmentdb):
+        """Test total length of the fragmentdb object."""
         assert fragmentdb.total_len() == 31 
 
     def test_StopIteration(self, fragmentdb):
+        """Test fragmentdb is iterable with StopIteration implemented."""
         with pytest.raises(StopIteration):
             for i in range(100):
                 next(fragmentdb)
 
     def test_for_loop(self, fragmentdb):
+        """Test all items in fragmentdb are lists."""
         for i in fragmentdb:
             assert isinstance(i, list)
 
-    #@pytest.mark.parametrize(
-    #    'fname',
-    #    [
-    #        (Path(tcommons.data_folder, 'LVALL_sample')),
-    #        #(Path(tcommons.data_folder, 'fragment_angle_db.pickle')),
-    #        ],
-    #    )
-    #def test_get_pure_fragment(self, fname):
-    #    fragdb = LF.FragmentAngleDB.from_file(fname)
-    #    
-    #    fragment = fragdb.get_pure_fragment()
-
     def test_get_pure_fragment_1(self, fragmentdb):
+        """Test a pure fragment is of list type."""
         fragment = fragmentdb.get_pure_fragment()
         assert isinstance(fragment, list)
         
     def test_get_pure_fragment_2(self, fragmentdb):
+        """Test get_pure_fragment API."""
         fragment = fragmentdb.get_pure_fragment()
         assert isinstance(fragment[0], LF.ResidueAngle)
    
     def test_get_angle_fragment_1(self, fragmentdb):
+        """Test angle fragment API for fragsize=None."""
         fraglist = fragmentdb.get_angle_fragment()
         assert isinstance(fraglist, list)
         
     def test_get_angle_fragment_2(self, fragmentdb):
+        """Test angle fragment API for fragsize=4."""
         fraglist = fragmentdb.get_angle_fragment(fragsize=4)
         assert isinstance(fraglist, list)
         assert len(fraglist) == 4
 
-    #@pytest.fixture(
-    #    params=[
-    #        Path(tcommons.data_folder, 'LVALL_sample'),
-    #        #Path(tcommons.data_folder, 'fragment_angle_db.pickle'),
-    #        ],
-    #    )
-    #def frag_file_path(self, request):
-    #    return request.param
-    #
-    #@pytest.fixture(params=range(1, 3))
-    #def frag_size(self, request):
-    #    return request.param
-    #
-    #@pytest.fixture()#(params=[(frag_file_path, frag_size)])
-    #def angle_fragment(self, frag_file_path, frag_size):#request):
-    #    fragdb = LF.FragmentAngleDB.from_file(frag_file_path)
-    #    return fragdb.get_angle_fragment(frag_size)
-    #
-    #def test_get_angle_fragment_type(self, angle_fragment):
-    #    assert isinstance(angle_fragment, list)
-    #
-    #def test_get_angle_fragment_item_type(self, angle_fragment):
-    #    assert isinstance(angle_fragment[0], LF.ResidueAngle)
-
-    #def test_get_angle_fragment_item_len(self, angle_fragment):
-    #    assert len(angle_fragment) == 1
-    #
-    #@pytest.fixture(params=[0])
-    #def frag_size_null(self, request):
-    #    return request.param
-
-    #@pytest.fixture()
-    #def angle_fragment_null(self, frag_file_path, frag_size_null):
-    #    fragdb = LF.FragmentAngleDB.from_file(frag_file_path)
-    #    return fragdb.get_angle_fragment(frag_size_null)
-
-    #def test_get_angle_fragment_null_type(self, angle_fragment_null):
-    #    assert isinstance(angle_fragment_null, list)
-
-    #def test_get_angle_fragment_null_len(self, angle_fragment_null):
-    #    assert len(angle_fragment_null) == 0
-    #@pytest.mark.parametrize(
-    #    'fname',
-    #    [
-    #        (Path(tcommons.data_folder, 'LVALL_sample')),
-    #        (Path(tcommons.data_folder, 'fragment_angle_db.pickle')),
-    #        ],
-    #    )
-    #def test_get_angle_fragment(self, fname):
-    #    fragdb = LF.FragmentAngleDB.from_file(fname)
-    #    
-    #    fragment = fragdb.get_angle_fragment(fragsize=1)
-    #    assert isinstance(fragment, list)
-    #    assert isinstance(fragment[0], LF.ResidueAngle)
-    #    assert len(fragment) == 1
-
-    #@pytest.fixture(
-    #    params=[
-    #        Path(tcommons.data_folder, 'LVALL_sample'),
-    #        Path(tcommons.data_folder, 'fragment_angle_db.pickle'),
-    #        ],
-    #    )
-    #def fragment(self, request):
-    #    fragdb = LF.FragmentAngleDB.from_file(request.param)
-    #    fragment = fragdb.get_angle_fragment(fragsize=0)
-    #    return fragment
-
-    #def test_get_angle_fragment_0size_type(self, fragment):
-    #    assert isinstance(fragment, list)
-
-    #def test_get_angle_fragment_0size_len(self, fragment):
-    #    assert len(fragment) == 0
-
-
-class TestFragDB2pickle:
-    """Test writing DB to pickle and readig it back."""
-    
-    @pytest.fixture(scope='class')
-    def LVALL_sample(self):
-        return LF.FragmentAngleDB.from_file(
-            Path(tcommons.data_folder, 'LVALL_sample')
-            )
-  
-    @pytest.fixture(scope='class')
+    @pytest.fixture
     def dest_pickle_path(self):
+        """Destination test pickle file."""
         return Path(tcommons.folder_output, 'dummypickle')
 
-    def test_save_text_to_pickle(self, LVALL_sample, dest_pickle_path):
-        LVALL_sample.save_pickle_db(dest_pickle_path)
+    def test_save_text_to_pickle(self, fragmentdb, dest_pickle_path):
+        """Test saving a DB to pickle."""
+        fragmentdb.save_pickle_db(dest_pickle_path)
     
-    def test_reload_pickle(self, LVALL_sample, dest_pickle_path):
+    def test_reload_pickle(self, fragmentdb, dest_pickle_path):
         """Test if a pickle saved from txt equals txt when reloaded."""
         b = LF.FragmentAngleDB.from_file(dest_pickle_path)
-        assert LVALL_sample == b
-
-    #def test_save_pickle_db(self, dest_pickle_path):
-    #    b = LF.FragmentAngleDB.from_file(dest_pickle_path)
-    #    c = LF.FragmentAngleDB.from_file(
-    #        Path(tcommons.data_folder, 'fragment_angle_db.pickle')
-    #        )
-    #    assert b == c
+        assert fragmentdb == b
