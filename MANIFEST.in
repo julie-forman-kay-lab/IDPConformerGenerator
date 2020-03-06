@@ -1,8 +1,26 @@
 graft docs
-prune docs/html
-prune docs/latex
+graft src
+
 prune tests
+prune alphas
 
-include *.rst LICENSE
+include .bumpversion.cfg
+include .coveragerc
+include .editorconfig
+include .readthedocs.yml
+include pyproject.toml
 
-global-exclude *.py[co] __pycache__
+include AUTHORS.rst
+include CHANGELOG.rst
+include CONTRIBUTING.rst
+include LICENSE
+include README.rst
+
+include tox.ini .travis.yml
+
+exclude PULLREQUEST.rst
+exclude REQUIREMENTS.md
+
+global-exclude *.py[cod] __pycache__/* *.so *.dylib
+global-exclude tags
+global-exclude *.swp
