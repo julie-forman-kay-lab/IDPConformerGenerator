@@ -61,7 +61,7 @@ class IDPConfGenException(Exception):
             self.args = args
        
         log.debug(f'Exception errors: {self.errmsg}')
-        log.degub(f'Exception args: {self.args}')
+        log.debug(f'Exception args: {self.args}')
 
         # ensure
         assert self.errmsg.count('{}') == len(self.args), \
