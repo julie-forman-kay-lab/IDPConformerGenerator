@@ -54,6 +54,7 @@ def test_IDPConfGenExc_errmsg_None(errmsg):
 @pytest.mark.parametrize(
     'args',
     [
+        (['some error']),
         (['some error {}', 1]),
         (['some error {} {}', 1, 2]),
         (['some error {} {} {}', 1, 2, 'asd']),
