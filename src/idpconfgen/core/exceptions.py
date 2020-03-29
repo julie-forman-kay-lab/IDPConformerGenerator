@@ -59,7 +59,10 @@ class IDPConfGenException(Exception):
 
         else:
             self.args = args
-         
+       
+        log.debug(f'Exception errors: {self.errmsg}')
+        log.degub(f'Exception args: {self.args}')
+
         # ensure
         assert self.errmsg.count('{}') == len(self.args), \
             f"Bad exceptions instantiation: {self.errmsg} with {self.args}"
