@@ -119,7 +119,7 @@ class DSSPParser:
     def _confirm_ss_data(data):
         # confirms data makes sense
         if not all((i in vars(DEFS.dssp_ss_keys).values() for i in data)):
-            raise EXCPTS.DSSPSecStructError(data)
+            raise EXCPTS.DSSPSecStructError()
 
     @staticmethod
     def _finds_data_index(data):

@@ -5,21 +5,35 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given
 
-#from idpconfgen import contactus as CONTACTUS
+from idpconfgen.core import has_string_formatters, count_string_formatters
 from idpconfgen.core import exceptions as EXCPTNS
+
+from .tcommons import random_type
 
 
 EXCPT_classes = inspect.getmembers(EXCPTNS, predicate=inspect.isclass)
 error_classes = [
     t[1] for t in EXCPT_classes
-        if issubclass(t[1], EXCPTNS.IDPConfGenException)
-            and t[0].endswith('Error')
+    if issubclass(t[1], EXCPTNS.IDPConfGenException)
+    and t[0].endswith('Error')
     ]
 
 
 @pytest.fixture(params=error_classes)
 def ErrorClass(request):
-    """Custom Error Classes in exception module."""
+    """Return custom Error Classes in exception module."""
+    return request.param
+
+
+exceptions_with_formattable_erromsg = list(filter(
+    lambda x: has_string_formatters(x.errmsg),
+    error_classes,
+    ))
+
+
+@pytest.fixture(params=exceptions_with_formattable_erromsg)
+def ExcptsFormattable(request):
+    """Return IDPConfGen Exceptions with formattable errmsg."""
     return request.param
 
 
@@ -28,9 +42,9 @@ def test_all_errors_names_end_in_error():
     endswitherror = [t[1] for t in EXCPT_classes if t[0].endswith('Error')]
     subclss = [
         t[1] for t in EXCPT_classes
-            if issubclass(t[1], EXCPTNS.IDPConfGenException)
+        if issubclass(t[1], EXCPTNS.IDPConfGenException)
         ]
-    assert len(endswitherror) == len(subclss) - 1 # IDPConfGenException itself
+    assert len(endswitherror) == len(subclss) - 1  # IDPConfGenException itself
 
 
 def test_IDPConfGenException_type():
@@ -46,25 +60,49 @@ def test_IDPConfGenExc_no_error_mg_0():
 
 @given(st.none())
 def test_IDPConfGenExc_errmsg_None(errmsg):
-    """Test init with errmsg=None."""
+    """Test init with errmsg=None, should be ignored."""
     err = EXCPTNS.IDPConfGenException(errmsg=errmsg)
     assert str(err) == EXCPTNS.IDPConfGenException.errmsg
 
 
-@pytest.mark.parametrize(
-    'args',
-    [
-        (['some error']),
-        (['some error {}', 1]),
-        (['some error {} {}', 1, 2]),
-        (['some error {} {} {}', 1, 2, 'asd']),
+def test_IDPExceptionFormattableError(ExcptsFormattable):
+    """
+    Test Exceptions with formattable errmsgs.
+
+    # have to use random_type() because of the incompatibility
+    # betwee pytest.fixtures and hypotesis.given
+
+    HypothesisDeprecationWarning: [...] uses the 'ExcptsFormattable' fixture,
+    but function-scoped fixtures should not be used with @given(...) tests,
+    because fixtures are not reset between generated examples!
+    since="2020-02-29",
+
+    -- Docs: https://docs.pytest.org/en/latest/warnings.html
+    """
+    num = count_string_formatters(ExcptsFormattable.errmsg)
+    args = [random_type() for i in range(num)]
+    str(ExcptsFormattable(*args))
+
+
+@pytest.fixture(
+    params=[
+        ('some error {}', 1, 'some error 1'),
+        ('some error {} {}', 1, 2, 'some error 1 2'),
+        ('some error {} {} {}', 1, 2, 'asd', 'some error 1 2 asd'),
         ]
     )
-def test_IDPCalcException_with_args(args):
-    """Test IDPCalcException to errmsg receive."""
-    err = EXCPTNS.IDPConfGenException(*args)
-    assert err.errmsg == args[0]
-    assert str(err) == args[0].format(*args[1:])
+def forcing_messages(request):
+    """Formattable messages that override the default errmsg."""
+    return request.param
+
+
+def test_forcing_messages(ErrorClass, forcing_messages):
+    """
+    Test all types of exception behave the same way when formattable string.
+    """
+    args, expected = forcing_messages[:-1], forcing_messages[-1]
+    err = ErrorClass(*args)
+    assert str(err) == expected
 
 
 @pytest.mark.parametrize(
@@ -73,9 +111,9 @@ def test_IDPCalcException_with_args(args):
         (['this should be ignored {} {}', 1, 2], 'some error.'),
         ]
     )
-def test_IDPCalcException_errmsg(args, errmsg):
+def test_IDPCalcException_errmsg(ErrorClass, args, errmsg):
     """Test IDPCalcException to errmsg without formatting args."""
-    err = EXCPTNS.IDPConfGenException(*args, errmsg=errmsg)
+    err = ErrorClass(*args, errmsg=errmsg)
     assert err.errmsg == errmsg
 
 

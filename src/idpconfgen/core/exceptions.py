@@ -1,7 +1,7 @@
 """IDP Conf Gen Exceptions."""
 from idpconfgen import log
 from idpconfgen import contactus as CONTACTUS
-from idpconfgen.core import has_string_formatters
+from idpconfgen.core import count_string_formatters
 
 
 class IDPConfGenException(Exception):
@@ -37,35 +37,35 @@ class IDPConfGenException(Exception):
     """
 
     errmsg = 'An unknnown error as occurred. ' + CONTACTUS.contact_message
-
+    
     def __init__(self, *args, errmsg=None):
 
-        if errmsg:
+        # IDPConfGenException(errmsg='Custom error msg')
+        if errmsg is not None:
+            assert isinstance(errmsg, str), f'wrong errmsg type: {type(errmsg)}'
             self.errmsg = errmsg
             self.args = []
 
-        elif len(args) == 1 and not has_string_formatters(self.errmsg):
-            self.errmsg = args[0]
-            self.args = []
-
-        elif len(args) == 1 \
-                and has_string_formatters(self.errmsg) \
-                and not has_string_formatters(args[0]):
+        elif len(args) == count_string_formatters(self.errmsg):
             self.args = args
-
-        elif len(args) > 1 and has_string_formatters(args[0]):
+    
+        else:
+            assert count_string_formatters(args[0]) == len(args[1:]), \
+                'args passed to Exception are not compatible to form a message'
             self.errmsg = args[0]
             self.args = args[1:]
 
-        else:
-            self.args = args
-       
         log.debug(f'Exception errors: {self.errmsg}')
         log.debug(f'Exception args: {self.args}')
 
         # ensure
-        assert self.errmsg.count('{}') == len(self.args), \
-            f"Bad exceptions instantiation: {self.errmsg} with {self.args}"
+        assert isinstance(self.args, (tuple, list)), \
+            f'wrong args {type(self.args)}'
+        assert count_string_formatters(self.errmsg) == len(self.args), (
+            'Bad Exception message:\n'
+            f'errmsg: {self.errmsg}\n'
+            f'args: {self.args}'
+            )
      
     def __str__(self):
         """Make me a string :-)."""
@@ -87,29 +87,35 @@ class IDPConfGenException(Exception):
 
 class PDBIDFactoryError(IDPConfGenException):
     """General PDBIDFactory Exception."""
+
     pass
 
 
 class DownloadFailedError(IDPConfGenException):
     """Raise when download fails."""
+
     pass
 
 
 class EmptyFilterError(IDPConfGenException):
     """Raise when PDB data filtering returns an empty selection."""
+  
     errmsg = 'Filter returns empty selection.'
 
 
 class DSSPParserError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'Error while parsing {}'
 
 
 class DSSPSecStructError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'Values differ from possible DSSP secondary structure keys.'
 
 
 class DSSPInputMissingError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
+
     errmsg = 'One of the two required positional arguments is missing.'
