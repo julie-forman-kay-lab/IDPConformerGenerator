@@ -39,11 +39,16 @@ class IDPConfGenException(Exception):
     errmsg = 'An unknnown error as occurred. ' + CONTACTUS.contact_message
 
     def __init__(self, *args, errmsg=None):
+        # require
+        assert errmsg is None or isinstance(errmsg, str), \
+            f'`errmsg` invalid type: {type(errmsg)}'
+
+        args = [str(a) for a in args]
 
         if errmsg:
             self.errmsg = errmsg
             self.args = []
-
+    
         elif len(args) == 1 and not has_string_formatters(self.errmsg):
             self.errmsg = args[0]
             self.args = []
@@ -64,8 +69,12 @@ class IDPConfGenException(Exception):
         log.debug(f'Exception args: {self.args}')
 
         # ensure
-        assert self.errmsg.count('{}') == len(self.args), \
-            f"Bad exceptions instantiation: {self.errmsg} with {self.args}"
+        assert self.errmsg.count('{}') == len(self.args), (
+            'Bad Exception message:\n'
+            f'errmsg: {self.errmsg}\n'
+            f'args: {self.args}'
+            )
+
      
     def __str__(self):
         """Make me a string :-)."""

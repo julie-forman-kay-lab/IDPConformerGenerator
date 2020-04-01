@@ -16,6 +16,7 @@ def has_string_formatters(s):
     bool
         ``True`` if yes, ``False`` if no.
     """
+    assert isinstance(s, str), f'`s` of wrong type: {type(s)}'
     # see: https://stackoverflow.com/questions/46161710/
     try:
         return list(string.Formatter().parse(s))[0][1] is not None
