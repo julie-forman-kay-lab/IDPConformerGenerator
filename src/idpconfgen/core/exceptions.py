@@ -44,37 +44,46 @@ class IDPConfGenException(Exception):
             f'`errmsg` invalid type: {type(errmsg)}'
 
         args = [str(a) for a in args]
-
-        if errmsg:
+         
+        # IDPConfGenException(errmsg='Custom error msg')
+        if errmsg is not None:
             self.errmsg = errmsg
             self.args = []
+ 
+        # IDPConfGenException('An error happened')
+        elif len(args) == 1:
+            if has_string_formatters(self.errmsg):
+                self.args = args
+             
+            else:
+                self.errmsg = args[0]
+                self.args = []
+ 
+        elif len(args) > 1:
+            # IDPConfGenException('An error happened: {}, {}', var1, var2)
+            if has_string_formatters(args[0]):
+                self.errmsg = args[0]
+                self.args = args[1:]
+           
+            # IDPCalculator(var1, var2)
+            else:
+                self.args = args
     
-        elif len(args) == 1 and not has_string_formatters(self.errmsg):
-            self.errmsg = args[0]
-            self.args = []
-
-        elif len(args) == 1 \
-                and has_string_formatters(self.errmsg) \
-                and not has_string_formatters(args[0]):
-            self.args = args
-
-        elif len(args) > 1 and has_string_formatters(args[0]):
-            self.errmsg = args[0]
-            self.args = args[1:]
-
+        # ATTENTION: self.args exists from default from Exception Base class
+        # Yet I didn't want to change the variable name
         else:
             self.args = args
-       
+
         log.debug(f'Exception errors: {self.errmsg}')
         log.debug(f'Exception args: {self.args}')
 
         # ensure
+        assert isinstance(self.args, (tuple, list)), f'{type(self.args)}'
         assert self.errmsg.count('{}') == len(self.args), (
             'Bad Exception message:\n'
             f'errmsg: {self.errmsg}\n'
             f'args: {self.args}'
             )
-
      
     def __str__(self):
         """Make me a string :-)."""

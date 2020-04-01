@@ -10,14 +10,23 @@ from idpconfgen.core import exceptions as EXCPTNS
 
 
 class MyExceptionNoMsg(EXCPTNS.IDPConfGenException):
+    """
+    IDPConfGen Exception with out errmsg implemented.
+
+    Error message is inherited from base class.
+    """
     pass
 
 
 class MyExceptionUnformattable(EXCPTNS.IDPConfGenException):
+    """IDPConfGen Exception with unformattable errormessage."""
+
     errmsg = 'Unformattable error message.'
 
 
 class MyExceptionFormattable(EXCPTNS.IDPConfGenException):
+    """IDPConfGen Exception with formattable errormessage."""
+
     # Formattable error message: {}.
     errmsg = 'fer: {}'
 
@@ -25,14 +34,14 @@ class MyExceptionFormattable(EXCPTNS.IDPConfGenException):
 EXCPT_classes = inspect.getmembers(EXCPTNS, predicate=inspect.isclass)
 error_classes = [
     t[1] for t in EXCPT_classes
-        if issubclass(t[1], EXCPTNS.IDPConfGenException)
-            and t[0].endswith('Error')
+    if issubclass(t[1], EXCPTNS.IDPConfGenException)
+    and t[0].endswith('Error')
     ]
 
 
 @pytest.fixture(params=error_classes)
 def ErrorClass(request):
-    """Custom Error Classes in exception module."""
+    """Return custom Error Classes in exception module."""
     return request.param
 
 
@@ -41,9 +50,9 @@ def test_all_errors_names_end_in_error():
     endswitherror = [t[1] for t in EXCPT_classes if t[0].endswith('Error')]
     subclss = [
         t[1] for t in EXCPT_classes
-            if issubclass(t[1], EXCPTNS.IDPConfGenException)
+        if issubclass(t[1], EXCPTNS.IDPConfGenException)
         ]
-    assert len(endswitherror) == len(subclss) - 1 # IDPConfGenException itself
+    assert len(endswitherror) == len(subclss) - 1  # IDPConfGenException itself
 
 
 def test_IDPConfGenException_type():
@@ -63,8 +72,6 @@ def test_IDPConfGenExc_errmsg_None(errmsg):
     err = EXCPTNS.IDPConfGenException(errmsg=errmsg)
     assert str(err) == EXCPTNS.IDPConfGenException.errmsg
 
-
-### new
 
 @pytest.mark.parametrize(
     'args,expected',
@@ -116,27 +123,6 @@ def test_IDPExceptionBase(args, expected):
     assert str(err) == expected
 
 
-# #old
-
-
-
-
-#@pytest.mark.parametrize(
-#    'args',
-#    [
-#        (['some error']),
-#        (['some error {}', 1]),
-#        (['some error {} {}', 1, 2]),
-#        (['some error {} {} {}', 1, 2, 'asd']),
-#        ]
-#    )
-#def test_IDPCalcException_with_args(args):
-#    """Test IDPCalcException to errmsg receive."""
-#    err = EXCPTNS.IDPConfGenException(*args)
-#    assert err.errmsg == args[0]
-#    assert str(err) == args[0].format(*args[1:])
-#
-#
 @pytest.mark.parametrize(
     'args,errmsg',
     [
