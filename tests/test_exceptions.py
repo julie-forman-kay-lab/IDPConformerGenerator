@@ -5,30 +5,10 @@ import hypothesis.strategies as st
 import pytest
 from hypothesis import given
 
-#from idpconfgen import contactus as CONTACTUS
+from idpconfgen.core import has_string_formatters, count_string_formatters
 from idpconfgen.core import exceptions as EXCPTNS
 
-
-class MyExceptionNoMsg(EXCPTNS.IDPConfGenException):
-    """
-    IDPConfGen Exception with out errmsg implemented.
-
-    Error message is inherited from base class.
-    """
-    pass
-
-
-class MyExceptionUnformattable(EXCPTNS.IDPConfGenException):
-    """IDPConfGen Exception with unformattable errormessage."""
-
-    errmsg = 'Unformattable error message.'
-
-
-class MyExceptionFormattable(EXCPTNS.IDPConfGenException):
-    """IDPConfGen Exception with formattable errormessage."""
-
-    # Formattable error message: {}.
-    errmsg = 'fer: {}'
+from .tcommons import random_type
 
 
 EXCPT_classes = inspect.getmembers(EXCPTNS, predicate=inspect.isclass)
@@ -42,6 +22,18 @@ error_classes = [
 @pytest.fixture(params=error_classes)
 def ErrorClass(request):
     """Return custom Error Classes in exception module."""
+    return request.param
+
+
+exceptions_with_formattable_erromsg = list(filter(
+    lambda x: has_string_formatters(x.errmsg),
+    error_classes,
+    ))
+
+
+@pytest.fixture(params=exceptions_with_formattable_erromsg)
+def ExcptsFormattable(request):
+    """Return IDPConfGen Exceptions with formattable errmsg."""
     return request.param
 
 
@@ -73,53 +65,43 @@ def test_IDPConfGenExc_errmsg_None(errmsg):
     assert str(err) == EXCPTNS.IDPConfGenException.errmsg
 
 
-@pytest.mark.parametrize(
-    'args,expected',
-    [
-        ([None], 'fer: None'),
-        (['some error'], 'fer: some error'),
-        (['some error {}', 1], 'some error 1'),
-        (['some error {} {}', 1, 2], 'some error 1 2'),
-        (['some error {} {} {}', 1, 2, 'asd'], 'some error 1 2 asd'),
+def test_IDPExceptionFormattableError(ExcptsFormattable):
+    """
+    Test Exceptions with formattable errmsgs.
+
+    # have to use random_type() because of the incompatibility
+    # betwee pytest.fixtures and hypotesis.given
+
+    HypothesisDeprecationWarning: [...] uses the 'ExcptsFormattable' fixture,
+    but function-scoped fixtures should not be used with @given(...) tests,
+    because fixtures are not reset between generated examples!
+    since="2020-02-29",
+
+    -- Docs: https://docs.pytest.org/en/latest/warnings.html
+    """
+    num = count_string_formatters(ExcptsFormattable.errmsg)
+    args = [random_type() for i in range(num)]
+    str(ExcptsFormattable(*args))
+
+
+@pytest.fixture(
+    params=[
+        ('some error {}', 1, 'some error 1'),
+        ('some error {} {}', 1, 2, 'some error 1 2'),
+        ('some error {} {} {}', 1, 2, 'asd', 'some error 1 2 asd'),
         ]
     )
-def test_IDPExceptionFormattableError(args, expected):
-    """Test IDPConfGenExceptions with Formattable Error."""
-    err = MyExceptionFormattable(*args)
-    assert str(err) == expected
+def forcing_messages(request):
+    """Formattable messages that override the default errmsg."""
+    return request.param
 
 
-@pytest.mark.parametrize(
-    'args,expected',
-    [
-        ([], MyExceptionUnformattable.errmsg),
-        ([None], 'None'),
-        (['some error'], 'some error'),
-        (['some error {}', 1], 'some error 1'),
-        (['some error {} {}', 1, 2], 'some error 1 2'),
-        (['some error {} {} {}', 1, 2, 'asd'], 'some error 1 2 asd'),
-        ]
-    )
-def test_IDPExceptionUnformattableError(args, expected):
-    """Test IDPConfGenExceptions with Unformattable Error."""
-    err = MyExceptionUnformattable(*args)
-    assert str(err) == expected
-
-
-@pytest.mark.parametrize(
-    'args,expected',
-    [
-        ([], MyExceptionNoMsg.errmsg),
-        ([None], 'None'),
-        (['some error'], 'some error'),
-        (['some error {}', 1], 'some error 1'),
-        (['some error {} {}', 1, 2], 'some error 1 2'),
-        (['some error {} {} {}', 1, 2, 'asd'], 'some error 1 2 asd'),
-        ]
-    )
-def test_IDPExceptionBase(args, expected):
-    """Test IDPConfGenException Base has unformattable behaviour."""
-    err = MyExceptionNoMsg(*args)
+def test_forcing_messages(ErrorClass, forcing_messages):
+    """
+    Test all types of exception behave the same way when formattable string.
+    """
+    args, expected = forcing_messages[:-1], forcing_messages[-1]
+    err = ErrorClass(*args)
     assert str(err) == expected
 
 
@@ -129,9 +111,9 @@ def test_IDPExceptionBase(args, expected):
         (['this should be ignored {} {}', 1, 2], 'some error.'),
         ]
     )
-def test_IDPCalcException_errmsg(args, errmsg):
+def test_IDPCalcException_errmsg(ErrorClass, args, errmsg):
     """Test IDPCalcException to errmsg without formatting args."""
-    err = EXCPTNS.IDPConfGenException(*args, errmsg=errmsg)
+    err = ErrorClass(*args, errmsg=errmsg)
     assert err.errmsg == errmsg
 
 

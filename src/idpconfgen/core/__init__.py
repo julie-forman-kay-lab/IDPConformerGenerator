@@ -23,3 +23,16 @@ def has_string_formatters(s):
     except IndexError:
         #  when string is ''
         return False
+
+
+def count_string_formatters(s):
+    """
+    Count string formatters: ``{}``.
+
+    Returns
+    -------
+    int
+        The number of string formatters.
+    """
+    assert isinstance(s, str), f'`s` of wrong type: {type(s)}'
+    return sum(1 for f in list(string.Formatter().parse(s)) if f[1] is not None)
