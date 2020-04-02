@@ -6,6 +6,16 @@ __pycache__/
 # C extensions
 *.so
 
+# vim and project files
+*.swp
+tags
+
+# project others
+tests/data_out_scratch/
+docshtml/
+*.debug
+*.error
+
 # Distribution / packaging
 .Python
 build/
