@@ -29,9 +29,21 @@ aminoacids = list(aa3to1.values())
 SSletters = ['L', 'H', 'S']
 
 
-def generate_fout_name():
-    letters = [random.choice(string.ascii_uppercase) for i in range(4)]
-    return '{}{}{}{}_{}.data'.format(random.randint(0, 9), *letters)
+class NameGenerator:
+    def __init__(self):
+        self.names = []
+
+    def generate_fout_name(self):
+        name = self._generate()
+        while name in self.names:
+            name = self._generate()
+        
+        self.names.append(name)
+        return name
+          
+    def _generate(self):
+        letters = [random.choice(string.ascii_uppercase) for i in range(4)]
+        return '{}{}{}{}_{}.data'.format(random.randint(0, 9), *letters)
 
 
 def generate_fasta():
@@ -80,7 +92,9 @@ def generate_CA_coords(length):
 
 def generate_dummy_data():
     
-    fout_name = generate_fout_name()
+    name_generator = NameGenerator()
+
+    fout_name = name_generator.generate_fout_name()
 
     fasta = generate_fasta()
     ss = generate_secondary_structure(len(fasta))
