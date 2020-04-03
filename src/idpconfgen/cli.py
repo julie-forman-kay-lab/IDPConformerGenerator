@@ -17,6 +17,7 @@ import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
 from idpconfgen import cli_ssext as ssext
+from idpconfgen import cli_fastaext as fastaext
 from idpconfgen.libs import libcli
 
 
@@ -61,6 +62,17 @@ def _load_args():
         )
     ap_ssext.set_defaults(func=ssext.main)
     
+    ap_fastaext = subparsers.add_parser(
+        'fastaext',
+        help='Extract FASTAS from PDBs',
+        parents=[fastaext.ap],
+        add_help=False,
+        description=libcli.detailed.format(fastaext._des),
+        usage=fastaext._us,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    ap_fastaext.set_defaults(func=fastaext.main)
+
     # prints help if not arguments are passed
     # if >2 prints help of subroutines.
     if len(sys.argv) < 2:

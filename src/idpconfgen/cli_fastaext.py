@@ -7,7 +7,7 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libmulticore, libparse
+from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 
 
@@ -87,9 +87,9 @@ def main(
      
     out_data = []
     for pdbid, pdbfile in zip(pdbids, pdbs):
-        structure = PDBDataFactory(Path(fin).read_text())
+        structure = libpdb.PDBDataFactory(Path(pdbfile).read_text())
         structure.build()
-        out_data.append('{}|{}'.format((pdbid, structure.fasta)))
+        out_data.append('{}|{}'.format(pdbid, structure.fasta))
      
     libio.write_text('\n'.join(out_data), output)
     return

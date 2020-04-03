@@ -1,6 +1,7 @@
 """Functions and Classes regarding Input/Output."""
 import glob
 import os
+import sys
 from functools import partial
 
 from idpconfgen import Path, log
