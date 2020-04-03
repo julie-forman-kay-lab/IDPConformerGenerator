@@ -1,7 +1,9 @@
 """Test libpdb."""
 from pathlib import Path
 
-from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList
+from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList, DataFromPDB
+
+from .tcommons import data_folder
 
 
 class TestPDBID:
@@ -204,3 +206,12 @@ class TestPDBList:
         assert pdblist1 == pdblist2
         assert isinstance(pdblist2.to_tuple(), tuple)
         assert tuple(pdblist1) == pdblist2.to_tuple()
+
+
+def test_DataFromPDB_1():
+    with open(Path(data_folder, '1A12_A.pdb')) as fh:
+        pdb = DataFromPDB(fh.read())
+    
+    pdb.build()
+    fasta = pdb.fasta
+    assert fasta[:4] == 'KKVK'

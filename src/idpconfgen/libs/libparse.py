@@ -6,7 +6,7 @@ import numpy as np
 from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs import libcheck, libpdb
+from idpconfgen.libs import libcheck, libpdb, libio
 
 
 class DSSPParser:
@@ -206,13 +206,7 @@ def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
     
     output_data = '\n'.join(output_data) + '\n'
-    
-    if output:
-        opath = Path(output)
-        opath.myparents().mkdir(parents=True, exist_ok=True)
-        opath.write_text(output_data)
-    else:
-        sys.stdout.write(output_data)
+    libio.write_text(output_data, output)
 
 
 def _concatenate_ss_from_dsspparsers(dsspparsers):

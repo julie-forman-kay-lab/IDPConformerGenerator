@@ -11,6 +11,7 @@ from multiprocessing.pool import ThreadPool
 import numpy as np
 
 from idpconfgen import Path, log
+from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libtimer
 from idpconfgen.logger import S, T
@@ -401,6 +402,20 @@ class DataFromPDB(PDBData):
         self.rawdata = data
         super().__init__()
     
+    @property
+    def fasta(self):
+        residues = {}
+        for row in range(self.pdb_array_data.shape[0]):
+            residues.setdefault(
+                self.pdb_array_data[row, 6],
+                self.pdb_array_data[row, 4],
+                )
+
+        return ''.join(DEFS.aa3to1[v] for v in residues.values())
+
+            
+
+
     def build(self):
         """Build raw data so that filters can be applied."""
         self.data = self.rawdata.split('\n')
