@@ -70,31 +70,32 @@ class Filter:
         ss_data = self.data[ss]
         return dict(filter(lambda fragment: len(fragment[0]) >= lower_bound and len(fragment[0]) <= upper_bound, ss_data.items()))
     
-    def find_aa_patterns(self, input_pattern, min_seq_chunk_size, max_mismatch, data=None):
-        """
-        Finds patterns of input_pattern in the data using the ProteinSearch algorithm.
+    # def find_aa_patterns(self, input_pattern, min_seq_chunk_size=None, max_mismatch=None, data=None):
+    #     """
+    #     Finds patterns of input_pattern in the data using the ProteinSearch algorithm.
 
-        The input data has to be of the following form:
-        {
-            "L": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
-            "H": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
-            "S": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
-        }
-        """
-        database = self.data
-        if not data:
-            database = data
+    #     The input data has to be of the following form:
+    #     {
+    #         "L": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+    #         "H": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+    #         "S": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+    #     }
+    #     """
+    #     database = self.data
+    #     if data:
+    #         database = data
 
-        protein_search = conformer_generator.ProteinSearch()
-        for _, sequences in database.items():
-            for fragment, fragment_data in sequences.items():
-                protein_search.start_search(
-                                                input_pattern,
-                                                fragment,
-                                                min_seq_chunk_size=min_seq_chunk_size,
-                                                max_mismatch=max_mismatch
-                                            )
-        return protein_search
+    #     protein_search = conformer_generator.ProteinSearch()
+    #     for _, sequences in database.items():
+    #         for fragment, fragment_data in sequences.items():
+    #             protein_search.start_search(
+    #                                             input_pattern,
+    #                                             fragment,
+    #                                             min_seq_chunk_size=min_seq_chunk_size,
+    #                                             max_mismatch=max_mismatch
+    #                                         )
+                
+    #     return protein_search
                 
 
     
@@ -102,6 +103,10 @@ class Filter:
 
 if __name__ == "__main__":
     filter_step = Filter("/Users/alaashamandy/IDPCalcPDBDownloader/alphas/data/")
-    print(filter_step.find_aa_patterns("EK", min_seq_chunk_size, max_mismatch))
+    print(filter_step.find_aa_patterns("YCV", 3, 0).results)
+    # print(filter_step.return_ss("H", 3, 9))
 
+    # protein_search = conformer_generator.ProteinSearch()
+    # protein_search.start_search("AAA", "AAA")
+    # print(protein_search.results[0]["AAA"])
 
