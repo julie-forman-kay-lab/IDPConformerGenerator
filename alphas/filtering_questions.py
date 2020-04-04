@@ -52,6 +52,26 @@ class Filter:
         self.folder_path = folder_path
         self.data = read_data_into_dict(folder_path)
 
+    def return_loops(self, lower_bound=None, upper_bound=None):
+        """
+        This function returns all the loop fragments
+        that have lower_bound<=size<=upper_bound.
+        """
+        if not lower_bound and not upper_bound:
+            #return all sizes
+            return self.data["L"]
+        return self.__return_loop_ranges(lower_bound, upper_bound)
+
+    def __return_loop_ranges(self,lower_bound, upper_bound):
+        result = {}
+        loop_data = self.data["L"]
+        for fragment in loop_data:
+            if len(fragment) >= lower_bound and len(fragment) <= upper_bound:
+                result[fragment] = loop_data[fragment]
+        return result
+    
+    
+
 
 if __name__ == "__main__":
     data = read_data_into_dict("/Users/alaashamandy/IDPCalcPDBDownloader/alphas/data/")
