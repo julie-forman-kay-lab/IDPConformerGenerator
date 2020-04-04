@@ -1,4 +1,5 @@
 import os
+from idpconfgen import conformer_generator
 
 def read_data_into_dict(folder_path):
     """
@@ -52,27 +53,55 @@ class Filter:
         self.folder_path = folder_path
         self.data = read_data_into_dict(folder_path)
 
-    def return_loops(self, lower_bound=None, upper_bound=None):
+    def return_ss(self, ss, lower_bound=None, upper_bound=None):
         """
         This function returns all the loop fragments
         that have lower_bound<=size<=upper_bound.
         """
+        # if ss not in self.data:
+            # TODO: raise exception
+
         if not lower_bound and not upper_bound:
             #return all sizes
-            return self.data["L"]
-        return self.__return_loop_ranges(lower_bound, upper_bound)
+            return {ss :self.data[ss]}
+        return {ss :self.__return_ss_ranges(ss, lower_bound, upper_bound)}
 
-    def __return_loop_ranges(self,lower_bound, upper_bound):
-        result = {}
-        loop_data = self.data["L"]
-        for fragment in loop_data:
-            if len(fragment) >= lower_bound and len(fragment) <= upper_bound:
-                result[fragment] = loop_data[fragment]
-        return result
+    def __return_ss_ranges(self, ss, lower_bound, upper_bound):
+        ss_data = self.data[ss]
+        return dict(filter(lambda fragment: len(fragment[0]) >= lower_bound and len(fragment[0]) <= upper_bound, ss_data.items()))
     
+    def find_aa_patterns(self, input_pattern, min_seq_chunk_size, max_mismatch, data=None):
+        """
+        Finds patterns of input_pattern in the data using the ProteinSearch algorithm.
+
+        The input data has to be of the following form:
+        {
+            "L": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+            "H": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+            "S": {seq1 : [x,y,z,phi,psi,omega,chi1], seq2: [x,y,z,phi,psi,omega,chi1]}, ...,
+        }
+        """
+        database = self.data
+        if not data:
+            database = data
+
+        protein_search = conformer_generator.ProteinSearch()
+        for _, sequences in database.items():
+            for fragment, fragment_data in sequences.items():
+                protein_search.start_search(
+                                                input_pattern,
+                                                fragment,
+                                                min_seq_chunk_size=min_seq_chunk_size,
+                                                max_mismatch=max_mismatch
+                                            )
+        return protein_search
+                
+
     
 
 
 if __name__ == "__main__":
-    data = read_data_into_dict("/Users/alaashamandy/IDPCalcPDBDownloader/alphas/data/")
-    print(data.items())
+    filter_step = Filter("/Users/alaashamandy/IDPCalcPDBDownloader/alphas/data/")
+    print(filter_step.find_aa_patterns("EK", min_seq_chunk_size, max_mismatch))
+
+
