@@ -14,7 +14,7 @@ class DSSPParser:
     Provides an interface for `DSSP files`_.
 
     .. _DSSP files: https://github.com/cmbi/xssp
-    
+
     If neither `fin` nor `data` parameters are given, initiates
     an data empty parser.
 
@@ -131,9 +131,7 @@ class DSSPParser:
 
     @staticmethod
     def _confirm_ss_data(data):
-        # confirms data makes sense
-
-        print(DEFS.dssp_ss_keys.all)
+        """Confirm secondary structure data characters are valid."""
         if not all((i in DEFS.dssp_ss_keys.valid for i in data)):
             raise EXCPTS.DSSPSecStructError()
 
@@ -165,13 +163,13 @@ def list_index_to_array(
         ):
     """
     Extract slices of strings in lists to an array.
-    
+
     At least one the named parameters must be provided.
-    
+
     In case more than one parameter set is provided:
         the `start`, `stop` or `step` trio have the highest priority,
         followed by `sObj` and last `index`.
-    
+
     Raises
     ------
     ValueError
@@ -182,7 +180,7 @@ def list_index_to_array(
     """
     if any((i is not None for i in (start, stop, step))):
         index = slice(start, stop, step)
-    
+
     elif sObj is not None:
         if isinstance(sObj, slice):
             index = sObj
@@ -206,7 +204,7 @@ def list_index_to_array(
 
     for i, line in enumerate(list_):
         array[i] = line[index]
-    
+
     return array
 
 
@@ -220,9 +218,9 @@ def export_ss_from_DSSP(*dssp_task_results, output='dssp.database'):
     dssp_task_results : multiple :class:`DSSPParser`
     """
     output_data = _concatenate_ss_from_dsspparsers(dssp_task_results)
-    
+
     output_data = '\n'.join(output_data) + '\n'
-    
+
     if output:
         opath = Path(output)
         opath.myparents().mkdir(parents=True, exist_ok=True)
@@ -240,7 +238,7 @@ def _concatenate_ss_from_dsspparsers(dsspparsers):
                 ''.join(dsspparser.ss),
                 )
             )
-    
+
     output.sort(key=lambda x: x.split('|')[0])
 
     return output

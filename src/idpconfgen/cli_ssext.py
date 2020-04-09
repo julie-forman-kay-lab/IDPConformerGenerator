@@ -121,6 +121,7 @@ def main(
         ncores=ncores,
         TaskMethod=libmulticore.DSSPTask,
         results_parser=libparse.DSSPParser.from_data_id_tuple,
+        reduced=reduced,
         )
     log.info(S('executing...'))
     ss_ext_exec.run()
