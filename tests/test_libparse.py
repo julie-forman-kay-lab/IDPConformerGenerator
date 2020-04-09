@@ -60,7 +60,7 @@ class TestDSSPParser:
     def test_dssp1(self):
         """Test initiation empty args."""
         libparse.DSSPParser()
-    
+
     def test_dssp1_1(self):
         """Test pdbid attribute."""
         dobj = libparse.DSSPParser(pdbid='1ABC')
@@ -85,7 +85,15 @@ class TestDSSPParser:
 
         expected = [' ', 'H', 'G', 'I', 'B', 'E', ' ', 'T', 'S', ' ']
         assert list(dobj.ss) == expected
-   
+
+
+    def test_dssp4(self):
+        """Test secondary structure parsing."""
+        dobj = libparse.DSSPParser(fin=self.dssp_file, reduced=True)
+        expected = ['L', 'H', 'H', 'H', 'E', 'E', 'L', 'L', 'L', 'L']
+        assert list(dobj.ss) == expected
+
+
     def test_dssp5(self):
         """Test DSSPParserError."""
         with pytest.raises(EXCPTS.DSSPParserError):

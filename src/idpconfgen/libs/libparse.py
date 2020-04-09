@@ -32,7 +32,7 @@ class DSSPParser:
     pdbid : any, optional
         An identification for the DSSP file being parsed.
         Deafults to None.
-    
+
     Attributes
     ----------
     ss : array
@@ -40,17 +40,26 @@ class DSSPParser:
         structure information DSSP Keys of the protein.
 
     """
-    
-    def __init__(self, *, fin=None, data=None, pdbid=None):
-        
+
+    def __init__(
+            self,
+            *,
+            fin=None,
+            data=None,
+            pdbid=None,
+            reduced=False,
+            ):
+
         self.pdbid = pdbid
-        
+        self.reduced = reduced
+
         if fin:
             self.read_dssp_data(Path(fin).read_text())
         elif data:
             self.read_dssp_data(data)
         else:
             self.data = None
+
 
     def __eq__(self, other):
         is_equal = [
@@ -73,14 +82,14 @@ class DSSPParser:
             data = data.split('\n')
         except AttributeError:  # data already a list
             pass
-        
+
         data = [i for i in data if i]  # removes empty strings
-       
+
         try:
             data_header_index = self._finds_data_index(data)
         except IndexError as err:
             raise EXCPTS.DSSPParserError(self.pdbid) from err
-            
+
         self.data = data[data_header_index + 1:]  # data starts afterthe header
 
         self.read_sec_structure()
@@ -89,12 +98,16 @@ class DSSPParser:
     def read_sec_structure(self):
         """
         Read secondary structure information from DSSP files.
-        
+
         Assigns :attr:`ss`.
         """
         self.ss = list_index_to_array(self.data, index=16)
+
+        if self.reduced:
+            self.ss = np.char.translate(self.ss, DEFS.dssp_trans)
+
         self._confirm_ss_data(self.ss)
-    
+
     def read_fasta(self):
         """
         Read FASTA (primary sequence) information from DSSP data.
@@ -102,9 +115,9 @@ class DSSPParser:
         Assigns :attr:`fasta`.
         """
         self.fasta = list_index_to_array(self.data, index=13)
-    
+
     @classmethod
-    def from_data_id_tuple(cls, subcmd_tuple):
+    def from_data_id_tuple(cls, subcmd_tuple, **kwargs):
         """
         Initiate from a tuple.
 
@@ -113,12 +126,15 @@ class DSSPParser:
         return cls(
             pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
             data=subcmd_tuple[1],
+            **kwargs,
             )
 
     @staticmethod
     def _confirm_ss_data(data):
         # confirms data makes sense
-        if not all((i in vars(DEFS.dssp_ss_keys).values() for i in data)):
+
+        print(DEFS.dssp_ss_keys.all)
+        if not all((i in DEFS.dssp_ss_keys.valid for i in data)):
             raise EXCPTS.DSSPSecStructError()
 
     @staticmethod
