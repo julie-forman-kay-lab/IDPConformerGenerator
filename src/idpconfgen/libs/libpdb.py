@@ -52,14 +52,14 @@ CIF_ATOM_KEYS = [
     ]
 
 
-class PDBParams:
+class _PDBParams:
     """
     Namespace for `PDB format v3`_.
 
     .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """  # noqa: E501
 
-    # slicers of the ATOM and HETATOM lines
+    # slicers of the ATOM and HETATM lines
     atom_line_name = slice(0, 6)
     atom_serial = slice(6, 11)
     atom_atom_name = slice(12, 16)
@@ -75,6 +75,9 @@ class PDBParams:
     atom_tempfactor = slice(60, 66)
     atom_element = slice(76, 78)
     atom_charge = slice(78, 80)
+
+    def __setattr__(self, key, value):
+        raise NotImplementedError(f'Can not set attributes to {self.__class__}')
 
     @property
     def atom_slicers(self):
@@ -94,6 +97,16 @@ class PDBParams:
                 for s in self._atom_slicer
                 ))
             return self._atom_slicers
+
+PDBParams = _PDBParams()
+
+# this servers read_pdb_data_to_array mainly
+# it is here for performance
+_pdb_atom_line_headings = {
+    'which': ('ATOM', 'HETATM'),
+    'ATOM': 'ATOM',
+    'HETATM': 'HETATM',
+    }
 
 
 
@@ -891,19 +904,45 @@ class PDBDownloader:
             return
 
 
-def read_pdb_file_to_array(lines):
-    """Transform PDB data into an array."""
+def read_pdb_file_to_array(lines, which='both'):
+    """
+    Transform PDB data into an array.
 
-    coordinate_data = list(filter(
-        lambda x: x.startswith(('ATOM', 'HETATM', 'ANISOU')),
-        self.data,
-        ))
+    Parameters
+    ----------
+    lines : list of strs
+        List of the PDB format v3 file lines.
 
-    self.pdb_array_data = np.empty(
-        (len(coordinate_data), len(slicers)),
-        dtype='<U8')
+    which : str
+        Which lines to consider ['ATOM', 'HETATM', 'both'].
+        Defaults to `'both'`, considers both 'ATOM' and 'HETATM'.
 
-    for ii, line in enumerate(coordinate_data):
-        for column, slicer_item in enumerate(slicers):
-            self.pdb_array_data[ii, column] = line[slicer_item[1]]
+    Returns
+    -------
+    numpy.ndarray of (N, 15)
+        Where N are the number of ATOM and/or HETATM lines,
+        and 15 the number of fields in ATOM/HETATM lines according
+        to the PDB format v3.
+    """
+    coords_headings = _pdb_atom_line_headings
+
+    try:
+        atom_hetatm_lines = filter(
+            lambda x: x.startswith(coord_headings[which]),
+            lines,
+            )
+    except KeyError:
+        err = ValueError(f'`which` got an unexpected value \'{which}\''.)
+        raise err from None
+
+    pdb_data_array = np.empty(
+        (len(atom_hetatm_lines), len(PDBParams.atom_slicers)),
+        dtype='<U8',
+        )
+
+    for row, line in enumerate(atom_hetatm_lines):
+        for column, slicer_item in enumerate(PDBParams.atom_slicers):
+            pdb_data_array[row, column] = line[slicer_item]
+
+    return pdb_data_array
 
