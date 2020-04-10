@@ -700,24 +700,27 @@ class MMCIFDataParser:
                 break
         
         for line in self.data[atom_start_index:]:
-            
+
             if line.startswith('#'):
                 break
             ls = line.split()
-            
+
             for i, key in enumerate(self.pdb_dict.keys()):
                 self.pdb_dict[key].append(ls[i])
 
 
-class PDBDataFactory:
+class Structure:
     """
-    Create a PDB handler.
+    Create a protein structure representation.
 
-    Implements readers for old PDB format and mmCIF.
-    
-    Returns the correct PDB handler instance loaded from
-    the PDB data.
-    
+    Implements readers for:
+
+    - PDB format version 3
+    - mmCIF
+
+    Returns the corresponding representation of Structure instance
+    based on the data input.
+
     Parameters
     ----------
     data:
@@ -726,18 +729,20 @@ class PDBDataFactory:
 
     def __new__(cls, data):
         """Factor PDB data."""
-        if isinstance(data, bytes):
-            data = data.decode('utf_8')
+        if isinstance(data, Path):
+            datastr = data.read_text()
+        elif isinstance(data, bytes):
+            datastr = data.decode('utf_8')
         elif isinstance(data, str):
             pass
         else:
             raise NotImplementedError('str or bytes allowed')
-        
+
         loop_ = re.compile('[lL][oO][oO][pP]_')
-        if loop_.search(data):
-            return DataFromCIF(data)
+        if loop_.search(datastr):
+            return DataFromCIF(datastr)
         else:
-            return DataFromPDB(data)
+            return DataFromPDB(datastr)
 
 
 class PDBDownloader:
@@ -745,7 +750,7 @@ class PDBDownloader:
     Control PDB downloading operations.
 
     Given a list of :class:`PDBID` downloads those PDB files.
-    
+
     Parameters
     ----------
     pdb_list : list
@@ -768,7 +773,7 @@ class PDBDownloader:
         simultaneoursly.
         Defaults to 1.
     """
-    
+
     def __init__(
             self,
             pdb_list,
@@ -777,22 +782,22 @@ class PDBDownloader:
             record_name=('ATOM',),
             **kwargs,
             ):
-        
+
         self.pdb_list = pdb_list
 
         self.destination = Path(destination)
         self.destination.mkdir(parents=True, exist_ok=True)
-        
+
         self.ncores = ncores
-        
+
         self.record_name = record_name
-        
+
         self.kwargs = kwargs
-        
+
         self.prepare_pdb_list()
-        
+
         return
-    
+
     def prepare_pdb_list(self):
         """Prepare a list with the PDBs to download."""
         self.pdbs_to_download = {}
@@ -832,7 +837,7 @@ class PDBDownloader:
         except (AttributeError, UnboundLocalError):  # response is None
             return
         
-        pdbdata = PDBDataFactory(downloaded_data)
+        pdbdata = Structure(downloaded_data)
         
         pdbdata.build()
         
