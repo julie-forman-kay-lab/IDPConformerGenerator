@@ -54,26 +54,60 @@ CIF_ATOM_KEYS = [
 
 class PDBParams:
     """
-    Namespace for `old PDB format`_.
+    Namespace for `PDB format v3`_.
 
     .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """  # noqa: E501
 
-    line_name = slice(0, 6)
-    serial = slice(6, 11)
-    atom_name = slice(12, 16)
-    altloc = slice(16, 17)
-    resname = slice(17, 20)
-    chainid = slice(21, 22)
-    resseq = slice(22, 26)
-    icode = slice(26, 27)
-    xcoord = slice(30, 38)
-    ycoord = slice(38, 46)
-    zcoord = slice(46, 54)
-    occupancy = slice(54, 60)
-    tempfactor = slice(60, 66)
-    element = slice(76, 78)
-    charge = slice(78, 80)
+    # slicers of the ATOM and HETATOM lines
+    atom_line_name = slice(0, 6)
+    atom_serial = slice(6, 11)
+    atom_atom_name = slice(12, 16)
+    atom_altloc = slice(16, 17)
+    atom_resname = slice(17, 20)
+    atom_chainid = slice(21, 22)
+    atom_resseq = slice(22, 26)
+    atom_icode = slice(26, 27)
+    atom_xcoord = slice(30, 38)
+    atom_ycoord = slice(38, 46)
+    atom_zcoord = slice(46, 54)
+    atom_occupancy = slice(54, 60)
+    atom_tempfactor = slice(60, 66)
+    atom_element = slice(76, 78)
+    atom_charge = slice(78, 80)
+
+    @property
+    def atom_slicers(self):
+        """Ordered list of ATOM and HETATOM slicers."""
+        try:
+            return self._atom_slicers
+        except AttributeError:
+            atom_slicers = list(filter(
+                lambda x: x[0].startswith('atom_'),
+                self.__dict__.items(),
+                ))
+            self._atom_slicers = [s[1] for s in atom_slicers]
+
+            # ensure
+            assert all(
+                isinstance(s, slice)
+                for s in self._atom_slicer
+                ))
+            return self._atom_slicers
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 class PDBIDFactory:
@@ -316,6 +350,7 @@ class PDBData(ABC):
     """
 
     def __init__(self):
+        self.rawdata = data
         self.clear_filters()
     
     def clear_filters(self):
@@ -387,7 +422,7 @@ class PDBData(ABC):
             raise EXCPTS.EmptyFilterError
 
 
-class DataFromPDB(PDBData):
+class PDBStructure(PDBData):
     """
     Hold structural data from PDB files.
 
@@ -396,41 +431,17 @@ class DataFromPDB(PDBData):
     data : str
         Raw structural data from PDB formatted files.
     """
-    
-    def __init__(self, data):
-        self.rawdata = data
-        super().__init__()
-    
+
     def build(self):
         """Build raw data so that filters can be applied."""
         self.data = self.rawdata.split('\n')
         self.read_pdb_data_to_array()
-    
-    def read_pdb_data_to_array(self):
-        """Transform PDB data into an array."""
-        slicers = list(filter(
-            lambda x: x[0].startswith(tuple(string.ascii_lowercase)),
-            PDBParams.__dict__.items(),
-            ))
-        
-        coordinate_data = list(filter(
-            lambda x: x.startswith(('ATOM', 'HETATM', 'ANISOU')),
-            self.data,
-            ))
-        
-        self.pdb_array_data = np.empty(
-            (len(coordinate_data), len(slicers)),
-            dtype='<U8')
-        
-        for ii, line in enumerate(coordinate_data):
-            for column, slicer_item in enumerate(slicers):
-                self.pdb_array_data[ii, column] = line[slicer_item[1]]
-    
+
     @property
     def chain_set(self):
         """All chain IDs present in the raw dataset."""  # noqa: D401
         return set(self.pdb_array_data[:, 5])
-        
+
     @property
     def filtered(self):
         """
@@ -445,7 +456,7 @@ class DataFromPDB(PDBData):
         for f in self.filters:
             filtered_data = filter(f, filtered_data)
         return filtered_data
-    
+
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
         self.filters.append(lambda x: x.startswith(record_name))
@@ -742,7 +753,7 @@ class Structure:
         if loop_.search(datastr):
             return DataFromCIF(datastr)
         else:
-            return DataFromPDB(datastr)
+            return PDBStructure(datastr)
 
 
 class PDBDownloader:
@@ -878,3 +889,21 @@ class PDBDownloader:
         except EXCPTS.DownloadFailedError as e:
             log.error(S(f'{repr(e)}: FAILED {pdbname}'))
             return
+
+
+def read_pdb_file_to_array(lines):
+    """Transform PDB data into an array."""
+
+    coordinate_data = list(filter(
+        lambda x: x.startswith(('ATOM', 'HETATM', 'ANISOU')),
+        self.data,
+        ))
+
+    self.pdb_array_data = np.empty(
+        (len(coordinate_data), len(slicers)),
+        dtype='<U8')
+
+    for ii, line in enumerate(coordinate_data):
+        for column, slicer_item in enumerate(slicers):
+            self.pdb_array_data[ii, column] = line[slicer_item[1]]
+
