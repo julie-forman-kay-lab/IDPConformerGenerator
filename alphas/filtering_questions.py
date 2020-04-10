@@ -74,10 +74,10 @@ def find_aa_patterns(input_pattern, database, min_seq_chunk_size=None, max_misma
             result[ss] = defaultdict(lambda: [])
             for fragment, fragment_data in sequences.items():
                 protein_search.start_search(
-                                                input_pattern,
-                                                fragment,
-                                                min_seq_chunk_size=min_seq_chunk_size,
-                                                max_mismatch=max_mismatch
+                                            input_pattern,
+                                            fragment,
+                                            min_seq_chunk_size=min_seq_chunk_size,
+                                            max_mismatch=max_mismatch,
                                             )
                 # most recent result
                 search_result = protein_search.results[-1]
@@ -120,21 +120,16 @@ class Filter:
         ss_data = self.filtered_data[ss]
         return dict(filter(lambda fragment: len(fragment[0]) >= lower_bound and len(fragment[0]) <= upper_bound, ss_data.items()))
     
-    def clear_filters():
+    def clear_filter(self):
         self.filtered_data = self.data
 
-    def return_filter():
+    def return_filter(self):
         return self.filtered_data
 
 
 if __name__ == "__main__":
     filter_step = Filter("/Users/alaashamandy/IDPCalcPDBDownloader/alphas/data/")
-    res = find_aa_patterns("YCV", 3, 0,)
-    for seq in res["H"]:
-        print(len(res["H"][seq]))
-    # print(filter_step.return_ss("H", 3, 9))
+    res = find_aa_patterns("YCV",  filter_step.return_filter(),3, 0)
+    print(res)
 
-    # protein_search = conformer_generator.ProteinSearch()
-    # protein_search.start_search("AAA", "AAA")
-    # print(protein_search.results[0]["AAA"])
 
