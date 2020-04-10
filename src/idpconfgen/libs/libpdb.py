@@ -1,4 +1,5 @@
 """Contain  handlers of PDB information."""
+# '\n'.join(','.join(map(str, bb)) for bb in b)
 import contextlib
 import functools
 import re
@@ -363,18 +364,24 @@ class PDBData(ABC):
     """
 
     def __init__(self):
-        self.rawdata = data
         self.clear_filters()
-    
+
+    @property
+    def filters(self):
+        return self._filters
+
     def clear_filters(self):
         """Clear up all the previously defined filters."""
-        self.filters = []
-    
-    @abstractmethod
+        self._filters = []
+
     def build(self):
         """Build the required data and attributes from the raw input."""
+        self._build()
+        assert isinstance(self.data_array, np.ndarray)
+        assert self.data_array.shape[1] == 15
+        assert self.data_array.shape[0] > 0
         return
-    
+
     @property
     @abstractmethod
     def chain_set(self):
@@ -384,22 +391,12 @@ class PDBData(ABC):
         Considers only Raw data.
         """
         return
-    
+
     @property
     @abstractmethod
     def filtered(self):  # noqa: D102
         return
-    
-    @abstractmethod
-    def add_filter_record_name(self, record_name):
-        """Add a filter for the RECORD NAME."""
-        return
-    
-    @abstractmethod
-    def add_filter_chain(self, chain):
-        """Add a filter for CHAIN ID."""
-        return
-    
+
     def write(self, filename):
         """Write filtered data to file in PDB format."""
         data2write = self.join_filtered()
@@ -411,7 +408,7 @@ class PDBData(ABC):
     def join_filtered(self, char='\n'):
         """
         Join filtered PDB data into a single string.
-        
+
         Parameters
         ----------
         char : str
@@ -422,7 +419,7 @@ class PDBData(ABC):
         -------
         string
             A unique string resulting from the filetered data.
-        
+
         Raises
         ------
         :class:`EmptyFilterError`
@@ -444,11 +441,20 @@ class PDBStructure(PDBData):
     data : str
         Raw structural data from PDB formatted files.
     """
+    def __init__(self, data):
+        self.rawdata = data
+        super().__init__()
 
-    def build(self):
-        """Build raw data so that filters can be applied."""
-        self.data = self.rawdata.split('\n')
-        self.read_pdb_data_to_array()
+    def _build(self):
+        """
+        Read structure raw data in :attr:`rawdata`.
+
+        After `.build()`, filters and data can be accessed.
+        """
+        self.data_array = read_pdb_data_to_array(
+            self.rawdata.split('\n'),
+            which='both',
+            )
 
     @property
     def chain_set(self):
@@ -473,11 +479,11 @@ class PDBStructure(PDBData):
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
         self.filters.append(lambda x: x.startswith(record_name))
-    
+
     def add_filter_chain(self, chain):
         """Add filters for chain."""
         self.filters.append(lambda x: self._filter_chain(x, chain))
-    
+
     def _filter_chain(self, line, chain):
         try:
             return line[21] == chain
@@ -494,15 +500,15 @@ class DataFromCIF(PDBData):
     data : str
         The CIf contained data.
     """
-    
+
     def __init__(self, data):
-        
+
         self.rawdata = data
         self._atom_info_keys = CIF_ATOM_KEYS
         self.pdbdata = {}
         self._void_translation_table = str.maketrans('?.', '  ')
         super().__init__()
-    
+
     def build(self):
         """
         Build data.
