@@ -83,6 +83,25 @@ class _PDBParams:
         self.__dict__.items(),
         )
 
+    line_formatter = (
+            "{:6s}"
+            "{:5d} "
+            "{:<4s}"
+            "{:1s}"
+            "{:3s} "
+            "{:1s}"
+            "{:4d}"
+            "{:1s}   "
+            "{:8.3f}"
+            "{:8.3f}"
+            "{:8.3f}"
+            "{:6.2f}"
+            "{:6.2f}      "
+            "{:<4s}"
+            "{:<2s}"
+            "{:2s}"
+            )
+
     def __setattr__(self, key, value):
         raise NotImplementedError(f'Can not set attributes to {self.__class__}')
 
@@ -112,9 +131,6 @@ class _PDBParams:
             self._acol(*range(len(names)))
             return self._acol
 
-
-
-
 PDBParams = _PDBParams()
 
 # this servers read_pdb_data_to_array mainly
@@ -125,16 +141,6 @@ _pdb_atom_line_headings = {
     'HETATM': 'HETATM',
     }
 
-
-
-
-
-
-
-
-
-
-#is_cif_loop.search, parse_cif_to_array
 
 def is_cif(datastr):
     """Detect if `datastr` is a CIF file."""
@@ -193,6 +199,8 @@ def parse_pdb_to_array(datastr, which='both'):
 
 
 def parse_cif_to_array(datastr):
+    """
+    """
     pdb_dict = {}
     data = datastr.split('\n')
     found = False
@@ -224,6 +232,78 @@ def parse_cif_to_array(datastr):
     return data_array
 
 
+def cif_get_line_elements(self, i):
+    """
+    """
+    # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
+    record = self.pdbdata.get('_atom_site.group_PDB')[i]
+
+    serial = pdbdata.get('_atom_site.Id')[i]
+
+    try:
+        atname = self.pdbdata['_atom_site.auth_atom_id'][i]
+    except KeyError:
+        atname = self.pdbdata['_atom_site.label_atom_id'][i]
+
+
+    try:
+        altloc = self.pdbdata['_atom_site.auth_alt_id'][i]
+    except KeyError:
+        altloc = self.pdbdata['_atom_site.label_alt_id'][i]
+    altloc = altloc.translate(self._void_translation_table)
+
+
+    try:
+        resname = self.pdbdata['_atom_site.auth_comp_id'][i]
+    except KeyError:
+        resname = self.pdbdata['_atom_site.label_comp_id'][i]
+
+
+    try:
+        chainids = self.pdbdata['_atom_site.auth_asym_id']
+    except KeyError:
+        chainids = self.pdbdata['_atom_site.label_asym_id']
+
+
+    try:
+        resseq = self.pdbdata['_atom_site.auth_seq_id'][i]
+    except KeyError:
+        resseq = self.pdbdata['_atom_site.label_seq_id'][i]
+
+
+    try:
+        icode = self.pdbdata['_atom_site.pdbx_PDB_ins_code'][i]
+    except KeyError:
+        icode = " "
+    icode = icode.translate(self._void_translation_table)
+
+
+    x = self.pdbdata.get('_atom_site.Cartn_x')[i]
+    y = self.pdbdata.get('_atom_site.Cartn_y')[i]
+    z = self.pdbdata.get('_atom_site.Cartn_z')[i]
+    occ = self.pdbdata.get('_atom_site.occupancy')[i]
+    tempfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
+    element = self.pdbdata.get('_atom_site.type_symbol')[i]
+    charge = self.pdbdata.get('_atom_site.pdbx_formal_charge')[i]
+
+    return (
+        record,
+        serial,
+        atname,
+        altloc,
+        resname,
+        chainids,
+        resseq,
+        icode,
+        x,
+        y,
+        z,
+        occ,
+        tempfactor,
+        ' ',  # segid
+        element,
+        charge,
+        )
 
 
 # order matters
@@ -231,10 +311,6 @@ structure_parsers = [
     (is_cif, parse_cif_to_array),
     (is_pdb, parse_pdb_to_array),
     ]
-
-
-
-
 
 
 class PDBIDFactory:
@@ -388,7 +464,7 @@ class PDBList:
             fh.write('\n'.join(str(pdbid) for pdbid in self.to_tuple()))
         
         log.info(S(f'PDBIDs written to {filename}'))
-        
+
 
 @functools.total_ordering
 class PDBID:
@@ -467,86 +543,7 @@ class PDBID:
             return name
 
 
-class PDBData(ABC):
-    """
-    Abstract base class for PDB data filters.
-
-    PDB data filters do what the name implies, filter PDB data according
-    to some criteria.
-
-    Filters can be accumulated to add restrictions.
-    """
-
-    def __init__(self):
-        self.clear_filters()
-
-    @property
-    def filters(self):
-        return self._filters
-
-    def clear_filters(self):
-        """Clear up all the previously defined filters."""
-        self._filters = []
-
-    def build(self):
-        """Build the required data and attributes from the raw input."""
-        self._build()
-        assert isinstance(self.data_array, np.ndarray)
-        assert self.data_array.shape[1] == 15
-        assert self.data_array.shape[0] > 0
-        return
-
-    @property
-    @abstractmethod
-    def chain_set(self):
-        """
-        Set of PDB chain IDs.
-
-        Considers only Raw data.
-        """
-        return
-
-    @property
-    @abstractmethod
-    def filtered(self):  # noqa: D102
-        return
-
-    def write(self, filename):
-        """Write filtered data to file in PDB format."""
-        data2write = self.join_filtered()
-
-        with open(filename, 'w') as fh:
-            fh.write(data2write + '\n')
-        log.info(S(f'saved: {filename}'))
-
-    def join_filtered(self, char='\n'):
-        """
-        Join filtered PDB data into a single string.
-
-        Parameters
-        ----------
-        char : str
-            The character with which perform string join.
-            Defaults to `new_line`.
-
-        Returns
-        -------
-        string
-            A unique string resulting from the filetered data.
-
-        Raises
-        ------
-        :class:`EmptyFilterError`
-            If resulting string is an empty string.
-        """
-        datafiltered = '\n'.join(self.filtered)
-        if datafiltered.strip():
-            return datafiltered
-        else:
-            raise EXCPTS.EmptyFilterError
-
-
-class PDBStructure:
+class Structure:
     """
     Hold structural data from PDB files.
 
@@ -637,318 +634,41 @@ class PDBStructure:
             lambda x: x[PDBParams.acol.chainid].startswith(record_name)
             )
 
-class DataFromCIF(PDBData):
-    """
-    Reads structural data for proteins in CIF files.
+    def write(self, filename):
+        """Write filtered data to file in PDB format."""
+        data2write = self.join_filtered()
 
-    Parameters
-    ----------
-    data : str
-        The CIf contained data.
-    """
+        with open(filename, 'w') as fh:
+            fh.write(data2write + '\n')
+        log.info(S(f'saved: {filename}'))
 
-    def __init__(self, data):
-
-        self.rawdata = data
-        self._atom_info_keys = CIF_ATOM_KEYS
-        self.pdbdata = {}
-        self._void_translation_table = str.maketrans('?.', '  ')
-        super().__init__()
-
-    def build(self):
+    def join_filtered(self, char='\n'):
         """
-        Build data.
+        Join filtered PDB data into a single string.
 
-        After data build, filters can be applied.
-        """
-        self.data = MMCIFDataParser(self.rawdata).pdb_dict
-        self.read_PDB_data()
-        self.all_true = np.repeat(
-            True,
-            len(self.pdbdata['_atom_site.group_PDB']),
-            )
-    
-    def read_PDB_data(self):
-        """Read PDB data."""
-        for key in self._atom_info_keys:
-            try:
-                self.pdbdata[key] = np.array(self.data[key])
-            except KeyError:
-                continue
-    
-    @property
-    def chain_set(self):
-        """All the chain ids present in the data set."""
-        try:
-            chainset = self.pdbdata['_atom_site.auth_asym_id']
-        except KeyError:
-            chainset = self.pdbdata['_atom_site.label_asym_id']
-        
-        return set(chainset)
-    
-    @property
-    def filtered(self):
-        """Filtered data in PDB format."""  # noqa: D401
-        return self.convert_to_pdb()
-    
-    def add_filter_chain(self, chain):
-        """
-        Add filter for chain identifier.
-
-        Only atoms of the specified chain will be parsed.
-        """
-        try:
-            chainids = self.pdbdata['_atom_site.auth_asym_id']
-        except KeyError:
-            chainids = self.pdbdata['_atom_site.label_asym_id']
-        
-        self.filters.append(chainids == chain)
-    
-    def add_filter_record_name(self, record_name):
-        """
-        Add a filter for the RECORD NAME.
-
-        Usually ATOM or/and HETATM. `Read further`_
-        
-        .. _Read further: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
-        """  # noqa: E501
-        self.filters.append(
-            np.isin(
-                self.pdbdata['_atom_site.group_PDB'],
-                np.array(record_name),
-                ),
-            )
-    
-    def convert_to_pdb(self):
-        """
-        Convert internal data to PDB format.
+        Parameters
+        ----------
+        char : str
+            The character with which perform string join.
+            Defaults to `new_line`.
 
         Returns
         -------
-        list
-            A list of the formatted PDB lines.
+        string
+            A unique string resulting from the filetered data.
+
+        Raises
+        ------
+        :class:`EmptyFilterError`
+            If resulting string is an empty string.
         """
-        to_output = self.all_true
-        for bool_array in self.filters:
-            to_output = np.logical_and(to_output, bool_array)
-        
-        line_formatter = (
-            "{:6s}"
-            "{:5d} "
-            "{:<4s}"
-            "{:1s}"
-            "{:3s} "
-            "{:1s}"
-            "{:4d}"
-            "{:1s}   "
-            "{:8.3f}"
-            "{:8.3f}"
-            "{:8.3f}"
-            "{:6.2f}"
-            "{:6.2f}      "
-            "{:<4s}"
-            "{:<2s}"
-            "{:2s}"
-            )
-        
-        pdb_lines = []
-        serial_count = 0
-        for i in range(len(self.all_true)):
-            if not to_output[i]:
-                continue
-            
-            serial_count += 1
-            
-            serial = serial_count
-            chainid = "0"
-            segid = chainid
-            
-            record,\
-                atname,\
-                altloc,\
-                resname,\
-                resnum,\
-                icode,\
-                x,\
-                y,\
-                z,\
-                occ,\
-                bfactor,\
-                element,\
-                charge = self._get_line_elements(i)
-        
-            line = line_formatter.format(
-                record,
-                serial,
-                atname,
-                altloc,
-                resname,
-                chainid,
-                int(resnum),
-                icode,
-                float(x),
-                float(y),
-                float(z),
-                float(occ),
-                float(bfactor),
-                segid,
-                element,
-                charge,
-                )
-            
-            pdb_lines.append(line)
-            
-        return pdb_lines
-    
-    def _get_line_elements(self, i):
-        # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
-        record = self.pdbdata.get('_atom_site.group_PDB')[i]
-
-        serial = pdbdata.get('_atom_site.Id')[i]
-
-
-        try:
-            atname = self.pdbdata['_atom_site.auth_atom_id'][i]
-        except KeyError:
-            atname = self.pdbdata['_atom_site.label_atom_id'][i]
-
-
-        try:
-            altloc = self.pdbdata['_atom_site.auth_alt_id'][i]
-        except KeyError:
-            altloc = self.pdbdata['_atom_site.label_alt_id'][i]
-        altloc = altloc.translate(self._void_translation_table)
-
-
-        try:
-            resname = self.pdbdata['_atom_site.auth_comp_id'][i]
-        except KeyError:
-            resname = self.pdbdata['_atom_site.label_comp_id'][i]
-
-
-        try:
-            chainids = self.pdbdata['_atom_site.auth_asym_id']
-        except KeyError:
-            chainids = self.pdbdata['_atom_site.label_asym_id']
-
-
-        try:
-            resseq = self.pdbdata['_atom_site.auth_seq_id'][i]
-        except KeyError:
-            resseq = self.pdbdata['_atom_site.label_seq_id'][i]
-
-
-        try:
-            icode = self.pdbdata['_atom_site.pdbx_PDB_ins_code'][i]
-        except KeyError:
-            icode = " "
-        icode = icode.translate(self._void_translation_table)
-
-
-        x = self.pdbdata.get('_atom_site.Cartn_x')[i]
-        y = self.pdbdata.get('_atom_site.Cartn_y')[i]
-        z = self.pdbdata.get('_atom_site.Cartn_z')[i]
-        occ = self.pdbdata.get('_atom_site.occupancy')[i]
-        tempfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
-        element = self.pdbdata.get('_atom_site.type_symbol')[i]
-        charge = self.pdbdata.get('_atom_site.pdbx_formal_charge')[i]
-
-        return (
-            record,
-            serial,
-            atname,
-            altloc,
-            resname,
-            chainids,
-            resseq,
-            icode,
-            x,
-            y,
-            z,
-            occ,
-            tempfactor,
-            ' ',  # segid
-            element,
-            charge,
-            )
-
-
-class MMCIFDataParser:
-    """
-    Quick mmCIF data parser for Proteins.
-    
-    Parameters
-    ----------
-    data : str
-        The structural data contained in mmCIF format.
-    """
-    
-    def __init__(self, data):
-        self.data = data.split('\n')
-        self.cifatomkeys = CIF_ATOM_KEYS
-        self.read()
-    
-    def read(self):
-        """
-        Read data string to pdb_dict attribute.
-
-        Performed at instantiation.
-        """
-        self.pdb_dict = {}
-        found = False
-        for ii, line in enumerate(self.data):
-            if line.startswith('_atom_site.'):
-                found = True
-                self.pdb_dict.setdefault(line.strip(), [])
-            elif found:
-                atom_start_index = ii
-                break
-
-        for line in self.data[atom_start_index:]:
-
-            if line.startswith('#'):
-                break
-            ls = line.split()
-
-            for i, key in enumerate(self.pdb_dict.keys()):
-                self.pdb_dict[key].append(ls[i])
-        
-
-
-class Structure:
-    """
-    Create a protein structure representation.
-
-    Implements readers for:
-
-    - PDB format version 3
-    - mmCIF
-
-    Returns the corresponding representation of Structure instance
-    based on the data input.
-
-    Parameters
-    ----------
-    data:
-        PDB structural data as string or bytes.
-    """
-
-    def __new__(cls, data):
-        """Factor PDB data."""
-        if isinstance(data, Path):
-            datastr = data.read_text()
-        elif isinstance(data, bytes):
-            datastr = data.decode('utf_8')
-        elif isinstance(data, str):
-            pass
+        datafiltered = '\n'.join(self.filtered)
+        if datafiltered.strip():
+            return datafiltered
         else:
-            raise NotImplementedError('str or bytes allowed')
+            raise EXCPTS.EmptyFilterError
 
-        loop_ = re.compile('[lL][oO][oO][pP]_')
-        if loop_.search(datastr):
-            return DataFromCIF(datastr)
-        else:
-            return PDBStructure(datastr)
+
 
 
 class PDBDownloader:
