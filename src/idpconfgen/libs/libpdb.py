@@ -74,6 +74,7 @@ class _PDBParams:
     atom_zcoord = slice(46, 54)
     atom_occupancy = slice(54, 60)
     atom_tempfactor = slice(60, 66)
+    atom_segid = slice(72, 76)
     atom_element = slice(76, 78)
     atom_charge = slice(78, 80)
 
@@ -133,6 +134,103 @@ _pdb_atom_line_headings = {
 
 
 
+#is_cif_loop.search, parse_cif_to_array
+
+def is_cif(datastr):
+    """Detect if `datastr` is a CIF file."""
+    assert isinstance(datastr, str)
+    cif_loop = re.compile('[lL][oO][oO][pP]_')
+    return bool(cif_loop.search(datastr)
+
+
+def is_pdb(datastr):
+    """Detect if `datastr` if a PDB format v3 file."""
+    return bool(datastr.count('\nATOM ') > 0)
+
+
+def parse_pdb_to_array(datastr, which='both'):
+    """
+    Transform PDB data into an array.
+
+    Parameters
+    ----------
+    datastr : str
+        String representing the PDB format v3 file.
+
+    which : str
+        Which lines to consider ['ATOM', 'HETATM', 'both'].
+        Defaults to `'both'`, considers both 'ATOM' and 'HETATM'.
+
+    Returns
+    -------
+    numpy.ndarray of (N, 15)
+        Where N are the number of ATOM and/or HETATM lines,
+        and 15 the number of fields in ATOM/HETATM lines according
+        to the PDB format v3.
+    """
+    coords_headings = _pdb_atom_line_headings
+    lines = datastr.split('\n')
+
+    try:
+        atom_hetatm_lines = filter(
+            lambda x: x.startswith(coord_headings[which]),
+            lines,
+            )
+    except KeyError:
+        err = ValueError(f'`which` got an unexpected value \'{which}\''.)
+        raise err from None
+
+    pdb_data_array = np.empty(
+        (len(atom_hetatm_lines), len(PDBParams.atom_slicers)),
+        dtype='<U8',
+        )
+
+    for row, line in enumerate(atom_hetatm_lines):
+        for column, slicer_item in enumerate(PDBParams.atom_slicers):
+            pdb_data_array[row, column] = line[slicer_item]
+
+    return pdb_data_array
+
+
+def parse_cif_to_array(datastr):
+    pdb_dict = {}
+    data = datastr.split('\n')
+    found = False
+    for ii, line in enumerate(self.data):
+        if line.startswith('_atom_site.'):
+            found = True
+            pdb_dict.setdefault(line.strip(), [])
+        elif found:
+            atom_start_index = ii
+            break
+
+    for line in data[atom_start_index:]:
+        if line.startswith('#'):
+            break
+        ls = line.split()
+
+        for i, key in enumerate(pdb_dict.keys()):
+            pdb_dict[key].append(ls[i])
+    else:
+        number_of_atoms = len(ls)
+
+    data_array = np.empty(
+        (len(number_of_atoms), len(PDBParams.atom_slicers)),
+        dtype='<U8',
+        )
+
+    for ii in range(number_of_atoms):
+        data_array[ii, :] = cif_get_line_elements(ii)
+    return data_array
+
+
+
+
+# order matters
+structure_parsers = [
+    (is_cif, parse_cif_to_array),
+    (is_pdb, parse_pdb_to_array),
+    ]
 
 
 
@@ -330,6 +428,7 @@ class PDBID:
             'chain': chain,
             }
         self.identifiers = {}
+
         for name, identifier in ids.items():
             if identifier:
                 self.identifiers[name] = identifier
@@ -456,11 +555,30 @@ class PDBStructure:
     data : str
         Raw structural data from PDB formatted files.
     """
-    def __init__(self, data):
-        assert isinstance(data, str), \
-            '`data` should be str type, got {type(data)}, instead.'
+    # all should return a string
+    _data_input_types = {
+        type(Path()): lambda x: x.read_text(),
+        bytes: lambda x: x.decode('utf_8'),
+        str: lambda x: x,
+        }
 
-        self.rawdata = data
+
+    def __init__(self, data):
+        data_type = type(data)
+
+        try:
+            datastr = self._data_input_types[data_type](data)
+        except KeyError as err:
+            err2 = NotImplementedError('Struture data not of proper type')
+            raise err2 from err
+        assert isinstance(datastr, str)
+
+        for condition, parser in structure_parsers.items():
+            if condition(datastr):
+                self._structure_parser = parser
+                break
+
+        self.datastr = datastr
         self.data_array = None
         self.clear_filters()
         assert isinstance(self.filters, list)
@@ -470,7 +588,7 @@ class PDBStructure:
         return = self._filters
 
     @property
-    def filtered(self):
+    def filtered_atom(self):
         """
         Filter data array by the selected filters.
 
@@ -487,7 +605,7 @@ class PDBStructure:
     @property
     def chain_set(self):
         """All chain IDs present in the raw dataset."""  # noqa: D401
-        return set(self.pdb_array_data[:, 5])
+        return set(self.pdb_array_data[:, PDBParams.acol.chainid])
 
     def clear_filters(self):
         self._filters = []
@@ -501,10 +619,7 @@ class PDBStructure:
 
         After `.build()`, filters and data can be accessed.
         """
-        self.data_array = read_pdb_data_to_array(
-            self.rawdata.split('\n'),
-            which='both',
-            )
+        self.data_array = self._structure_parser(self.datastr)
 
     def add_filter(self, function):
         """Adds a function as filter."""
@@ -518,16 +633,9 @@ class PDBStructure:
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
-        self.filters.append(lambda x: self._filter_chain(x, chain))
         self.filters.append(
             lambda x: x[PDBParams.acol.chainid].startswith(record_name)
             )
-
-    def _filter_chain(self, line, chain):
-        try:
-            return line[21] == chain
-        except IndexError:
-            return False
 
 class DataFromCIF(PDBData):
     """
@@ -693,47 +801,76 @@ class DataFromCIF(PDBData):
         return pdb_lines
     
     def _get_line_elements(self, i):
-        
+        # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
         record = self.pdbdata.get('_atom_site.group_PDB')[i]
+
+        serial = pdbdata.get('_atom_site.Id')[i]
+
+
         try:
             atname = self.pdbdata['_atom_site.auth_atom_id'][i]
         except KeyError:
             atname = self.pdbdata['_atom_site.label_atom_id'][i]
-        
+
+
         try:
             altloc = self.pdbdata['_atom_site.auth_alt_id'][i]
         except KeyError:
             altloc = self.pdbdata['_atom_site.label_alt_id'][i]
         altloc = altloc.translate(self._void_translation_table)
-        
+
+
         try:
             resname = self.pdbdata['_atom_site.auth_comp_id'][i]
         except KeyError:
             resname = self.pdbdata['_atom_site.label_comp_id'][i]
-        
+
+
         try:
-            resnum = self.pdbdata['_atom_site.auth_seq_id'][i]
+            chainids = self.pdbdata['_atom_site.auth_asym_id']
         except KeyError:
-            resnum = self.pdbdata['_atom_site.label_seq_id'][i]
-        
+            chainids = self.pdbdata['_atom_site.label_asym_id']
+
+
+        try:
+            resseq = self.pdbdata['_atom_site.auth_seq_id'][i]
+        except KeyError:
+            resseq = self.pdbdata['_atom_site.label_seq_id'][i]
+
+
         try:
             icode = self.pdbdata['_atom_site.pdbx_PDB_ins_code'][i]
         except KeyError:
             icode = " "
         icode = icode.translate(self._void_translation_table)
-        
+
+
         x = self.pdbdata.get('_atom_site.Cartn_x')[i]
         y = self.pdbdata.get('_atom_site.Cartn_y')[i]
         z = self.pdbdata.get('_atom_site.Cartn_z')[i]
-        
         occ = self.pdbdata.get('_atom_site.occupancy')[i]
-        bfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
-        
+        tempfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
         element = self.pdbdata.get('_atom_site.type_symbol')[i]
         charge = self.pdbdata.get('_atom_site.pdbx_formal_charge')[i]
-        
-        return record, atname, altloc, resname, resnum, icode, x, y, z,\
-            occ, bfactor, element, charge
+
+        return (
+            record,
+            serial,
+            atname,
+            altloc,
+            resname,
+            chainids,
+            resseq,
+            icode,
+            x,
+            y,
+            z,
+            occ,
+            tempfactor,
+            ' ',  # segid
+            element,
+            charge,
+            )
 
 
 class MMCIFDataParser:
@@ -766,7 +903,7 @@ class MMCIFDataParser:
             elif found:
                 atom_start_index = ii
                 break
-        
+
         for line in self.data[atom_start_index:]:
 
             if line.startswith('#'):
@@ -775,6 +912,7 @@ class MMCIFDataParser:
 
             for i, key in enumerate(self.pdb_dict.keys()):
                 self.pdb_dict[key].append(ls[i])
+        
 
 
 class Structure:
@@ -947,46 +1085,4 @@ class PDBDownloader:
             log.error(S(f'{repr(e)}: FAILED {pdbname}'))
             return
 
-
-def read_pdb_file_to_array(lines, which='both'):
-    """
-    Transform PDB data into an array.
-
-    Parameters
-    ----------
-    lines : list of strs
-        List of the PDB format v3 file lines.
-
-    which : str
-        Which lines to consider ['ATOM', 'HETATM', 'both'].
-        Defaults to `'both'`, considers both 'ATOM' and 'HETATM'.
-
-    Returns
-    -------
-    numpy.ndarray of (N, 15)
-        Where N are the number of ATOM and/or HETATM lines,
-        and 15 the number of fields in ATOM/HETATM lines according
-        to the PDB format v3.
-    """
-    coords_headings = _pdb_atom_line_headings
-
-    try:
-        atom_hetatm_lines = filter(
-            lambda x: x.startswith(coord_headings[which]),
-            lines,
-            )
-    except KeyError:
-        err = ValueError(f'`which` got an unexpected value \'{which}\''.)
-        raise err from None
-
-    pdb_data_array = np.empty(
-        (len(atom_hetatm_lines), len(PDBParams.atom_slicers)),
-        dtype='<U8',
-        )
-
-    for row, line in enumerate(atom_hetatm_lines):
-        for column, slicer_item in enumerate(PDBParams.atom_slicers):
-            pdb_data_array[row, column] = line[slicer_item]
-
-    return pdb_data_array
 
