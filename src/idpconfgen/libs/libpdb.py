@@ -61,7 +61,7 @@ class _PDBParams:
     """  # noqa: E501
 
     # slicers of the ATOM and HETATM lines
-    atom_line_name = slice(0, 6)
+    atom_record = slice(0, 6)
     atom_serial = slice(6, 11)
     atom_atom_name = slice(12, 16)
     atom_altloc = slice(16, 17)
@@ -77,6 +77,11 @@ class _PDBParams:
     atom_element = slice(76, 78)
     atom_charge = slice(78, 80)
 
+    _atom_attrs = filter(
+        lambda x: x[0].startswith('atom_'),
+        self.__dict__.items(),
+        )
+
     def __setattr__(self, key, value):
         raise NotImplementedError(f'Can not set attributes to {self.__class__}')
 
@@ -86,11 +91,7 @@ class _PDBParams:
         try:
             return self._atom_slicers
         except AttributeError:
-            atom_slicers = list(filter(
-                lambda x: x[0].startswith('atom_'),
-                self.__dict__.items(),
-                ))
-            self._atom_slicers = [s[1] for s in atom_slicers]
+            self._atom_slicers = [s[1] for s in self._atom_attrs]
 
             # ensure
             assert all(
@@ -98,6 +99,20 @@ class _PDBParams:
                 for s in self._atom_slicer
                 ))
             return self._atom_slicers
+
+    def acol(self):
+        try:
+            return self._acol
+        except AttributeError:
+            ac = namedtuple(
+                'AtomCols',
+                (f'acol_{s[0].lstrip("atom_")}' for s in self._atom_attrs),
+                )
+            self._acol(*range(len(names)))
+            return self._acol
+
+
+
 
 PDBParams = _PDBParams()
 
@@ -432,7 +447,7 @@ class PDBData(ABC):
             raise EXCPTS.EmptyFilterError
 
 
-class PDBStructure(PDBData):
+class PDBStructure:
     """
     Hold structural data from PDB files.
 
@@ -442,10 +457,45 @@ class PDBStructure(PDBData):
         Raw structural data from PDB formatted files.
     """
     def __init__(self, data):
-        self.rawdata = data
-        super().__init__()
+        assert isinstance(data, str), \
+            '`data` should be str type, got {type(data)}, instead.'
 
-    def _build(self):
+        self.rawdata = data
+        self.data_array = None
+        self.clear_filters()
+        assert isinstance(self.filters, list)
+
+    @property
+    def filters(self):
+        return = self._filters
+
+    @property
+    def filtered(self):
+        """
+        Filter data array by the selected filters.
+
+        Returns
+        -------
+        list
+            The data in PDB format after filtering.
+        """
+        filtered_data = self.data_array
+        for f in self.filters:
+            filtered_data = filter(f, filtered_data)
+        return filtered_data
+
+    @property
+    def chain_set(self):
+        """All chain IDs present in the raw dataset."""  # noqa: D401
+        return set(self.pdb_array_data[:, 5])
+
+    def clear_filters(self):
+        self._filters = []
+
+    def pop_last_filter(self):
+        self._filters.pop()
+
+    def build(self):
         """
         Read structure raw data in :attr:`rawdata`.
 
@@ -456,39 +506,16 @@ class PDBStructure(PDBData):
             which='both',
             )
 
-    @property
-    def chain_set(self):
-        """All chain IDs present in the raw dataset."""  # noqa: D401
-        return set(self.pdb_array_data[:, 5])
-
-    @property
-    def filtered(self):
-        """
-        Parse the raw data applying the selected filters.
-
-        Returns
-        -------
-        list
-            The data in PDB format after filtering.
-        """
-        filtered_data = self.data
-        for f in self.filters:
-            filtered_data = filter(f, filtered_data)
-        return filtered_data
+    def add_filter(self, function):
+        self.filters.append(function)
 
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
-        self.filters.append(lambda x: x.startswith(record_name))
+        self.filters.append(lambda x: x[0].startswith(record_name))
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
         self.filters.append(lambda x: self._filter_chain(x, chain))
-
-    def _filter_chain(self, line, chain):
-        try:
-            return line[21] == chain
-        except IndexError:
-            return False
 
 
 class DataFromCIF(PDBData):
