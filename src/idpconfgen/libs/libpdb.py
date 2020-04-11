@@ -106,7 +106,7 @@ class _PDBParams:
         except AttributeError:
             ac = namedtuple(
                 'AtomCols',
-                (f'acol_{s[0].lstrip("atom_")}' for s in self._atom_attrs),
+                (s[0].lstrip("atom_") for s in self._atom_attrs),
                 )
             self._acol(*range(len(names)))
             return self._acol
@@ -507,16 +507,27 @@ class PDBStructure:
             )
 
     def add_filter(self, function):
+        """Adds a function as filter."""
         self.filters.append(function)
 
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
-        self.filters.append(lambda x: x[0].startswith(record_name))
+        self.filters.append(
+            lambda x: x[PDBParams.acol.record].startswith(record_name)
+            )
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
         self.filters.append(lambda x: self._filter_chain(x, chain))
+        self.filters.append(
+            lambda x: x[PDBParams.acol.chainid].startswith(record_name)
+            )
 
+    def _filter_chain(self, line, chain):
+        try:
+            return line[21] == chain
+        except IndexError:
+            return False
 
 class DataFromCIF(PDBData):
     """
