@@ -1,5 +1,4 @@
 """Contain  handlers of PDB information."""
-# '\n'.join(','.join(map(str, bb)) for bb in b)
 import contextlib
 import functools
 import re
@@ -101,6 +100,9 @@ class _PDBParams:
             "{:<2s}"
             "{:2s}"
             )
+    format_functs = [str, int, str, str, str, str, int, str, float, float,
+                     float, float, float, str, str, str]
+    assert len(line_formatter) == len(format_functs)
 
     def __setattr__(self, key, value):
         raise NotImplementedError(f'Can not set attributes to {self.__class__}')
@@ -343,17 +345,11 @@ class CIFParser:
             )
 
 
-# order matters
-structure_parsers = [
-    (is_cif, parse_cif_to_array),
-    (is_pdb, parse_pdb_to_array),
-    ]
-
 
 class PDBIDFactory:
     r"""
     Parse input for PDBID instatiation.
-    
+
     Parameters
     ----------
     name : str or Path
@@ -372,13 +368,13 @@ class PDBIDFactory:
     Returns
     -------
     :class:`PDBID` object.
-    
+
     """
 
     rgx_XXXX = re.compile(r'^[0-9a-zA-Z]{4}(\s|$)')
     rgx_XXXXC = re.compile(r'^[0-9a-zA-Z]{5,}(\s|$)')
     rgx_XXXX_C = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+(\s|$)')
-    
+
     def __new__(cls, name):
         """Construct class."""
         if isinstance(name, PDBID):
@@ -394,23 +390,23 @@ class PDBIDFactory:
             cls.rgx_XXXXC: cls._parse_XXXXC,
             cls.rgx_XXXX_C: cls._parse_XXXX_C,
             }
-        
+
         for regex, parser in pdb_filename_regex.items():
             if regex.search(str(name)):  # in case Path obj
                 return PDBID(*parser(name))
         else:
             emsg = f"PDB code format not valid: {name}. No regex matches."
             raise EXCPTS.PDBIDFactoryError(emsg)
-    
+
     @staticmethod
     def _parse_XXXX(pdbid):
         return pdbid[:4], None
-    
+
     @staticmethod
     def _parse_XXXXC(pdbid):
         pdbinfo = pdbid.split()[0]
         return pdbinfo[:4], pdbinfo[4:]
-    
+
     @staticmethod
     def _parse_XXXX_C(pdbid):
         pdbid, chainid = pdbid.split()[0].split('_')
@@ -420,7 +416,7 @@ class PDBIDFactory:
 class PDBList:
     """
     List of PDBID objects.
-    
+
     Parameters
     ----------
     pdb_names : obj:iterator
@@ -430,7 +426,7 @@ class PDBList:
     """
 
     def __new__(cls, pdb_names):  # noqa: D102
-        
+
         try:
             if isinstance(pdb_names, cls):
                 return pdb_names
@@ -438,7 +434,7 @@ class PDBList:
                 return super().__new__(cls)
         except IndexError:
             return super().__new__(cls)
-        
+
     def __init__(self, pdb_names):
         valid_pdb_names = filter(
             # str() because may receive Paths
@@ -446,38 +442,38 @@ class PDBList:
             pdb_names,
             )
         self.set = set(PDBIDFactory(element) for element in valid_pdb_names)
-    
+
     def __repr__(self):
         return '{}(\n    {})\n'.format(
             self.__class__.__name__,
             ',\n    '.join(repr(x) for x in self),
             )
-    
+
     def __str__(self):
         return '{} with {} elements'.format(
             self.__class__.__name__,
             len(self),
             )
-    
+
     def __eq__(self, other):
         try:
             return self.set == other.set
         except AttributeError:
             return self.set == other
-    
+
     def __iter__(self):
         return iter(self.to_tuple())
-    
+
     def __getitem__(self, index):
         return self.to_tuple()[index]
-    
+
     def __len__(self):
         return len(self.set)
-    
+
     def to_tuple(self):
         """Convert PDBList to sorted tuple."""
         return tuple(sorted(self.set))
-    
+
     def difference(self, other):
         """
         Difference between self and other.
@@ -487,7 +483,7 @@ class PDBList:
         PDBList
         """
         return PDBList(tuple(self.set.difference(other.set)))
-    
+
     def write(self, filename='PDBIDs.list'):
         """
         Write to a file the PDBIDs in the PDBList.
@@ -499,7 +495,7 @@ class PDBList:
         """
         with open(filename, 'w') as fh:
             fh.write('\n'.join(str(pdbid) for pdbid in self.to_tuple()))
-        
+
         log.info(S(f'PDBIDs written to {filename}'))
 
 
@@ -507,35 +503,35 @@ class PDBList:
 class PDBID:
     """
     PDB object identifier.
-    
+
     Identifies unique downloadable/stored units.
-    
+
     In the current implmentation each unit is one PDB chain,
     which is identified by the PDBID and its chain identifier.
-    
+
     Parameters
     ----------
     name : obj:`str`
         The PDBID, for example: 1ABC
-    
+
     chain : obj:`str`
         The chain identifier.
         Defaults to None.
-    
+
     Attributes
     ----------
     name:
         The four character PDB identifier.
-    
+
     chain:
         The chain identifier.
     """
 
     def __init__(self, name, chain=None):
-        
+
         self.name = name.upper()
         self.chain = chain
-        
+
         # made manual to completely control order
         ids = {
             'chain': chain,
@@ -545,35 +541,35 @@ class PDBID:
         for name, identifier in ids.items():
             if identifier:
                 self.identifiers[name] = identifier
-    
+
     def __repr__(self):
-        
+
         iditems = self.identifiers.items()
-        
+
         kwargs = ', '.join(f'{key}={val!r}' for key, val in iditems)
-        
+
         if kwargs:
             kwargs = ', ' + kwargs
-        
+
         return '{}(name={!r}{})'.format(
             self.__class__.__name__,
             self.name,
             kwargs,
             )
-    
+
     def __lt__(self, other):
         return str(self) < str(other)
-    
+
     def __hash__(self):
         return hash(str(self))
-    
+
     def __eq__(self, other):
         return str(self) == str(other)
-    
+
     def __str__(self):
         name = f'{self.name}'
         ids = '_'.join(self.identifiers.values())
-        
+
         if ids:
             return f'{name}_' + ids
         else:
@@ -589,40 +585,58 @@ class Structure:
     data : str
         Raw structural data from PDB formatted files.
     """
+    # possible data inputs in __init__
     # all should return a string
-    _data_input_types = {
+    _data2string = {
         type(Path()): lambda x: x.read_text(),
         bytes: lambda x: x.decode('utf_8'),
         str: lambda x: x,
         }
 
+    # order matters
+    structure_parsers = [
+        (is_cif, parse_cif_to_array),
+        (is_pdb, parse_pdb_to_array),
+        ]
 
     def __init__(self, data):
         data_type = type(data)
 
         try:
-            datastr = self._data_input_types[data_type](data)
+            datastr = self._data2string[data_type](data)
         except KeyError as err:
             err2 = NotImplementedError('Struture data not of proper type')
             raise err2 from err
         assert isinstance(datastr, str)
 
-        for condition, parser in structure_parsers.items():
+        for condition, parser in self.structure_parsers:
             if condition(datastr):
                 self._structure_parser = parser
                 break
 
-        self.datastr = datastr
+        self._datastr = datastr
         self.data_array = None
         self.clear_filters()
         assert isinstance(self.filters, list)
+
+    def build(self):
+        """
+        Read structure raw data in :attr:`rawdata`.
+
+        After `.build()`, filters and data can be accessed.
+        """
+        self.data_array = self._structure_parser(self._datastr)
+        del self._datastr
+
+    def clear_filters(self):
+        self._filters = []
 
     @property
     def filters(self):
         return = self._filters
 
     @property
-    def filtered_atom(self):
+    def filtered_atoms(self):
         """
         Filter data array by the selected filters.
 
@@ -641,19 +655,8 @@ class Structure:
         """All chain IDs present in the raw dataset."""  # noqa: D401
         return set(self.pdb_array_data[:, PDBParams.acol.chainid])
 
-    def clear_filters(self):
-        self._filters = []
-
     def pop_last_filter(self):
         self._filters.pop()
-
-    def build(self):
-        """
-        Read structure raw data in :attr:`rawdata`.
-
-        After `.build()`, filters and data can be accessed.
-        """
-        self.data_array = self._structure_parser(self.datastr)
 
     def add_filter(self, function):
         """Adds a function as filter."""
@@ -671,41 +674,23 @@ class Structure:
             lambda x: x[PDBParams.acol.chainid].startswith(record_name)
             )
 
-    def write(self, filename):
-        """Write filtered data to file in PDB format."""
-        data2write = self.join_filtered()
-
-        with open(filename, 'w') as fh:
-            fh.write(data2write + '\n')
-        log.info(S(f'saved: {filename}'))
-
-    def join_filtered(self, char='\n'):
-        """
-        Join filtered PDB data into a single string.
-
-        Parameters
-        ----------
-        char : str
-            The character with which perform string join.
-            Defaults to `new_line`.
-
-        Returns
-        -------
-        string
-            A unique string resulting from the filetered data.
-
-        Raises
-        ------
-        :class:`EmptyFilterError`
-            If resulting string is an empty string.
-        """
-        datafiltered = '\n'.join(self.filtered)
-        if datafiltered.strip():
-            return datafiltered
-        else:
+    def write_PDB(self, filename):
+        lines = self._make_pdb()
+        if not lines:
             raise EXCPTS.EmptyFilterError
 
+        with open(filename, 'w') as fh:
+            fh.writelines(lines)
+            fh.write('\n')
+        log.info(S(f'saved: {filename}'))
 
+    def _make_pdb(self):
+        return [
+            PDBParams.line_formatter.format(
+                *[func(i) for func, i in zip(line, PDBParams.format_funcs)]
+                )
+            for line in self.filtered
+            ]
 
 
 class PDBDownloader:
@@ -799,21 +784,21 @@ class PDBDownloader:
             downloaded_data = response.read()
         except (AttributeError, UnboundLocalError):  # response is None
             return
-        
+
         pdbdata = Structure(downloaded_data)
-        
+
         pdbdata.build()
-        
+
         if chains[0] is None:
             chains = pdbdata.chain_set
-        
+
         for chain in chains:
-            
+
             pdbdata.add_filter_record_name(self.record_name)
             pdbdata.add_filter_chain(chain)
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
             try:
-                pdbdata.write(destination)
+                pdbdata.write_PDB(destination)
             except EXCPTS.EmptyFilterError:
                 log.error(T(f'Empty Filter for {destination}'))
                 log.debug(traceback.format_exc())
