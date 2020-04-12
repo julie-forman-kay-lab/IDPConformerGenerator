@@ -9,6 +9,8 @@ tests_folder = Path(__file__).myparents()
 project_folder = tests_folder.parents[0]
 
 data_folder = Path(tests_folder, 'data')
+pdb_example = Path(data_folder, 'pdb_example.pdb')
+cif_example = Path(data_folder, 'cif_example.cif')
 
 folder_output = Path(
     tests_folder,

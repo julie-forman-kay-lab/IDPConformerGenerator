@@ -6,11 +6,13 @@ import string
 import traceback
 import urllib.request
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 
 import numpy as np
 
 from idpconfgen import Path, log
+from idpconfgen.core import count_string_formatters
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libtimer
 from idpconfgen.logger import S, T
@@ -59,76 +61,77 @@ class _PDBParams:
     .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """  # noqa: E501
 
-    # slicers of the ATOM and HETATM lines
-    atom_record = slice(0, 6)
-    atom_serial = slice(6, 11)
-    atom_atom_name = slice(12, 16)
-    atom_altloc = slice(16, 17)
-    atom_resname = slice(17, 20)
-    atom_chainid = slice(21, 22)
-    atom_resseq = slice(22, 26)
-    atom_icode = slice(26, 27)
-    atom_xcoord = slice(30, 38)
-    atom_ycoord = slice(38, 46)
-    atom_zcoord = slice(46, 54)
-    atom_occupancy = slice(54, 60)
-    atom_tempfactor = slice(60, 66)
-    atom_segid = slice(72, 76)
-    atom_element = slice(76, 78)
-    atom_charge = slice(78, 80)
+    def __init__(self):
+        # slicers of the ATOM and HETATM lines
+        self.atom_record = slice(0, 6)
+        self.atom_serial = slice(6, 11)
+        self.atom_atom_name = slice(12, 16)
+        self.atom_altloc = slice(16, 17)
+        self.atom_resname = slice(17, 20)
+        self.atom_chainid = slice(21, 22)
+        self.atom_resseq = slice(22, 26)
+        self.atom_icode = slice(26, 27)
+        self.atom_xcoord = slice(30, 38)
+        self.atom_ycoord = slice(38, 46)
+        self.atom_zcoord = slice(46, 54)
+        self.atom_occupancy = slice(54, 60)
+        self.atom_tempfactor = slice(60, 66)
+        self.atom_segid = slice(72, 76)
+        self.atom_element = slice(76, 78)
+        self.atom_charge = slice(78, 80)
 
-    _atom_attrs = filter(
-        lambda x: x[0].startswith('atom_'),
-        self.__dict__.items(),
-        )
-
-    line_formatter = (
-            "{:6s}"
-            "{:5d} "
-            "{:<4s}"
-            "{:1s}"
-            "{:3s} "
-            "{:1s}"
-            "{:4d}"
-            "{:1s}   "
-            "{:8.3f}"
-            "{:8.3f}"
-            "{:8.3f}"
-            "{:6.2f}"
-            "{:6.2f}      "
-            "{:<4s}"
-            "{:<2s}"
-            "{:2s}"
-            )
-    format_functs = [str, int, str, str, str, str, int, str, float, float,
-                     float, float, float, str, str, str]
-    assert len(line_formatter) == len(format_functs)
-
-    def __setattr__(self, key, value):
-        raise NotImplementedError(f'Can not set attributes to {self.__class__}')
-
-    @property
-    def atom_slicers(self):
-        """Ordered list of ATOM and HETATOM slicers."""
-        try:
-            return self._atom_slicers
-        except AttributeError:
-            self._atom_slicers = [s[1] for s in self._atom_attrs]
-
-            # ensure
-            assert all(isinstance(s, slice) for s in self._atom_slicer))
-            return self._atom_slicers
-
-    def acol(self):
-        try:
-            return self._acol
-        except AttributeError:
-            ac = namedtuple(
-                'AtomCols',
-                (s[0].lstrip("atom_") for s in self._atom_attrs),
+        self.line_formatter = (
+                "{:6s}"
+                "{:5d} "
+                "{:<4s}"
+                "{:1s}"
+                "{:3s} "
+                "{:1s}"
+                "{:4d}"
+                "{:1s}   "
+                "{:8.3f}"
+                "{:8.3f}"
+                "{:8.3f}"
+                "{:6.2f}"
+                "{:6.2f}      "
+                "{:<4s}"
+                "{:<2s}"
+                "{:2s}"
                 )
-            self._acol(*range(len(names)))
-            return self._acol
+        self.format_functs = [str, int, str, str, str, str, int, str, float, float,
+                         float, float, float, str, str, str]
+        assert count_string_formatters(self.line_formatter) == len(self.format_functs)
+
+        # Attributes for the ATOM/HETATM lines
+        self.__dict__['_atom_attrs'] = list(filter(
+            lambda x: x[0].startswith('atom_'),
+            self.__dict__.items(),
+            ))
+        assert self._atom_attrs
+
+        self.__dict__['atom_slicers'] = [s[1] for s in self._atom_attrs]
+        assert self.atom_slicers
+        assert all(isinstance(s, slice) for s in self.atom_slicers)
+
+
+        # The columns of the different PDB ATOM fields
+        atom_attr_names = [s[0].lstrip("atom_") for s in self._atom_attrs]
+        assert len(atom_attr_names) == len(self._atom_attrs)
+        assert all(isinstance(s, str) for s in atom_attr_names)
+
+        AtomCols = namedtuple('AtomCols', atom_attr_names)
+        # range here because of the number of the columns
+        self.__dict__['acol'] = AtomCols(*range(len(self._atom_attrs)))
+        assert all(isinstance(i, int) for i in self.acol)
+        assert self.acol.chainid == 5
+
+        def _setattr(self):
+            errmsg = f'Can not set attributes to {self.__class__}'
+            raise NotImplementedError(errmsg)
+        self.__setattr__ = _setattr
+        return
+    #def __setattr__(self, *args):
+        #raise NotImplementedError(f'Can not set attributes to {self.__class__}')
 
 # instantiates singleton-like
 PDBParams = _PDBParams()
@@ -136,7 +139,7 @@ PDBParams = _PDBParams()
 # this servers read_pdb_data_to_array mainly
 # it is here for performance
 _pdb_atom_line_headings = {
-    'which': ('ATOM', 'HETATM'),
+    'both': ('ATOM', 'HETATM'),
     'ATOM': 'ATOM',
     'HETATM': 'HETATM',
     }
@@ -147,7 +150,7 @@ def is_cif(datastr):
     assert isinstance(datastr, str), \
         f'`datastr` is not str: {type(datastr)} instead'
     cif_loop = re.compile('[lL][oO][oO][pP]_')
-    return bool(cif_loop.search(datastr)
+    return bool(cif_loop.search(datastr))
 
 
 def is_pdb(datastr):
@@ -172,8 +175,11 @@ def gen_pdb_data_array(number_of_atoms):
     np.ndarray of (N, :attr:`PDBParams.atom_slicers), dtype = '<U8'
         Where N is the ``number_of_atoms``.
     """
+    # require
     assert isinstance(number_of_atoms, int), \
-        f'`number_of_atoms` is not int, {type(number_of_atoms)}'
+        f'`number_of_atoms` is not int, {type(number_of_atoms)} '
+    assert number_of_atoms > 0, \
+        f'or number is less than zero: {number_of_atoms}.'
 
     return np.empty(
         (number_of_atoms, len(PDBParams.atom_slicers)),
@@ -181,7 +187,7 @@ def gen_pdb_data_array(number_of_atoms):
         )
 
 
-def parse_pdb_to_array(datastr, which='both'):
+def parse_pdb_to_array(datastr, which='both', **kwargs):
     """
     Transform PDB data into an array.
 
@@ -209,12 +215,12 @@ def parse_pdb_to_array(datastr, which='both'):
     lines = datastr.split('\n')
 
     try:
-        atom_hetatm_lines = filter(
-            lambda x: x.startswith(coord_headings[which]),
+        atom_hetatm_lines = list(filter(
+            lambda x: x.startswith(coords_headings[which]),
             lines,
-            )
+            ))
     except KeyError as err:
-        err2 = ValueError(f'`which` got an unexpected value \'{which}\''.)
+        err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
 
     data_array = gen_pdb_data_array(len(atom_hetatm_lines))
@@ -226,7 +232,7 @@ def parse_pdb_to_array(datastr, which='both'):
     return data_array
 
 
-def parse_cif_to_array(datastr):
+def parse_cif_to_array(datastr, **kwargs):
     """
     Parse mmCIF protein data to array.
 
@@ -255,7 +261,7 @@ class CIFParser:
     def read_cif(self, datastr):
         """Read 'atom_site' entries to dictionary."""
         lines = datastr.split('\n')
-        atom_start_index = self.find_atom_site_lines(lines)
+        atom_start_index = self._find_atom_site_lines(lines)
         self._populate_key_lists(lines, atom_start_index)
 
     def _find_atom_site_lines(self, lines):
@@ -344,6 +350,126 @@ class CIFParser:
             charge,
             )
 
+
+class Structure:
+    """
+    Hold structural data from PDB files.
+
+    Parameters
+    ----------
+    data : str
+        Raw structural data from PDB formatted files.
+    """
+    # possible data inputs in __init__
+    # all should return a string
+    _data2string = {
+        type(Path()): lambda x: x.read_text(),
+        bytes: lambda x: x.decode('utf_8'),
+        str: lambda x: x,
+        }
+
+    # order matters
+    structure_parsers = [
+        (is_cif, parse_cif_to_array),
+        (is_pdb, parse_pdb_to_array),
+        ]
+
+    def __init__(self, data, **kwargs):
+        data_type = type(data)
+
+        try:
+            datastr = self._data2string[data_type](data)
+        except KeyError as err:
+            err2 = NotImplementedError('Struture data not of proper type')
+            raise err2 from err
+        assert isinstance(datastr, str)
+
+        self._structure_parser = self._detect_structure_type(datastr)
+
+        self._datastr = datastr
+        self.data_array = None
+        self.clear_filters()
+        self.kwargs = kwargs
+        assert isinstance(self.filters, list)
+
+    @classmethod
+    def _detect_structure_type(cls, datastr):
+        for condition, parser in cls.structure_parsers:
+            if condition(datastr):
+                return parser
+
+    def build(self):
+        """
+        Read structure raw data in :attr:`rawdata`.
+
+        After `.build()`, filters and data can be accessed.
+        """
+        self.data_array = self._structure_parser(self._datastr, **self.kwargs)
+        del self._datastr
+
+    def clear_filters(self):
+        self._filters = []
+
+    @property
+    def filters(self):
+        return self._filters
+
+    @property
+    def filtered_atoms(self):
+        """
+        Filter data array by the selected filters.
+
+        Returns
+        -------
+        list
+            The data in PDB format after filtering.
+        """
+        filtered_data = self.data_array
+        for f in self.filters:
+            filtered_data = filter(f, filtered_data)
+        return filtered_data
+
+    @property
+    def chain_set(self):
+        """All chain IDs present in the raw dataset."""  # noqa: D401
+        return set(self.data_array[:, PDBParams.acol.chainid])
+
+    def pop_last_filter(self):
+        self._filters.pop()
+
+    def add_filter(self, function):
+        """Adds a function as filter."""
+        self.filters.append(function)
+
+    def add_filter_record_name(self, record_name):
+        """Add filter for record names."""
+        self.filters.append(
+            lambda x: x[PDBParams.acol.record].startswith(record_name)
+            )
+
+    def add_filter_chain(self, chain):
+        """Add filters for chain."""
+        self.filters.append(
+            lambda x: x[PDBParams.acol.chainid].startswith(chain)
+            )
+
+    def write_PDB(self, filename):
+        lines = self._make_pdb()
+        if not lines:
+            raise EXCPTS.EmptyFilterError
+
+        with open(filename, 'w') as fh:
+            fh.writelines(lines)
+            fh.write('\n')
+        log.info(S(f'saved: {filename}'))
+
+    def _make_pdb(self):
+        return [
+            PDBParams.line_formatter.format(
+                *[func(i) for func, i in zip(line, PDBParams.format_funcs)]
+                )
+            for line in self.filtered
+            ]
 
 
 class PDBIDFactory:
@@ -576,123 +702,6 @@ class PDBID:
             return name
 
 
-class Structure:
-    """
-    Hold structural data from PDB files.
-
-    Parameters
-    ----------
-    data : str
-        Raw structural data from PDB formatted files.
-    """
-    # possible data inputs in __init__
-    # all should return a string
-    _data2string = {
-        type(Path()): lambda x: x.read_text(),
-        bytes: lambda x: x.decode('utf_8'),
-        str: lambda x: x,
-        }
-
-    # order matters
-    structure_parsers = [
-        (is_cif, parse_cif_to_array),
-        (is_pdb, parse_pdb_to_array),
-        ]
-
-    def __init__(self, data):
-        data_type = type(data)
-
-        try:
-            datastr = self._data2string[data_type](data)
-        except KeyError as err:
-            err2 = NotImplementedError('Struture data not of proper type')
-            raise err2 from err
-        assert isinstance(datastr, str)
-
-        for condition, parser in self.structure_parsers:
-            if condition(datastr):
-                self._structure_parser = parser
-                break
-
-        self._datastr = datastr
-        self.data_array = None
-        self.clear_filters()
-        assert isinstance(self.filters, list)
-
-    def build(self):
-        """
-        Read structure raw data in :attr:`rawdata`.
-
-        After `.build()`, filters and data can be accessed.
-        """
-        self.data_array = self._structure_parser(self._datastr)
-        del self._datastr
-
-    def clear_filters(self):
-        self._filters = []
-
-    @property
-    def filters(self):
-        return = self._filters
-
-    @property
-    def filtered_atoms(self):
-        """
-        Filter data array by the selected filters.
-
-        Returns
-        -------
-        list
-            The data in PDB format after filtering.
-        """
-        filtered_data = self.data_array
-        for f in self.filters:
-            filtered_data = filter(f, filtered_data)
-        return filtered_data
-
-    @property
-    def chain_set(self):
-        """All chain IDs present in the raw dataset."""  # noqa: D401
-        return set(self.pdb_array_data[:, PDBParams.acol.chainid])
-
-    def pop_last_filter(self):
-        self._filters.pop()
-
-    def add_filter(self, function):
-        """Adds a function as filter."""
-        self.filters.append(function)
-
-    def add_filter_record_name(self, record_name):
-        """Add filter for record names."""
-        self.filters.append(
-            lambda x: x[PDBParams.acol.record].startswith(record_name)
-            )
-
-    def add_filter_chain(self, chain):
-        """Add filters for chain."""
-        self.filters.append(
-            lambda x: x[PDBParams.acol.chainid].startswith(record_name)
-            )
-
-    def write_PDB(self, filename):
-        lines = self._make_pdb()
-        if not lines:
-            raise EXCPTS.EmptyFilterError
-
-        with open(filename, 'w') as fh:
-            fh.writelines(lines)
-            fh.write('\n')
-        log.info(S(f'saved: {filename}'))
-
-    def _make_pdb(self):
-        return [
-            PDBParams.line_formatter.format(
-                *[func(i) for func, i in zip(line, PDBParams.format_funcs)]
-                )
-            for line in self.filtered
-            ]
-
-
 class PDBDownloader:
     """
     Control PDB downloading operations.
@@ -752,7 +761,7 @@ class PDBDownloader:
         for pdbid in self.pdb_list:
             pdbentry = self.pdbs_to_download.setdefault(pdbid.name, [])
             pdbentry.append(pdbid.chain)
-    
+
     @libtimer.record_time()
     def run(self):
         """Run download operation."""
@@ -761,25 +770,25 @@ class PDBDownloader:
             f'{len(self.pdbs_to_download)} PDBs will be downloaded '
             f'and at least {len(self.pdb_list)} chains will be saved'
             ))
-        
+
         results = ThreadPool(self.ncores).imap_unordered(
             self._download_single_pdb,
             self.pdbs_to_download.items(),
             )
-        
+
         for _r in results:
             continue
-    
+
     def _download_single_pdb(self, pdbid_and_chains_tuple):
-        
+
         pdbname = pdbid_and_chains_tuple[0]
         chains = pdbid_and_chains_tuple[1]
-        
+
         possible_links = [l.format(pdbname) for l in POSSIBLELINKS]
-        
+
         with self._attempt_download(pdbname):
             response = self._download_data(possible_links)
-        
+
         try:
             downloaded_data = response.read()
         except (AttributeError, UnboundLocalError):  # response is None
@@ -805,7 +814,7 @@ class PDBDownloader:
                 log.error(S(f'record_name: {self.record_name}'))
                 log.error(S(f'chain filter: {chain}'))
             pdbdata.clear_filters()
-        
+
     def _download_data(self, possible_links):
         for weblink in possible_links:
             try:
