@@ -211,9 +211,9 @@ def parse_pdb_to_array(datastr, which='both'):
             lambda x: x.startswith(coord_headings[which]),
             lines,
             )
-    except KeyError:
-        err = ValueError(f'`which` got an unexpected value \'{which}\''.)
-        raise err from None
+    except KeyError as err:
+        err2 = ValueError(f'`which` got an unexpected value \'{which}\''.)
+        raise err2 from err
 
     data_array = gen_pdb_data_array(len(atom_hetatm_lines))
 
@@ -234,7 +234,7 @@ def parse_cif_to_array(datastr):
     data_array = gen_pdb_data_array(cif.number_of_atoms)
 
     for ii in range(cif.number_of_atoms):
-        data_array[ii, :] = cif.get_line_elements(ii)
+        data_array[ii, :] = cif.get_line_elements_for_PDB(ii)
 
     return data_array
 
@@ -245,24 +245,28 @@ class CIFParser:
     def __init__(self, datastr):
         """
         """
-        self.cif_dict = None
+        self.cif_dict = {}
         self.number_of_atoms = None
+        self._void_translation_table = str.maketrans('?.', '  ')
         self.read_cif(datastr)
 
     def read_cif(self, datastr):
         """Read 'atom_site' entries to dictionary."""
-        self.cif_dict = {}
         lines = datastr.split('\n')
+        atom_start_index = self.find_atom_site_lines(lines)
+        self._populate_key_lists(lines, atom_start_index)
+
+    def _find_atom_site_lines(self, lines):
         found = False
         for ii, line in enumerate(lines):
             if line.startswith('_atom_site.'):
                 found = True
                 self.cif_dict.setdefault(line.strip(), [])
             elif found:
-                atom_start_index = ii
-                break
+                return ii
 
-        for line in lines[atom_start_index:]:
+    def _populate_key_lists(self, lines, start_index):
+        for line in lines[start_index:]:
             if line.startswith('#'):
                 break
             ls = line.split()
@@ -272,14 +276,11 @@ class CIFParser:
         else:
            self.number_of_atoms = len(ls)
 
-
-
-    def cif_get_line_elements_for_PDB(self, i):
+    def get_line_elements_for_PDB(self, i):
         """
         """
         # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
         record = self.cif_dict.get('_atom_site.group_PDB')[i]
-
         serial = self.cif_dict.get('_atom_site.Id')[i]
 
         try:
@@ -287,38 +288,32 @@ class CIFParser:
         except KeyError:
             atname = self.cif_dict['_atom_site.label_atom_id'][i]
 
-
         try:
             altloc = self.cif_dict['_atom_site.auth_alt_id'][i]
         except KeyError:
             altloc = self.cif_dict['_atom_site.label_alt_id'][i]
         altloc = altloc.translate(self._void_translation_table)
 
-
         try:
             resname = self.cif_dict['_atom_site.auth_comp_id'][i]
         except KeyError:
             resname = self.cif_dict['_atom_site.label_comp_id'][i]
-
 
         try:
             chainids = self.cif_dict['_atom_site.auth_asym_id']
         except KeyError:
             chainids = self.cif_dict['_atom_site.label_asym_id']
 
-
         try:
             resseq = self.cif_dict['_atom_site.auth_seq_id'][i]
         except KeyError:
             resseq = self.cif_dict['_atom_site.label_seq_id'][i]
-
 
         try:
             icode = self.cif_dict['_atom_site.pdbx_PDB_ins_code'][i]
         except KeyError:
             icode = " "
         icode = icode.translate(self._void_translation_table)
-
 
         x = self.cif_dict.get('_atom_site.Cartn_x')[i]
         y = self.cif_dict.get('_atom_site.Cartn_y')[i]
