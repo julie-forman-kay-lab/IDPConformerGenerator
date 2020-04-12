@@ -114,10 +114,7 @@ class _PDBParams:
             self._atom_slicers = [s[1] for s in self._atom_attrs]
 
             # ensure
-            assert all(
-                isinstance(s, slice)
-                for s in self._atom_slicer
-                ))
+            assert all(isinstance(s, slice) for s in self._atom_slicer))
             return self._atom_slicers
 
     def acol(self):
@@ -131,6 +128,7 @@ class _PDBParams:
             self._acol(*range(len(names)))
             return self._acol
 
+# instantiates singleton-like
 PDBParams = _PDBParams()
 
 # this servers read_pdb_data_to_array mainly
@@ -144,14 +142,41 @@ _pdb_atom_line_headings = {
 
 def is_cif(datastr):
     """Detect if `datastr` is a CIF file."""
-    assert isinstance(datastr, str)
+    assert isinstance(datastr, str), \
+        f'`datastr` is not str: {type(datastr)} instead'
     cif_loop = re.compile('[lL][oO][oO][pP]_')
     return bool(cif_loop.search(datastr)
 
 
 def is_pdb(datastr):
     """Detect if `datastr` if a PDB format v3 file."""
+    assert isinstance(datastr, str), \
+        f'`datastr` is not str: {type(datastr)} instead'
     return bool(datastr.count('\nATOM ') > 0)
+
+
+def gen_pdb_data_array(number_of_atoms):
+    """
+    Generate an array data structure to contain structure data.
+
+    Parameters
+    ----------
+    number_of_atoms : int
+        The number of atoms in the structure.
+        Determines the size of the axis 0 of the structure array.
+
+    Returns
+    -------
+    np.ndarray of (N, :attr:`PDBParams.atom_slicers), dtype = '<U8'
+        Where N is the ``number_of_atoms``.
+    """
+    assert isinstance(number_of_atoms, int), \
+        f'`number_of_atoms` is not int, {type(number_of_atoms)}'
+
+    return np.empty(
+        (number_of_atoms, len(PDBParams.atom_slicers)),
+        dtype='<U8',
+        )
 
 
 def parse_pdb_to_array(datastr, which='both'):
@@ -174,6 +199,10 @@ def parse_pdb_to_array(datastr, which='both'):
         and 15 the number of fields in ATOM/HETATM lines according
         to the PDB format v3.
     """
+    # require
+    assert isinstance(datastr, str), \
+        f'`datastr` is not str: {type(datastr)} instead'
+
     coords_headings = _pdb_atom_line_headings
     lines = datastr.split('\n')
 
@@ -186,124 +215,137 @@ def parse_pdb_to_array(datastr, which='both'):
         err = ValueError(f'`which` got an unexpected value \'{which}\''.)
         raise err from None
 
-    pdb_data_array = np.empty(
-        (len(atom_hetatm_lines), len(PDBParams.atom_slicers)),
-        dtype='<U8',
-        )
+    data_array = gen_pdb_data_array(len(atom_hetatm_lines))
 
     for row, line in enumerate(atom_hetatm_lines):
         for column, slicer_item in enumerate(PDBParams.atom_slicers):
-            pdb_data_array[row, column] = line[slicer_item]
+            data_array[row, column] = line[slicer_item]
 
-    return pdb_data_array
+    return data_array
 
 
 def parse_cif_to_array(datastr):
     """
+    Parse mmCIF protein data to array.
+
+    Array is as given by :func:`gen_pdb_data_array`.
     """
-    pdb_dict = {}
-    data = datastr.split('\n')
-    found = False
-    for ii, line in enumerate(self.data):
-        if line.startswith('_atom_site.'):
-            found = True
-            pdb_dict.setdefault(line.strip(), [])
-        elif found:
-            atom_start_index = ii
-            break
+    cif = CIFParser(datastr)
+    data_array = gen_pdb_data_array(cif.number_of_atoms)
 
-    for line in data[atom_start_index:]:
-        if line.startswith('#'):
-            break
-        ls = line.split()
+    for ii in range(cif.number_of_atoms):
+        data_array[ii, :] = cif.get_line_elements(ii)
 
-        for i, key in enumerate(pdb_dict.keys()):
-            pdb_dict[key].append(ls[i])
-    else:
-        number_of_atoms = len(ls)
-
-    data_array = np.empty(
-        (len(number_of_atoms), len(PDBParams.atom_slicers)),
-        dtype='<U8',
-        )
-
-    for ii in range(number_of_atoms):
-        data_array[ii, :] = cif_get_line_elements(ii)
     return data_array
 
 
-def cif_get_line_elements(self, i):
+class CIFParser:
     """
     """
-    # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
-    record = self.pdbdata.get('_atom_site.group_PDB')[i]
+    def __init__(self, datastr):
+        """
+        """
+        self.cif_dict = None
+        self.number_of_atoms = None
+        self.read_cif(datastr)
 
-    serial = pdbdata.get('_atom_site.Id')[i]
+    def read_cif(self, datastr):
+        """Read 'atom_site' entries to dictionary."""
+        self.cif_dict = {}
+        lines = datastr.split('\n')
+        found = False
+        for ii, line in enumerate(lines):
+            if line.startswith('_atom_site.'):
+                found = True
+                self.cif_dict.setdefault(line.strip(), [])
+            elif found:
+                atom_start_index = ii
+                break
 
-    try:
-        atname = self.pdbdata['_atom_site.auth_atom_id'][i]
-    except KeyError:
-        atname = self.pdbdata['_atom_site.label_atom_id'][i]
+        for line in lines[atom_start_index:]:
+            if line.startswith('#'):
+                break
+            ls = line.split()
 
-
-    try:
-        altloc = self.pdbdata['_atom_site.auth_alt_id'][i]
-    except KeyError:
-        altloc = self.pdbdata['_atom_site.label_alt_id'][i]
-    altloc = altloc.translate(self._void_translation_table)
-
-
-    try:
-        resname = self.pdbdata['_atom_site.auth_comp_id'][i]
-    except KeyError:
-        resname = self.pdbdata['_atom_site.label_comp_id'][i]
-
-
-    try:
-        chainids = self.pdbdata['_atom_site.auth_asym_id']
-    except KeyError:
-        chainids = self.pdbdata['_atom_site.label_asym_id']
-
-
-    try:
-        resseq = self.pdbdata['_atom_site.auth_seq_id'][i]
-    except KeyError:
-        resseq = self.pdbdata['_atom_site.label_seq_id'][i]
+            for i, key in enumerate(self.cif_dict.keys()):
+                self.cif_dict[key].append(ls[i])
+        else:
+           self.number_of_atoms = len(ls)
 
 
-    try:
-        icode = self.pdbdata['_atom_site.pdbx_PDB_ins_code'][i]
-    except KeyError:
-        icode = " "
-    icode = icode.translate(self._void_translation_table)
+
+    def cif_get_line_elements_for_PDB(self, i):
+        """
+        """
+        # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
+        record = self.cif_dict.get('_atom_site.group_PDB')[i]
+
+        serial = self.cif_dict.get('_atom_site.Id')[i]
+
+        try:
+            atname = self.cif_dict['_atom_site.auth_atom_id'][i]
+        except KeyError:
+            atname = self.cif_dict['_atom_site.label_atom_id'][i]
 
 
-    x = self.pdbdata.get('_atom_site.Cartn_x')[i]
-    y = self.pdbdata.get('_atom_site.Cartn_y')[i]
-    z = self.pdbdata.get('_atom_site.Cartn_z')[i]
-    occ = self.pdbdata.get('_atom_site.occupancy')[i]
-    tempfactor = self.pdbdata.get('_atom_site.B_iso_or_equiv')[i]
-    element = self.pdbdata.get('_atom_site.type_symbol')[i]
-    charge = self.pdbdata.get('_atom_site.pdbx_formal_charge')[i]
+        try:
+            altloc = self.cif_dict['_atom_site.auth_alt_id'][i]
+        except KeyError:
+            altloc = self.cif_dict['_atom_site.label_alt_id'][i]
+        altloc = altloc.translate(self._void_translation_table)
 
-    return (
-        record,
-        serial,
-        atname,
-        altloc,
-        resname,
-        chainids,
-        resseq,
-        icode,
-        x,
-        y,
-        z,
-        occ,
-        tempfactor,
-        ' ',  # segid
-        element,
-        charge,
-        )
+
+        try:
+            resname = self.cif_dict['_atom_site.auth_comp_id'][i]
+        except KeyError:
+            resname = self.cif_dict['_atom_site.label_comp_id'][i]
+
+
+        try:
+            chainids = self.cif_dict['_atom_site.auth_asym_id']
+        except KeyError:
+            chainids = self.cif_dict['_atom_site.label_asym_id']
+
+
+        try:
+            resseq = self.cif_dict['_atom_site.auth_seq_id'][i]
+        except KeyError:
+            resseq = self.cif_dict['_atom_site.label_seq_id'][i]
+
+
+        try:
+            icode = self.cif_dict['_atom_site.pdbx_PDB_ins_code'][i]
+        except KeyError:
+            icode = " "
+        icode = icode.translate(self._void_translation_table)
+
+
+        x = self.cif_dict.get('_atom_site.Cartn_x')[i]
+        y = self.cif_dict.get('_atom_site.Cartn_y')[i]
+        z = self.cif_dict.get('_atom_site.Cartn_z')[i]
+        occ = self.cif_dict.get('_atom_site.occupancy')[i]
+        tempfactor = self.cif_dict.get('_atom_site.B_iso_or_equiv')[i]
+        element = self.cif_dict.get('_atom_site.type_symbol')[i]
+        charge = self.cif_dict.get('_atom_site.pdbx_formal_charge')[i]
+
+        return (
+            record,
+            serial,
+            atname,
+            altloc,
+            resname,
+            chainids,
+            resseq,
+            icode,
+            x,
+            y,
+            z,
+            occ,
+            tempfactor,
+            ' ',  # segid
+            element,
+            charge,
+            )
 
 
 # order matters
