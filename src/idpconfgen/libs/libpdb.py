@@ -54,6 +54,17 @@ CIF_ATOM_KEYS = [
     ]
 
 
+# thanks to @JoaoRodrigues (GitHub) for this cif regex
+CIF_LINE_REGEX = re.compile(
+    r'''
+    '(.*?)' | # single quoted substring OR
+    "(.*?)" | # double quoted substring OR
+    (\S+)     # any consec. non-whitespace character(s)
+    ''',
+    re.VERBOSE,
+    )
+
+
 class _PDBParams:
     """
     Namespace for `PDB format v3`_.
@@ -101,8 +112,12 @@ class _PDBParams:
                 "{:>2s}"
                 "{:2s}"
                 )
-        self.format_funcs = [str, int, self.format_atom, str, str, str, int, str, float, float,
-                         float, float, float, str, str, str]
+        # 5 functions each line
+        self.format_funcs = [
+            str, int, self.format_atom, str, str,
+            self.format_chain, int, str, float, float,
+            float, float, float, str, str,
+            str]
         assert count_string_formatters(self.line_formatter) == len(self.format_funcs)
 
         # Attributes for the ATOM/HETATM lines
@@ -133,7 +148,8 @@ class _PDBParams:
 
     def __setattr__(self, *args):
         if self._init:
-            raise NotImplementedError(f'Can not set attributes to {self.__class__}')
+            errmsg = f'Can not set attributes to {self.__class__}'
+            raise NotImplementedError(errmsg)
         super().__setattr__(*args)
 
     @staticmethod
@@ -143,6 +159,16 @@ class _PDBParams:
             return ' {:<3s}'.format(a)
         else:
             return '{:<4s}'.format(a)
+
+    @staticmethod
+    def format_chain(chain):
+        """
+        Format chain identifier to one letter.
+
+        This is required to receive chain IDs from mmCIF files, which
+        may have more than one letter.
+        """
+        return chain.strip()[0]
 
 # instantiates singleton-like
 PDBParams = _PDBParams()
@@ -258,20 +284,87 @@ def parse_cif_to_array(datastr, **kwargs):
     return data_array
 
 
+def find_cif_atom_site_headers(lines, cif_dict):
+    """
+    Find `_atom_site.` headers.
+
+    Given a list of mmCIF lines, finds headers of `_atom_site.`
+
+    Parameters
+    ----------
+    lines : list
+        The lines of the mmCIF files are read by `file.readlines()`.
+
+    cif_dict : dict
+        A dictionary where to initiate the `atom_site.` keys.
+        Keys are assigned empty list as value.
+
+    Returns
+    -------
+    int
+        The index of ``lines`` where the `_atom_site.` structural
+        information starts.
+
+    Raises
+    ------
+    CIFFileInvalidError
+        If any `_atom_site.` keys are found in ``lines``.
+    """
+    # require
+    assert isinstance(lines, list)
+    assert isinstance(cif_dict, dict)
+
+    found = False
+    for ii, line in enumerate(lines):
+        if line.startswith('_atom_site.'):
+            found = True
+            cif_dict.setdefault(line.strip(), [])
+        elif found:
+            return ii
+    errmsg = 'Could not find `_atom_site.` entries for CIF file'
+    raise EXCPTS.CIFFileInvalidError(errmsg)
+
+
+def populate_cif_dictionary(lines, start_index, cif_dict):
+    """
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    Raises
+    ------
+    """
+    CLR = CIF_LINE_REGEX
+    counter = 0
+    for line in lines[start_index:]:
+        if line.startswith('#'):
+            return counter
+
+        ls = [''.join(t) for t in CLR.findall(line)]
+
+        for i, key in enumerate(cif_dict.keys()):
+            try:
+                cif_dict[key].append(ls[i])
+            except IndexError as err:
+                errmsg = f'CIF line did not split properly: {ls}'
+                EXCPTS.CIFFileInvalidError(errmsg)
+
+        counter += 1
+
+    errmsg = 'Could not find the \'#\' to end CIF reading.'
+    raise EXCPTS.CIFFileInvalidError(errmsg)
+
+
 class CIFParser:
     """
     """
     def __init__(self, datastr):
         """
         """
-        # thanks to @JoaoRodrigues (GitHub) for this cif regex
-        self._cif_line_regex = re.compile(
-            r'''
-            '(.*?)' | # single quoted substring OR
-            "(.*?)" | # double quoted substring OR
-            (\S+)     # any consec. non-whitespace character(s)
-            ''',
-            re.VERBOSE)
+        self._cif_line_regex = CIF_LINE_REGEX
         self.cif_dict = {}
         self.number_of_atoms = None
         self._void_translation_table = str.maketrans('?.', '  ')
@@ -280,105 +373,177 @@ class CIFParser:
     def read_cif(self, datastr):
         """Read 'atom_site' entries to dictionary."""
         lines = datastr.split('\n')
-        atom_start_index = self._find_atom_site_lines(lines)
-        self._populate_key_lists(lines, atom_start_index)
+        atom_start_index = find_cif_atom_site_headers(lines, self.cif_dict)
+        self._len = \
+            populate_cif_dictionary(lines, atom_start_index, self.cif_dict)
 
-    def _find_atom_site_lines(self, lines):
-        found = False
-        for ii, line in enumerate(lines):
-            if line.startswith('_atom_site.'):
-                found = True
-                self.cif_dict.setdefault(line.strip(), [])
-            elif found:
-                return ii
-        errmsg = 'Could not find `_atom_site.` entries for CIF file'
-        raise EXCPTS.CIFFileInvalidError(errmsg)
+    def __len__(self):
+        return self._len
 
-    def _populate_key_lists(self, lines, start_index):
-        counter = 0
-        for line in lines[start_index:]:
-            if line.startswith('#'):
-                self.number_of_atoms = counter
-                return
+    @property
+    def line(self):
+        return self._line
 
-            ls = [''.join(t) for t in self._cif_line_regex.findall(line)]
+    @line.setter
+    def line(self, ii):
+        assert isinstance(ii, int)
+        assert 0 <= ii <= len(self)
+        self._line = ii
 
-            for i, key in enumerate(self.cif_dict.keys()):
-                try:
-                    self.cif_dict[key].append(ls[i])
-                except IndexError as err:
-                    errmsg = f'CIF line did not split properly: {ls}'
-                    EXCPTS.CIFFileInvalidError(errmsg)
-
-            counter += 1
-        errmsg = 'Could not find the \'#\' to end CIF reading.'
-        raise EXCPTS.CIFFileInvalidError(errmsg)
-
-    def get_line_elements_for_PDB(self, i):
+    def get_line_elements_for_PDB(self, i=None):
         """
         """
         # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
-        record = self.cif_dict.get('_atom_site.group_PDB')[i]
-
-        try:
-            serial = self.cif_dict['_atom_site.Id'][i]
-        except KeyError:
-            serial = self.cif_dict['_atom_site.id'][i]
-
-        auth_label = [
-            'atom_id',
-            'alt_id',
-            'comp_id',
-            'asym_id',
-            'seq_id',
-            ]
-
-        values = []
-        for key in auth_label:
-            try:
-                values.append(self.cif_dict[f'_atom_site.label_{key}'][i])
-            except KeyError:
-                values.append(self.cif_dict[f'_atom_site.auth_{key}'][i])
-
-        atname, altloc, resname, chainid, resseq = values
-
-        try:
-            icode = self.cif_dict['_atom_site.pdbx_PDB_ins_code'][i]
-        except KeyError:
-            icode = " "
-
-        x = self.cif_dict.get('_atom_site.Cartn_x')[i]
-        y = self.cif_dict.get('_atom_site.Cartn_y')[i]
-        z = self.cif_dict.get('_atom_site.Cartn_z')[i]
-        occ = self.cif_dict.get('_atom_site.occupancy')[i]
-        tempfactor = self.cif_dict.get('_atom_site.B_iso_or_equiv')[i]
-        element = self.cif_dict.get('_atom_site.type_symbol')[i]
-        charge = self.cif_dict.get('_atom_site.pdbx_formal_charge')[i]
-
-        altloc = altloc.translate(self._void_translation_table)
-        icode = icode.translate(self._void_translation_table)
-        charge = charge.translate(self._void_translation_table)
-
-        to_return = [
-            record,
-            serial,
-            atname,
-            altloc,
-            resname,
-            chainid,
-            resseq,
-            icode,
-            x,
-            y,
-            z,
-            occ,
-            tempfactor,
+        if i:
+            self.line = i
+        return [
+            self.record,
+            self.serial,
+            self.atname,
+            self.altloc,
+            self.resname,
+            self.chainid,
+            self.resseq,
+            self.icode,
+            self.x,
+            self.y,
+            self.z,
+            self.occ,
+            self.tempfactor,
             '    ',  # segid
-            element,
-            charge,
+            self.element,
+            self.charge,
             ]
-        assert all(isinstance(i, str) for i in to_return), f'{i}'
-        return to_return
+
+    def get_value(self, label):
+        return self.cif_dict[label][self.line]
+
+    def _auth_label(self, label):
+        try:
+            return self.get_value(f'_atom_site.label_{label}')
+        except KeyError:
+            return self.get_value(f'_atom_site.auth_{label}')
+
+    def _translate(self, item):
+        return item.translate(self._void_translation_table)
+
+    @property
+    def record(self):
+        return self.get_value('_atom_site.group_PDB')
+
+    @property
+    def serial(self):
+        try:
+            return self.get_value('_atom_site.Id')
+        except KeyError:
+            return self.get_value('_atom_site.id')
+
+    @property
+    def atname(self):
+        return self._auth_label('atom_id')
+
+    @property
+    def altloc(self):
+        altloc = self._auth_label('alt_id')
+        return self._translate(altloc)
+
+    @property
+    def resname(self):
+        return self._auth_label('comp_id')
+
+    @property
+    def chainid(self):
+        value = self._auth_label('asym_id')
+        if value in ('?', '.'):
+            value = self.get_value(f'_atom_site.auth_asym_id')
+        return value
+
+    @property
+    def resseq(self):
+        return self._auth_label('seq_id')
+
+    @property
+    def icode(self):
+        try:
+            icode = self.get_value('_atom_site.pdbx_PDB_ins_code')
+            return self._translate(icode)
+        except KeyError:
+            return " "
+
+    @property
+    def xcoord(self):
+        return self.get_value('_atom_site.Cartn_x')
+
+    @property
+    def ycoord(self):
+        return self.get_value('_atom_site.Cartn_y')
+
+    @property
+    def zcoord(self):
+        return self.get_value('_atom_site.Cartn_z')
+
+    @property
+    def tempfactor(self):
+        return self.get_value('_atom_site.B_iso_or_equiv')
+
+    @property
+    def element(self):
+        return self.get_value('_atom_site.type_symbol')
+
+    @property
+    def charge(self):
+        charge = self.get_value('_atom_site.pdbx_formal_charge')
+        return self._translate(charge)
+
+       # auth_label = [
+       #     'atom_id',
+       #     'alt_id',
+       #     'comp_id',
+       #     'seq_id',
+       #     ]
+
+       # values = []
+       # for key in auth_label:
+       #     try:
+       #         value = self.cif_dict[f'_atom_site.label_{key}'][i]
+       #     except KeyError:
+       #         value = self.cif_dict[f'_atom_site.auth_{key}'][i]
+       #     values.append(value)
+
+       # atname, altloc, resname, resseq = values
+
+
+
+       # z = self.cif_dict.get('_atom_site.Cartn_z')[i]
+       # occ = self.cif_dict.get('_atom_site.occupancy')[i]
+       # tempfactor = self.cif_dict.get('_atom_site.B_iso_or_equiv')[i]
+       # element = self.cif_dict.get('_atom_site.type_symbol')[i]
+       # charge = self.cif_dict.get('_atom_site.pdbx_formal_charge')[i]
+
+       # altloc = altloc.translate(self._void_translation_table)
+       # icode = icode.translate(self._void_translation_table)
+       # charge = charge.translate(self._void_translation_table)
+
+       # to_return = [
+       #     record,
+       #     serial,
+       #     atname,
+       #     altloc,
+       #     resname,
+       #     chainid,
+       #     resseq,
+       #     icode,
+       #     x,
+       #     y,
+       #     z,
+       #     occ,
+       #     tempfactor,
+       #     '    ',  # segid
+       #     element,
+       #     charge,
+       #     ]
+       # assert all(isinstance(i, str) for i in to_return), f'{i}'
+       # return to_return
 
 
 class Structure:
