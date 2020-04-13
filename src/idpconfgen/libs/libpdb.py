@@ -336,9 +336,9 @@ class CIFParser:
         values = []
         for key in auth_label:
             try:
-                values.append(self.cif_dict[f'_atom_site.auth_{key}'][i])
-            except KeyError:
                 values.append(self.cif_dict[f'_atom_site.label_{key}'][i])
+            except KeyError:
+                values.append(self.cif_dict[f'_atom_site.auth_{key}'][i])
 
         atname, altloc, resname, chainid, resseq = values
 
@@ -840,8 +840,9 @@ class PDBDownloader:
             try:
                 pdbdata.write_PDB(destination)
             except EXCPTS.EmptyFilterError:
-                log.error(T(f'Empty Filter for {destination}'))
                 log.debug(traceback.format_exc())
+                log.error(S(f'Empty Filter for:'))
+                log.error(S(f'{destination}'))
                 log.error(S(f'record_name: {self.record_name}'))
                 log.error(S(f'chain filter: {chain}'))
             pdbdata.clear_filters()
