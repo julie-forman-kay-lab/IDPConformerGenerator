@@ -101,19 +101,6 @@ def CIFParser_fixture(request):
 
 
 @pytest.mark.parametrize(
-    'line,expected',
-    [
-        # TODO
-        ]
-    )
-def test_CIFParser_init(CIFParser_fixture, line, expected):
-    """
-    """
-    cif = CIFParser_fixture
-    assert cif.get_line_elements_for_PDB(line) == expected
-
-
-@pytest.mark.parametrize(
     'example,parser',
     [
         (pdb_example, parse_pdb_to_array),
@@ -198,5 +185,13 @@ def test_Structure_save(Structure_built):
     Structure_built.write_PDB(fout)
     result = fout.read_text()
     expected = pdb_saved.read_text()
-    #fout.unlink()
+    fout.unlink()
     assert result == expected
+
+
+def test_Structure_save_empty_filter_error(Structure_built):
+    """
+    """
+    Structure_built.add_filter_chain('Z')
+    with pytest.raises(EXCPTS.EmptyFilterError):
+        Structure_built._make_pdb()

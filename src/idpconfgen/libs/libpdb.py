@@ -98,7 +98,7 @@ class _PDBParams:
                 "{:6.2f}"
                 "{:6.2f}      "
                 "{:<4s}"
-                "{:<2s}"
+                "{:>2s}"
                 "{:2s}"
                 )
         self.format_funcs = [str, int, self.format_atom, str, str, str, int, str, float, float,
@@ -264,6 +264,7 @@ class CIFParser:
     def __init__(self, datastr):
         """
         """
+        # thanks to @JoaoRodrigues (GitHub) for this cif regex
         self._cif_line_regex = re.compile(
             r'''
             '(.*?)' | # single quoted substring OR
@@ -299,8 +300,8 @@ class CIFParser:
             if line.startswith('#'):
                 self.number_of_atoms = counter
                 return
-            _ = (''.join(t) for t in self._cif_line_regex.findall(line))
-            ls = ['' if t in set(('.', '?')) else t for t in _]
+
+            ls = [''.join(t) for t in self._cif_line_regex.findall(line)]
 
             for i, key in enumerate(self.cif_dict.keys()):
                 try:
@@ -324,37 +325,27 @@ class CIFParser:
         except KeyError:
             serial = self.cif_dict['_atom_site.id'][i]
 
-        try:
-            atname = self.cif_dict['_atom_site.auth_atom_id'][i]
-        except KeyError:
-            atname = self.cif_dict['_atom_site.label_atom_id'][i]
+        auth_label = [
+            'atom_id',
+            'alt_id',
+            'comp_id',
+            'asym_id',
+            'seq_id',
+            ]
 
-        try:
-            altloc = self.cif_dict['_atom_site.auth_alt_id'][i]
-        except KeyError:
-            altloc = self.cif_dict['_atom_site.label_alt_id'][i]
-        #altloc = altloc.translate(self._void_translation_table)
+        values = []
+        for key in auth_label:
+            try:
+                values.append(self.cif_dict[f'_atom_site.auth_{key}'][i])
+            except KeyError:
+                values.append(self.cif_dict[f'_atom_site.label_{key}'][i])
 
-        try:
-            resname = self.cif_dict['_atom_site.auth_comp_id'][i]
-        except KeyError:
-            resname = self.cif_dict['_atom_site.label_comp_id'][i]
-
-        try:
-            chainid = self.cif_dict['_atom_site.auth_asym_id'][i]
-        except KeyError:
-            chainid = self.cif_dict['_atom_site.label_asym_id'][i]
-
-        try:
-            resseq = self.cif_dict['_atom_site.auth_seq_id'][i]
-        except KeyError:
-            resseq = self.cif_dict['_atom_site.label_seq_id'][i]
+        atname, altloc, resname, chainid, resseq = values
 
         try:
             icode = self.cif_dict['_atom_site.pdbx_PDB_ins_code'][i]
         except KeyError:
             icode = " "
-        #icode = icode.translate(self._void_translation_table)
 
         x = self.cif_dict.get('_atom_site.Cartn_x')[i]
         y = self.cif_dict.get('_atom_site.Cartn_y')[i]
@@ -363,7 +354,10 @@ class CIFParser:
         tempfactor = self.cif_dict.get('_atom_site.B_iso_or_equiv')[i]
         element = self.cif_dict.get('_atom_site.type_symbol')[i]
         charge = self.cif_dict.get('_atom_site.pdbx_formal_charge')[i]
-        #charge = charge.translate(self._void_translation_table)
+
+        altloc = altloc.translate(self._void_translation_table)
+        icode = icode.translate(self._void_translation_table)
+        charge = charge.translate(self._void_translation_table)
 
         to_return = [
             record,
@@ -379,13 +373,13 @@ class CIFParser:
             z,
             occ,
             tempfactor,
-            ' ',  # segid
+            '    ',  # segid
             element,
             charge,
             ]
-        for i in to_return:
-            assert not isinstance(i, list), f'{i}'
+        assert all(isinstance(i, str) for i in to_return), f'{i}'
         return to_return
+
 
 class Structure:
     """
@@ -398,6 +392,7 @@ class Structure:
     """
     # possible data inputs in __init__
     # all should return a string
+    # used for control flow
     _data2string = {
         type(Path()): lambda x: x.read_text(),
         bytes: lambda x: x.decode('utf_8'),
@@ -491,21 +486,21 @@ class Structure:
 
     def write_PDB(self, filename):
         lines = self._make_pdb()
-        if not lines:
-            raise EXCPTS.EmptyFilterError
-
         with open(filename, 'w') as fh:
             fh.write('\n'.join(lines))
             fh.write('\n')
         log.info(S(f'saved: {filename}'))
 
     def _make_pdb(self):
-        return [
+        lines = [
             PDBParams.line_formatter.format(
                 *[func(i) for i, func in zip(line, PDBParams.format_funcs)]
                 )
             for line in self.filtered_atoms
             ]
+        if not lines:
+            raise EXCPTS.EmptyFilterError
+        return lines
 
 
 class PDBIDFactory:
@@ -863,7 +858,7 @@ class PDBDownloader:
                 return response
         else:
             raise EXCPTS.DownloadFailedError
-    
+
     @contextlib.contextmanager
     def _attempt_download(self, pdbname):
         try:
