@@ -61,7 +61,10 @@ class _PDBParams:
     .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
     """  # noqa: E501
 
+    _init = False
+
     def __init__(self):
+
         # slicers of the ATOM and HETATM lines
         self.atom_record = slice(0, 6)
         self.atom_serial = slice(6, 11)
@@ -83,7 +86,7 @@ class _PDBParams:
         self.line_formatter = (
                 "{:6s}"
                 "{:5d} "
-                "{:<4s}"
+                "{}"
                 "{:1s}"
                 "{:3s} "
                 "{:1s}"
@@ -98,9 +101,9 @@ class _PDBParams:
                 "{:<2s}"
                 "{:2s}"
                 )
-        self.format_functs = [str, int, str, str, str, str, int, str, float, float,
+        self.format_funcs = [str, int, self.format_atom, str, str, str, int, str, float, float,
                          float, float, float, str, str, str]
-        assert count_string_formatters(self.line_formatter) == len(self.format_functs)
+        assert count_string_formatters(self.line_formatter) == len(self.format_funcs)
 
         # Attributes for the ATOM/HETATM lines
         self.__dict__['_atom_attrs'] = list(filter(
@@ -125,13 +128,21 @@ class _PDBParams:
         assert all(isinstance(i, int) for i in self.acol)
         assert self.acol.chainid == 5
 
-        def _setattr(self):
-            errmsg = f'Can not set attributes to {self.__class__}'
-            raise NotImplementedError(errmsg)
-        self.__setattr__ = _setattr
+        self._init = True
         return
-    #def __setattr__(self, *args):
-        #raise NotImplementedError(f'Can not set attributes to {self.__class__}')
+
+    def __setattr__(self, *args):
+        if self._init:
+            raise NotImplementedError(f'Can not set attributes to {self.__class__}')
+        super().__setattr__(*args)
+
+    @staticmethod
+    def format_atom(atom):
+        a = atom.strip()
+        if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
+            return ' {:<3s}'.format(a)
+        else:
+            return '{:<4s}'.format(a)
 
 # instantiates singleton-like
 PDBParams = _PDBParams()
@@ -253,6 +264,13 @@ class CIFParser:
     def __init__(self, datastr):
         """
         """
+        self._cif_line_regex = re.compile(
+            r'''
+            '(.*?)' | # single quoted substring OR
+            "(.*?)" | # double quoted substring OR
+            (\S+)     # any consec. non-whitespace character(s)
+            ''',
+            re.VERBOSE)
         self.cif_dict = {}
         self.number_of_atoms = None
         self._void_translation_table = str.maketrans('?.', '  ')
@@ -272,24 +290,39 @@ class CIFParser:
                 self.cif_dict.setdefault(line.strip(), [])
             elif found:
                 return ii
+        errmsg = 'Could not find `_atom_site.` entries for CIF file'
+        raise EXCPTS.CIFFileInvalidError(errmsg)
 
     def _populate_key_lists(self, lines, start_index):
+        counter = 0
         for line in lines[start_index:]:
             if line.startswith('#'):
-                break
-            ls = line.split()
+                self.number_of_atoms = counter
+                return
+            _ = (''.join(t) for t in self._cif_line_regex.findall(line))
+            ls = ['' if t in set(('.', '?')) else t for t in _]
 
             for i, key in enumerate(self.cif_dict.keys()):
-                self.cif_dict[key].append(ls[i])
-        else:
-           self.number_of_atoms = len(ls)
+                try:
+                    self.cif_dict[key].append(ls[i])
+                except IndexError as err:
+                    errmsg = f'CIF line did not split properly: {ls}'
+                    EXCPTS.CIFFileInvalidError(errmsg)
+
+            counter += 1
+        errmsg = 'Could not find the \'#\' to end CIF reading.'
+        raise EXCPTS.CIFFileInvalidError(errmsg)
 
     def get_line_elements_for_PDB(self, i):
         """
         """
         # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
         record = self.cif_dict.get('_atom_site.group_PDB')[i]
-        serial = self.cif_dict.get('_atom_site.Id')[i]
+
+        try:
+            serial = self.cif_dict['_atom_site.Id'][i]
+        except KeyError:
+            serial = self.cif_dict['_atom_site.id'][i]
 
         try:
             atname = self.cif_dict['_atom_site.auth_atom_id'][i]
@@ -300,7 +333,7 @@ class CIFParser:
             altloc = self.cif_dict['_atom_site.auth_alt_id'][i]
         except KeyError:
             altloc = self.cif_dict['_atom_site.label_alt_id'][i]
-        altloc = altloc.translate(self._void_translation_table)
+        #altloc = altloc.translate(self._void_translation_table)
 
         try:
             resname = self.cif_dict['_atom_site.auth_comp_id'][i]
@@ -308,9 +341,9 @@ class CIFParser:
             resname = self.cif_dict['_atom_site.label_comp_id'][i]
 
         try:
-            chainids = self.cif_dict['_atom_site.auth_asym_id']
+            chainid = self.cif_dict['_atom_site.auth_asym_id'][i]
         except KeyError:
-            chainids = self.cif_dict['_atom_site.label_asym_id']
+            chainid = self.cif_dict['_atom_site.label_asym_id'][i]
 
         try:
             resseq = self.cif_dict['_atom_site.auth_seq_id'][i]
@@ -321,7 +354,7 @@ class CIFParser:
             icode = self.cif_dict['_atom_site.pdbx_PDB_ins_code'][i]
         except KeyError:
             icode = " "
-        icode = icode.translate(self._void_translation_table)
+        #icode = icode.translate(self._void_translation_table)
 
         x = self.cif_dict.get('_atom_site.Cartn_x')[i]
         y = self.cif_dict.get('_atom_site.Cartn_y')[i]
@@ -330,14 +363,15 @@ class CIFParser:
         tempfactor = self.cif_dict.get('_atom_site.B_iso_or_equiv')[i]
         element = self.cif_dict.get('_atom_site.type_symbol')[i]
         charge = self.cif_dict.get('_atom_site.pdbx_formal_charge')[i]
+        #charge = charge.translate(self._void_translation_table)
 
-        return (
+        to_return = [
             record,
             serial,
             atname,
             altloc,
             resname,
-            chainids,
+            chainid,
             resseq,
             icode,
             x,
@@ -348,8 +382,10 @@ class CIFParser:
             ' ',  # segid
             element,
             charge,
-            )
-
+            ]
+        for i in to_return:
+            assert not isinstance(i, list), f'{i}'
+        return to_return
 
 class Structure:
     """
@@ -459,16 +495,16 @@ class Structure:
             raise EXCPTS.EmptyFilterError
 
         with open(filename, 'w') as fh:
-            fh.writelines(lines)
+            fh.write('\n'.join(lines))
             fh.write('\n')
         log.info(S(f'saved: {filename}'))
 
     def _make_pdb(self):
         return [
             PDBParams.line_formatter.format(
-                *[func(i) for func, i in zip(line, PDBParams.format_funcs)]
+                *[func(i) for i, func in zip(line, PDBParams.format_funcs)]
                 )
-            for line in self.filtered
+            for line in self.filtered_atoms
             ]
 
 

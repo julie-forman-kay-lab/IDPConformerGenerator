@@ -91,6 +91,12 @@ class PDBIDFactoryError(IDPConfGenException):
     pass
 
 
+class CIFFileInvalidError(IDPConfGenException):
+    """CIF file has loop_ but yet is invalid."""
+
+    pass
+
+
 class DownloadFailedError(IDPConfGenException):
     """Raise when download fails."""
 

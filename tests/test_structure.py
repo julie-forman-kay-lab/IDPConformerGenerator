@@ -1,9 +1,12 @@
 """Test Structure class."""
+from pathlib import Path
+
+import numpy as np
 import pytest
 import hypothesis.strategies as st
 from hypothesis import given
 
-
+from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libpdb import (
     gen_pdb_data_array,
     is_cif,
@@ -18,6 +21,10 @@ from idpconfgen.libs.libpdb import (
 from . tcommons import (
     pdb_example,
     cif_example,
+    cif_noatomsite,
+    cif_nohash,
+    cif_EOF,
+    pdb_saved,
     )
 
 
@@ -48,15 +55,21 @@ def test_gen_array_data(number):
     """
     result = gen_pdb_data_array(number)
     assert result.shape == (number, len(PDBParams.atom_slicers))
-    assert result.dype == '<U8'
+    assert result.dtype == '<U8'
 
 
 def test_parse_pdb_to_array():
     """
     """
     data_array = parse_pdb_to_array(pdb_example.read_text())
-    assert data_array.shape == (3000, len(PDBParams.atom_slicers))
+    assert data_array.shape == (5385, len(PDBParams.atom_slicers))
     assert data_array.dtype == np.dtype('<U8')
+
+
+def test_parse_pdb_to_array_ValueError():
+    """."""
+    with pytest.raises(ValueError):
+        parse_pdb_to_array(pdb_example.read_text(), which='none')
 
 
 # TODO
@@ -64,13 +77,28 @@ def test_parse_cif_to_array():
     """
     """
     data_array = parse_cif_to_array(cif_example.read_text())
-    assert data_array.shape == (3000, len(PDBParams.atom_slicers))
+    assert data_array.shape == (5385, len(PDBParams.atom_slicers))
     assert data_array.dtype == np.dtype('<U8')
+
+
+@pytest.mark.parametrize(
+    'ciffile',
+    [
+        cif_noatomsite,
+        cif_nohash,
+        cif_EOF,
+        ]
+    )
+def test_parse_cif_to_array_noatoms_error(ciffile):
+    """/"""
+    with pytest.raises(EXCPTS.CIFFileInvalidError):
+        parse_cif_to_array(ciffile.read_text())
 
 
 @pytest.fixture()
 def CIFParser_fixture(request):
     return CIFParser(cif_example.read_text())
+
 
 @pytest.mark.parametrize(
     'line,expected',
@@ -102,9 +130,12 @@ def test_Structure_dispatch(example, parser):
     assert result == parser
 
 
-@pytest.fixture
+@pytest.fixture(params=[
+    pdb_example,
+    cif_example,
+    ])
 def Structure_built(request):
-    s = Structure(pdb_example.read_text())
+    s = Structure(request.param.read_text())
     s.build()
     return s
 
@@ -156,3 +187,16 @@ def test_Structure_chain_set(Structure_built):
     """
     """
     assert Structure_built.chain_set == set(['A', 'B'])
+
+
+def test_Structure_save(Structure_built):
+    """Test save functionality."""
+    Structure_built.add_filter(lambda x: int(x[PDBParams.acol.resseq]) < 11)
+    Structure_built.add_filter_chain('A')
+
+    fout = Path('pdb_testing.pdb')
+    Structure_built.write_PDB(fout)
+    result = fout.read_text()
+    expected = pdb_saved.read_text()
+    #fout.unlink()
+    assert result == expected
