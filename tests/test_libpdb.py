@@ -9,6 +9,19 @@ from idpconfgen.libs.libpdb import (
     is_pdb,
     )
 
+@pytest.mark.parametrize(
+    'is_func,structure,expected',
+    [
+        (is_cif, cif_example, True),
+        (is_cif, pdb_example, False),
+        (is_pdb, pdb_example, True),
+        ]
+    )
+def test_is_function(is_func, structure, expected):
+    """
+    """
+    assert is_func(structure.read_text()) == expected
+
 
 def test_PDBParams():
     """

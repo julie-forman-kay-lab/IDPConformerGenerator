@@ -4,128 +4,6 @@ import re
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 
-CIF_ATOM_KEYS = [
-    '_atom_site.group_PDB',  # 1 atom HETATM
-    '_atom_site.id',  # 2 atom number
-    '_atom_site.label_atom_id',  # 3 ATOM NAME
-    '_atom_site.label_alt_id',  # altloc
-    '_atom_site.label_comp_id',  # 4 resname
-    '_atom_site.label_asym_id',  # 5 chainid
-    '_atom_site.label_seq_id',  # 6 resnum
-    '_atom_site.label_entity_id',
-    '_atom_site.auth_atom_id',  # 3 ATOM NAME
-    '_atom_site.auth_alt_id',  # altloc
-    '_atom_site.auth_comp_id',  # 4 resname
-    '_atom_site.auth_asym_id',  # 5 chainid
-    '_atom_site.auth_seq_id',  # 6 resnum
-    '_atom_site.auth_entity_id',
-    '_atom_site.pdbx_PDB_ins_code',  # iCode
-    '_atom_site.Cartn_x',  # 7
-    '_atom_site.Cartn_y',  # 8
-    '_atom_site.Cartn_z',  # 9
-    '_atom_site.occupancy',  # 10
-    '_atom_site.B_iso_or_equiv',  # 11
-    '_atom_site.type_symbol',  # 12
-    '_atom_site.pdbx_formal_charge',
-    '_atom_site.pdbx_PDB_model_num',
-    '_atom_site.group_PDB',
-    ]
-
-
-# thanks to @JoaoRodrigues (GitHub) for this cif regex
-CIF_LINE_REGEX = re.compile(
-    r'''
-    '(.*?)' | # single quoted substring OR
-    "(.*?)" | # double quoted substring OR
-    (\S+)     # any consec. non-whitespace character(s)
-    ''',
-    re.VERBOSE,
-    )
-
-_void_translation_table = str.maketrans('?.', '  ')
-
-
-def is_cif(datastr):
-    """Detect if `datastr` is a CIF file."""
-    assert isinstance(datastr, str), \
-        f'`datastr` is not str: {type(datastr)} instead'
-    cif_loop = re.compile('[lL][oO][oO][pP]_')
-    return bool(cif_loop.search(datastr))
-
-
-def find_cif_atom_site_headers(lines, cif_dict):
-    """
-    Find `_atom_site.` headers.
-
-    Given a list of mmCIF lines, finds headers of `_atom_site.`
-
-    Parameters
-    ----------
-    lines : list
-        The lines of the mmCIF files are read by `file.readlines()`.
-
-    cif_dict : dict
-        A dictionary where to initiate the `atom_site.` keys.
-        Keys are assigned empty list as value.
-
-    Returns
-    -------
-    int
-        The index of ``lines`` where the `_atom_site.` structural
-        information starts.
-
-    Raises
-    ------
-    CIFFileInvalidError
-        If any `_atom_site.` keys are found in ``lines``.
-    """
-    # require
-    assert isinstance(lines, list)
-    assert isinstance(cif_dict, dict)
-
-    found = False
-    for ii, line in enumerate(lines):
-        if line.startswith('_atom_site.'):
-            found = True
-            cif_dict.setdefault(line.strip(), [])
-        elif found:
-            return ii
-    errmsg = 'Could not find `_atom_site.` entries for CIF file'
-    raise EXCPTS.CIFFileInvalidError(errmsg)
-
-
-def populate_cif_dictionary(lines, start_index, cif_dict):
-    """
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-
-    Raises
-    ------
-    """
-    CLR = CIF_LINE_REGEX
-    counter = 0
-    for line in lines[start_index:]:
-        if line.startswith('#'):
-            return counter
-
-        ls = [''.join(t) for t in CLR.findall(line)]
-
-        for i, key in enumerate(cif_dict.keys()):
-            try:
-                cif_dict[key].append(ls[i])
-            except IndexError as err:
-                errmsg = f'CIF line did not split properly: {ls}'
-                EXCPTS.CIFFileInvalidError(errmsg)
-
-        counter += 1
-
-    errmsg = 'Could not find the \'#\' to end CIF reading.'
-    raise EXCPTS.CIFFileInvalidError(errmsg)
-
 
 class CIFParser:
     """
@@ -160,12 +38,12 @@ class CIFParser:
         assert 0 <= ii <= len(self)
         self._line = ii
 
-    def get_line_elements_for_PDB(self, i=None):
+    def get_line_elements_for_PDB(self, line=None):
         """
         """
         # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
-        if i:
-            self.line = i
+        if line:
+            self.line = line
         return [
             self.record,
             self.serial,
@@ -175,12 +53,12 @@ class CIFParser:
             self.chainid,
             self.resseq,
             self.icode,
-            self.x,
-            self.y,
-            self.z,
+            self.xcoord,
+            self.ycoord,
+            self.zcoord,
             self.occ,
             self.tempfactor,
-            '    ',  # segid
+            ' ',  # segid
             self.element,
             self.charge,
             ]
@@ -253,6 +131,10 @@ class CIFParser:
         return self.get_value('_atom_site.Cartn_z')
 
     @property
+    def occ(self):
+        return self.get_value('_atom_site.occupancy')
+
+    @property
     def tempfactor(self):
         return self.get_value('_atom_site.B_iso_or_equiv')
 
@@ -265,3 +147,141 @@ class CIFParser:
         charge = self.get_value('_atom_site.pdbx_formal_charge')
         return self._translate(charge)
 
+
+def is_cif(datastr):
+    """Detect if `datastr` is a CIF file."""
+    assert isinstance(datastr, str), \
+        f'`datastr` is not str: {type(datastr)} instead'
+    cif_loop = re.compile('[lL][oO][oO][pP]_')
+    return bool(cif_loop.search(datastr))
+
+
+def find_cif_atom_site_headers(lines, cif_dict):
+    """
+    Find `_atom_site.` headers.
+
+    Given a list of mmCIF lines, finds headers of `_atom_site.`
+
+    Parameters
+    ----------
+    lines : list
+        The lines of the mmCIF files are read by `file.readlines()`.
+
+    cif_dict : dict
+        A dictionary where to initiate the `atom_site.` keys.
+        Keys are assigned empty list as value.
+
+    Returns
+    -------
+    int
+        The index of ``lines`` where the `_atom_site.` structural
+        information starts.
+
+    Raises
+    ------
+    CIFFileInvalidError
+        If any `_atom_site.` keys are found in ``lines``.
+    """
+    # require
+    assert isinstance(lines, list)
+    assert isinstance(cif_dict, dict)
+
+    found = False
+    for ii, line in enumerate(lines):
+        if line.startswith('_atom_site.'):
+            found = True
+            cif_dict.setdefault(line.strip(), [])
+        elif found:
+            return ii
+    errmsg = 'Could not find `_atom_site.` entries for CIF file'
+    raise EXCPTS.CIFFileError(errmsg)
+
+
+def populate_cif_dictionary(lines, start_index, cif_dict):
+    """
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+
+    Raises
+    ------
+    """
+    counter = 0
+    for line in lines[start_index:]:
+        if line.startswith('#'):
+            return counter
+
+        ls = parse_cif_line(line)
+
+        for i, key in enumerate(cif_dict.keys()):
+            try:
+                cif_dict[key].append(ls[i])
+            except IndexError as err:
+                errmsg = f'CIF line did not split properly: {ls}'
+                EXCPTS.CIFFileError(errmsg)
+
+        counter += 1
+
+    errmsg = 'Could not find the \'#\' to end CIF reading.'
+    raise EXCPTS.CIFFileError(errmsg)
+
+
+def parse_cif_line(line):
+    """
+    Parse CIF line according to `CIF_LINE_REGEX`.
+
+    Parameters
+    ----------
+    line : str
+        The line to parse.
+
+    Returns
+    -------
+    list
+        A list with the parsed line elements.
+    """
+    CLR = cif_line_regex
+    return [''.join(t) for t in CLR.findall(line)]
+
+
+cif_atom_keys = [
+    '_atom_site.group_PDB',  # 1 atom HETATM
+    '_atom_site.id',  # 2 atom number
+    '_atom_site.label_atom_id',  # 3 ATOM NAME
+    '_atom_site.label_alt_id',  # altloc
+    '_atom_site.label_comp_id',  # 4 resname
+    '_atom_site.label_asym_id',  # 5 chainid
+    '_atom_site.label_seq_id',  # 6 resnum
+    '_atom_site.label_entity_id',
+    '_atom_site.auth_atom_id',  # 3 ATOM NAME
+    '_atom_site.auth_alt_id',  # altloc
+    '_atom_site.auth_comp_id',  # 4 resname
+    '_atom_site.auth_asym_id',  # 5 chainid
+    '_atom_site.auth_seq_id',  # 6 resnum
+    '_atom_site.auth_entity_id',
+    '_atom_site.pdbx_PDB_ins_code',  # iCode
+    '_atom_site.Cartn_x',  # 7
+    '_atom_site.Cartn_y',  # 8
+    '_atom_site.Cartn_z',  # 9
+    '_atom_site.occupancy',  # 10
+    '_atom_site.B_iso_or_equiv',  # 11
+    '_atom_site.type_symbol',  # 12
+    '_atom_site.pdbx_formal_charge',
+    '_atom_site.pdbx_PDB_model_num',
+    '_atom_site.group_PDB',
+    ]
+
+# thanks to @JoaoRodrigues (GitHub) for this cif regex
+cif_line_regex = re.compile(
+    r'''
+    '(.*?)' | # single quoted substring OR
+    "(.*?)" | # double quoted substring OR
+    (\S+)     # any consec. non-whitespace character(s)
+    ''',
+    re.VERBOSE,
+    )
+
+_void_translation_table = str.maketrans('?.', '  ')

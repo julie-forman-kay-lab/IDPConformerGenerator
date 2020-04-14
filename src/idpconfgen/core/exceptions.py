@@ -91,7 +91,7 @@ class PDBIDFactoryError(IDPConfGenException):
     pass
 
 
-class CIFFileInvalidError(IDPConfGenException):
+class CIFFileError(IDPConfGenException):
     """CIF file has loop_ but yet is invalid."""
 
     pass

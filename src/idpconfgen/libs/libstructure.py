@@ -1,12 +1,21 @@
 """
-Handle structure representation components.
+Store internal protein structure representation.
+
+Classes
+-------
+Structure
+    The main API that represents a protein structure in IDPConfGen.
 """
 import warnings
 
 import numpy as np
 
+from idpconfgen import Path
 from idpconfgen.libs.libpdb import PDBParams, is_pdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
+
+
+# module variables are defined at the end.
 
 
 class Structure:
@@ -20,8 +29,8 @@ class Structure:
     """
     def __init__(self, data, **kwargs):
 
-        datastr = _get_datastr(data)
-        self._structure_parser = _detect_structure_type(datastr)
+        datastr = get_datastr(data)
+        self._structure_parser = detect_structure_type(datastr)
 
         self._datastr = datastr
         self.data_array = None
@@ -92,13 +101,50 @@ class Structure:
             raise EXCPTS.EmptyFilterError from err
 
 
-# this servers read_pdb_data_to_array mainly
-# it is here for performance
-_pdb_atom_line_headings = {
-    'both': ('ATOM', 'HETATM'),
-    'ATOM': 'ATOM',
-    'HETATM': 'HETATM',
-    }
+def parse_pdb_to_array(datastr, which='both', **kwargs):
+    """
+    Transform PDB data into an array.
+
+    Parameters
+    ----------
+    datastr : str
+        String representing the PDB format v3 file.
+
+    which : str
+        Which lines to consider ['ATOM', 'HETATM', 'both'].
+        Defaults to `'both'`, considers both 'ATOM' and 'HETATM'.
+
+    Returns
+    -------
+    numpy.ndarray of (N, len(`PDBParams.atom_slicers`))
+        Where N are the number of ATOM and/or HETATM lines,
+        and axis=1 the number of fields in ATOM/HETATM lines according
+        to the PDB format v3.
+    """
+    # require
+    assert isinstance(datastr, str), \
+        f'`datastr` is not str: {type(datastr)} instead'
+
+    lines = datastr.split('\n')
+    record_lines = filter_record_lines(lines, which=which)
+    data_array = gen_empty_structure_data_array(len(record_lines))
+    populate_structure_array_from_pdb(record_lines, data_array)
+    return data_array
+
+
+def parse_cif_to_array(datastr, **kwargs):
+    """
+    Parse mmCIF protein data to array.
+
+    Array is as given by :func:`gen_empty_structure_data_array`.
+    """
+    cif = CIFParser(datastr)
+    data_array = gen_empty_structure_data_array(cif.number_of_atoms)
+
+    for ii in range(cif.number_of_atoms):
+        data_array[ii, :] = cif.get_line_elements_for_PDB(ii)
+
+    return data_array
 
 
 def gen_empty_structure_data_array(number_of_atoms):
@@ -128,89 +174,27 @@ def gen_empty_structure_data_array(number_of_atoms):
         )
 
 
-def parse_pdb_to_array(datastr, which='both', **kwargs):
-    """
-    Transform PDB data into an array.
-
-    Parameters
-    ----------
-    datastr : str
-        String representing the PDB format v3 file.
-
-    which : str
-        Which lines to consider ['ATOM', 'HETATM', 'both'].
-        Defaults to `'both'`, considers both 'ATOM' and 'HETATM'.
-
-    Returns
-    -------
-    numpy.ndarray of (N, len(`PDBParams.atom_slicers`))
-        Where N are the number of ATOM and/or HETATM lines,
-        and axis=1 the number of fields in ATOM/HETATM lines according
-        to the PDB format v3.
-    """
-    # require
-    assert isinstance(datastr, str), \
-        f'`datastr` is not str: {type(datastr)} instead'
-
-    lines = datastr.split('\n')
-    record_lines = _filter_record_lines(lines, which=which)
-    data_array = gen_empty_structure_data_array(len(record_lines))
-    _populate_structure_array_from_pdb(record_lines, data_array)
-    return data_array
-
-
-def _populate_structure_array_from_pdb(record_lines, data_array):
+def populate_structure_array_from_pdb(record_lines, data_array):
     for row, line in enumerate(record_lines):
         for column, slicer_item in enumerate(PDBParams.atom_slicers):
             data_array[row, column] = line[slicer_item]
 
 
-def _filter_record_lines(lines, which='both'):
+def filter_record_lines(lines, which='both'):
     """Filter lines to get record lines only."""
-    coords_headings = _pdb_atom_line_headings
+    record_headings = record_line_headings
     try:
         # returns lines because needs len after
         return list(filter(
-            lambda x: x.startswith(coords_headings[which]),
-            lines,
+                    lambda x: x.startswith(record_headings[which]),
+                    lines,
             ))
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
 
 
-def parse_cif_to_array(datastr, **kwargs):
-    """
-    Parse mmCIF protein data to array.
-
-    Array is as given by :func:`gen_empty_structure_data_array`.
-    """
-    cif = CIFParser(datastr)
-    data_array = gen_empty_structure_data_array(cif.number_of_atoms)
-
-    for ii in range(cif.number_of_atoms):
-        data_array[ii, :] = cif.get_line_elements_for_PDB(ii)
-
-    return data_array
-
-
-# possible data inputs in __init__
-# all should return a string
-# used for control flow
-_type2string = {
-    type(Path()): lambda x: x.read_text(),
-    bytes: lambda x: x.decode('utf_8'),
-    str: lambda x: x,
-    }
-
-# order matters
-_structure_parsers = [
-    (is_cif, parse_cif_to_array),
-    (is_pdb, parse_pdb_to_array),
-    ]
-
-
-def _get_datastr(data):
+def get_datastr(data):
     data_type = type(data)
     try:
         datastr = _type2string[data_type](data)
@@ -221,8 +205,8 @@ def _get_datastr(data):
     return datastr
 
 
-def _detect_structure_type(datastr):
-    for condition, parser in _structure_parsers:
+def detect_structure_type(datastr):
+    for condition, parser in structure_parsers:
         if condition(datastr):
             return parser
 
@@ -244,3 +228,27 @@ def structure_to_pdb(atoms):
             )
         for line in atoms
         ]
+
+
+# this servers read_pdb_data_to_array mainly
+# it is here for performance
+record_line_headings = {
+    'both': ('ATOM', 'HETATM'),
+    'ATOM': 'ATOM',
+    'HETATM': 'HETATM',
+    }
+
+# possible data inputs in __init__
+# all should return a string
+# used for control flow
+_type2string = {
+    type(Path()): lambda x: x.read_text(),
+    bytes: lambda x: x.decode('utf_8'),
+    str: lambda x: x,
+    }
+
+# order matters
+structure_parsers = [
+    (is_cif, parse_cif_to_array),
+    (is_pdb, parse_pdb_to_array),
+    ]
