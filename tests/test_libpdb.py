@@ -1,7 +1,27 @@
 """Test libpdb."""
 from pathlib import Path
 
-from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList
+from idpconfgen.libs.libpdb import (
+    PDBID,
+    PDBIDFactory,
+    PDBList,
+    PDBParams,
+    is_pdb,
+    )
+
+
+def test_PDBParams():
+    """
+    """
+    with pytest.raises(NotImplementedError):
+        PDBParams.some_attr = None
+
+
+def test_PDBParams_format_chain():
+    """
+    """
+    assert PDBParams.format_chain('AAA') == 'A'
+
 
 
 class TestPDBID:

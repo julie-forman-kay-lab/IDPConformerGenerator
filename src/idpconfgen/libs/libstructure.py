@@ -5,8 +5,8 @@ import warnings
 
 import numpy as np
 
-from idpcalculator.libs.libpdb import PDBParams, is_pdb
-from idpcalculator.libs.libcif import CIFParser, is_cif
+from idpconfgen.libs.libpdb import PDBParams, is_pdb
+from idpconfgen.libs.libcif import CIFParser, is_cif
 
 
 class Structure:
@@ -243,3 +243,4 @@ def structure_to_pdb(atoms):
             *[func(i) for i, func in zip(line, PDBParams.format_funcs)]
             )
         for line in atoms
+        ]

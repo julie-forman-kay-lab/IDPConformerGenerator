@@ -7,15 +7,11 @@ import hypothesis.strategies as st
 from hypothesis import given
 
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs.libpdb import (
-    gen_pdb_data_array,
-    is_cif,
-    is_pdb,
+from idpconfgen.libs.libstructure import (
+    gen_empty_structure_data_array,
     parse_pdb_to_array,
     parse_cif_to_array,
-    PDBParams,
-    CIFParser,
-    Structure
+    Structure,
     )
 
 from . tcommons import (
@@ -26,13 +22,6 @@ from . tcommons import (
     cif_EOF,
     pdb_saved,
     )
-
-
-def test_PDBParams():
-    """
-    """
-    with pytest.raises(NotImplementedError):
-        PDBParams.some_attr = None
 
 
 @pytest.mark.parametrize(
@@ -53,7 +42,7 @@ def test_is_function(is_func, structure, expected):
 def test_gen_array_data(number):
     """
     """
-    result = gen_pdb_data_array(number)
+    result = gen_empty_structure_data_array(number)
     assert result.shape == (number, len(PDBParams.atom_slicers))
     assert result.dtype == '<U8'
 
