@@ -179,7 +179,7 @@ def find_cif_atom_site_headers(lines, cif_dict):
 
     Raises
     ------
-    CIFFileInvalidError
+    CIFFileError
         If any `_atom_site.` keys are found in ``lines``.
     """
     # require
@@ -208,7 +208,13 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
     Raises
     ------
+    InvalidCIFLineError
+        If the number of fields in parsed line do not match expected
+        `_atom_site.` fields in the dictionary.
     """
+    assert len(lines) > start_index
+
+    valid_len = len(cif_dict.keys())
     counter = 0
     for line in lines[start_index:]:
         if line.startswith('#'):
@@ -216,17 +222,22 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
         ls = parse_cif_line(line)
 
+        if len(ls) != valid_len:
+            errmsg = (
+                "Fields in line do not match number of excepted `_atom_site.` fields.\n"
+                f"Line read: {line}\n"
+                f"At: start index {start_index}, counter {counter}."
+                )
+            raise EXCPTS.CIFFileError(errmsg)
+
         for i, key in enumerate(cif_dict.keys()):
-            try:
-                cif_dict[key].append(ls[i])
-            except IndexError as err:
-                errmsg = f'CIF line did not split properly: {ls}'
-                EXCPTS.CIFFileError(errmsg)
+            #try:
+            cif_dict[key].append(ls[i])
+            #except IndexError as err:
+                #errmsg = f'CIF line did not split properly: {ls}'
+                #EXCPTS.CIFFileError(errmsg)
 
         counter += 1
-
-    errmsg = 'Could not find the \'#\' to end CIF reading.'
-    raise EXCPTS.CIFFileError(errmsg)
 
 
 def parse_cif_line(line):

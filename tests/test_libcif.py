@@ -14,6 +14,9 @@ from .tcommons import (
     cif_example,
     cif_example_auth,
     cif_example_noasymid,
+    cif_nohash,
+    cif_example_headers,
+    cif_EOF,
     )
 
 
@@ -30,6 +33,7 @@ def test_cif_line_regex(in1, expected):
     """Test cif line parse according to regex."""
     result = parse_cif_line(in1)
     assert result == expected
+
 
 
 def test_is_cif():
@@ -81,6 +85,27 @@ def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
     assert cif_pdb['_atom_site.label_atom_id'][:5] == \
         ['N', 'CA', 'C', 'O', 'CB']
     assert cif_pdb['_atom_site.Cartn_x'][-2] == '28.365'
+
+
+@pytest.mark.parametrize(
+    'args',
+    [
+        (cif_EOF.read_text().split('\n'), 22, {i:[] for i in cif_example_headers}),
+        (cif_nohash.read_text().split('\n'), 22, {i:[] for i in cif_example_headers}),
+        ([''], 0, {'_atom_site.id': []}),
+        ]
+    )
+def test_populate_cif_dictionary_errors(args):
+    """Test CIF without hash raise error."""
+    with pytest.raises(EXCPTS.CIFFileError):
+        populate_cif_dictionary(*args)
+
+
+#def test_populate_cif_dictionary_line_error():
+#    """Test CIF Regex raises errors."""
+#    # could be any line
+#    with pytest.raises(EXCPTS.InvalidCIFLineError):
+#        populate_cif_dictionary([''], 1, {'_atom_site.id': []})
 
 
 @pytest.fixture(params=[
