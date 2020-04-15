@@ -102,16 +102,17 @@ class Filter:
         self.data = read_data_into_dict(folder_path)
         self.filtered_data = self.data
 
-    def return_ss(self, ss, lower_bound=None, upper_bound=None):
+    def apply_ss(self, ss, lower_bound=None, upper_bound=None):
         """
-        This function returns all the ss fragments
-        that have lower_bound<=size<=upper_bound.
-        Where ss can be loops, helixes or sheets
+        This function filters the data to have ss
+        fragments that have lower_bound<=size<=
+        upper_bound. Where ss can be loops, helices
+        or sheets.
         """
         if ss not in self.filtered_data:
             return {}
 
-        if not lower_bound and not upper_bound:
+        if not lower_bound or not upper_bound:
             #return all sizes
             self.filtered_data = {ss :self.filtered_data[ss]}
         self.filtered_data = {ss :self.__return_ss_ranges(ss, lower_bound, upper_bound)}
