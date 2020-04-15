@@ -69,7 +69,7 @@ def parsed_array_examples(request):
 
 
 def test_parsed_array_examples_shape(parsed_array_examples):
-    assert parsed_array_examples.shape == (5385, len(PDBParams.atom_slicers))
+    assert parsed_array_examples.shape == (545, len(PDBParams.atom_slicers))
 
 
 def test_parsed_array_examples_dtype(parsed_array_examples):
@@ -119,13 +119,13 @@ def test_Structure_build_2(fix_Structure_build):
 
 
 def test_Structure_build_3(fix_Structure_build):
-    assert fix_Structure_build.data_array.shape == (5385, len(PDBParams.atom_slicers))
+    assert fix_Structure_build.data_array.shape == (545, len(PDBParams.atom_slicers))
 
 
 def test_Structure_build_filters_true(fix_Structure_build):
     fix_Structure_build.add_filter(lambda x: True)
     assert len(fix_Structure_build.filters) == 1
-    assert len(list(fix_Structure_build.filtered_atoms)) == 5385
+    assert len(list(fix_Structure_build.filtered_atoms)) == 545
 
 
 def test_Structure_build_filters_false(fix_Structure_build):
@@ -141,8 +141,8 @@ def test_Structure_build_filters_false(fix_Structure_build):
 @pytest.mark.parametrize(
     'in1,expected',
     [
-        (cif_example, 2559),
-        (pdb_example, 2692),
+        (cif_example, 142),
+        (pdb_example, 275),  # :%s/\(^ATOM\|^HETATM\).\{} B \s.//n
         ]
     )
 def test_Structure_filter_B(in1, expected):
@@ -156,7 +156,7 @@ def test_Structure_filter_B(in1, expected):
 def test_Structure_filter_ATOM(fix_Structure_build):
     fix_Structure_build.add_filter_record_name('ATOM')
     result = list(fix_Structure_build.filtered_atoms)
-    assert len(result) == 5118
+    assert len(result) == 278
 
 
 def test_Structure_filter_backbone(fix_Structure_build):
@@ -168,8 +168,7 @@ def test_Structure_filter_backbone(fix_Structure_build):
         )
     fix_Structure_build.add_filter_record_name('ATOM')
     result = list(fix_Structure_build.filtered_atoms)
-    print(result)
-    assert len(result) == 2616
+    assert len(result) == 132
 
 
 

@@ -61,7 +61,7 @@ def fix_find_cif_atom_site_headers(request):
 def test_find_cif_atom_site_headers_index(fix_find_cif_atom_site_headers):
     """Text index matches first structure line after atom_site headers."""
     index = fix_find_cif_atom_site_headers[0]
-    assert index == 1192
+    assert index == 58
 
 
 def test_find_cif_atom_site_headers_len(fix_find_cif_atom_site_headers):
@@ -89,7 +89,7 @@ def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
     lines = fix_find_cif_atom_site_headers[2]
 
     number_of_atoms = populate_cif_dictionary(lines, index, cif_pdb)
-    assert number_of_atoms == 5385
+    assert number_of_atoms == 545
     assert cif_pdb['_atom_site.label_atom_id'][:5] == \
         ['N', 'CA', 'C', 'O', 'CB']
     assert cif_pdb['_atom_site.Cartn_x'][-2] == '28.365'
@@ -119,7 +119,7 @@ def cif_parsed(request):
 
 def test_CIFParse_len(cif_parsed):
     """Test CIFParse len."""
-    assert len(cif_parsed) == 5385
+    assert len(cif_parsed) == 545
 
 def test_CIFParse_line_default(cif_parsed):
     """Test default attribute line."""
@@ -196,7 +196,7 @@ def test_CIFParse_get_values_line_3(cif_parsed):
         ' ',
         'O',
         ' ']
-    assert cif_parsed.get_line_elements_for_PDB(line=5384) == expected
+    assert cif_parsed.get_line_elements_for_PDB(line=544) == expected
 
 
 
