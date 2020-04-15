@@ -16,6 +16,7 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libtimer
 from idpconfgen.logger import S, T
 from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs import libpdb
 
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
@@ -129,6 +130,7 @@ class PDBDownloader:
 
             pdbdata.add_filter_record_name(self.record_name)
             pdbdata.add_filter_chain(chain)
+            pdbdata.add_filter(lambda x: x[libpdb.PDBParams.acol.altloc] in ('A', ''))
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
             try:
                 pdbdata.write_PDB(destination)

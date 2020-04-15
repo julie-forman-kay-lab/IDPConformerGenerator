@@ -87,7 +87,7 @@ class _PDBParams:
 
 
         # The columns of the different PDB ATOM fields
-        atom_attr_names = [s[0].lstrip("atom_") for s in self._atom_attrs]
+        atom_attr_names = [s[0][5:] for s in self._atom_attrs]
         assert len(atom_attr_names) == len(self._atom_attrs)
         assert all(isinstance(s, str) for s in atom_attr_names)
 
