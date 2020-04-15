@@ -3,6 +3,9 @@ import argparse
 import sys
 
 
+from idpconfgen import Path
+
+
 detailed = "detailed instructions:\n\n{}"
 
 
@@ -47,3 +50,38 @@ def parse_doc_params(docstring):
     usage = '\n'.join(doclines[doclines.index('USAGE:') + 1:])
      
     return prog, description, usage
+
+
+def add_parser_pdbs(parser):
+    """
+    Add PDBs entry to argument parser.
+
+    Parameters
+    ----------
+    parser : `argparse.ArgumentParser` object
+    """
+    parser.add_argument(
+        'pdbs',
+        help='PDB file list.',
+        nargs='+',
+        )
+
+def add_parser_destination_folder(parser):
+    """
+    Adds destination folder argument.
+
+    Parameters
+    ----------
+    parser : `argparse.ArgumentParser` object
+    """
+    parser.add_argument(
+        '-d',
+        '--destination',
+        help=(
+            'Destination folder where PDB files will be stored. '
+            'Defaults to current working directory.'
+            ),
+        type=Path,
+        default=Path.cwd(),
+        )
+

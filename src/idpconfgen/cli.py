@@ -16,6 +16,7 @@ import argparse
 import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
+from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
 from idpconfgen.libs import libcli
 
@@ -60,7 +61,18 @@ def _load_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
     ap_ssext.set_defaults(func=ssext.main)
-    
+
+    ap_segext = subparsers.add_parser(
+        'segext',
+        help='Segment extract',
+        parents=[segext.ap],
+        add_help=False,
+        description=libcli.detailed.format(segext._des),
+        usage=segext._us,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    ap_segext.set_defaults(func=segext.main)
+
     # prints help if not arguments are passed
     # if >2 prints help of subroutines.
     if len(sys.argv) < 2:
