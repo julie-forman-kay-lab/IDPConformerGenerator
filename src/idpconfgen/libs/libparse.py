@@ -90,7 +90,7 @@ class DSSPParser:
         except IndexError as err:
             raise EXCPTS.DSSPParserError(self.pdbid) from err
 
-        self.data = data[data_header_index + 1:]  # data starts afterthe header
+        self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']  # data starts afterthe header
 
         self.read_sec_structure()
         self.read_fasta()
