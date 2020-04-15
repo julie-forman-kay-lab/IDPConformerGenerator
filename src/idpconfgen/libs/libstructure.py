@@ -127,7 +127,12 @@ def parse_pdb_to_array(datastr, which='both', **kwargs):
     assert isinstance(datastr, str), \
         f'`datastr` is not str: {type(datastr)} instead'
 
-    lines = datastr.split('\n')
+    _ = datastr[datastr.find('MODEL'):datastr.find('ENDMDL')].split('\n')[1:-1]
+    if _:
+        lines = _
+    else:
+        lines = datastr.split('\n')
+
     record_lines = filter_record_lines(lines, which=which)
     data_array = gen_empty_structure_data_array(len(record_lines))
     populate_structure_array_from_pdb(record_lines, data_array)
@@ -195,6 +200,8 @@ def filter_record_lines(lines, which='both'):
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
+
+
 
 
 def get_datastr(data):

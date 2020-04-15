@@ -99,7 +99,7 @@ def main(
 
         pdbdata = libstructure.Structure(pdbid.read_text())
         pdbdata.build()
-        pdbdata.add_filter(lambda x: x[libpdb.PDBParams.acol.name] in ('N', 'CA', 'O', 'C'))
+        pdbdata.add_filter(lambda x: x[libpdb.PDBParams.acol.name] in ('N', 'CA', 'C'))
 
         counter = 1
 
@@ -111,18 +111,22 @@ def main(
         for segtype, segslice in user_required_dssp_segments:
 
             res_slice = slice(
-                segslice.start*4,
-                segslice.stop*4,
+                segslice.start*3,
+                segslice.stop*3,
                 None,
                 )
+
+            if res_slice.stop - res_slice.start < 12:
+                continue
+
             to_write = list(pdbdata.filtered_atoms)[res_slice]
 
-            if len(to_write) >= 4 * 3:
-                libstructure.write_PDB(
-                    libstructure.structure_to_pdb(to_write),
-                    Path(dest, f'{pdbid.stem}_{segtype}_{counter}.pdb'),
-                    )
-                counter += 1
+            #if len(to_write) >= 4 * 3:
+            libstructure.write_PDB(
+                libstructure.structure_to_pdb(to_write),
+                Path(dest, f'{pdbid.stem}_{segtype}_{counter}.pdb'),
+                )
+            counter += 1
 
 
 
