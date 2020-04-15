@@ -18,6 +18,14 @@ from idpconfgen.logger import S, T
 from idpconfgen.libs.libstructure import Structure
 
 
+PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
+CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
+POSSIBLELINKS = [
+    PDB_WEB_LINK,
+    CIF_WEB_LINK,
+    ]
+
+
 class PDBDownloader:
     """
     Control PDB downloading operations.

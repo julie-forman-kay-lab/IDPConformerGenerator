@@ -18,13 +18,6 @@ from idpconfgen.libs import libtimer
 from idpconfgen.logger import S, T
 
 
-PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
-CIF_WEB_LINK = "https://files.rcsb.org/download/{}.cif"
-POSSIBLELINKS = [
-    PDB_WEB_LINK,
-    CIF_WEB_LINK,
-    ]
-
 
 class _PDBParams:
     """
