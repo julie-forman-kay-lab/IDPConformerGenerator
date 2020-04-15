@@ -250,7 +250,7 @@ def read_pipe_file(text):
     tuple (str, str)
         Of codes and data.
     """
-    return zip(*(line.split('|') for line in text.split('\n')))
+    return zip(*(line.split('|') for line in text.split('\n') if line))
 
 
 def group_by(data):
@@ -285,5 +285,8 @@ def group_by(data):
     else:
         current.append(slice(start, i + 1))
         groups.append(current)
+    assert groups
+    assert (groups[0][0], str)
+    assert (groups[0][0], slice)
     return groups
 

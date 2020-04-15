@@ -93,7 +93,7 @@ class Structure:
         """Add filters for chain."""
         self.filters.append(lambda x: x[PDBParams.acol.chainid] == chain)
 
-    def write_PDB(self, filename):
+    def write_PDB(self, filename, start=None, stop=None, step=None):
         lines = structure_to_pdb(self.filtered_atoms)
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
