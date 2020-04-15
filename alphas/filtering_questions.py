@@ -142,17 +142,6 @@ def remove_illegal_fragments(data, ss_sandwich, min_sanwich_length, ss_burger, m
             results[cur_fragment_aa] = fragment_data[start_index*7: (start_index+len(cur_fragment_aa)*7)]
     return results
 
-
-
-
-
-
-
-                    
-
-
-
-
 def find_aa_patterns(input_pattern, database, min_seq_chunk_size=None, max_mismatch=None):
         """
         Finds patterns of input_pattern in the data using the ProteinSearch algorithm.
@@ -249,14 +238,6 @@ class Filter:
     def return_filter(self):
         return self.filtered_data
 
-
-if __name__ == "__main__":
-    filter_step = Filter("/Users/alaashamandy/Desktop/UNIWORK/CSC495/IDPCalcPDBDownloader/alphas/data/")
-    filter_step.filter_ss_sandwich("L", 3, "H", 2, keep_others=False)
-    return_filter= filter_step.return_filter()
-    for key, value in return_filter["L + H"].items():
-        print(key)
-        print()
 
 
 
