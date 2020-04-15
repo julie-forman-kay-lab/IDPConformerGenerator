@@ -167,7 +167,7 @@ def test_list_files_recursively_3():
         tcommons.data_folder,
         ext='.pdb',
         )
-    expected = [tcommons.data_folder.joinpath(p) for p in ['1A12_A.pdb']]
+    expected = [tcommons.data_folder.joinpath(p) for p in ['pdb_example.pdb', 'pdb_saved.pdb']]
     assert sorted(files) == sorted(expected)
 
 
@@ -185,11 +185,12 @@ def test_read_path_bundle_typeerror(in1):
             [tcommons.data_folder],
             None,
             [
-                Path(tcommons.data_folder, '1A12_A.pdb'),
                 Path(tcommons.data_folder, '1ABC_D.dssp'),
                 Path(tcommons.data_folder, '1ABC_E.dssp'),
                 Path(tcommons.data_folder, 'cull.list'),
                 Path(tcommons.data_folder, 'pdblist.list'),
+                Path(tcommons.data_folder, 'pdb_example.pdb'),
+                Path(tcommons.data_folder, 'pdb_saved.pdb'),
                 Path(tcommons.data_folder, 'wrong.dssp'),
                 Path(tcommons.data_folder, 'wrong2.dssp'),
                 ]
@@ -203,7 +204,6 @@ def test_read_path_bundle_typeerror(in1):
             None,
             [
                 Path(tcommons.project_folder, 'setup.py'),
-                Path(tcommons.data_folder, '1A12_A.pdb'),
                 Path(tcommons.data_folder, '1ABC_D.dssp'),
                 Path(tcommons.data_folder, '1ABC_E.dssp'),
                 Path(tcommons.data_folder, 'cull.list'),
@@ -247,12 +247,18 @@ def test_read_bundle_inputs(in1, ext, expected):
         (
             tcommons.data_folder,
             '.pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            [
+                Path(tcommons.data_folder, 'pdb_example.pdb'),
+                Path(tcommons.data_folder, 'pdb_saved.pdb')
+                ],
             ),
         (
             tcommons.data_folder,
             'pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            [
+                Path(tcommons.data_folder, 'pdb_example.pdb'),
+                Path(tcommons.data_folder, 'pdb_saved.pdb')
+                ],
             ),
         (
             tcommons.data_folder,

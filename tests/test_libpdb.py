@@ -1,7 +1,58 @@
 """Test libpdb."""
 from pathlib import Path
 
-from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList
+import pytest
+
+from idpconfgen.libs.libpdb import (
+    PDBID,
+    PDBIDFactory,
+    PDBList,
+    PDBParams,
+    is_pdb,
+    )
+
+from .tcommons import pdb_example
+
+
+@pytest.mark.parametrize(
+    'is_func,structure,expected',
+    [
+        (is_pdb, pdb_example, True),
+        ]
+    )
+def test_is_function(is_func, structure, expected):
+    """
+    """
+    assert is_func(structure.read_text()) == expected
+
+
+@pytest.mark.parametrize(
+    'atom,expected',
+    [
+        ('N', ' N  '),
+        ('CO', ' CO '),
+        ('FE', 'FE  '),
+        ('OD1', ' OD1'),
+        ]
+    )
+def test_format_atoms(atom, expected):
+    """Test PDBParams format atom."""
+    assert PDBParams.format_atom(atom) == expected
+
+
+
+def test_PDBParams():
+    """
+    """
+    with pytest.raises(NotImplementedError):
+        PDBParams.some_attr = None
+
+
+def test_PDBParams_format_chain():
+    """
+    """
+    assert PDBParams.format_chain('AAA') == 'A'
+
 
 
 class TestPDBID:

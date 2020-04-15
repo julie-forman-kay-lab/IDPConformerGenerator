@@ -26,7 +26,7 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libpdb
+from idpconfgen.libs import libcli, libio, libpdb, libdownload
 from idpconfgen.logger import S, T, init_files
 
 
@@ -126,7 +126,7 @@ def main(
         log.info(S('done\n'))
     
     if update:
-        pdbdownloader = libpdb.PDBDownloader(
+        pdbdownloader = libdownload.PDBDownloader(
             pdblist_comparison,
             destination,
             record_name=record_name,
