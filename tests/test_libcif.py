@@ -26,7 +26,15 @@ from .tcommons import (
         (
             "ATOM   1    N N     . ALA A 1 4   ? 11.751 37.846 29.016  1.00 44.65 ? 4   ALA A N     1 \n",
             ['ATOM', '1', 'N', 'N', '.', 'ALA', 'A', '1', '4', '?', '11.751', '37.846', '29.016', '1.00', '44.65', '?', '4', 'ALA', 'A', 'N', '1'],
-            )
+            ),
+        (
+            "HETATM 5119 N N     . ASN C 2 .   ? 29.722 14.604 9.802   1.00 12.15 ? 331 ASN A N     1 ",
+            ['HETATM', '5119', 'N', 'N', '.', 'ASN', 'C', '2', '.', '?', '29.722', '14.604', '9.802', '1.00', '12.15', '?', '331', 'ASN', 'A', 'N', '1'],
+            ),
+        (
+            'HETATM 5132 O "O5\'" . AMP D 3 .   ? 23.706 19.236 9.885   1.00 10.43 ? 332 AMP A "O5\'" 1 ',
+            ['HETATM', '5132', 'O', "O5'", '.', 'AMP', 'D', '3', '.', '?', '23.706', '19.236', '9.885', '1.00', '10.43', '?', '332', 'AMP', 'A', "O5'", '1'],
+            ),
         ]
     )
 def test_cif_line_regex(in1, expected):
@@ -101,13 +109,6 @@ def test_populate_cif_dictionary_errors(args):
         populate_cif_dictionary(*args)
 
 
-#def test_populate_cif_dictionary_line_error():
-#    """Test CIF Regex raises errors."""
-#    # could be any line
-#    with pytest.raises(EXCPTS.InvalidCIFLineError):
-#        populate_cif_dictionary([''], 1, {'_atom_site.id': []})
-
-
 @pytest.fixture(params=[
     cif_example,
     cif_example_auth,
@@ -120,6 +121,9 @@ def test_CIFParse_len(cif_parsed):
     """Test CIFParse len."""
     assert len(cif_parsed) == 5385
 
+def test_CIFParse_line_default(cif_parsed):
+    """Test default attribute line."""
+    assert cif_parsed.line == 0
 
 def test_CIFParse_line(cif_parsed):
     """Test CIFParse len."""
@@ -174,7 +178,29 @@ def test_CIFParse_get_values_line_2(cif_parsed):
     assert cif_parsed.get_line_elements_for_PDB(line=2) == expected
 
 
-def test_CIFParse_get_values_no_chaindi():
+def test_CIFParse_get_values_line_3(cif_parsed):
+    expected = [
+        'HETATM',
+        '5385',
+        'O',
+        ' ',
+        'HOH',
+        'H',
+        ' ',
+        ' ',
+        '45.659',
+        '28.060',
+        '40.225',
+        '1.00',
+        '3.27',
+        ' ',
+        'O',
+        ' ']
+    assert cif_parsed.get_line_elements_for_PDB(line=5384) == expected
+
+
+
+def test_CIFParse_get_values_no_chainid():
     """
     Also test lack of ins code.
     """

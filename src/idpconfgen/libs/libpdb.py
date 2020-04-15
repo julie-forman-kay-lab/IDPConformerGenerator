@@ -40,7 +40,7 @@ class _PDBParams:
         # slicers of the ATOM and HETATM lines
         self.atom_record = slice(0, 6)
         self.atom_serial = slice(6, 11)
-        self.atom_atom_name = slice(12, 16)
+        self.atom_name = slice(12, 16)
         self.atom_altloc = slice(16, 17)
         self.atom_resname = slice(17, 20)
         self.atom_chainid = slice(21, 22)

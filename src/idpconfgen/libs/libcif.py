@@ -12,8 +12,8 @@ class CIFParser:
         """
         """
         self.cif_dict = {}
-        self.number_of_atoms = None
         self.read_cif(datastr)
+        self.line = 0
 
     def read_cif(self, datastr):
         """Read 'atom_site' entries to dictionary."""
@@ -108,7 +108,7 @@ class CIFParser:
 
     @property
     def resseq(self):
-        return self._auth_label('seq_id')
+        return self._translate(self._auth_label('seq_id'))
 
     @property
     def icode(self):
@@ -255,7 +255,7 @@ def parse_cif_line(line):
         A list with the parsed line elements.
     """
     CLR = cif_line_regex
-    return [''.join(t) for t in CLR.findall(line)]
+    return [''.join(t).strip() for t in CLR.findall(line)]
 
 
 cif_atom_keys = [

@@ -10,7 +10,9 @@ import warnings
 
 import numpy as np
 
-from idpconfgen import Path
+from idpconfgen import Path, log
+from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.logger import S, T
 from idpconfgen.libs.libpdb import PDBParams, is_pdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
 
@@ -89,16 +91,16 @@ class Structure:
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
-        self.filters.append(
-            lambda x: x[PDBParams.acol.chainid].startswith(chain)
-            )
+        self.filters.append(lambda x: x[PDBParams.acol.chainid] == chain)
 
     def write_PDB(self, filename):
         lines = structure_to_pdb(self.filtered_atoms)
-        if lines:
-            write_PDB(lines, filename)
-        else:
-            raise EXCPTS.EmptyFilterError from err
+        with warnings.catch_warnings():
+            warnings.filterwarnings('error')
+            try:
+                write_PDB(lines, filename)
+            except UserWarning:
+                raise EXCPTS.EmptyFilterError
 
 
 def parse_pdb_to_array(datastr, which='both', **kwargs):
@@ -139,10 +141,11 @@ def parse_cif_to_array(datastr, **kwargs):
     Array is as given by :func:`gen_empty_structure_data_array`.
     """
     cif = CIFParser(datastr)
-    data_array = gen_empty_structure_data_array(cif.number_of_atoms)
+    number_of_atoms = len(cif)
+    data_array = gen_empty_structure_data_array(number_of_atoms)
 
-    for ii in range(cif.number_of_atoms):
-        data_array[ii, :] = cif.get_line_elements_for_PDB(ii)
+    for ii in range(number_of_atoms):
+        data_array[ii, :] = cif.get_line_elements_for_PDB(line=ii)
 
     return data_array
 
@@ -177,7 +180,7 @@ def gen_empty_structure_data_array(number_of_atoms):
 def populate_structure_array_from_pdb(record_lines, data_array):
     for row, line in enumerate(record_lines):
         for column, slicer_item in enumerate(PDBParams.atom_slicers):
-            data_array[row, column] = line[slicer_item]
+            data_array[row, column] = line[slicer_item].strip()
 
 
 def filter_record_lines(lines, which='both'):
@@ -195,9 +198,10 @@ def filter_record_lines(lines, which='both'):
 
 
 def get_datastr(data):
+    t2s = type2string
     data_type = type(data)
     try:
-        datastr = _type2string[data_type](data)
+        datastr = t2s[data_type](data)
     except KeyError as err:
         err2 = NotImplementedError('Struture data not of proper type')
         raise err2 from err
@@ -206,9 +210,11 @@ def get_datastr(data):
 
 
 def detect_structure_type(datastr):
-    for condition, parser in structure_parsers:
+    sp = structure_parsers
+    for condition, parser in sp:
         if condition(datastr):
             return parser
+    raise EXCPTS.ParserNotFoundError
 
 
 def write_PDB(lines, filename):
@@ -241,7 +247,7 @@ record_line_headings = {
 # possible data inputs in __init__
 # all should return a string
 # used for control flow
-_type2string = {
+type2string = {
     type(Path()): lambda x: x.read_text(),
     bytes: lambda x: x.decode('utf_8'),
     str: lambda x: x,

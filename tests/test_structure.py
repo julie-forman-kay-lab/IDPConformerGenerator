@@ -1,4 +1,5 @@
 """Test Structure class."""
+import inspect
 from pathlib import Path
 
 import numpy as np
@@ -31,6 +32,24 @@ from . tcommons import (
     )
 
 
+@pytest.mark.parametrize(
+    'data',
+    [
+        cif_example,
+        'some string text',
+        b'some bytes text',
+        ]
+    )
+def test_get_datastr(data):
+    """Test dict to get datastr."""
+    assert get_datastr(data)
+
+
+def test_get_datastr_error():
+    """Test dict to get datastr."""
+    with pytest.raises(NotImplementedError):
+        get_datastr(int)
+
 
 @given(st.integers(min_value=1, max_value=100_000))
 def test_gen_empty_structure_array(number):
@@ -52,6 +71,7 @@ def parsed_array_examples(request):
 def test_parsed_array_examples_shape(parsed_array_examples):
     assert parsed_array_examples.shape == (5385, len(PDBParams.atom_slicers))
 
+
 def test_parsed_array_examples_dtype(parsed_array_examples):
     assert parsed_array_examples.dtype == np.dtype('<U8')
 
@@ -62,126 +82,147 @@ def test_parse_pdb_to_array_ValueError():
         parse_pdb_to_array(pdb_example.read_text(), which='none')
 
 
-## TODO
-#def test_parse_cif_to_array():
-#    """
-#    """
-#    data_array = parse_cif_to_array(cif_example.read_text())
-#    assert data_array.shape == (5385, len(PDBParams.atom_slicers))
-#    assert data_array.dtype == np.dtype('<U8')
-#
-#
-#@pytest.mark.parametrize(
-#    'ciffile',
-#    [
-#        cif_noatomsite,
-#        cif_nohash,
-#        cif_EOF,
-#        ]
-#    )
-#def test_parse_cif_to_array_noatoms_error(ciffile):
-#    """/"""
-#    with pytest.raises(EXCPTS.CIFFileInvalidError):
-#        parse_cif_to_array(ciffile.read_text())
-#
-#
-#@pytest.fixture()
-#def CIFParser_fixture(request):
-#    return CIFParser(cif_example.read_text())
-#
-#
-#@pytest.mark.parametrize(
-#    'example,parser',
-#    [
-#        (pdb_example, parse_pdb_to_array),
-#        (cif_example, parse_cif_to_array),
-#        ]
-#    )
-#def test_Structure_dispatch(example, parser):
-#    """
-#    Test Structure dispatch.
-#
-#    Structure should return the correct subclass.
-#    """
-#    result = Structure._detect_structure_type(example.read_text())
-#    assert result == parser
-#
-#
-#@pytest.fixture(params=[
-#    pdb_example,
-#    cif_example,
-#    ])
-#def Structure_built(request):
-#    s = Structure(request.param.read_text())
-#    s.build()
-#    return s
-#
-#
-#@pytest.mark.parametrize(
-#    'func,number_of_lines',
-#    [
-#        (lambda x: int(x[PDBParams.acol.resseq]) < 10, 96),
-#        ]
-#    )
-#def test_Structure_1(Structure_built, func, number_of_lines):
-#    """
-#    """
-#    s = Structure_built
-#    s.add_filter(func)
-#    assert len(list(s.filtered_atoms)) == number_of_lines
-#
-#
-#@pytest.mark.parametrize(
-#    'record',
-#    [
-#        ('ATOM', 'HETATM'),
-#        'ATOM',
-#        'HETATM',
-#        ]
-#    )
-#def test_Structure_filter_record_name(Structure_built, record):
-#    """
-#    """
-#    Structure_built.add_filter_record_name(record)
-#    lines = list(Structure_built.filtered_atoms)
-#    assert all(l[0].strip() in record for l in lines)
-#
-#
-#@pytest.mark.parametrize(
-#    'chain, expected',
-#    [
-#        ('A',2693),
-#        ]
-#    )
-#def test_Structure_filter_chain(Structure_built, chain, expected):
-#    """
-#    """
-#    Structure_built.add_filter_chain(chain)
-#    assert len(list(Structure_built.filtered_atoms)) == expected
-#
-#
-#def test_Structure_chain_set(Structure_built):
-#    """
-#    """
-#    assert Structure_built.chain_set == set(['A', 'B'])
-#
-#
-#def test_Structure_save(Structure_built):
-#    """Test save functionality."""
-#    Structure_built.add_filter(lambda x: int(x[PDBParams.acol.resseq]) < 11)
-#    Structure_built.add_filter_chain('A')
-#
-#    fout = Path('pdb_testing.pdb')
-#    Structure_built.write_PDB(fout)
-#    result = fout.read_text()
-#    expected = pdb_saved.read_text()
-#    fout.unlink()
-#    assert result == expected
-#
-#
-#def test_Structure_save_empty_filter_error(Structure_built):
-#    """
-#    """
-#    Structure_built.add_filter_chain('Z')
-#    with pytest.raises(EXCPTS.EmptyFilterError):
-#        Structure_built._make_pdb()
+@pytest.fixture(params=[
+    cif_example,
+    pdb_example,
+    ])
+def fix_Structure(request):
+    s = Structure(request.param.read_text())
+    return s
+
+
+@pytest.fixture(params=[
+    cif_example,
+    pdb_example,
+    ])
+def fix_Structure_build(request):
+    s = Structure(request.param.read_text())
+    s.build()
+    return s
+
+
+def test_Structure(fix_Structure):
+    """ """
+    assert fix_Structure.data_array is None
+    assert inspect.isfunction(fix_Structure._structure_parser)
+    assert fix_Structure._datastr
+
+
+def test_Structure_build_1(fix_Structure_build):
+    """Build method."""
+    with pytest.raises(AttributeError):
+        fix_Structure._datastr
+
+
+def test_Structure_build_2(fix_Structure_build):
+    assert isinstance(fix_Structure_build.data_array, np.ndarray)
+
+
+def test_Structure_build_3(fix_Structure_build):
+    assert fix_Structure_build.data_array.shape == (5385, len(PDBParams.atom_slicers))
+
+
+def test_Structure_build_filters_true(fix_Structure_build):
+    fix_Structure_build.add_filter(lambda x: True)
+    assert len(fix_Structure_build.filters) == 1
+    assert len(list(fix_Structure_build.filtered_atoms)) == 5385
+
+
+def test_Structure_build_filters_false(fix_Structure_build):
+    fix_Structure_build.add_filter(lambda x: False)
+    assert len(fix_Structure_build.filters) == 1
+    assert len(list(fix_Structure_build.filtered_atoms)) == 0
+
+    fix_Structure_build.pop_last_filter()
+    assert len(fix_Structure_build.filters) == 0
+
+
+
+@pytest.mark.parametrize(
+    'in1,expected',
+    [
+        (cif_example, 2559),
+        (pdb_example, 2692),
+        ]
+    )
+def test_Structure_filter_B(in1, expected):
+    s = Structure(in1.read_text())
+    s.build()
+    s.add_filter_chain('B')
+    result = list(s.filtered_atoms)
+    assert len(result) == expected
+
+
+def test_Structure_filter_ATOM(fix_Structure_build):
+    fix_Structure_build.add_filter_record_name('ATOM')
+    result = list(fix_Structure_build.filtered_atoms)
+    assert len(result) == 5118
+
+
+def test_Structure_filter_backbone(fix_Structure_build):
+    # CIF VIM REGEX: :%s/^ATOM.\{10}\(N\|CA\|C\|O\)\s.//n
+    # PDB VIM REGEX: :%s/^ATOM.\{9}\(N\|CA\|C\|O\)\s.//n
+    assert PDBParams.acol.name == 2
+    fix_Structure_build.add_filter(
+        lambda x: x[PDBParams.acol.name] in ('N', 'CA', 'O', 'C')
+        )
+    fix_Structure_build.add_filter_record_name('ATOM')
+    result = list(fix_Structure_build.filtered_atoms)
+    print(result)
+    assert len(result) == 2616
+
+
+
+
+def test_Structure_chainset():
+    """Test chain set."""
+    s = Structure(cif_example.read_text())
+    s.build()
+    assert s.chain_set == {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}
+
+
+def test_Structure_write(fix_Structure_build):
+    """Test save functionality."""
+    fix_Structure_build.add_filter_record_name('ATOM')
+    fix_Structure_build.add_filter(lambda x: int(x[PDBParams.acol.resseq]) < 11)
+    fix_Structure_build.add_filter_chain('A')
+
+    fout = Path('pdb_testing.pdb')
+    fix_Structure_build.write_PDB(fout)
+    result = fout.read_text()
+    expected = pdb_saved.read_text()
+    fout.unlink()
+    assert result == expected
+
+
+def test_Structure_write_empty_filter(fix_Structure_build):
+    """Test save functionality."""
+    fix_Structure_build.add_filter(lambda x: False)
+
+    fout = Path('pdb_testing.pdb')
+    with pytest.raises(EXCPTS.EmptyFilterError):
+        fix_Structure_build.write_PDB(fout)
+
+
+@pytest.mark.parametrize(
+    'example,parser',
+    [
+        (pdb_example, parse_pdb_to_array),
+        (cif_example, parse_cif_to_array),
+        ]
+    )
+def test_Structure_dispatch(example, parser):
+    """
+    Test Structure dispatch.
+
+    Structure should return the correct subclass.
+    """
+    result = detect_structure_type(example.read_text())
+    assert result == parser
+
+
+def test_structure_type_error():
+    """Raise error when parser not found."""
+    with pytest.raises(EXCPTS.ParserNotFoundError):
+        detect_structure_type(' ')
+

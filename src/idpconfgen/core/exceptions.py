@@ -125,3 +125,9 @@ class DSSPInputMissingError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
 
     errmsg = 'One of the two required positional arguments is missing.'
+
+
+class ParserNotFoundError(IDPConfGenException):
+    """Raises when parser for PDB/CIF file is not found."""
+
+    errmsg = 'Could not identity a proper parser.'
