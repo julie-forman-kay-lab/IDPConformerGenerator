@@ -208,13 +208,15 @@ class JoinedResults:
             ncores=1,
             TaskMethod=SubprocessTask,
             results_parser=str,
+            **kwargs,
             ):
         self.input_data = input_data
         self.cmd = command
         self.ncores = ncores
         self.TaskMethod = TaskMethod
         self.rp = results_parser
-        
+        self.kwargs = kwargs
+
     def build(self):
         """Build tasks, results and workers."""
         self.tasks = multiprocessing.JoinableQueue()
@@ -249,5 +251,10 @@ class JoinedResults:
         numjobs = len(self.input_data)
         self.results = []
         while numjobs:
-            self.results.append(self.rp(self.queue_results.get()))
+            self.results.append(
+                self.rp(
+                    self.queue_results.get(),
+                    **self.kwargs,
+                    )
+                )
             numjobs -= 1
