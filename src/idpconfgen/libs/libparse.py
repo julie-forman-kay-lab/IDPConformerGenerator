@@ -33,6 +33,10 @@ class DSSPParser:
         An identification for the DSSP file being parsed.
         Deafults to None.
 
+    reduced : bool
+        Whether or not to reduce secondary structure representation
+        only three types: loops 'L', helices 'H', and sheets 'E'.
+
     Attributes
     ----------
     ss : array
@@ -90,7 +94,9 @@ class DSSPParser:
         except IndexError as err:
             raise EXCPTS.DSSPParserError(self.pdbid) from err
 
-        self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']  # data starts afterthe header
+        # data starts afterthe header
+        # '!' appears in gap regions, so that line needs to be ignored.
+        self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']
 
         self.read_sec_structure()
         self.read_fasta()

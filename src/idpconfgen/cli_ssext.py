@@ -52,7 +52,10 @@ ap.add_argument(
 ap.add_argument(
     '-r',
     '--reduced',
-    help='Consider reduced nomenclature for secondary structure identity.',
+    help=(
+        'Reduces nomenclature for secondary structure identity '
+        'to \'L\', \'H\' and \'E\'.'
+        ),
     action='store_true',
     )
 
