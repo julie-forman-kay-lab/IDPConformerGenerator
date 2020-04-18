@@ -18,6 +18,93 @@ from idpconfgen.libs import libtimer
 from idpconfgen.logger import S, T
 
 
+PDBField = namedtuple('PDBField', ['slice', 'col'])
+
+# ATOM and HETATM fields
+
+
+
+atom_record = PDBField(slice(0, 6), 0)
+atom_serial = PDBField(slice(6, 11), 1)
+atom_name = PDBField(slice(12, 16), 2)
+atom_altLoc = PDBField(slice(16, 17), 3)
+atom_resName = PDBField(slice(17, 20), 4)
+atom_chainID = PDBField(slice(21, 22), 5)
+atom_resSeq = PDBField(slice(22, 26), 6)
+atom_iCode = PDBField(slice(26, 27), 7)
+atom_x = PDBField(slice(30, 38), 8)
+atom_y = PDBField(slice(38, 46), 9)
+atom_z = PDBField(slice(46, 54), 10)
+atom_occ = PDBField(slice(54, 60), 11)
+atom_temp = PDBField(slice(60, 66), 12)
+atom_segid = PDBField(slice(72, 76), 13)
+atom_element = PDBField(slice(76, 78), 14)
+atom_model = PDBField(slice(78, 80), 15)
+
+atom_slicers = [
+    atom_record,
+    atom_serial,
+    atom_name,
+    atom_altLoc,
+    atom_resName,
+    atom_chainID,
+    atom_resSeq,
+    atom_iCode,
+    atom_x,
+    atom_y,
+    atom_z,
+    atom_occ,
+    atom_temp,
+    atom_segid,
+    atom_element,
+    atom_model,
+    ]
+
+
+atom_line_formatter = (
+        "{:6s}"
+        "{:5d} "
+        "{}"
+        "{:1s}"
+        "{:3s} "
+        "{:1s}"
+        "{:4d}"
+        "{:1s}   "
+        "{:8.3f}"
+        "{:8.3f}"
+        "{:8.3f}"
+        "{:6.2f}"
+        "{:6.2f}      "
+        "{:<4s}"
+        "{:>2s}"
+        "{:2s}"
+        )
+
+# functions to apply to each format field in atom line string
+atom_format_funcs = [
+    str, int, format_atom_name, str, str,
+    format_chainid, int, str, float, float,
+    float, float, float, str, str,
+    str]
+
+
+def format_atom_name(atom):
+    a = atom.strip()
+    if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
+        return ' {:<3s}'.format(a)
+    else:
+        return '{:<4s}'.format(a)
+
+
+def format_chainid(chain):
+    """
+    Format chain identifier to one letter.
+
+    This is required to receive chain IDs from mmCIF files, which
+    may have more than one letter.
+    """
+    return chain.strip()[0]
+
 
 class _PDBParams:
     """
