@@ -23,6 +23,23 @@ PDBField = namedtuple('PDBField', ['slice', 'col'])
 # ATOM and HETATM fields
 
 
+def format_atom_name(atom):
+    a = atom.strip()
+    if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
+        return ' {:<3s}'.format(a)
+    else:
+        return '{:<4s}'.format(a)
+
+
+def format_chainid(chain):
+    """
+    Format chain identifier to one letter.
+
+    This is required to receive chain IDs from mmCIF files, which
+    may have more than one letter.
+    """
+    return chain.strip()[0]
+
 
 atom_record = PDBField(slice(0, 6), 0)
 atom_serial = PDBField(slice(6, 11), 1)
@@ -87,23 +104,6 @@ atom_format_funcs = [
     float, float, float, str, str,
     str]
 
-
-def format_atom_name(atom):
-    a = atom.strip()
-    if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
-        return ' {:<3s}'.format(a)
-    else:
-        return '{:<4s}'.format(a)
-
-
-def format_chainid(chain):
-    """
-    Format chain identifier to one letter.
-
-    This is required to receive chain IDs from mmCIF files, which
-    may have more than one letter.
-    """
-    return chain.strip()[0]
 
 
 class _PDBParams:
