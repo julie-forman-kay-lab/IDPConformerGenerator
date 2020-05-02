@@ -212,13 +212,16 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     p1, p2, p3 = it.tee(_exist, 3)
 
     f1 = filter(Path.is_dir, p1)
-    f2 = filter(lambda x: has_suffix(x, ext=listext), p2)
-    f3 = filter(
-        lambda x: x.is_file() \
+
+    partial2 = partial(has_suffix, ext=listext)
+    f2 = filter(partial2, p2)
+
+    def _is_f3(x):
+       return x.is_file() \
             and not has_suffix(x, ext=listext) \
-            and has_suffix(x, ext=ext),
-        p3,
-        )
+            and has_suffix(x, ext=ext)
+
+    f3 = filter(_is_f3, p3)
 
     files.extend(CFI(map(partial(LFR, ext=ext), f1)))
     files.extend(CFI(map(read_from_list, f2)))
@@ -227,6 +230,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     [log.error(S('file not found: {}', path)) for path in _not_exist]
 
     return sorted(files)
+
 
 
 def glob_folder(folder, ext):
