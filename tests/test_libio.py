@@ -1,6 +1,6 @@
 """Test I/O lib."""
 import pytest
-
+from pprint import pprint
 from idpconfgen import Path
 from idpconfgen.libs import libio
 
@@ -10,25 +10,25 @@ from . import tcommons
 def test_concatenate_1():
     """Test concatenate entries."""
     user_input = [
-        'IDDXCH',
+        'ABC1D',
         'somefile_that_does_not_exist.list',
-        Path(tcommons.data_folder, 'pdblist.list').str(),
-        Path(tcommons.data_folder, 'pdblist.list'),
+        Path(tcommons.iofiles_folder, 'file.list').str(),
+        Path(tcommons.iofiles_folder, 'file.list'),
         ]
 
     expected_output = [
-        'IDDXCH',
+        'ABC1D',
         'somefile_that_does_not_exist.list',
-        '123A\n',
-        '123AB\n',
-        '123ABC\n',
-        '123A90\n',
         '# some comment line\n',
-        '123A\n',
-        '123AB\n',
-        '123ABC\n',
-        '123A90\n',
+        'file6\n',
+        'file7\n',
+        'file8\n',
+        '\n',
         '# some comment line\n',
+        'file6\n',
+        'file7\n',
+        'file8\n',
+        '\n',
         ]
 
     output = libio.concatenate_entries(user_input)
@@ -45,14 +45,14 @@ def test_concatenate_2(in1):
 
 def test_check_file_exists_1():
     """Test with a file that exists."""
-    result = libio.check_file_exist([tcommons.data_folder / '1A12_A.pdb'])
+    result = libio.check_file_exist([tcommons.iofiles_folder / 'file1'])
     assert (True, []) == result
 
 
 def test_check_file_exists_2():
     """Test with a file that do not exist."""
     result = libio.check_file_exist([
-        tcommons.data_folder / '1A12_A.pdb',
+        tcommons.iofiles_folder / 'file1',
         'donotexist',
         ])
     assert (False, ['donotexist']) == result
@@ -89,85 +89,91 @@ def test_add_existent_files_2():
 
 def test_has_suffix_1():
     """Test ext is None."""
-    assert libio.has_suffix('file') is True
+    assert libio.has_suffix('file')
 
 
 def test_has_suffix_2():
     """Test ext is equals file."""
-    assert libio.has_suffix('file.pdb', ext='.pdb') is True
+    assert libio.has_suffix('file.pdb', ext='.pdb')
 
 
 def test_has_suffix_3():
     """Test ext is differs file."""
-    assert libio.has_suffix('file.csv', ext='.pdb') is False
+    assert not libio.has_suffix('file.csv', ext='.pdb')
 
 
 def test_has_suffix_4():
     """Test ext is None when file has ext."""
-    assert libio.has_suffix('file.csv') is True
+    assert libio.has_suffix('file.csv')
 
 
 def test_has_suffix_5():
     """Test ext differs without dot."""
-    assert libio.has_suffix('file.csv', ext='pdb') is False
+    assert not libio.has_suffix('file.csv', ext='pdb')
 
 
 def test_has_suffix_6():
     """Test ext correct without dot."""
-    assert libio.has_suffix('file.csv', ext='csv') is True
+    assert libio.has_suffix('file.csv', ext='csv')
 
 
 def test_list_recursively_1():
-    """Test finds .pdb files."""
+    """Test finds .ext files."""
     files = libio.list_files_recursively(
-        tcommons.data_folder,
-        ext='.pdb',
+        tcommons.iofiles_folder,
+        ext='.ext',
         )
 
-    assert files == [Path(tcommons.data_folder, '1A12_A.pdb')]
+    expected = [
+        Path(tcommons.iofiles_folder, 'file.ext'),
+        Path(tcommons.iofiles_folder, 'other_files', 'file2.ext'),
+        ]
+
+    assert files == expected
 
 
 def test_list_files_recursively_1():
     """Test None as  extention."""
-    files = libio.list_files_recursively(
-        tcommons.data_folder,
-        )
-    
+    files = libio.list_files_recursively(tcommons.iofiles_folder)
+
     expected = [
-        tcommons.data_folder.joinpath(p) for p in [
-            '1ABC_D.dssp',
-            '1ABC_E.dssp',
-            'wrong.dssp',
-            'wrong2.dssp',
-            '1A12_A.pdb',
-            'cull.list',
-            'pdblist.list',
-            'path_bundle.flist',
+        tcommons.iofiles_folder.joinpath(p) for p in [
+            'file1',
+            'file2',
+            'file3',
+            'file6',
+            'file7',
+            'file8',
+            'file.ext',
+            'file.list',
+            'README',
+            Path('other_files', 'file2.ext'),
+            Path('other_files', 'file4'),
+            Path('other_files', 'file5'),
             ]
         ]
-    
+
     assert sorted(files) == sorted(expected)
 
 
-def test_list_files_recursively_2():
-    """Test pdb extention."""
+@pytest.mark.parametrize(
+    'ext',
+    ['ext', '.ext'],
+    )
+def test_list_files_recursively_2(ext):
+    """Test ext extention."""
     files = libio.list_files_recursively(
-        tcommons.data_folder,
-        ext='pdb',
+        tcommons.iofiles_folder,
+        ext=ext,
         )
-    
-    expected = [tcommons.data_folder.joinpath(p) for p in ['1A12_A.pdb']]
-    
-    assert sorted(files) == sorted(expected)
 
+    expected = [
+        tcommons.iofiles_folder.joinpath(p) for p in [
+            Path('other_files', 'file2.ext'),
+            'file.ext',
+            ]
+        ]
 
-def test_list_files_recursively_3():
-    """Test .pdb."""
-    files = libio.list_files_recursively(
-        tcommons.data_folder,
-        ext='.pdb',
-        )
-    expected = [tcommons.data_folder.joinpath(p) for p in ['1A12_A.pdb']]
     assert sorted(files) == sorted(expected)
 
 
@@ -182,89 +188,43 @@ def test_read_path_bundle_typeerror(in1):
     'in1,ext,expected',
     [
         (
-            [tcommons.data_folder],
-            None,
-            [
-                Path(tcommons.data_folder, '1A12_A.pdb'),
-                Path(tcommons.data_folder, '1ABC_D.dssp'),
-                Path(tcommons.data_folder, '1ABC_E.dssp'),
-                Path(tcommons.data_folder, 'cull.list'),
-                Path(tcommons.data_folder, 'pdblist.list'),
-                Path(tcommons.data_folder, 'wrong.dssp'),
-                Path(tcommons.data_folder, 'wrong2.dssp'),
-                ]
-            ),
-        (
-            [
-                tcommons.data_folder,
-                Path(tcommons.data_folder, 'path_bundle.flist'),
-                Path(tcommons.data_folder, 'noexist_bundle.flist'),
-                ],
-            None,
-            [
-                Path(tcommons.project_folder, 'setup.py'),
-                Path(tcommons.data_folder, '1A12_A.pdb'),
-                Path(tcommons.data_folder, '1ABC_D.dssp'),
-                Path(tcommons.data_folder, '1ABC_E.dssp'),
-                Path(tcommons.data_folder, 'cull.list'),
-                Path(tcommons.data_folder, 'pdblist.list'),
-                Path(tcommons.data_folder, 'wrong.dssp'),
-                Path(tcommons.data_folder, 'wrong2.dssp'),
-                ]
-            ),
-        (
-            [Path(tcommons.data_folder, 'path_bundle.flist')],
-            None,
-            [
-                Path(tcommons.project_folder, 'setup.py'),
-                ]
-            ),
-        (
-            [tcommons.data_folder],
-            '.pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
-            ),
-        (
-            [tcommons.data_folder],
-            'pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
-            ),
-        (
-            [tcommons.data_folder],
-            '.none',
-            [],
-            ),
-        ]
+        [
+            tcommons.iofiles_folder / 'file1',
+            tcommons.iofiles_folder / 'other_files',
+            tcommons.iofiles_folder / 'file.list',
+            ],
+        None,
+        [
+            tcommons.iofiles_folder / 'file1',
+            Path('file6'),
+            Path('file7'),
+            Path('file8'),
+            tcommons.iofiles_folder / 'other_files' / 'file2.ext',
+            tcommons.iofiles_folder / 'other_files' / 'file4',
+            tcommons.iofiles_folder / 'other_files' / 'file5',
+            ]
+        )]
     )
 def test_read_bundle_inputs(in1, ext, expected):
     """Test read_bundle multiple inputs."""
-    assert expected == libio.read_path_bundle(in1, ext=ext)
+    result = libio.read_path_bundle(in1, ext=ext, listext='.list')
+    pprint(result)
+    assert sorted(expected) == result
 
 
 @pytest.mark.parametrize(
     'in1,ext,expected',
     [
         (
-            tcommons.data_folder,
-            '.pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            tcommons.iofiles_folder,
+            '.ext',
+            [tcommons.iofiles_folder / 'file.ext'],
             ),
         (
-            tcommons.data_folder,
-            'pdb',
-            [Path(tcommons.data_folder, '1A12_A.pdb')],
+            tcommons.iofiles_folder / 'other_files',
+            'ext',
+            [tcommons.iofiles_folder / 'other_files' / 'file2.ext'],
             ),
-        (
-            tcommons.data_folder,
-            '.dssp',
-            [
-                Path(tcommons.data_folder, '1ABC_D.dssp'),
-                Path(tcommons.data_folder, '1ABC_E.dssp'),
-                Path(tcommons.data_folder, 'wrong.dssp'),
-                Path(tcommons.data_folder, 'wrong2.dssp'),
-                ],
-            ),
-        (tcommons.data_folder, '.none', []),
         ]
     )
 def test_glob_folder(in1, ext, expected):

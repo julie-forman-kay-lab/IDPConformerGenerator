@@ -1,4 +1,5 @@
 """Functions and Classes regarding Input/Output."""
+import itertools as it
 import glob
 import os
 from functools import partial
@@ -17,7 +18,7 @@ def concatenate_entries(entry_list):
     entry lists. Single entries in the input list are used directly
     while files are read and their lines added one by one to the
     concatenated list.
-    
+
     Notice:
         Does not descriminate between single entries and mispelled
         file paths. Every string that cannot be openned as path
@@ -48,7 +49,7 @@ def concatenate_entries(entry_list):
 def check_file_exist(files_list):
     """
     Confirm all files in a list exist.
-    
+
     Logs each entry for each file not found.
 
     Parameters
@@ -67,13 +68,15 @@ def check_file_exist(files_list):
     """
     log.info(T('checking files exist'))
 
+    # list() because of the return statement
     files_not_found = list(filter(
-        lambda x: not Path(x).exists(),
-        files_list))
-    
+        lambda x: not Path(x).is_file(),
+        files_list,
+        ))
+
     for file_ in files_not_found:
         log.info(S('File NOT found: {}', file_))
-    
+
     return not bool(files_not_found), files_not_found
 
 
@@ -106,7 +109,7 @@ def has_suffix(path, ext=None):
 def list_files_recursively(folder, ext=None):
     """
     List files recursively from source folder.
-    
+
     Parameters
     ----------
     folder : string or Path
@@ -124,14 +127,15 @@ def list_files_recursively(folder, ext=None):
     """
     files_list = []
     for root, _subdirs, files in os.walk(folder):
-        
+
         only_ext = filter(
             partial(has_suffix, ext=ext),
             files,
             )
-        
+
         for file_ in only_ext:
-            files_list.append(Path(root, file_))
+            files_list.append(Path(root, file_).resolve())
+
     return files_list
 
 
@@ -140,7 +144,7 @@ def add_existent_files(storage, source):
     Add files that exist to a list.
 
     Given a list of `source` Paths, if Path exist adds it to `storage`.
-    
+
     Adds Path instances.
     """
     for path in source:
@@ -149,6 +153,14 @@ def add_existent_files(storage, source):
             storage.append(p)
         else:
             log.error(S('file not found: {}', p.str()))
+
+
+def read_from_list(path):
+    with open(path, 'r') as fin:
+        lines = map(str.strip, fin.readlines())
+        valid = filter(bool, lines)
+        no_comments = filter(lambda x: not x.startswith('#'), valid)
+        return list(map(Path, no_comments))
 
 
 @libcheck.argstype((list, tuple),)
@@ -163,15 +175,15 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
 
     If a string points to a folder, registers all files in that folder
         that have extension `ext`, recursively.
-    
+
     If a string points to a file with extension `listext`, registers
         all files refered in the `listext` file that exist in disk.
-    
+
     Parameters
     ----------
     path_bundle : list-like
         A list containing strings or paths that point to files or folders.
-    
+
     ext : string
         The file extension to consider. If ``None`` considers all files.
         Defaults to ``None``.
@@ -185,47 +197,41 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     list
         A sorted list of all the files registered that exist in the disk.
     """
-    func = add_existent_files
-    hsuffix = has_suffix
-
     files = []
-    
-    folders = filter(
-        lambda x: Path(x).is_dir(),
-        path_bundle,
-        )
 
-    extfiles = filter(
-        partial(hsuffix, ext=ext),
-        path_bundle,
-        )
+    LFR = list_files_recursively
+    CFI = it.chain.from_iterable
 
-    listfiles = filter(
-        partial(hsuffix, ext=listext),
-        path_bundle,
-        )
-    
-    for folder in folders:
-        files.extend(list_files_recursively(folder, ext=ext))
+    pbundle, pbundle2 = it.tee(map(Path, path_bundle))
 
-    func(files, extfiles)
-   
-    for path in listfiles:
-        try:
-            with path.open('r') as fh:
-                possible_files = [l.strip() for l in fh.readlines()]
-        except FileNotFoundError:
-            log.error(S('file not found: {}', path))
-            continue
-        
-        files_w_ext = filter(
-            partial(hsuffix, ext=ext),
-            possible_files,
-            )
+    _exist = filter(Path.exists, pbundle)
+    _not_exist = filter(lambda x: not x.exists(), pbundle2)
 
-        func(files, files_w_ext)
-    
-    return sorted(p for p in files if p.suffix != listext)
+    p1, p2, p3 = it.tee(_exist, 3)
+
+    # is dir filter
+    f1 = filter(Path.is_dir, p1)
+
+    # reads list files
+    partial2 = partial(has_suffix, ext=listext)
+    f2 = filter(partial2, p2)
+
+    # files with valid extension
+    def _is_f3(x):
+       return x.is_file() \
+            and not has_suffix(x, ext=listext) \
+            and has_suffix(x, ext=ext)
+
+    f3 = filter(_is_f3, p3)
+
+    # appends everything
+    files.extend(CFI(map(partial(LFR, ext=ext), f1)))
+    files.extend(CFI(map(read_from_list, f2)))
+    files.extend(f3)
+
+    [log.error(S('file not found: {}', path)) for path in _not_exist]
+
+    return sorted(files)
 
 
 def glob_folder(folder, ext):
@@ -248,7 +254,7 @@ def glob_folder(folder, ext):
     list of Path objects
         SORTED list of matching results.
     """
-    ext = f"*.{ext.strip().lstrip('*').lstrip('.')}"
+    ext = f'*.{ext[ext.find(".") + 1:]}'
     files = sorted(glob.glob(Path(folder, ext).str()))
     log.debug(f'folder {folder} read {len(files)} files with extension {ext}')
     return [Path(p) for p in files]
