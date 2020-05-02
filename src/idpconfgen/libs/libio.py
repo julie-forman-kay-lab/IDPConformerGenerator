@@ -220,9 +220,9 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
         p3,
         )
 
-    files.extend(CFI(LFR(p, ext=ext) for p in f1))
-    files.extend(CFI(read_from_list(p) for p in f2))
-    files.extend(p for p in f3)
+    files.extend(CFI(map(partial(LFR, ext=ext), f1)))
+    files.extend(CFI(map(read_from_list, f2)))
+    files.extend(f3)
 
     [log.error(S('file not found: {}', path)) for path in _not_exist]
 
