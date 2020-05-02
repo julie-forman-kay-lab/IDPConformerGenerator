@@ -162,8 +162,6 @@ def read_from_list(path):
         no_comments = filter(lambda x: not x.startswith('#'), valid)
         return list(map(Path, no_comments))
 
-    #return [p.strip() for p in Path(path).read_text().split('\n') if not p.startswith('#')]
-
 
 @libcheck.argstype((list, tuple),)
 def read_path_bundle(path_bundle, ext=None, listext='.flist'):
@@ -211,11 +209,14 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
 
     p1, p2, p3 = it.tee(_exist, 3)
 
+    # is dir filter
     f1 = filter(Path.is_dir, p1)
 
+    # reads list files
     partial2 = partial(has_suffix, ext=listext)
     f2 = filter(partial2, p2)
 
+    # files with valid extension
     def _is_f3(x):
        return x.is_file() \
             and not has_suffix(x, ext=listext) \
@@ -223,6 +224,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
 
     f3 = filter(_is_f3, p3)
 
+    # appends everything
     files.extend(CFI(map(partial(LFR, ext=ext), f1)))
     files.extend(CFI(map(read_from_list, f2)))
     files.extend(f3)
@@ -230,7 +232,6 @@ def read_path_bundle(path_bundle, ext=None, listext='.flist'):
     [log.error(S('file not found: {}', path)) for path in _not_exist]
 
     return sorted(files)
-
 
 
 def glob_folder(folder, ext):
