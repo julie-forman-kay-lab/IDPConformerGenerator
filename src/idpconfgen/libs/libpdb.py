@@ -58,6 +58,7 @@ atom_segid = PDBField(slice(72, 76), 13)
 atom_element = PDBField(slice(76, 78), 14)
 atom_model = PDBField(slice(78, 80), 15)
 
+# order matters
 atom_slicers = [
     atom_record,
     atom_serial,
@@ -103,116 +104,6 @@ atom_format_funcs = [
     format_chainid, int, str, float, float,
     float, float, float, str, str,
     str]
-
-
-
-class _PDBParams:
-    """
-    Namespace for `PDB format v3`_.
-
-    .. _old PDB format: http://www.wwpdb.org/documentation/file-format-content/format33/sect9.html
-    """  # noqa: E501
-
-    _init = False
-
-    def __init__(self):
-
-        # slicers of the ATOM and HETATM lines
-        self.atom_record = slice(0, 6)
-        self.atom_serial = slice(6, 11)
-        self.atom_name = slice(12, 16)
-        self.atom_altloc = slice(16, 17)
-        self.atom_resname = slice(17, 20)
-        self.atom_chainid = slice(21, 22)
-        self.atom_resseq = slice(22, 26)
-        self.atom_icode = slice(26, 27)
-        self.atom_xcoord = slice(30, 38)
-        self.atom_ycoord = slice(38, 46)
-        self.atom_zcoord = slice(46, 54)
-        self.atom_occupancy = slice(54, 60)
-        self.atom_tempfactor = slice(60, 66)
-        self.atom_segid = slice(72, 76)
-        self.atom_element = slice(76, 78)
-        self.atom_charge = slice(78, 80)
-
-        self.line_formatter = (
-                "{:6s}"
-                "{:5d} "
-                "{}"
-                "{:1s}"
-                "{:3s} "
-                "{:1s}"
-                "{:4d}"
-                "{:1s}   "
-                "{:8.3f}"
-                "{:8.3f}"
-                "{:8.3f}"
-                "{:6.2f}"
-                "{:6.2f}      "
-                "{:<4s}"
-                "{:>2s}"
-                "{:2s}"
-                )
-        # 5 functions each line
-        self.format_funcs = [
-            str, int, self.format_atom, str, str,
-            self.format_chain, int, str, float, float,
-            float, float, float, str, str,
-            str]
-        assert count_string_formatters(self.line_formatter) == len(self.format_funcs)
-
-        # Attributes for the ATOM/HETATM lines
-        self.__dict__['_atom_attrs'] = list(filter(
-            lambda x: x[0].startswith('atom_'),
-            self.__dict__.items(),
-            ))
-        assert self._atom_attrs
-
-        self.__dict__['atom_slicers'] = [s[1] for s in self._atom_attrs]
-        assert self.atom_slicers
-        assert all(isinstance(s, slice) for s in self.atom_slicers)
-
-
-        # The columns of the different PDB ATOM fields
-        atom_attr_names = [s[0][5:] for s in self._atom_attrs]
-        assert len(atom_attr_names) == len(self._atom_attrs)
-        assert all(isinstance(s, str) for s in atom_attr_names)
-
-        AtomCols = namedtuple('AtomCols', atom_attr_names)
-        # range here because of the number of the columns
-        self.__dict__['acol'] = AtomCols(*range(len(self._atom_attrs)))
-        assert all(isinstance(i, int) for i in self.acol)
-        assert self.acol.chainid == 5
-
-        self._init = True
-        return
-
-    def __setattr__(self, *args):
-        if self._init:
-            errmsg = f'Can not set attributes to {self.__class__}'
-            raise NotImplementedError(errmsg)
-        super().__setattr__(*args)
-
-    @staticmethod
-    def format_atom(atom):
-        a = atom.strip()
-        if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
-            return ' {:<3s}'.format(a)
-        else:
-            return '{:<4s}'.format(a)
-
-    @staticmethod
-    def format_chain(chain):
-        """
-        Format chain identifier to one letter.
-
-        This is required to receive chain IDs from mmCIF files, which
-        may have more than one letter.
-        """
-        return chain.strip()[0]
-
-# instantiates singleton-like
-PDBParams = _PDBParams()
 
 
 def is_pdb(datastr):
