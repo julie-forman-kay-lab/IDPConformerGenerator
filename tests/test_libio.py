@@ -1,5 +1,7 @@
 """Test I/O lib."""
+import collections
 import pytest
+import types
 from pprint import pprint
 from idpconfgen import Path
 from idpconfgen.libs import libio
@@ -19,21 +21,25 @@ def test_concatenate_1():
     expected_output = [
         'ABC1D',
         'somefile_that_does_not_exist.list',
-        '# some comment line\n',
-        'file6\n',
-        'file7\n',
-        'file8\n',
-        '\n',
-        '# some comment line\n',
-        'file6\n',
-        'file7\n',
-        'file8\n',
-        '\n',
+        '# some comment line',
+        'file6',
+        'file7',
+        'file8',
+        '# some comment line',
+        'file6',
+        'file7',
+        'file8',
         ]
 
     output = libio.concatenate_entries(user_input)
 
     assert expected_output == output
+
+
+def test_paths_from_flist():
+    result = libio.paths_from_flist(tcommons.iofiles_folder / 'file.list')
+    assert isinstance(result, collections.Iterable)
+    assert list(result) == [Path(f'file{i}') for i in range(6,9)]
 
 
 @pytest.mark.parametrize('in1', ['string', 1, 1.0, Path('somepath')])
@@ -46,7 +52,7 @@ def test_concatenate_2(in1):
 def test_check_file_exists_1():
     """Test with a file that exists."""
     result = libio.check_file_exist([tcommons.iofiles_folder / 'file1'])
-    assert (True, []) == result
+    assert any(result)
 
 
 def test_check_file_exists_2():
@@ -55,7 +61,7 @@ def test_check_file_exists_2():
         tcommons.iofiles_folder / 'file1',
         'donotexist',
         ])
-    assert (False, ['donotexist']) == result
+    assert (False, [Path('donotexist')]) == result
 
 
 @pytest.mark.parametrize('in1', [1, 1.0, 's', Path('p')])
@@ -129,7 +135,7 @@ def test_list_recursively_1():
         Path(tcommons.iofiles_folder, 'other_files', 'file2.ext'),
         ]
 
-    assert files == expected
+    assert list(files) == expected
 
 
 def test_list_files_recursively_1():
@@ -208,8 +214,7 @@ def test_read_path_bundle_typeerror(in1):
 def test_read_bundle_inputs(in1, ext, expected):
     """Test read_bundle multiple inputs."""
     result = libio.read_path_bundle(in1, ext=ext, listext='.list')
-    pprint(result)
-    assert sorted(expected) == result
+    assert sorted(expected) == sorted(result)
 
 
 @pytest.mark.parametrize(
