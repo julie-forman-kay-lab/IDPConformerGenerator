@@ -6,16 +6,16 @@ import functools
 def argstype(*types):
     """
     Decorate a function to check for args types.
-    
+
     @argstype(type1, type2, (type3, type4))
-    
+
     For each function argument provide a type or a tuple of types.
     """
     def decorator(func):
-        
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-           
+
             for arg, type_ in zip(args, types):
                 if not isinstance(arg, type_):
                     raise TypeError(

@@ -7,8 +7,9 @@ from idpconfgen import Path
 tests_folder = Path(__file__).myparents()
 
 project_folder = tests_folder.parents[0]
-
+iofiles_folder = Path(tests_folder, 'readfiles')
 data_folder = Path(tests_folder, 'data')
+
 pdb_example = Path(data_folder, 'pdb_example.pdb')
 cif_example = Path(data_folder, 'cif_example.cif')
 cif_example_auth = Path(data_folder, 'cif_example_auth.cif')
@@ -42,6 +43,7 @@ cif_example_headers = [
     ]
 
 pdb_saved = Path(data_folder, 'pdb_saved.pdb')
+
 
 folder_output = Path(
     tests_folder,
