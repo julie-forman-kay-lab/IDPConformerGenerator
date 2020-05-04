@@ -208,13 +208,15 @@ class JoinedResults:
             ncores=1,
             TaskMethod=SubprocessTask,
             results_parser=str,
+            **kwargs,
             ):
         self.input_data = input_data
         self.cmd = command
         self.ncores = ncores
         self.TaskMethod = TaskMethod
         self.rp = results_parser
-        
+        self.kwargs = kwargs
+
     def build(self):
         """Build tasks, results and workers."""
         self.tasks = multiprocessing.JoinableQueue()
@@ -222,23 +224,25 @@ class JoinedResults:
         self.workers = \
             [Worker(self.tasks, self.queue_results)
                 for i in range(self.ncores)]
-    
+
     def run(self):
         """
         Run tasks.
-        
+
         Executes .build() method beforehand.
 
         Results are saved in the attribute `results` list, this is
         sorted naturally by the order of subprocess termination.
         """
         self.build()
-        
+
         for w in self.workers:
             w.start()
 
+        numjobs = 0
         for input_datum in self.input_data:
             self.tasks.put(self.TaskMethod(self.cmd, input_datum))
+            numjobs += 1
 
         # Adds a poison pill
         for _w in self.workers:
@@ -246,8 +250,12 @@ class JoinedResults:
 
         self.tasks.join()
 
-        numjobs = len(self.input_data)
         self.results = []
         while numjobs:
-            self.results.append(self.rp(self.queue_results.get()))
+            self.results.append(
+                self.rp(
+                    self.queue_results.get(),
+                    **self.kwargs,
+                    )
+                )
             numjobs -= 1

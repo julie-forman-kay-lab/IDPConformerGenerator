@@ -50,6 +50,16 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-r',
+    '--reduced',
+    help=(
+        'Reduces nomenclature for secondary structure identity '
+        'to \'L\', \'H\' and \'E\'.'
+        ),
+    action='store_true',
+    )
+
+ap.add_argument(
     '-n',
     '--ncores',
     help='Number of cores to use',
@@ -78,6 +88,7 @@ def main(
         pdbs,
         output=None,
         ncores=1,
+        reduced=False,
         **kwargs,
         ):
     """
@@ -100,7 +111,7 @@ def main(
     """
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
-    
+
     log.info(T('reading input paths'))
     pdbs = libio.read_path_bundle(pdbs)
     log.info(S('done'))
@@ -113,10 +124,11 @@ def main(
         ncores=ncores,
         TaskMethod=libmulticore.DSSPTask,
         results_parser=libparse.DSSPParser.from_data_id_tuple,
+        reduced=reduced,
         )
     log.info(S('executing...'))
     ss_ext_exec.run()
-    
+
     log.info(T('exporting output to: {}', output))
     libparse.export_ss_from_DSSP(*ss_ext_exec.results, output=output)
 

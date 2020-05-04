@@ -9,6 +9,7 @@ tests_folder = Path(__file__).myparents()
 project_folder = tests_folder.parents[0]
 
 data_folder = Path(tests_folder, 'data')
+iofiles_folder = Path(tests_folder, 'readfiles')
 
 folder_output = Path(
     tests_folder,
