@@ -1,0 +1,105 @@
+@startuml
+
+
+package libcif {
+class CIFParser {
+a
+}
+
+object find_cif_atom_site_headers
+object is_cif
+object parse_cif_line
+object populate_cif_dictionary
+
+CIFParser -down-> find_cif_atom_site_headers
+
+find_cif_atom_site_headers  #-down-  is_cif                   #lightgrey
+is_cif                      #-down-  parse_cif_line           #lightgrey
+parse_cif_line              #-down-  populate_cif_dictionary  #lightgrey
+
+}
+
+
+package libpdb {
+object _nothing
+object atom_
+object atom_format_funcs
+object atom_line_formatter
+object atom_slicers
+object format_atom_name
+object format_chainid
+object is_pdb
+
+_nothing             #-down-  atom_                #lightgrey
+atom_                #-down-  atom_format_funcs    #lightgrey
+atom_format_funcs    #-down-  atom_line_formatter  #lightgrey
+atom_line_formatter  #-down-  atom_slicers         #lightgrey
+atom_slicers         #-down-  format_atom_name     #lightgrey
+format_atom_name     #-down-  format_chainid       #lightgrey
+format_chainid       #-down-  is_pdb               #lightgrey
+
+}
+
+package libstructure {
+class Structure {
++chain_set
++filtered_atoms
+-_data_str, del after .buil
+-_filters
+-_structure_parser
++add_filter()
++add_filter_chain()
++add_filter_record_name()
++build()
++clear_filters()
++data_array
++pop_last_filter()
++write_PDB()
+}
+
+object cols
+object detect_structure_type
+object filter_record_lines
+object gen_empty_structure_data_array
+object get_datastr
+object parse_cif_to_array
+object populate_structure_array_from_pdb
+object record_headings
+object structure_parsers
+object structure_to_pdb
+object type2string
+object write_PDB
+
+Structure -down-> cols
+
+cols                               #-down-  detect_structure_type              #lightgrey
+detect_structure_type              #-down-  filter_record_lines                #lightgrey
+filter_record_lines                #-down-  gen_empty_structure_data_array     #lightgrey
+gen_empty_structure_data_array     #-down-  get_datastr                        #lightgrey
+get_datastr                        #-down-  parse_cif_to_array                 #lightgrey
+parse_cif_to_array                 #-down-  parse_pdb_to_array                 #lightgrey
+parse_pdb_to_array                 #-down-  populate_structure_array_from_pdb  #lightgrey
+populate_structure_array_from_pdb  #-down-  record_headings                    #lightgrey
+record_headings                    #-down-  structure_parsers                  #lightgrey
+structure_parsers                  #-down-  structure_to_pdb                   #lightgrey
+structure_to_pdb                   #-down-  type2string                        #lightgrey
+type2string                        #-down-  write_PDB                          #lightgrey
+
+gen_empty_structure_data_array     -right->  atom_slicers
+parse_cif_to_array                 -left->   CIFParser
+populate_structure_array_from_pdb  -right->  atom_slicers
+structure_parsers                  -left->   is_cif
+structure_parsers                  -right->  is_pdb
+structure_to_pdb                   -right->  atom_format_funcs
+structure_to_pdb                   -right->  atom_line_formatter
+structure_to_pdb                   -right->  format_atom_name
+
+}
+
+
+libstructure  -right[hidden]->  libpdb
+libstructure  -left[hidden]->   libcif
+
+
+
+@enduml
