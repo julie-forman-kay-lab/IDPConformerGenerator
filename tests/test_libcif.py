@@ -105,7 +105,7 @@ def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
     )
 def test_populate_cif_dictionary_errors(args):
     """Test CIF without hash raise error."""
-    with pytest.raises(EXCPTS.CIFFileError):
+    with pytest.raises(EXCPTS.CIFFileError) as err:
         populate_cif_dictionary(*args)
 
 

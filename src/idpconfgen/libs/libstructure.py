@@ -46,9 +46,18 @@ class Structure:
     selection to a file.
     >>> s = Structure('1ABC.cif')
     >>> s.build()
-    >>> s.add_filter(lambda x: int(x[libpdb.atom_resSeq]) > 50)
+    >>> s.add_filter(lambda x: int(x[col_resSeq]) > 50)
     >>> s.write_PDB('out.pdb')
     """
+
+    __slots__ = [
+        '_datastr',
+        '_filters',
+        '_structure_parser',
+        'data_array',
+        'kwargs',
+        ]
+
     def __init__(self, data, **kwargs):
 
         datastr = get_datastr(data)

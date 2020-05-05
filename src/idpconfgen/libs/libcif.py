@@ -8,6 +8,13 @@ from idpconfgen.core import exceptions as EXCPTS
 class CIFParser:
     """
     """
+
+    __slots__ = [
+        '_len',
+        '_line',
+        'cif_dict',
+        ]
+
     def __init__(self, datastr):
         """
         """
@@ -224,18 +231,15 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
         if len(ls) != valid_len:
             errmsg = (
-                "Fields in line do not match number of excepted `_atom_site.` fields.\n"
-                f"Line read: {line}\n"
+                "Fields in line do not match number of excepted `_atom_site.*` "
+                "fields.\n"
+                f"Line read: {line!r}\n"
                 f"At: start index {start_index}, counter {counter}."
                 )
-            raise EXCPTS.CIFFileError(errmsg)
+            raise EXCPTS.CIFFileError(errmsg=errmsg)
 
         for i, key in enumerate(cif_dict.keys()):
-            #try:
             cif_dict[key].append(ls[i])
-            #except IndexError as err:
-                #errmsg = f'CIF line did not split properly: {ls}'
-                #EXCPTS.CIFFileError(errmsg)
 
         counter += 1
 

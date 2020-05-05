@@ -24,8 +24,8 @@ from idpconfgen.logger import S, T
 
 
 def format_atom_name(atom, element):
-    #a = atom.strip()
-    if element in ('C', 'N', 'O', 'S'):
+    a = atom.strip()
+    if element in ('H', 'C', 'N', 'O', 'S'):
         if len(atom) < 4:
             return ' {:<3s}'.format(atom)
         else:
@@ -105,12 +105,14 @@ atom_line_formatter = (
         )
 
 # functions to apply to each format field in atom line string
+def _nothing(x): return x
+
 atom_format_funcs = [
     #str, int, format_atom_name, str, str,
-    str, int, str.strip, str, str,
-    format_chainid, int, str, float, float,
-    float, float, float, str, str,
-    str]
+    _nothing, int, _nothing, _nothing, _nothing,
+    format_chainid, int, _nothing, float, float,
+    float, float, float, _nothing, _nothing,
+    _nothing]
 
 
 def is_pdb(datastr):
@@ -202,12 +204,9 @@ class PDBList:
 
     def __new__(cls, pdb_names):  # noqa: D102
 
-        try:
-            if isinstance(pdb_names, cls):
-                return pdb_names
-            else:
-                return super().__new__(cls)
-        except IndexError:
+        if isinstance(pdb_names, cls):
+            return pdb_names
+        else:
             return super().__new__(cls)
 
     def __init__(self, pdb_names):
@@ -225,7 +224,7 @@ class PDBList:
             )
 
     def __str__(self):
-        return '{} with {} elements'.format(
+        return '{} with {} element(s).'.format(
             self.__class__.__name__,
             len(self),
             )
