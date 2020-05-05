@@ -94,7 +94,7 @@ class Structure:
     @property
     def chain_set(self):
         """All chain IDs present in the raw dataset."""  # noqa: D401
-        return set(self.data_array[:, libpdb.atom_chainID.col])
+        return set(self.data_array[:, col_chainID])
 
     def pop_last_filter(self):
         self._filters.pop()
@@ -106,12 +106,12 @@ class Structure:
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
         self.filters.append(
-            lambda x: x[libpdb.atom_record.col].startswith(record_name)
+            lambda x: x[col_record].startswith(record_name)
             )
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
-        self.filters.append(lambda x: x[libpdb.atom_chainID.col] == chain)
+        self.filters.append(lambda x: x[col_chainID] == chain)
 
     def write_PDB(self, filename, start=None, stop=None, step=None):
         lines = structure_to_pdb(self.filtered_atoms)
@@ -260,19 +260,29 @@ def structure_to_pdb(atoms):
 
     for line in atoms:
         values = [func(i) for i, func in zip(line, libpdb.atom_format_funcs)]
-        values[libpdb.atom_name.col] = libpdb.format_atom_name(
-            values[libpdb.atom_name.col],
-            values[libpdb.atom_element.col],
+        values[col_name] = libpdb.format_atom_name(
+            values[col_name],
+            values[col_element],
             )
         yield libpdb.atom_line_formatter.format(*values)
-#
-#    return (
-#        libpdb.line_formatter.format(
-#            *(func(i) for i, func in zip(line, libpdb.format_funcs))
-#            )
-#        for line in atoms
-#        )
 
+
+col_record = 0
+col_serial = 1
+col_name = 2
+col_altLoc = 3
+col_resName = 4
+col_chainID = 5
+col_resSeq = 6
+col_iCode = 7
+col_x = 8
+col_y = 9
+col_z = 10
+col_occ = 11
+col_temp = 12
+col_segid = 13
+col_element = 14
+col_model = 15
 
 # this servers read_pdb_data_to_array mainly
 # it is here for performance
