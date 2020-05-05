@@ -11,6 +11,8 @@ iofiles_folder = Path(tests_folder, 'readfiles')
 data_folder = Path(tests_folder, 'data')
 
 pdb_example = Path(data_folder, 'pdb_example.pdb')
+pdb_models = Path(data_folder, 'pdb_models.pdb')
+pdb_models_output = Path(data_folder, 'pdb_models_output.pdb')
 cif_example = Path(data_folder, 'cif_example.cif')
 cif_example_auth = Path(data_folder, 'cif_example_auth.cif')
 cif_example_noasymid = Path(data_folder, 'cif_example_noasymid.cif')

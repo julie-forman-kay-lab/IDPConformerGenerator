@@ -3,11 +3,11 @@ from pathlib import Path
 
 import pytest
 
+from idpconfgen.libs import libpdb
 from idpconfgen.libs.libpdb import (
     PDBID,
     PDBIDFactory,
     PDBList,
-    PDBParams,
     is_pdb,
     )
 
@@ -27,31 +27,25 @@ def test_is_function(is_func, structure, expected):
 
 
 @pytest.mark.parametrize(
-    'atom,expected',
+    'atom,element,expected',
     [
-        ('N', ' N  '),
-        ('CO', ' CO '),
-        ('FE', 'FE  '),
-        ('OD1', ' OD1'),
+        ('N', 'N', ' N  '),
+        ('CO', 'C', ' CO '),
+        ('CA', 'CA', 'CA  '),
+        ('CHA', 'C', ' CHA'),
+        ('FE', 'FE', 'FE  '),
+        ('OD1', 'O', ' OD1'),
         ]
     )
-def test_format_atoms(atom, expected):
-    """Test PDBParams format atom."""
-    assert PDBParams.format_atom(atom) == expected
+def test_format_atoms(atom, element, expected):
+    """Test format atom."""
+    assert libpdb.format_atom_name(atom, element) == expected
 
 
-
-def test_PDBParams():
+def test_format_chain():
     """
     """
-    with pytest.raises(NotImplementedError):
-        PDBParams.some_attr = None
-
-
-def test_PDBParams_format_chain():
-    """
-    """
-    assert PDBParams.format_chain('AAA') == 'A'
+    assert libpdb.format_chainid('AAA') == 'A'
 
 
 

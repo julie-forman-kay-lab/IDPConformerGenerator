@@ -99,7 +99,7 @@ def main(
 
         pdbdata = libstructure.Structure(pdbid.read_text())
         pdbdata.build()
-        pdbdata.add_filter(lambda x: x[libpdb.PDBParams.acol.name] in ('N', 'CA', 'C'))
+        pdbdata.add_filter(lambda x: x[libpdb.atom_name.col] in ('N', 'CA', 'C'))
 
         counter = 1
 

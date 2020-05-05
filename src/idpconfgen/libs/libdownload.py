@@ -130,7 +130,7 @@ class PDBDownloader:
 
             pdbdata.add_filter_record_name(self.record_name)
             pdbdata.add_filter_chain(chain)
-            pdbdata.add_filter(lambda x: x[libpdb.PDBParams.acol.altloc] in ('A', ''))
+            pdbdata.add_filter(lambda x: x[libpdb.atom_altLoc.col] in ('A', ''))
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
             try:
                 pdbdata.write_PDB(destination)

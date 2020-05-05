@@ -8,7 +8,7 @@ import hypothesis.strategies as st
 from hypothesis import given
 
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs.libpdb import PDBParams
+from idpconfgen.libs import libpdb
 from idpconfgen.libs.libstructure import (
     Structure,
     parse_pdb_to_array,
@@ -24,6 +24,8 @@ from idpconfgen.libs.libstructure import (
 
 from . tcommons import (
     pdb_example,
+    pdb_models,
+    pdb_models_output,
     cif_example,
     cif_noatomsite,
     cif_nohash,
@@ -55,7 +57,7 @@ def test_get_datastr_error():
 def test_gen_empty_structure_array(number):
     """Test generation of Structure data structure."""
     result = gen_empty_structure_data_array(number)
-    assert result.shape == (number, len(PDBParams.atom_slicers))
+    assert result.shape == (number, len(libpdb.atom_slicers))
     assert result.dtype == '<U8'
 
 
@@ -69,7 +71,7 @@ def parsed_array_examples(request):
 
 
 def test_parsed_array_examples_shape(parsed_array_examples):
-    assert parsed_array_examples.shape == (545, len(PDBParams.atom_slicers))
+    assert parsed_array_examples.shape == (545, len(libpdb.atom_slicers))
 
 
 def test_parsed_array_examples_dtype(parsed_array_examples):
@@ -119,7 +121,7 @@ def test_Structure_build_2(fix_Structure_build):
 
 
 def test_Structure_build_3(fix_Structure_build):
-    assert fix_Structure_build.data_array.shape == (545, len(PDBParams.atom_slicers))
+    assert fix_Structure_build.data_array.shape == (545, len(libpdb.atom_slicers))
 
 
 def test_Structure_build_filters_true(fix_Structure_build):
@@ -162,9 +164,9 @@ def test_Structure_filter_ATOM(fix_Structure_build):
 def test_Structure_filter_backbone(fix_Structure_build):
     # CIF VIM REGEX: :%s/^ATOM.\{10}\(N\|CA\|C\|O\)\s.//n
     # PDB VIM REGEX: :%s/^ATOM.\{9}\(N\|CA\|C\|O\)\s.//n
-    assert PDBParams.acol.name == 2
+    assert libpdb.atom_name.col == 2
     fix_Structure_build.add_filter(
-        lambda x: x[PDBParams.acol.name] in ('N', 'CA', 'O', 'C')
+        lambda x: x[libpdb.atom_name.col] in ('N', 'CA', 'O', 'C')
         )
     fix_Structure_build.add_filter_record_name('ATOM')
     result = list(fix_Structure_build.filtered_atoms)
@@ -183,13 +185,25 @@ def test_Structure_chainset():
 def test_Structure_write(fix_Structure_build):
     """Test save functionality."""
     fix_Structure_build.add_filter_record_name('ATOM')
-    fix_Structure_build.add_filter(lambda x: int(x[PDBParams.acol.resseq]) < 11)
+    fix_Structure_build.add_filter(lambda x: int(x[libpdb.atom_resSeq.col]) < 11)
     fix_Structure_build.add_filter_chain('A')
 
     fout = Path('pdb_testing.pdb')
     fix_Structure_build.write_PDB(fout)
     result = fout.read_text()
     expected = pdb_saved.read_text()
+    fout.unlink()
+    assert result == expected
+
+
+def test_Structure_write_pdb_models():
+    """Test Structure parsig MODELS."""
+    s = Structure(pdb_models)
+    s.build()
+    fout = Path('pdb_testing.pdb')
+    s.write_PDB(fout)
+    result = fout.read_text()
+    expected = pdb_models_output.read_text()
     fout.unlink()
     assert result == expected
 

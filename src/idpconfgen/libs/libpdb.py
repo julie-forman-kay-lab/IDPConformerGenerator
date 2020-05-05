@@ -23,12 +23,18 @@ PDBField = namedtuple('PDBField', ['slice', 'col'])
 # ATOM and HETATM fields
 
 
-def format_atom_name(atom):
-    a = atom.strip()
-    if len(a) < 4 and a.startswith(('C', 'N', 'O', 'S')):
-        return ' {:<3s}'.format(a)
+def format_atom_name(atom, element):
+    #a = atom.strip()
+    if element in ('C', 'N', 'O', 'S'):
+        if len(atom) < 4:
+            return ' {:<3s}'.format(atom)
+        else:
+            return '{:<4s}'.format(atom)
+    elif len(atom) == 2:
+        return '{:<2s}  '.format(atom)
     else:
-        return '{:<4s}'.format(a)
+        _ = f'Could not format this atom:type {atom}:{element}'
+        raise EXCPTS.PDBFormatError(_)
 
 
 def format_chainid(chain):
@@ -60,22 +66,22 @@ atom_model = PDBField(slice(78, 80), 15)
 
 # order matters
 atom_slicers = [
-    atom_record,
-    atom_serial,
-    atom_name,
-    atom_altLoc,
-    atom_resName,
-    atom_chainID,
-    atom_resSeq,
-    atom_iCode,
-    atom_x,
-    atom_y,
-    atom_z,
-    atom_occ,
-    atom_temp,
-    atom_segid,
-    atom_element,
-    atom_model,
+    atom_record.slice,
+    atom_serial.slice,
+    atom_name.slice,
+    atom_altLoc.slice,
+    atom_resName.slice,
+    atom_chainID.slice,
+    atom_resSeq.slice,
+    atom_iCode.slice,
+    atom_x.slice,
+    atom_y.slice,
+    atom_z.slice,
+    atom_occ.slice,
+    atom_temp.slice,
+    atom_segid.slice,
+    atom_element.slice,
+    atom_model.slice,
     ]
 
 
@@ -100,7 +106,8 @@ atom_line_formatter = (
 
 # functions to apply to each format field in atom line string
 atom_format_funcs = [
-    str, int, format_atom_name, str, str,
+    #str, int, format_atom_name, str, str,
+    str, int, str.strip, str, str,
     format_chainid, int, str, float, float,
     float, float, float, str, str,
     str]

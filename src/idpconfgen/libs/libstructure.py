@@ -13,7 +13,7 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.logger import S, T
-from idpconfgen.libs.libpdb import PDBParams, is_pdb
+from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
 
 
@@ -22,12 +22,32 @@ from idpconfgen.libs.libcif import CIFParser, is_cif
 
 class Structure:
     """
-    Hold structural data from PDB files.
+    Hold structural data from PDB/mmCIF files.
+
+    Run the ``.buil()`` method to read the structure.
+
+    Cases for PDB Files:
+    * If there are several MODELS only the first model is considered.
 
     Parameters
     ----------
-    data : str
-        Raw structural data from PDB formatted files.
+    data : str, bytes, Path
+        Raw structural data from PDB/mmCIF formatted files.
+
+    Examples
+    --------
+    Opens a PDB file, selects only chain 'A' and saves selection to a file.
+    >>> s = Structure('1ABC.pdb')
+    >>> s.build()
+    >>> s.add_filter_chain('A')
+    >>> s.write_PDB('out.pdb')
+
+    Opens a mmCIF file, selects only residues above 50 and saves
+    selection to a file.
+    >>> s = Structure('1ABC.cif')
+    >>> s.build()
+    >>> s.add_filter(lambda x: int(x[libpdb.atom_resSeq]) > 50)
+    >>> s.write_PDB('out.pdb')
     """
     def __init__(self, data, **kwargs):
 
@@ -74,7 +94,7 @@ class Structure:
     @property
     def chain_set(self):
         """All chain IDs present in the raw dataset."""  # noqa: D401
-        return set(self.data_array[:, PDBParams.acol.chainid])
+        return set(self.data_array[:, libpdb.atom_chainID.col])
 
     def pop_last_filter(self):
         self._filters.pop()
@@ -86,12 +106,12 @@ class Structure:
     def add_filter_record_name(self, record_name):
         """Add filter for record names."""
         self.filters.append(
-            lambda x: x[PDBParams.acol.record].startswith(record_name)
+            lambda x: x[libpdb.atom_record.col].startswith(record_name)
             )
 
     def add_filter_chain(self, chain):
         """Add filters for chain."""
-        self.filters.append(lambda x: x[PDBParams.acol.chainid] == chain)
+        self.filters.append(lambda x: x[libpdb.atom_chainID.col] == chain)
 
     def write_PDB(self, filename, start=None, stop=None, step=None):
         lines = structure_to_pdb(self.filtered_atoms)
@@ -118,7 +138,7 @@ def parse_pdb_to_array(datastr, which='both', **kwargs):
 
     Returns
     -------
-    numpy.ndarray of (N, len(`PDBParams.atom_slicers`))
+    numpy.ndarray of (N, len(`libpdb.atom_slicers`))
         Where N are the number of ATOM and/or HETATM lines,
         and axis=1 the number of fields in ATOM/HETATM lines according
         to the PDB format v3.
@@ -167,7 +187,7 @@ def gen_empty_structure_data_array(number_of_atoms):
 
     Returns
     -------
-    np.ndarray of (N, :attr:`PDBParams.atom_slicers), dtype = '<U8'
+    np.ndarray of (N, :attr:`libpdb.atom_slicers), dtype = '<U8'
         Where N is the ``number_of_atoms``.
     """
     # require
@@ -177,14 +197,14 @@ def gen_empty_structure_data_array(number_of_atoms):
         f'or number is less than zero: {number_of_atoms}.'
 
     return np.empty(
-        (number_of_atoms, len(PDBParams.atom_slicers)),
+        (number_of_atoms, len(libpdb.atom_slicers)),
         dtype='<U8',
         )
 
 
 def populate_structure_array_from_pdb(record_lines, data_array):
     for row, line in enumerate(record_lines):
-        for column, slicer_item in enumerate(PDBParams.atom_slicers):
+        for column, slicer_item in enumerate(libpdb.atom_slicers):
             data_array[row, column] = line[slicer_item].strip()
 
 
@@ -225,9 +245,11 @@ def detect_structure_type(datastr):
 
 
 def write_PDB(lines, filename):
-    if lines:
+    # this happens here because lines can be a generator
+    concat_lines = '\n'.join(lines)
+    if concat_lines:
         with open(filename, 'w') as fh:
-            fh.write('\n'.join(lines))
+            fh.write(concat_lines)
             fh.write('\n')
         log.info(S(f'saved: {filename}'))
     else:
@@ -235,12 +257,21 @@ def write_PDB(lines, filename):
 
 
 def structure_to_pdb(atoms):
-    return [
-        PDBParams.line_formatter.format(
-            *[func(i) for i, func in zip(line, PDBParams.format_funcs)]
+
+    for line in atoms:
+        values = [func(i) for i, func in zip(line, libpdb.atom_format_funcs)]
+        values[libpdb.atom_name.col] = libpdb.format_atom_name(
+            values[libpdb.atom_name.col],
+            values[libpdb.atom_element.col],
             )
-        for line in atoms
-        ]
+        yield libpdb.atom_line_formatter.format(*values)
+#
+#    return (
+#        libpdb.line_formatter.format(
+#            *(func(i) for i, func in zip(line, libpdb.format_funcs))
+#            )
+#        for line in atoms
+#        )
 
 
 # this servers read_pdb_data_to_array mainly
@@ -263,5 +294,5 @@ type2string = {
 # order matters
 structure_parsers = [
     (is_cif, parse_cif_to_array),
-    (is_pdb, parse_pdb_to_array),
+    (libpdb.is_pdb, parse_pdb_to_array),
     ]

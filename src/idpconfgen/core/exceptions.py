@@ -91,6 +91,10 @@ class PDBIDFactoryError(IDPConfGenException):
     pass
 
 
+class PDBFormatError(IDPConfGenException):
+    """Exception for PDB format related issues."""
+
+
 class CIFFileError(IDPConfGenException):
     """CIF file has loop_ but yet is invalid."""
 
