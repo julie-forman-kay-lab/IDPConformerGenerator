@@ -248,3 +248,65 @@ def _concatenate_ss_from_dsspparsers(dsspparsers):
     output.sort(key=lambda x: x.split('|')[0])
 
     return output
+
+
+def read_pipe_file(text):
+    """
+    Read IDPConfGen pipe file.
+
+    Pipe files have the following structure:
+
+    CODE|DATA
+    CODE|DATA
+    (...)
+
+    Parameters
+    ----------
+    text : str
+        The crude text to read.
+
+    Returns
+    -------
+    tuple (str, str)
+        Of codes and data.
+    """
+    return zip(*(line.split('|') for line in text.split('\n') if line))
+
+
+def group_by(data):
+    """
+    Groups data by indexes.
+
+    Parameters
+    ----------
+    data : iterable
+        The data to group by.
+
+    Returns
+    -------
+    list : ((type, slice),)
+
+    Examples
+    --------
+    >>> group_by('LLLLLSSSSSSEEEEE')
+    [['L', slice(0, 5)], ['S', slice(5, 11)], ['E', slice(11,16)]]
+    """
+    prev = data[0]
+    start = 0
+    current = [prev]
+    groups = []
+    for i, datum in enumerate(data):
+        if datum != prev:
+            current.append(slice(start, i))
+            groups.append(current)
+            start = i
+            current = [datum]
+        prev = datum
+    else:
+        current.append(slice(start, i + 1))
+        groups.append(current)
+    assert groups
+    assert (groups[0][0], str)
+    assert (groups[0][0], slice)
+    return groups
+

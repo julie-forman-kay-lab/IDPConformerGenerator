@@ -1,0 +1,39 @@
+loop_
+_atom_site.group_PDB 
+_atom_site.id 
+_atom_site.type_symbol 
+_atom_site.label_atom_id 
+_atom_site.label_alt_id 
+_atom_site.label_comp_id 
+_atom_site.label_asym_id 
+_atom_site.label_entity_id 
+_atom_site.label_seq_id 
+_atom_site.Cartn_x 
+_atom_site.Cartn_y 
+_atom_site.Cartn_z 
+_atom_site.occupancy 
+_atom_site.B_iso_or_equiv 
+_atom_site.pdbx_formal_charge 
+_atom_site.auth_seq_id 
+_atom_site.auth_comp_id 
+_atom_site.auth_asym_id 
+_atom_site.auth_atom_id 
+_atom_site.pdbx_PDB_model_num 
+ATOM   1    N N     . ALA ? 1 4    11.751 37.846 29.016  1.00 44.65 ? 4   ALA A N     1 
+ATOM   2    C CA    . ALA ? 1 4    12.501 39.048 28.539  1.00 30.68 ? 4   ALA A CA    1 
+ATOM   3    C C     . ALA ? 1 4    13.740 38.628 27.754  1.00 24.74 ? 4   ALA A C     1 
+ATOM   4    O O     . ALA ? 1 4    14.207 37.495 27.890  1.00 25.59 ? 4   ALA A O     1 
+ATOM   5    C CB    . ALA ? 1 4    12.902 39.919 29.730  1.00 16.77 ? 4   ALA A CB    1 
+ATOM   6    N N     . TYR ? 1 5    14.235 39.531 26.906  1.00 19.29 ? 5   TYR A N     1 
+ATOM   7    C CA    . TYR ? 1 5    15.552 39.410 26.282  1.00 8.51  ? 5   TYR A CA    1 
+ATOM   8    C C     . TYR ? 1 5    16.616 38.913 27.263  1.00 6.11  ? 5   TYR A C     1 
+ATOM   9    O O     . TYR ? 1 5    17.187 37.844 27.068  1.00 17.99 ? 5   TYR A O     1 
+ATOM   10   C CB    . TYR ? 1 5    15.988 40.762 25.702  1.00 2.00  ? 5   TYR A CB    1 
+ATOM   11   C CG    . TYR ? 1 5    17.319 40.745 24.982  1.00 2.00  ? 5   TYR A CG    1 
+ATOM   12   C CD1   . TYR ? 1 5    17.411 40.331 23.653  1.00 19.29 ? 5   TYR A CD1   1 
+ATOM   13   C CD2   . TYR ? 1 5    18.476 41.210 25.604  1.00 9.65  ? 5   TYR A CD2   1 
+ATOM   14   C CE1   . TYR ? 1 5    18.629 40.396 22.953  1.00 2.00  ? 5   TYR A CE1   1 
+ATOM   15   C CE2   . TYR ? 1 5    19.703 41.271 24.914  1.00 8.78  ? 5   TYR A CE2   1 
+ATOM   16   C CZ    . TYR ? 1 5    19.763 40.863 23.594  1.00 8.76  ? 5   TYR A CZ    1 
+ATOM   17   O OH    . TYR ? 1 5    20.971 40.889 22.920  1.00 8.23  ? 5   TYR A OH    1 
+#
