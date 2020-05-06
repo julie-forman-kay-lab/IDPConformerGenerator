@@ -12,14 +12,12 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.logger import S, T
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
+from idpconfgen.logger import S
 
 
 # module variables are defined at the end.
-
-
 class Structure:
     """
     Hold structural data from PDB/mmCIF files.
@@ -79,10 +77,12 @@ class Structure:
         del self._datastr
 
     def clear_filters(self):
+        """Clear/Deletes registered filters."""
         self._filters = []
 
     @property
     def filters(self):
+        """Filter functions registered ordered by registry record."""
         return self._filters
 
     @property
@@ -106,10 +106,11 @@ class Structure:
         return set(self.data_array[:, col_chainID])
 
     def pop_last_filter(self):
+        """Pop last filter."""
         self._filters.pop()
 
     def add_filter(self, function):
-        """Adds a function as filter."""
+        """Add a function as filter."""
         self.filters.append(function)
 
     def add_filter_record_name(self, record_name):
@@ -122,7 +123,8 @@ class Structure:
         """Add filters for chain."""
         self.filters.append(lambda x: x[col_chainID] == chain)
 
-    def write_PDB(self, filename, start=None, stop=None, step=None):
+    def write_PDB(self, filename):
+        """Write Structure to PDB file."""
         lines = structure_to_pdb(self.filtered_atoms)
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
@@ -212,6 +214,22 @@ def gen_empty_structure_data_array(number_of_atoms):
 
 
 def populate_structure_array_from_pdb(record_lines, data_array):
+    """
+    Populate structure array from PDB lines.
+
+    Parameters
+    ----------
+    record_lines : list-like
+        The PDB record lines (ATOM or HETATM) to parse.
+
+    data_array : np.ndarray
+        The array to populate.
+
+    Returns
+    -------
+    None
+        Populates array in place.
+    """
     for row, line in enumerate(record_lines):
         for column, slicer_item in enumerate(libpdb.atom_slicers):
             data_array[row, column] = line[slicer_item].strip()
@@ -222,18 +240,32 @@ def filter_record_lines(lines, which='both'):
     record_headings = record_line_headings
     try:
         # returns lines because needs len after
-        return list(filter(
-                    lambda x: x.startswith(record_headings[which]),
-                    lines,
-            ))
+        return list(
+            filter(
+                lambda x: x.startswith(record_headings[which]),
+                lines,
+                ),
+            )
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
 
 
-
-
 def get_datastr(data):
+    """
+    Get data in string format.
+
+    Can parse data from several formats:
+
+    * Path, reads file content
+    * bytes, converst to str
+    * str, returns the input
+
+    Returns
+    -------
+    str
+        That represents the data
+    """
     t2s = type2string
     data_type = type(data)
     try:
@@ -246,6 +278,16 @@ def get_datastr(data):
 
 
 def detect_structure_type(datastr):
+    """
+    Detect Structure data parser.
+
+    Uses `structure_parsers`.
+
+    Returns
+    -------
+    func or class
+        That which can parse `datastr` to a :class:`Structure'.
+    """
     sp = structure_parsers
     for condition, parser in sp:
         if condition(datastr):
@@ -254,7 +296,18 @@ def detect_structure_type(datastr):
 
 
 def write_PDB(lines, filename):
-    # this happens here because lines can be a generator
+    """
+    Write Structure data format to PDB.
+
+    Parameters
+    ----------
+    lines : list or np.ndarray
+        Lines contains PDB data as according to `parse_pdb_to_array`.
+
+    filename : str or Path
+        The name of the output PDB file.
+    """
+    # use join here because lines can be a generator
     concat_lines = '\n'.join(lines)
     if concat_lines:
         with open(filename, 'w') as fh:
@@ -266,7 +319,18 @@ def write_PDB(lines, filename):
 
 
 def structure_to_pdb(atoms):
+    """
+    Convert table to PDB formatted lines.
 
+    Parameters
+    ----------
+    atoms : np.ndarray, shape (N, 16) or similar data structure
+        Where N is the number of atoms and 16 the number of cols.
+
+    Yields
+    ------
+    Formatted PDB line according to `libpdb.atom_line_formatter`.
+    """
     for line in atoms:
         values = [func(i) for i, func in zip(line, libpdb.atom_format_funcs)]
         values[col_name] = libpdb.format_atom_name(
