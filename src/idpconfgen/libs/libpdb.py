@@ -1,30 +1,34 @@
 """Contain  handlers of PDB information."""
-import contextlib
 import functools
 import re
-import string
-import traceback
-import urllib.request
-from abc import ABC, abstractmethod
-from collections import namedtuple
-from multiprocessing.pool import ThreadPool
-
-import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core import count_string_formatters
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs import libtimer
-from idpconfgen.logger import S, T
-
-
-#PDBField = namedtuple('PDBField', ['slice', 'col'])
-
-# ATOM and HETATM fields
+from idpconfgen.logger import S
 
 
 def format_atom_name(atom, element):
-    a = atom.strip()
+    """
+    Format PDB Record line Atom name.
+
+    Further Reading:
+
+    * https://www.cgl.ucsf.edu/chimera/docs/UsersGuide/tutorials/pdbintro.html
+
+    Parameters
+    ----------
+    atom : str
+        The atom name.
+
+    element : str
+        The atom element code.
+
+    Returns
+    -------
+    str
+        Formatted atom name.
+    """
+    atom = atom.strip()
     if element in ('H', 'C', 'N', 'O', 'S'):
         if len(atom) < 4:
             return ' {:<3s}'.format(atom)
@@ -86,33 +90,36 @@ atom_slicers = [
 
 
 atom_line_formatter = (
-        "{:6s}"
-        "{:5d} "
-        "{}"
-        "{:1s}"
-        "{:3s} "
-        "{:1s}"
-        "{:4d}"
-        "{:1s}   "
-        "{:8.3f}"
-        "{:8.3f}"
-        "{:8.3f}"
-        "{:6.2f}"
-        "{:6.2f}      "
-        "{:<4s}"
-        "{:>2s}"
-        "{:2s}"
-        )
+    "{:6s}"
+    "{:5d} "
+    "{}"
+    "{:1s}"
+    "{:3s} "
+    "{:1s}"
+    "{:4d}"
+    "{:1s}   "
+    "{:8.3f}"
+    "{:8.3f}"
+    "{:8.3f}"
+    "{:6.2f}"
+    "{:6.2f}      "
+    "{:<4s}"
+    "{:>2s}"
+    "{:2s}"
+    )
+
 
 # functions to apply to each format field in atom line string
-def _nothing(x): return x
+def _nothing(x):
+    return x
+
 
 atom_format_funcs = [
-    #str, int, format_atom_name, str, str,
     _nothing, int, _nothing, _nothing, _nothing,
     format_chainid, int, _nothing, float, float,
     float, float, float, _nothing, _nothing,
-    _nothing]
+    _nothing,
+    ]
 
 
 def is_pdb(datastr):
@@ -120,7 +127,6 @@ def is_pdb(datastr):
     assert isinstance(datastr, str), \
         f'`datastr` is not str: {type(datastr)} instead'
     return bool(datastr.count('\nATOM ') > 0)
-
 
 
 class PDBIDFactory:
@@ -348,6 +354,3 @@ class PDBID:
             return f'{name}_' + ids
         else:
             return name
-
-
-
