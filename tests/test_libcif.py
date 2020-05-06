@@ -4,19 +4,19 @@ import pytest
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libcif import (
     CIFParser,
-    is_cif,
     find_cif_atom_site_headers,
-    populate_cif_dictionary,
+    is_cif,
     parse_cif_line,
+    populate_cif_dictionary,
     )
 
 from .tcommons import (
+    cif_EOF,
     cif_example,
     cif_example_auth,
+    cif_example_headers,
     cif_example_noasymid,
     cif_nohash,
-    cif_example_headers,
-    cif_EOF,
     )
 
 
@@ -24,16 +24,16 @@ from .tcommons import (
     'in1,expected',
     [
         (
-            "ATOM   1    N N     . ALA A 1 4   ? 11.751 37.846 29.016  1.00 44.65 ? 4   ALA A N     1 \n",
-            ['ATOM', '1', 'N', 'N', '.', 'ALA', 'A', '1', '4', '?', '11.751', '37.846', '29.016', '1.00', '44.65', '?', '4', 'ALA', 'A', 'N', '1'],
+            "ATOM   1    N N     . ALA A 1 4   ? 11.751 37.846 29.016  1.00 44.65 ? 4   ALA A N     1 \n",  # noqa: E501
+            ['ATOM', '1', 'N', 'N', '.', 'ALA', 'A', '1', '4', '?', '11.751', '37.846', '29.016', '1.00', '44.65', '?', '4', 'ALA', 'A', 'N', '1'],  # noqa: E501
             ),
         (
-            "HETATM 5119 N N     . ASN C 2 .   ? 29.722 14.604 9.802   1.00 12.15 ? 331 ASN A N     1 ",
-            ['HETATM', '5119', 'N', 'N', '.', 'ASN', 'C', '2', '.', '?', '29.722', '14.604', '9.802', '1.00', '12.15', '?', '331', 'ASN', 'A', 'N', '1'],
+            "HETATM 5119 N N     . ASN C 2 .   ? 29.722 14.604 9.802   1.00 12.15 ? 331 ASN A N     1 ",  # noqa: E501
+            ['HETATM', '5119', 'N', 'N', '.', 'ASN', 'C', '2', '.', '?', '29.722', '14.604', '9.802', '1.00', '12.15', '?', '331', 'ASN', 'A', 'N', '1'],  # noqa: E501
             ),
         (
-            'HETATM 5132 O "O5\'" . AMP D 3 .   ? 23.706 19.236 9.885   1.00 10.43 ? 332 AMP A "O5\'" 1 ',
-            ['HETATM', '5132', 'O', "O5'", '.', 'AMP', 'D', '3', '.', '?', '23.706', '19.236', '9.885', '1.00', '10.43', '?', '332', 'AMP', 'A', "O5'", '1'],
+            'HETATM 5132 O "O5\'" . AMP D 3 .   ? 23.706 19.236 9.885   1.00 10.43 ? 332 AMP A "O5\'" 1 ',  # noqa: E501
+            ['HETATM', '5132', 'O', "O5'", '.', 'AMP', 'D', '3', '.', '?', '23.706', '19.236', '9.885', '1.00', '10.43', '?', '332', 'AMP', 'A', "O5'", '1'],  # noqa: E501
             ),
         ]
     )
@@ -41,7 +41,6 @@ def test_cif_line_regex(in1, expected):
     """Test cif line parse according to regex."""
     result = parse_cif_line(in1)
     assert result == expected
-
 
 
 def test_is_cif():
@@ -71,7 +70,7 @@ def test_find_cif_atom_site_headers_len(fix_find_cif_atom_site_headers):
 
 
 def test_find_cif_atom_site_headers_keys(fix_find_cif_atom_site_headers):
-    """Test all headings are `_atom_site.`"""
+    """Test all headings are `_atom_site.`."""
     cif_pdb = fix_find_cif_atom_site_headers[1]
     assert all(k.startswith('_atom_site.') for k in cif_pdb.keys())
 
@@ -98,14 +97,26 @@ def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
 @pytest.mark.parametrize(
     'args',
     [
-        (cif_EOF.read_text().split('\n'), 22, {i:[] for i in cif_example_headers}),
-        (cif_nohash.read_text().split('\n'), 22, {i:[] for i in cif_example_headers}),
-        ([''], 0, {'_atom_site.id': []}),
+        (
+            cif_EOF.read_text().split('\n'),
+            22,
+            {i: [] for i in cif_example_headers},
+            ),
+        (
+            cif_nohash.read_text().split('\n'),
+            22,
+            {i: [] for i in cif_example_headers},
+            ),
+        (
+            [''],
+            0,
+            {'_atom_site.id': []},
+            ),
         ]
     )
 def test_populate_cif_dictionary_errors(args):
     """Test CIF without hash raise error."""
-    with pytest.raises(EXCPTS.CIFFileError) as err:
+    with pytest.raises(EXCPTS.CIFFileError):
         populate_cif_dictionary(*args)
 
 
@@ -114,6 +125,7 @@ def test_populate_cif_dictionary_errors(args):
     cif_example_auth,
     ])
 def cif_parsed(request):
+    """Fixture parsed cif file."""
     return CIFParser(request.param.read_text())
 
 
@@ -121,9 +133,11 @@ def test_CIFParse_len(cif_parsed):
     """Test CIFParse len."""
     assert len(cif_parsed) == 545
 
+
 def test_CIFParse_line_default(cif_parsed):
     """Test default attribute line."""
     assert cif_parsed.line == 0
+
 
 def test_CIFParse_line(cif_parsed):
     """Test CIFParse len."""
@@ -132,10 +146,13 @@ def test_CIFParse_line(cif_parsed):
 
 
 def test_CIFParse_line_error(cif_parsed):
+    """Raises error in property."""
     with pytest.raises(AssertionError):
         cif_parsed.line = -5
 
+
 def test_CIFParse_get_values(cif_parsed):
+    """Test get values from line properly."""
     cif_parsed.line = 0
     expected = [
         'ATOM',
@@ -158,6 +175,7 @@ def test_CIFParse_get_values(cif_parsed):
 
 
 def test_CIFParse_get_values_line_2(cif_parsed):
+    """Test get values from line properly."""
     expected = [
         'ATOM',
         '3',
@@ -179,6 +197,7 @@ def test_CIFParse_get_values_line_2(cif_parsed):
 
 
 def test_CIFParse_get_values_line_3(cif_parsed):
+    """Test get values from line properly."""
     expected = [
         'HETATM',
         '5385',
@@ -199,11 +218,8 @@ def test_CIFParse_get_values_line_3(cif_parsed):
     assert cif_parsed.get_line_elements_for_PDB(line=544) == expected
 
 
-
 def test_CIFParse_get_values_no_chainid():
-    """
-    Also test lack of ins code.
-    """
+    """Also test lack of ins code."""
     cif = CIFParser(cif_example_noasymid.read_text())
     expected = [
         'ATOM',
