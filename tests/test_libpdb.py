@@ -2,8 +2,8 @@
 from pathlib import Path
 
 import pytest
-from hypothesis import strategies as st
 from hypothesis import given
+from hypothesis import strategies as st
 
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
@@ -21,11 +21,11 @@ from .tcommons import pdb_example
     'is_func,structure,expected',
     [
         (is_pdb, pdb_example, True),
+        # we need a False example here, review this function.
         ]
     )
 def test_is_function(is_func, structure, expected):
-    """
-    """
+    """Test wether file is pdb."""
     assert is_func(structure.read_text()) == expected
 
 
@@ -47,18 +47,19 @@ def test_format_atoms(atom, element, expected):
 
 
 def test_format_atoms_error():
+    """Test error with wrong atom."""
     with pytest.raises(EXCPTS.PDBFormatError):
         libpdb.format_atom_name('FES', 'FE')
 
 
 def test_format_chain():
-    """
-    """
+    """Test format chain."""
     assert libpdb.format_chainid('AAA') == 'A'
 
 
 @given(st.text())
 def test_nothing(txt):
+    """Test nothing function."""
     assert txt == libpdb._nothing(txt)
 
 
@@ -184,7 +185,7 @@ class TestPDBIDFactory:
     def test_parse_error_1(self):
         """Test parser not found."""
         with pytest.raises(EXCPTS.PDBIDFactoryError):
-            pdbid0 = PDBIDFactory('#*(!@#!@')
+            PDBIDFactory('#*(!@#!@')
 
 
 class TestPDBList:
