@@ -1,12 +1,20 @@
 """Handle CIF data."""
 import re
 
-from idpconfgen import Path, log
+#  from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 
 
 class CIFParser:
     """
+    mmCIFParser for structural data ONLY.
+
+    That is, fields from the m_site.` group.
+
+    Parameters
+    ----------
+    datastr : str
+        The contect of the mmCIF file in string format.
     """
 
     __slots__ = [
@@ -16,14 +24,12 @@ class CIFParser:
         ]
 
     def __init__(self, datastr):
-        """
-        """
         self.cif_dict = {}
         self.read_cif(datastr)
         self.line = 0
 
     def read_cif(self, datastr):
-        """Read 'atom_site' entries to dictionary."""
+        """Read 'atom_site.' entries to dictionary."""
         lines = datastr.split('\n')
         atom_start_index = find_cif_atom_site_headers(lines, self.cif_dict)
         self._len = populate_cif_dictionary(
@@ -33,20 +39,35 @@ class CIFParser:
             )
 
     def __len__(self):
+        """The length is defined by the number of atoms."""  # noqa: D401
         return self._len
 
     @property
     def line(self):
+        """The current line number."""  # noqa: D401
         return self._line
 
     @line.setter
     def line(self, ii):
+        """Set the current line number."""
         assert isinstance(ii, int)
         assert 0 <= ii <= len(self)
         self._line = ii
 
     def get_line_elements_for_PDB(self, line=None):
         """
+        Retrieve `line` elements.
+
+        Parameters
+        ----------
+        line : int, optional
+            If given retrieve values for that line and sets that as
+            current line. Else, retrieves values for current :attr:`line`.
+
+        Return
+        ------
+        list
+            The values of the line.
         """
         # http://mmcif.wwpdb.org/docs/pdb_to_pdbx_correspondences.html
         if line:
@@ -71,6 +92,7 @@ class CIFParser:
             ]
 
     def get_value(self, label):
+        """Retrieve the label value for the current :attr:`line`."""
         return self.cif_dict[label][self.line]
 
     def _auth_label(self, label):
@@ -84,10 +106,12 @@ class CIFParser:
 
     @property
     def record(self):
+        """The record field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.group_PDB')
 
     @property
     def serial(self):
+        """The serial field of the current :attr:`line`."""  # noqa: D401
         try:
             return self.get_value('_atom_site.Id')
         except KeyError:
@@ -95,19 +119,23 @@ class CIFParser:
 
     @property
     def atname(self):
+        """The atom name field of the current :attr:`line`."""  # noqa: D401
         return self._auth_label('atom_id')
 
     @property
     def altloc(self):
+        """The altloc field of the current :attr:`line`."""  # noqa: D401
         altloc = self._auth_label('alt_id')
         return self._translate(altloc)
 
     @property
     def resname(self):
+        """The resname field of the current :attr:`line`."""  # noqa: D401
         return self._auth_label('comp_id')
 
     @property
     def chainid(self):
+        """The chainID field of the current :attr:`line`."""  # noqa: D401
         value = self._auth_label('asym_id')
         if value in ('?', '.'):
             value = self.get_value(f'_atom_site.auth_asym_id')
@@ -115,10 +143,12 @@ class CIFParser:
 
     @property
     def resseq(self):
+        """The resSeq field of the current :attr:`line`."""  # noqa: D401
         return self._translate(self._auth_label('seq_id'))
 
     @property
     def icode(self):
+        """The icode field of the current :attr:`line`."""  # noqa: D401
         try:
             icode = self.get_value('_atom_site.pdbx_PDB_ins_code')
             return self._translate(icode)
@@ -127,30 +157,37 @@ class CIFParser:
 
     @property
     def xcoord(self):
+        """The Xcoord field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.Cartn_x')
 
     @property
     def ycoord(self):
+        """The Ycoord field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.Cartn_y')
 
     @property
     def zcoord(self):
+        """The Zcoord field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.Cartn_z')
 
     @property
     def occ(self):
+        """The occupancy field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.occupancy')
 
     @property
     def tempfactor(self):
+        """The tempfactor field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.B_iso_or_equiv')
 
     @property
     def element(self):
+        """The element field of the current :attr:`line`."""  # noqa: D401
         return self.get_value('_atom_site.type_symbol')
 
     @property
     def charge(self):
+        """The charge field of the current :attr:`line`."""  # noqa: D401
         charge = self.get_value('_atom_site.pdbx_formal_charge')
         return self._translate(charge)
 
@@ -188,6 +225,10 @@ def find_cif_atom_site_headers(lines, cif_dict):
     ------
     CIFFileError
         If any `_atom_site.` keys are found in ``lines``.
+
+    See Also
+    --------
+    populate_cif_dictionary
     """
     # require
     assert isinstance(lines, list)
@@ -206,18 +247,35 @@ def find_cif_atom_site_headers(lines, cif_dict):
 
 def populate_cif_dictionary(lines, start_index, cif_dict):
     """
+    Populate mmCIF dictionary.
 
     Parameters
     ----------
+    lines : list
+        The mmCIF lines. Normally the whole mmCIF file content.
+
+    start_index : int
+        The line index, that is, line number 0-indexed, where the
+        actual `atom_site.` structural information starts.
+
+    cif_dict : dict
+        The mmCIF dictionary to populate. The dict keys should be
+        previously prepared and should match the data in the `lines`.
 
     Returns
     -------
+    None
+        Edits dictionary in place.
 
     Raises
     ------
     InvalidCIFLineError
         If the number of fields in parsed line do not match expected
         `_atom_site.` fields in the dictionary.
+
+    See Also
+    --------
+    find_cif_atom_site_headers
     """
     assert len(lines) > start_index
 
