@@ -37,7 +37,7 @@ class IDPConfGenException(Exception):
     """
 
     errmsg = 'An unknnown error as occurred. ' + CONTACTUS.contact_message
-    
+
     def __init__(self, *args, errmsg=None):
 
         # IDPConfGenException(errmsg='Custom error msg')
@@ -48,7 +48,7 @@ class IDPConfGenException(Exception):
 
         elif len(args) == count_string_formatters(self.errmsg):
             self.args = args
-    
+
         else:
             assert count_string_formatters(args[0]) == len(args[1:]), \
                 'args passed to Exception are not compatible to form a message'
@@ -66,7 +66,7 @@ class IDPConfGenException(Exception):
             f'errmsg: {self.errmsg}\n'
             f'args: {self.args}'
             )
-     
+
     def __str__(self):
         """Make me a string :-)."""
         return self.errmsg.format(*self.args)
@@ -74,9 +74,9 @@ class IDPConfGenException(Exception):
     def report(self):
         """
         Report error in the form of a string.
-        
+
         Identifies Error type and error message.
-        
+
         Returns
         -------
         str
@@ -109,7 +109,7 @@ class DownloadFailedError(IDPConfGenException):
 
 class EmptyFilterError(IDPConfGenException):
     """Raise when PDB data filtering returns an empty selection."""
-  
+
     errmsg = 'Filter returns empty selection.'
 
 
@@ -132,6 +132,11 @@ class DSSPInputMissingError(IDPConfGenException):
 
 
 class ParserNotFoundError(IDPConfGenException):
-    """Raises when parser for PDB/CIF file is not found."""
+    """Raise when parser for PDB/CIF file is not found."""
 
     errmsg = 'Could not identity a proper parser.'
+
+class NotBuiltError(IDPConfGenException):
+    """Raise when attempting to access data of an object before building."""
+
+    pass

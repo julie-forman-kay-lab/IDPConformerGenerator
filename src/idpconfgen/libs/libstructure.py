@@ -7,10 +7,12 @@ Structure
     The main API that represents a protein structure in IDPConfGen.
 """
 import warnings
+from collections import defaultdict
 
 import numpy as np
 
 from idpconfgen import Path, log
+from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
@@ -49,10 +51,10 @@ class Structure:
     """
 
     __slots__ = [
+        '_data_array',
         '_datastr',
         '_filters',
         '_structure_parser',
-        'data_array',
         'kwargs',
         ]
 
@@ -62,7 +64,6 @@ class Structure:
         self._structure_parser = detect_structure_type(datastr)
 
         self._datastr = datastr
-        self.data_array = None
         self.kwargs = kwargs
         self.clear_filters()
         assert isinstance(self.filters, list)
@@ -73,12 +74,24 @@ class Structure:
 
         After `.build()`, filters and data can be accessed.
         """
-        self.data_array = self._structure_parser(self._datastr, **self.kwargs)
+        self._data_array = self._structure_parser(self._datastr, **self.kwargs)
         del self._datastr
 
     def clear_filters(self):
         """Clear/Deletes registered filters."""
         self._filters = []
+
+    @property
+    def data_array(self):
+        """Contain structure data in the form of a Numpy array."""
+        try:
+            return self._data_array
+        except AttributeError as err:
+            errmsg = (
+                'Please `.build()` the Structure before attempting to access'
+                'its data'
+                )
+            raise EXCPTS.NotBuiltError(errmsg=errmsg) from err
 
     @property
     def filters(self):
@@ -104,6 +117,24 @@ class Structure:
     def chain_set(self):
         """All chain IDs present in the raw dataset."""  # noqa: D401
         return set(self.data_array[:, col_chainID])
+
+    @property
+    def fasta(self):
+        """
+        FASTA sequence of the :attr:`filtered_atoms` lines.
+
+        HETATM residues with non-canonical codes are represented as X.
+        """
+        c, rs, rn = col_chainID, col_resSeq, col_resName
+
+        chains = defaultdict(dict)
+        for row in self.filtered_atoms:
+            chains[row[c]].setdefault(row[rs], DEFS.aa3to1.get(row[rn], 'X'))
+
+        return {
+            chain: ''.join(residues.values())
+            for chain, residues in chains.items()
+            }
 
     def pop_last_filter(self):
         """Pop last filter."""
