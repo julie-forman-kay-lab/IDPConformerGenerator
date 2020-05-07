@@ -5,9 +5,10 @@ USAGE:
     $ idpconfgen fastaext [PDBS]
 """
 import argparse
+import itertools as it
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
+from idpconfgen.libs import libcli, libio, libpdb, libstructure
 from idpconfgen.logger import S, T, init_files
 
 
@@ -79,18 +80,22 @@ def main(
     """
     log.info(T('Extracting FASTA sequence information'))
     init_files(log, LOGFILESNAME)
-     
+
     log.info(T('reading input paths'))
-    pdbs = libio.read_path_bundle(pdbs)
+    # tee is used to keep memory footprint low
+    # though it would be faster to create a list from path_bundle
+    _, pdbs = it.tee(libio.read_path_bundle(pdbs))
     log.info(S('done'))
-    pdbids = libpdb.PDBList(pdbs)
-     
+    pdbids = libpdb.PDBList(_)
+
     out_data = []
     for pdbid, pdbfile in zip(pdbids, pdbs):
-        structure = libpdb.PDBDataFactory(Path(pdbfile).read_text())
+        structure = libstructure.Structure(Path(pdbfile))
         structure.build()
-        out_data.append('{}|{}'.format(pdbid, structure.fasta))
-     
+        fasta = structure.fasta
+        assert len(fasta) == 1
+        out_data.append('{}|{}'.format(pdbid, next(iter(fasta.values()))))
+
     libio.write_text('\n'.join(out_data), output)
     return
 

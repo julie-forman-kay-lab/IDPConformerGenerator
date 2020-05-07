@@ -126,7 +126,10 @@ def test_Structure_fasta_A(fix_Structure_build):
     """Test FASTA property."""
     fix_Structure_build.add_filter_chain('A')
     fix_Structure_build.add_filter_record_name('ATOM')
-    assert fix_Structure_build.fasta == {'A': 'AYIAKQRQISFVKSHF'}
+    fasta = fix_Structure_build.fasta
+    assert fasta == {'A': 'AYIAKQRQISFVKSHF'}
+    # this functionality is used in cli_fastaext
+    assert next(iter(fasta.values())) == 'AYIAKQRQISFVKSHF'
 
 
 def test_Structure_fasta_CIF_all():
@@ -143,7 +146,9 @@ def test_Structure_fasta_CIF_all():
         'G': 'X',
         'H': 'X',
         }
-    assert s.fasta == expected
+    fasta = s.fasta
+    assert fasta == expected
+    assert next(iter(fasta.values())) == 'AYIAKQRQISFVKSHF'
 
 
 def test_Structure_build_3(fix_Structure_build):
