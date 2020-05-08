@@ -9,6 +9,22 @@ from idpconfgen.libs import libio
 from . import tcommons
 
 
+def test_concatenate_0():
+    """Test against cull.list."""
+    result = libio.concatenate_entries([tcommons.cull])
+    expected = [
+        '# 5XLI chains renamed to lowercase\n',
+        '12E8H       221  XRAY        1.900    0.22    0.27\n',
+        '16PKA       415  XRAY        1.600    0.19    0.23\n',
+        '16VPA       366  XRAY        2.100    0.19    0.26\n',
+        '1A04A       215  XRAY        2.200    0.21    0.27\n',
+        '1A05A       358  XRAY        2.000    0.20    0.28\n',
+        '1A0JA       223  XRAY        1.700    0.17    0.21\n',
+        '1A12A       413  XRAY        1.700    0.19    0.22\n',
+        '1A1XA       108  XRAY        2.000    0.21    0.25\n',
+        ]
+
+
 def test_concatenate_1():
     """Test concatenate entries."""
     user_input = [
