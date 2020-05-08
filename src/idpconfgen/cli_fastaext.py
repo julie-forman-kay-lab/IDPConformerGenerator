@@ -74,9 +74,6 @@ def main(
     output : string or Path, optional
         If given prints output to that file, else prints to console.
         Defaults to `None`.
-
-    ncores : int
-        The numbers of cores to use.
     """
     log.info(T('Extracting FASTA sequence information'))
     init_files(log, LOGFILESNAME)
@@ -90,7 +87,7 @@ def main(
 
     out_data = []
     for pdbid, pdbfile in zip(pdbids, pdbs):
-        structure = libstructure.Structure(Path(pdbfile))
+        structure = libstructure.Structure(pdbfile)
         structure.build()
         fasta = structure.fasta
         assert len(fasta) == 1
