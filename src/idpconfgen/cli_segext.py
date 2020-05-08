@@ -86,20 +86,23 @@ def main(
     pdb_list = libio.read_path_bundle(pdbs)
     log.info(S('read pdb bundle'))
 
-    codes, dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
+    #codes, dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
+    dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
     log.info(S('read dssp'))
 
     for i, pdbid in enumerate(pdb_list):
-        assert pdbid.stem == codes[i], \
-            'PDBID {pdbid.stem} and CODE {codes[i]} do not match'
+        #assert pdbid.stem == codes[i], \
+            #f'PDBID {pdbid.stem} and CODE {codes[i]} do not match'
 
         log.info(S(f'working with {pdbid}'))
 
-        dssp_segments = libparse.group_by(dssp_data[i])
+        dssp_segments = libparse.group_by(dssp_data[pdbid.stem])
 
         pdbdata = libstructure.Structure(pdbid.read_text())
         pdbdata.build()
-        pdbdata.add_filter(lambda x: x[libpdb.atom_name.col] in ('N', 'CA', 'C'))
+        pdbdata.add_filter(
+            lambda x: x[libstructure.col_name] in ('N', 'CA', 'C')
+            )
 
         counter = 1
 

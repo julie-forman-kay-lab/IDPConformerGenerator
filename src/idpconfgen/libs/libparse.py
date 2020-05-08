@@ -270,7 +270,11 @@ def read_pipe_file(text):
     tuple (str, str)
         Of codes and data.
     """
-    return zip(*(line.split('|') for line in text.split('\n') if line))
+    lines = text.split('\n')
+    elines = filter(bool, lines)
+    #slines = [l.split('|') for l in elines]
+    return {c:s for line in elines for c, s in (line.split('|'),)}
+    #return zip(*(line.split('|') for line in text.split('\n') if line))
 
 
 def group_by(data):
@@ -306,7 +310,7 @@ def group_by(data):
         current.append(slice(start, i + 1))
         groups.append(current)
     assert groups
-    assert (groups[0][0], str)
-    assert (groups[0][0], slice)
+    assert isinstance(groups[0][0], str)
+    assert isinstance(groups[0][1], slice)
     return groups
 
