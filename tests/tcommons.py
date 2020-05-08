@@ -9,7 +9,13 @@ tests_folder = Path(__file__).myparents()
 project_folder = tests_folder.parents[0]
 iofiles_folder = Path(tests_folder, 'readfiles')
 data_folder = Path(tests_folder, 'data')
+folder_output = Path(
+    tests_folder,
+    'data_out_scratch',
+    )
 
+
+cull = Path(data_folder, 'cull.list')
 pdb_example = Path(data_folder, 'pdb_example.pdb')
 pdb_models = Path(data_folder, 'pdb_models.pdb')
 pdb_models_output = Path(data_folder, 'pdb_models_output.pdb')
@@ -46,11 +52,6 @@ cif_example_headers = [
 
 pdb_saved = Path(data_folder, 'pdb_saved.pdb')
 
-
-folder_output = Path(
-    tests_folder,
-    'data_out_scratch',
-    )
 
 
 def random_type():

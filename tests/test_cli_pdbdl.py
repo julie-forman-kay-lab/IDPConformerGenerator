@@ -1,20 +1,18 @@
 """Test client for PDB Downloader."""
-
+import shutil
 from idpconfgen import Path
 from idpconfgen.cli_pdbdownloader import main
 
 from . import tcommons
 
 
-class TestCliPDBdl:
-    """Test client for PDB Downloader."""
-
-    cull = Path(tcommons.data_folder, 'cull.list')
-
-    def test_main(self):
-        """Test main from cli_pdbdownloader."""
-        main(
-            [self.cull],
-            destination=tcommons.folder_output,
-            update=True,
-            )
+def test_main():
+    """Test main from cli_pdbdownloader."""
+    folderout = Path('downloaded_test')
+    folderout.mkdir(exist_ok=True)
+    main(
+        [tcommons.cull],
+        destination=folderout,
+        update=True,
+        )
+    shutil.rmtree(folderout)

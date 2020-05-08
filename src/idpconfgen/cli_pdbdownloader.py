@@ -103,7 +103,7 @@ def main(
         ):
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
-    
+
     pdbids_to_read = libio.concatenate_entries(pdblist)
     pdblist = libpdb.PDBList(pdbids_to_read)
 
@@ -111,7 +111,7 @@ def main(
     log.info(S(f'from: {pdblist}'))
     log.info(S(f'{str(pdblist)}'))
     log.info(S('done\n'))
-    
+
     if destination:
         pdblist_destination = \
             libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
@@ -119,12 +119,12 @@ def main(
         log.info(S(f'from: {destination}'))
         log.info(S(f'{str(pdblist_destination)}'))
         log.info(S('done\n'))
-        
+
         pdblist_comparison = pdblist.difference(pdblist_destination)
         log.info(T('Comparison between input and destination'))
         log.info(S(f'{str(pdblist_comparison)}'))
         log.info(S('done\n'))
-    
+
     if update:
         pdbdownloader = libdownload.PDBDownloader(
             pdblist_comparison,
@@ -139,7 +139,7 @@ def main(
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))
-    
+
     return
 
 

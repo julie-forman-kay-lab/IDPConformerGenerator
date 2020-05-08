@@ -1,22 +1,14 @@
+"""Functions and variables to download files and data."""
 import contextlib
-import functools
-import re
-import string
 import traceback
 import urllib.request
-from abc import ABC, abstractmethod
-from collections import namedtuple
 from multiprocessing.pool import ThreadPool
 
-import numpy as np
-
 from idpconfgen import Path, log
-from idpconfgen.core import count_string_formatters
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs import libtimer
-from idpconfgen.logger import S, T
+from idpconfgen.libs import libstructure, libtimer
 from idpconfgen.libs.libstructure import Structure
-from idpconfgen.libs import libpdb
+from idpconfgen.logger import S, T
 
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
@@ -130,16 +122,23 @@ class PDBDownloader:
 
             pdbdata.add_filter_record_name(self.record_name)
             pdbdata.add_filter_chain(chain)
-            pdbdata.add_filter(lambda x: x[libpdb.atom_altLoc.col] in ('A', ''))
+            pdbdata.add_filter(
+                lambda x: x[libstructure.col_altLoc] in ('A', '')
+                )
             destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
+
             try:
                 pdbdata.write_PDB(destination)
             except EXCPTS.EmptyFilterError:
                 log.debug(traceback.format_exc())
-                log.error(S(f'Empty Filter for:'))
-                log.error(S(f'{destination}'))
-                log.error(S(f'record_name: {self.record_name}'))
-                log.error(S(f'chain filter: {chain}'))
+                logstr = (
+                    f'Empty Filter for: \n'
+                    f'{destination} \n'
+                    f'record_name: {self.record_name} \n'
+                    f'chain filter: {chain} \n'
+                    )
+                log.info(S(logstr))
+
             pdbdata.clear_filters()
 
     def _download_data(self, possible_links):
@@ -162,4 +161,3 @@ class PDBDownloader:
         except EXCPTS.DownloadFailedError as e:
             log.error(S(f'{repr(e)}: FAILED {pdbname}'))
             return
-
