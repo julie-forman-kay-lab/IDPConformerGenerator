@@ -18,15 +18,16 @@ import sys
 from idpconfgen import cli_pdbdownloader as pdbdl
 from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
+from idpconfgen import cli_fastaext as fastaext
 from idpconfgen.libs import libcli
 
 
 # https://stackoverflow.com/questions/14988397
 # https://stackoverflow.com/questions/4042452
 def _load_args():
-    
+
     prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
-    
+
     ap = libcli.CustomParser(
         prog='idpconfgen',  # prog_,
         description=libcli.detailed.format(description_),
@@ -39,7 +40,18 @@ def _load_args():
         description='DESCRIPTION',
         help='IDP Conf Gen subroutines:',
         )
-    
+
+    ap_fastaext = subparsers.add_parser(
+        'fastaext',
+        help='Extract FASTAS from PDBs',
+        parents=[fastaext.ap],
+        add_help=False,
+        description=libcli.detailed.format(fastaext._des),
+        usage=fastaext._us,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    ap_fastaext.set_defaults(func=fastaext.main)
+
     ap_pdbdl = subparsers.add_parser(
         'pdbdl',
         help='PDB Downloader',
@@ -50,7 +62,7 @@ def _load_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
     ap_pdbdl.set_defaults(func=pdbdl.main)
-   
+
     ap_ssext = subparsers.add_parser(
         'ssext',
         help='PDB Downloader',
@@ -80,9 +92,9 @@ def _load_args():
         ap.exit()
 
     cmd = ap.parse_args()
-   
+
     return cmd
-   
+
 
 def maincli():
     """
@@ -95,5 +107,5 @@ def maincli():
 
 
 if __name__ == '__main__':
-    
+
     maincli()

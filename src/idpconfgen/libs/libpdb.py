@@ -3,6 +3,7 @@ import functools
 import re
 
 from idpconfgen import Path, log
+from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.logger import S
 

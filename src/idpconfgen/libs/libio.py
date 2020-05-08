@@ -2,6 +2,7 @@
 import itertools as it
 import glob
 import os
+import sys
 from functools import partial
 
 from idpconfgen import Path, log
@@ -303,3 +304,19 @@ def glob_folder(folder, ext):
     files = glob.glob(Path(folder, ext).str())
     log.debug(f'folder {folder} read {len(files)} files with extension {ext}')
     return [Path(p) for p in files]
+
+
+def write_text(text, output=None):
+    """
+    Writes text to output.
+
+    If output is ``None`` writes to stdout.
+    Else, writes to file.
+    """
+    try:
+        opath = Path(output)
+    except TypeError:
+        sys.stdout.write(text)
+    else:
+        opath.myparents().mkdir(parents=True, exist_ok=True)
+        opath.write_text(text)

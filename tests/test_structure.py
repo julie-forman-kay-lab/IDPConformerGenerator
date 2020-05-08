@@ -95,11 +95,6 @@ def fix_Structure_build(request):
     return s
 
 
-def test_Structure(fix_Structure):
-    """Test data_array instantiates as None."""
-    assert fix_Structure.data_array is None
-
-
 def test_structure_parsers(fix_Structure):
     """Test has structure_parser function."""
     assert inspect.isfunction(fix_Structure._structure_parser)
@@ -110,15 +105,50 @@ def test_has_datastr(fix_Structure):
     assert fix_Structure._datastr
 
 
+def test_not_data_array(fix_Structure):
+    """Test AttributeError."""
+    with pytest.raises(EXCPTS.NotBuiltError):
+        fix_Structure.data_array
+
+
 def test_Structure_build_1(fix_Structure_build):
     """Build method."""
     with pytest.raises(AttributeError):
-        fix_Structure._datastr
+        fix_Structure_build._datastr
 
 
 def test_Structure_build_2(fix_Structure_build):
     """Test data array is numpy array."""
     assert isinstance(fix_Structure_build.data_array, np.ndarray)
+
+
+def test_Structure_fasta_A(fix_Structure_build):
+    """Test FASTA property."""
+    fix_Structure_build.add_filter_chain('A')
+    fix_Structure_build.add_filter_record_name('ATOM')
+    fasta = fix_Structure_build.fasta
+    assert fasta == {'A': 'AYIAKQRQISFVKSHF'}
+    # this functionality is used in cli_fastaext
+    assert next(iter(fasta.values())) == 'AYIAKQRQISFVKSHF'
+
+
+def test_Structure_fasta_CIF_all():
+    """Test FASTA property."""
+    s = libstructure.Structure(cif_example)
+    s.build()
+    expected = {
+        'A': 'AYIAKQRQISFVKSHF',
+        'B': 'AYIAKQRQISFVKSHFS',
+        'C': 'N',
+        'D': 'X',
+        'E': 'N',
+        'F': 'X',
+        'G': 'X',
+        'H': 'X',
+        }
+    fasta = s.fasta
+    assert fasta == expected
+    assert next(iter(fasta.values())) == 'AYIAKQRQISFVKSHF'
 
 
 def test_Structure_build_3(fix_Structure_build):
