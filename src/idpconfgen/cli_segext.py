@@ -46,6 +46,17 @@ ap.add_argument(
     default='all',
     )
 
+ap.add_argument(
+    '-a',
+    '--atoms',
+    help=(
+        'List of atom names to save in the selection.\n'
+        'Defaults to `N`, `CA`, and `C`.'
+        ),
+    default=('N', 'CA', 'C'),
+    nargs='+',
+    )
+
 
 def filter_dssp_segments(seg, required='all'):
     if required == 'all':
@@ -72,27 +83,28 @@ def maincli():
 def main(
         pdbs,
         dssp,
+        atoms,
+        minimum_size=4,
         destination=None,
         structure='all',
         func=None,
         ):
 
+    slice_jump = len(atoms)
+    minimum_size = slice_jump * minimum_size
+
     dest = Path(destination)
     dest.mkdir(exist_ok=True, parents=True)
 
-    assert structure == 'L'
     log.info(T('spliting PDBs into secondary structure components'))
 
     pdb_list = libio.read_path_bundle(pdbs)
     log.info(S('read pdb bundle'))
 
-    #codes, dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
     dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
     log.info(S('read dssp'))
 
-    for i, pdbid in enumerate(pdb_list):
-        #assert pdbid.stem == codes[i], \
-            #f'PDBID {pdbid.stem} and CODE {codes[i]} do not match'
+    for pdbid in pdb_list:
 
         log.info(S(f'working with {pdbid}'))
 
@@ -100,9 +112,7 @@ def main(
 
         pdbdata = libstructure.Structure(pdbid.read_text())
         pdbdata.build()
-        pdbdata.add_filter(
-            lambda x: x[libstructure.col_name] in ('N', 'CA', 'C')
-            )
+        pdbdata.add_filter(lambda x: x[libstructure.col_name] in atoms)
 
         counter = 1
 
@@ -114,17 +124,16 @@ def main(
         for segtype, segslice in user_required_dssp_segments:
 
             res_slice = slice(
-                segslice.start*3,
-                segslice.stop*3,
+                segslice.start * slice_jump,
+                segslice.stop * slice_jump,
                 None,
                 )
 
-            if res_slice.stop - res_slice.start < 12:
+            if res_slice.stop - res_slice.start < minimum_size:
                 continue
 
             to_write = list(pdbdata.filtered_atoms)[res_slice]
 
-            #if len(to_write) >= 4 * 3:
             libstructure.write_PDB(
                 libstructure.structure_to_pdb(to_write),
                 Path(dest, f'{pdbid.stem}_{segtype}_{counter}.pdb'),

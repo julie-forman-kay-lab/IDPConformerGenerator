@@ -288,13 +288,15 @@ def group_by(data):
 
     Returns
     -------
-    list : ((type, slice),)
+    list : [[type, slice],]
 
     Examples
     --------
     >>> group_by('LLLLLSSSSSSEEEEE')
     [['L', slice(0, 5)], ['S', slice(5, 11)], ['E', slice(11,16)]]
     """
+    assert data
+
     prev = data[0]
     start = 0
     current = [prev]
@@ -309,7 +311,7 @@ def group_by(data):
     else:
         current.append(slice(start, i + 1))
         groups.append(current)
-    assert groups
+
     assert isinstance(groups[0][0], str)
     assert isinstance(groups[0][1], slice)
     return groups
