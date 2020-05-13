@@ -4,6 +4,7 @@ import math
 import numpy as np
 
 from idpconfgen import log
+from idpconfgen.libs import libstructure
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],
@@ -201,8 +202,8 @@ def calc_torsion_angles(coords):
     by the following slices to the resulting array:
 
     - phi (N-CA), [2::3]
-    - psi (CA-N), [::3]
-    - omega (N-C), [1::3]
+    - psi (CA-C), [::3]
+    - omega (C-N), [1::3]
 
     Parameters
     ----------
@@ -250,3 +251,16 @@ def calc_torsion_angles(coords):
 
     # torsion angles
     return -np.arctan2(sin_theta, cos_theta)
+
+
+def validate_array_for_torsion(data):
+    """Validates data for torsion angle calculation."""
+
+    if data[0, libstructure.col_name] != 'N':
+        return 'The first atom is not N, it should be!'
+
+    if data.shape[0] % 3:
+        return 'Number of backbone atoms is not module of 3.'
+
+    return ''
+

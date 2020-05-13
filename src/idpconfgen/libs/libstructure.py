@@ -157,10 +157,12 @@ class Structure:
         """Add filters for chain."""
         self.filters.append(lambda x: x[col_chainID] == chain)
 
-    def add_filter_backbone(self):
+    def add_filter_backbone(self, minimal=False):
         """Add filter to consider only backbone atoms."""
         ib = is_backbone
-        self.filters.append(lambda x: ib(x[col_name], x[col_element]))
+        self.filters.append(
+            lambda x: ib(x[col_name], x[col_element], minimal=minimal)
+            )
 
     def write_PDB(self, filename):
         """Write Structure to PDB file."""
@@ -396,6 +398,10 @@ col_segid = 13
 col_element = 14
 col_model = 15
 
+
+cols_coords = [col_x, col_y, col_z]
+
+
 # this servers read_pdb_data_to_array mainly
 # it is here for performance
 record_line_headings = {
@@ -425,7 +431,7 @@ def _APPLY_FILTER(it, func):
 
 
 
-def is_backbone(atom, element):
+def is_backbone(atom, element, minimal=False):
     """
     Whether `atom` is a protein backbone atom or not.
 
@@ -436,7 +442,15 @@ def is_backbone(atom, element):
 
     element : str
         The element name.
+
+    minimal : bool
+        If `True` considers only `C` and `N` elements.
+        `False`, considers also `O`.
     """
     e = element.strip()
     a = atom.strip()
-    return e in ('C', 'O', 'N') and a in ('N', 'CA', 'O', 'C')
+    pure_atoms = {
+        True: ('N', 'C'),
+        False: ('N', 'C', 'O'),
+        }
+    return e in pure_atoms[minimal] and a in ('N', 'CA', 'O', 'C')
