@@ -19,6 +19,7 @@ from idpconfgen import cli_pdbdownloader as pdbdl
 from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
 from idpconfgen import cli_fastaext as fastaext
+from idpconfgen import cli_torsions as torsions
 from idpconfgen.libs import libcli
 
 
@@ -84,6 +85,17 @@ def _load_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         )
     ap_segext.set_defaults(func=segext.main)
+
+    ap_torsions = subparsers.add_parser(
+        'torsions',
+        help='Calculates Torsion Angles',
+        parents=[torsions.ap],
+        add_help=False,
+        description=libcli.detailed.format(torsions._des),
+        usage=torsions._us,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        )
+    ap_torsions.set_defaults(func=torsions.main)
 
     # prints help if not arguments are passed
     # if >2 prints help of subroutines.

@@ -8,6 +8,7 @@ Structure
 """
 import warnings
 from collections import defaultdict
+from functools import reduce
 
 import numpy as np
 
@@ -108,10 +109,12 @@ class Structure:
         list
             The data in PDB format after filtering.
         """
-        filtered_data = self.data_array
-        for f in self.filters:
-            filtered_data = filter(f, filtered_data)
-        return filtered_data
+        apply_filter = _APPLY_FILTER
+        return np.array(list(reduce(
+            apply_filter,
+            self.filters,
+            self.data_array,
+            )))
 
     @property
     def chain_set(self):
@@ -153,6 +156,11 @@ class Structure:
     def add_filter_chain(self, chain):
         """Add filters for chain."""
         self.filters.append(lambda x: x[col_chainID] == chain)
+
+    def add_filter_backbone(self):
+        """Add filter to consider only backbone atoms."""
+        ib = is_backbone
+        self.filters.append(lambda x: ib(x[col_name], x[col_element]))
 
     def write_PDB(self, filename):
         """Write Structure to PDB file."""
@@ -410,3 +418,25 @@ structure_parsers = [
     (is_cif, parse_cif_to_array),
     (libpdb.is_pdb, parse_pdb_to_array),
     ]
+
+
+def _APPLY_FILTER(it, func):
+    return filter(func, it)
+
+
+
+def is_backbone(atom, element):
+    """
+    Whether `atom` is a protein backbone atom or not.
+
+    Parameters
+    ----------
+    atom : str
+        The atom name.
+
+    element : str
+        The element name.
+    """
+    e = element.strip()
+    a = atom.strip()
+    return e in ('C', 'O', 'N') and a in ('N', 'CA', 'O', 'C')

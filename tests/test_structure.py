@@ -226,6 +226,15 @@ def test_Structure_filter_backbone(fix_Structure_build):
     assert len(result) == 132
 
 
+def test_Structure_filter_backbone_method(fix_Structure_build):
+    """Test filter backbone atoms."""
+    fix_Structure_build.add_filter_record_name('ATOM')
+    fix_Structure_build.add_filter_backbone()
+    result = fix_Structure_build.filtered_atoms
+    assert result.shape[0] == 132
+
+
+
 def test_Structure_chainset():
     """Test chain set."""
     s = libstructure.Structure(cif_example.read_text())
