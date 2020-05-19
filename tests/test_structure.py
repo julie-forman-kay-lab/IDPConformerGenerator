@@ -134,7 +134,7 @@ def test_Structure_fasta_A(fix_Structure_build):
 
 def test_Structure_fasta_CIF_all():
     """Test FASTA property."""
-    s = libstructure.Structure(cif_example)
+    s = libstructure.Structure(cif_example, label_priority='label')
     s.build()
     expected = {
         'A': 'AYIAKQRQISFVKSHF',
@@ -190,20 +190,34 @@ def test_false_pop_last_filter(filtered):
     assert len(filtered[0].filters) == 0
 
 
-@pytest.mark.parametrize(
-    'in1,expected',
-    [
-        (cif_example, 142),
-        (pdb_example, 275),  # :%s/\(^ATOM\|^HETATM\).\{} B \s.//n
-        ]
-    )
-def test_Structure_filter_B(in1, expected):
-    """Test Structure filter chain B."""
-    s = libstructure.Structure(in1.read_text())
+def test_Structure_filter_B_pdb():
+    """Test Structure filter chain B for a PDB file."""
+    # :%s/\(^ATOM\|^HETATM\).\{} B \s.//n
+    s = libstructure.Structure(pdb_example)
     s.build()
     s.add_filter_chain('B')
     result = list(s.filtered_atoms)
-    assert len(result) == expected
+    assert len(result) == 275
+
+
+def test_Structure_filter_B_cif_auth():
+    """Test Structure filter chain B for CIF in `auth`."""
+    #%s/\(^ATOM\|^HETATM\).*\sB\s\D//n
+    s = libstructure.Structure(cif_example, label_priority='auth')
+    s.build()
+    s.add_filter_chain('B')
+    result = list(s.filtered_atoms)
+    assert len(result) == 275
+
+
+def test_Structure_filter_B_cif_label():
+    """Test Structure filter chain B for CIF in `label`."""
+    #%s/\(^ATOM\|^HETATM\).*\sB\s\d//n
+    s = libstructure.Structure(cif_example, label_priority='label')
+    s.build()
+    s.add_filter_chain('B')
+    result = list(s.filtered_atoms)
+    assert len(result) == 142
 
 
 def test_Structure_filter_ATOM(fix_Structure_build):
@@ -228,7 +242,7 @@ def test_Structure_filter_backbone(fix_Structure_build):
 
 def test_Structure_chainset():
     """Test chain set."""
-    s = libstructure.Structure(cif_example.read_text())
+    s = libstructure.Structure(cif_example, label_priority='label')
     s.build()
     assert s.chain_set == {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'}
 

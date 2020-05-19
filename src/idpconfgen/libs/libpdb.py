@@ -1,4 +1,5 @@
 """Contain  handlers of PDB information."""
+from collections import defaultdict
 import functools
 import re
 
@@ -30,7 +31,7 @@ def format_atom_name(atom, element):
         Formatted atom name.
     """
     atom = atom.strip()
-    if element in ('H', 'C', 'N', 'O', 'S'):
+    if element in ('H', 'D', 'C', 'N', 'O', 'S'):
         if len(atom) < 4:
             return ' {:<3s}'.format(atom)
         else:
@@ -250,6 +251,13 @@ class PDBList:
 
     def __len__(self):
         return len(self.set)
+
+    @property
+    def name_chains_dict(self):
+        name_chains = defaultdict(list)
+        for pdbid in self:
+            name_chains[pdbid.name].append(pdbid.chain)
+        return name_chains
 
     def to_tuple(self):
         """Convert PDBList to sorted tuple."""

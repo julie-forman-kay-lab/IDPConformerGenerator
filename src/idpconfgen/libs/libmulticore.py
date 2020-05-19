@@ -1,10 +1,46 @@
 """Multi-core related objects."""
 import multiprocessing
 import subprocess
+from functools import partial
+from multiprocessing import Pool
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
 from idpconfgen.logger import S
+from idpconfgen.libs.libtimer import ProgressBar
+
+
+def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
+    """Multiprocess Pools a function.
+
+    Parameters
+    ----------
+    func : callable
+        The function to execute along the iterable `items`.
+
+    items : interable
+        Elements to pass to the `func`.
+
+    method : str
+        The :class:`Pool` method to execute.
+        Defaults to `imap_unordered`.
+
+    ncores : int
+        The number of cores to use. Defaults to `1`.
+
+    kwargs :
+        The named arguments to pass to `func`.
+    """
+    f = partial(func, **kwargs)
+
+    with \
+            Pool(ncores) as pool, \
+            ProgressBar(len(items)) as pb:
+
+        imap = getattr(pool, method)(f, items)
+
+        for _i in imap:
+            pb.increment()
 
 
 class Worker(multiprocessing.Process):

@@ -8,6 +8,7 @@ Structure
 """
 import warnings
 from collections import defaultdict
+from pathlib import Path as _Path
 
 import numpy as np
 
@@ -162,7 +163,7 @@ class Structure:
             try:
                 write_PDB(lines, filename)
             except UserWarning:
-                raise EXCPTS.EmptyFilterError
+                raise EXCPTS.EmptyFilterError(filename)
 
 
 def parse_pdb_to_array(datastr, which='both', **kwargs):
@@ -207,7 +208,7 @@ def parse_cif_to_array(datastr, **kwargs):
 
     Array is as given by :func:`gen_empty_structure_data_array`.
     """
-    cif = CIFParser(datastr)
+    cif = CIFParser(datastr, **kwargs)
     number_of_atoms = len(cif)
     data_array = gen_empty_structure_data_array(number_of_atoms)
 
@@ -344,7 +345,7 @@ def write_PDB(lines, filename):
         with open(filename, 'w') as fh:
             fh.write(concat_lines)
             fh.write('\n')
-        log.info(S(f'saved: {filename}'))
+        #log.info(S(f'saved: {filename}'))
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
@@ -400,6 +401,7 @@ record_line_headings = {
 # all should return a string
 # used for control flow
 type2string = {
+    type(_Path()): lambda x: x.read_text(),
     type(Path()): lambda x: x.read_text(),
     bytes: lambda x: x.decode('utf_8'),
     str: lambda x: x,

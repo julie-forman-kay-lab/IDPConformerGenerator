@@ -18,12 +18,20 @@ class CIFParser:
     """
 
     __slots__ = [
+        '_auth_label',
         '_len',
         '_line',
         'cif_dict',
         ]
 
-    def __init__(self, datastr):
+    def __init__(self, datastr, label_priority='auth'):
+
+        _label_priority = {
+            'auth': self._auth_label_priority,
+            'label': self._label_auth_priority,
+            }
+
+        self._auth_label = _label_priority[label_priority]
         self.cif_dict = {}
         self.read_cif(datastr)
         self.line = 0
@@ -95,7 +103,13 @@ class CIFParser:
         """Retrieve the label value for the current :attr:`line`."""
         return self.cif_dict[label][self.line]
 
-    def _auth_label(self, label):
+    def _auth_label_priority(self, label):
+        try:
+            return self.get_value(f'_atom_site.auth_{label}')
+        except KeyError:
+            return self.get_value(f'_atom_site.label_{label}')
+
+    def _label_auth_priority(self, label):
         try:
             return self.get_value(f'_atom_site.label_{label}')
         except KeyError:
