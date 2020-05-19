@@ -26,11 +26,19 @@ USAGE:
 import argparse
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libpdb, libdownload
+from idpconfgen.libs import libcli
+from idpconfgen.libs.libdownload import download_structure
+from idpconfgen.libs.libio import (
+    concatenate_entries,
+    glob_folder,
+    make_destination_folder,
+    )
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = 'pdbdownloader'
+LOGFILESNAME = '.pdbdownloader'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -104,8 +112,8 @@ def main(
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
 
-    pdbids_to_read = libio.concatenate_entries(pdblist)
-    pdblist = libpdb.PDBList(pdbids_to_read)
+    pdbids_to_read = concatenate_entries(pdblist)
+    pdblist = PDBList(pdbids_to_read)
 
     log.info(T('reading input PDB list'))
     log.info(S(f'from: {pdblist}'))
@@ -114,7 +122,7 @@ def main(
 
     if destination:
         pdblist_destination = \
-            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
+            PDBList(glob_folder(destination, '*.pdb'))
         log.info(T('reading destination folder'))
         log.info(S(f'from: {destination}'))
         log.info(S(f'{str(pdblist_destination)}'))
@@ -126,16 +134,20 @@ def main(
         log.info(S('done\n'))
 
     if update:
-        pdbdownloader = libdownload.PDBDownloader(
-            pdblist_comparison,
-            destination,
-            record_name=record_name,
+
+        dest = make_destination_folder(destination)
+
+        pool_function(
+            download_structure,
+            pdblist_comparison.name_chains_dict.items(),
             ncores=ncores,
+            # other kwargs for target function
+            folder=dest,
+            record_name=record_name,
             )
-        pdbdownloader.prepare_pdb_list()
-        pdbdownloader.run()
+
         pdblist_updated = \
-            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
+            PDBList(glob_folder(destination, '*.pdb'))
         log.info(T('Reading UPDATED destination'))
         log.info(S(f'{str(pdblist_updated)}'))
         log.info(S('done\n'))

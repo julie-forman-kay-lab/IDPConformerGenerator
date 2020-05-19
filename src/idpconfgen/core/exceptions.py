@@ -71,6 +71,9 @@ class IDPConfGenException(Exception):
         """Make me a string :-)."""
         return self.errmsg.format(*self.args)
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self}'
+
     def report(self):
         """
         Report error in the form of a string.
@@ -83,6 +86,7 @@ class IDPConfGenException(Exception):
             The formatted string report.
         """
         return f'{self.__class__.__name__} * {self}'
+
 
 
 class PDBIDFactoryError(IDPConfGenException):
@@ -110,7 +114,7 @@ class DownloadFailedError(IDPConfGenException):
 class EmptyFilterError(IDPConfGenException):
     """Raise when PDB data filtering returns an empty selection."""
 
-    errmsg = 'Filter returns empty selection.'
+    errmsg = 'Filter returns empty selection, when saving file {}.'
 
 
 class DSSPParserError(IDPConfGenException):

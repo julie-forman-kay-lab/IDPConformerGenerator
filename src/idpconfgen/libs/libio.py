@@ -320,3 +320,13 @@ def write_text(text, output=None):
     else:
         opath.myparents().mkdir(parents=True, exist_ok=True)
         opath.write_text(text)
+
+def make_destination_folder(dest):
+    try:
+        dest_ = Path(dest)
+    except TypeError:
+        return Path.cwd()
+    else:
+        dest_.mkdir(parents=True, exist_ok=True)
+        return dest_
+

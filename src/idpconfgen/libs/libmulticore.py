@@ -1,10 +1,46 @@
 """Multi-core related objects."""
 import multiprocessing
 import subprocess
+from functools import partial
+from multiprocessing import Pool
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
 from idpconfgen.logger import S
+from idpconfgen.libs.libtimer import ProgressBar
+
+
+def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
+    """Multiprocess Pools a function.
+
+    Parameters
+    ----------
+    func : callable
+        The function to execute along the iterable `items`.
+
+    items : interable
+        Elements to pass to the `func`.
+
+    method : str
+        The :class:`Pool` method to execute.
+        Defaults to `imap_unordered`.
+
+    ncores : int
+        The number of cores to use. Defaults to `1`.
+
+    kwargs :
+        The named arguments to pass to `func`.
+    """
+    f = partial(func, **kwargs)
+
+    with \
+            Pool(ncores) as pool, \
+            ProgressBar(len(items)) as pb:
+
+        imap = getattr(pool, method)(f, items)
+
+        for _i in imap:
+            pb.increment()
 
 
 class Worker(multiprocessing.Process):
@@ -15,13 +51,13 @@ class Worker(multiprocessing.Process):
     ----------
     task_queue
         A queue of tasks. Queue must be poisoned with a terminal `None`.
-    
+
     results_queue
         A queue where to store the results.
     """
 
     def __init__(self, task_queue, result_queue):
-      
+
         # super().__init__(self) ?
         multiprocessing.Process.__init__(self)
         self.task_queue = task_queue
@@ -68,16 +104,16 @@ class SubprocessTask(Task):
         should be given here, and two formats are possible,
         as string or as list. If string, string is split into
         its components, for example:
-            
+
             'ls -ltr' will result in ['ls', '-ltr']
-        
+
         A preprepared list can be given instead.
-    
+
     input : list
         A list containing whatever input the command must receive.
         Defaults to None, no input is used.
     """
-   
+
     @libcheck.argstype(Task, (list, str))
     @libcheck.kwargstype((type(None), list, tuple))
     def __init__(self, cmd_exec, input_=None):
@@ -98,7 +134,7 @@ class SubprocessTask(Task):
                 k.lstrip('_'),
                 v) for k, v in self.__dict__.items()),
             )
-  
+
     def __call__(self):  # noqa: D400
         """Call. hello? Are you there?"""
         self.prepare_cmd()
@@ -136,7 +172,7 @@ class SubprocessTask(Task):
     def execute(self):
         """
         Execute subprocess.run() on the defined task.
-        
+
         May brake if .prepare_cmd() was not executed beforehand.
         """
         log.info(S('running {}', self.cmd))
@@ -148,11 +184,11 @@ class SubprocessTask(Task):
 
 class DSSPTask(SubprocessTask):
     """Subprocess Task for DSSP third party executable."""
-    
+
     @libcheck.argstype(Task, (list, str), (str, Path))
     def __init__(self, cmd, input_):
         # forces input_ to be positional parameter in subclass DSSPTask
-        
+
         try:
             cmd.append('-i')
         except AttributeError:
@@ -162,7 +198,7 @@ class DSSPTask(SubprocessTask):
         input_ = [input_]
 
         super().__init__(cmd, input_=input_)
-    
+
     def __call__(self):
         """Call on meeeee :)."""
         self.prepare_cmd()
@@ -178,7 +214,7 @@ class JoinedResults:
     related [command - input] tasks. These tasks are executed
     as picked from the queue when the previous finishes. Takses are
     executed by :class:`Worker` objects.
-    
+
     As tasks complete, results are stored in the :attr:`results`.
 
     Parameters
