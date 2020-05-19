@@ -12,12 +12,11 @@ from pathlib import Path as _Path
 
 import numpy as np
 
-from idpconfgen import Path, log
+from idpconfgen import Path
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
-from idpconfgen.logger import S
 
 
 # module variables are defined at the end.
@@ -345,7 +344,7 @@ def write_PDB(lines, filename):
         with open(filename, 'w') as fh:
             fh.write(concat_lines)
             fh.write('\n')
-        #log.info(S(f'saved: {filename}'))
+        # log.info(S(f'saved: {filename}'))
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
