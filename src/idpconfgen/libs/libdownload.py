@@ -59,7 +59,7 @@ def download_structure(pdbid, folder='', record_name='ATOM'):
 
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(
-        lambda x: x[col_altLoc] in ('A', '')
+        lambda x: x[col_altLoc] in ('A', '', ' ')
         )
 
     for chain in chains:
