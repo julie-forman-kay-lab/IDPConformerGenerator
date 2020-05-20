@@ -64,9 +64,22 @@ def download_structure(pdbid, folder='', record_name='ATOM'):
 
     for chain in chains:
         pdbdata.add_filter_chain(chain)
-        fout = Path(folder, f'{pdbname}_{chain}.pdb')
-        with try_to_write(downloaded_data, fout):
-            pdbdata.write_PDB(fout)
+
+        #
+        pdbsegs = pdbdata.residue_segments
+        if len(pdbsegs) > 1:
+            for i, segment in enumerate(pdbsegs):
+                fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb}')
+                with try_to_write(downloaded_data, fout_seg):
+                    write_PDB(segment)
+
+        #
+        else:
+            fout = Path(folder, f'{pdbname}_{chain}.pdb')
+            with try_to_write(downloaded_data, fout):
+                pdbdata.write_PDB(fout)
+
+
         pdbdata.pop_last_filter()
 
 

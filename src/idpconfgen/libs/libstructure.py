@@ -68,6 +68,9 @@ class Structure:
         self.clear_filters()
         assert isinstance(self.filters, list)
 
+    def __getitem__(self, vals):
+        return self.filtered_atoms[vals[0], vals[1]]
+
     def build(self):
         """
         Read structure raw data in :attr:`rawdata`.
@@ -135,6 +138,15 @@ class Structure:
             chain: ''.join(residues.values())
             for chain, residues in chains.items()
             }
+
+    @property
+    def residue_seguments(self):
+        # https://stackoverflow.com/questions/7352684
+        fa = self.filtered_atoms
+        return np.split(
+            fa,
+            np.where(np.diff(fa[:, col_resSeq]) != 1)[0]+1
+            )
 
     def pop_last_filter(self):
         """Pop last filter."""
