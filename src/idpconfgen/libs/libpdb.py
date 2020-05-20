@@ -1,10 +1,9 @@
 """Contain  handlers of PDB information."""
-from collections import defaultdict
 import functools
 import re
+from collections import defaultdict
 
 from idpconfgen import Path, log
-from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.logger import S
 
@@ -30,17 +29,25 @@ def format_atom_name(atom, element):
     str
         Formatted atom name.
     """
-    atom = atom.strip()
-    if element in ('H', 'D', 'C', 'N', 'O', 'S'):
-        if len(atom) < 4:
-            return ' {:<3s}'.format(atom)
-        else:
-            return '{:<4s}'.format(atom)
-    elif len(atom) == 2:
-        return '{:<2s}  '.format(atom)
-    else:
-        _ = f'Could not format this atom:type {atom}:{element}'
-        raise EXCPTS.PDBFormatError(_)
+    # this implementation is 10% slower than the pure if/else strategy
+    # however it looks simpler and avoids the need for an assert
+    # because KeyError is used as contract
+    AFD = _atom_format_dict
+    atm = atom.strip()
+    return AFD[len(element.strip())][len(atm) < 4].format(atm)
+
+
+_atom_format_dict = {
+    # len of element, atom formatting string
+    1: {
+        True: ' {:<3s}',
+        False: '{:<4s}',
+        },
+    2: {
+        True: '{:<4s}',
+        False: '{:<4s}',
+        },
+    }
 
 
 def format_chainid(chain):
@@ -254,6 +261,7 @@ class PDBList:
 
     @property
     def name_chains_dict(self):
+        """Export PDBIDs: Chains dictionary map."""
         name_chains = defaultdict(list)
         for pdbid in self:
             name_chains[pdbid.name].append(pdbid.chain)
