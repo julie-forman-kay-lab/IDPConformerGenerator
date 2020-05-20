@@ -30,24 +30,30 @@ def format_atom_name(atom, element):
         Formatted atom name.
     """
     # this implementation is 10% slower than the pure if/else strategy
-    # however it looks simpler and avoids the need for an assert
+    # however it is simpler and cleaner and avoids the need for an assert
     # because KeyError is used as contract
-    AFD = _atom_format_dict
     atm = atom.strip()
-    return AFD[len(element.strip())][len(atm) < 4].format(atm)
+    len_atm = len(atm)
+    len_ele = len(element.strip())
 
-
-_atom_format_dict = {
     # len of element, atom formatting string
-    1: {
-        True: ' {:<3s}',
-        False: '{:<4s}',
-        },
-    2: {
-        True: '{:<4s}',
-        False: '{:<4s}',
-        },
-    }
+    atom_format_dict = {
+        1: {
+            0 < len_atm < 4: ' {:<3s}',
+            len_atm == 4: '{:<4s}',
+            },
+        2: {
+            0 < len_atm <= 4: '{:<4s}',
+            },
+        }
+    try:
+        return _atom_format_dict[len_ele][True]
+    except KeyError as err:
+        _ = f'Could not format this atom:type -> {atom}:{element}'
+        # raising KeyError assures that no context in IDPConfGen
+        # will handle it. @joaomcteixeira never handles pure Python
+        # exceptions, those are treated as bugs.
+        raise KeyError(_) from err
 
 
 def format_chainid(chain):
