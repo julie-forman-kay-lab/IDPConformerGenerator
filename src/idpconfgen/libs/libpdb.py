@@ -8,6 +8,29 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.logger import S
 
 
+# string formats for atom name
+_3 = ' {:<3s}'
+_4 = '{:<4s}'
+# len of element, atom formatting string
+# anything outside this is an error
+_atom_format_dict = {
+    # len of element
+    1: {
+        # len of atom name
+        1: _3,
+        2: _3,
+        3: _3,
+        4: _4,
+        },
+    2: {
+        1: _4,
+        2: _4,
+        3: _4,
+        4: _4,
+        },
+    }
+
+
 def format_atom_name(atom, element):
     """
     Format PDB Record line Atom name.
@@ -29,25 +52,13 @@ def format_atom_name(atom, element):
     str
         Formatted atom name.
     """
-    # this implementation is 10% slower than the pure if/else strategy
-    # however it is simpler and cleaner and avoids the need for an assert
-    # because KeyError is used as contract
     atm = atom.strip()
     len_atm = len(atm)
     len_ele = len(element.strip())
+    AFD = _atom_format_dict
 
-    # len of element, atom formatting string
-    atom_format_dict = {
-        1: {
-            0 < len_atm < 4: ' {:<3s}',
-            len_atm == 4: '{:<4s}',
-            },
-        2: {
-            0 < len_atm <= 4: '{:<4s}',
-            },
-        }
     try:
-        return _atom_format_dict[len_ele][True]
+        return AFD[len_ele][len_atm].format(atm)
     except KeyError as err:
         _ = f'Could not format this atom:type -> {atom}:{element}'
         # raising KeyError assures that no context in IDPConfGen
