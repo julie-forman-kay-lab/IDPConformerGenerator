@@ -1,12 +1,34 @@
 """Contain  handlers of PDB information."""
-from collections import defaultdict
 import functools
 import re
+from collections import defaultdict
 
 from idpconfgen import Path, log
-from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.logger import S
+
+
+# string formats for atom name
+_3 = ' {:<3s}'
+_4 = '{:<4s}'
+# len of element, atom formatting string
+# anything outside this is an error
+_atom_format_dict = {
+    # len of element
+    1: {
+        # len of atom name
+        1: _3,
+        2: _3,
+        3: _3,
+        4: _4,
+        },
+    2: {
+        1: _4,
+        2: _4,
+        3: _4,
+        4: _4,
+        },
+    }
 
 
 def format_atom_name(atom, element):
@@ -30,17 +52,19 @@ def format_atom_name(atom, element):
     str
         Formatted atom name.
     """
-    atom = atom.strip()
-    if element in ('H', 'D', 'C', 'N', 'O', 'S'):
-        if len(atom) < 4:
-            return ' {:<3s}'.format(atom)
-        else:
-            return '{:<4s}'.format(atom)
-    elif len(atom) == 2:
-        return '{:<2s}  '.format(atom)
-    else:
-        _ = f'Could not format this atom:type {atom}:{element}'
-        raise EXCPTS.PDBFormatError(_)
+    atm = atom.strip()
+    len_atm = len(atm)
+    len_ele = len(element.strip())
+    AFD = _atom_format_dict
+
+    try:
+        return AFD[len_ele][len_atm].format(atm)
+    except KeyError as err:
+        _ = f'Could not format this atom:type -> {atom}:{element}'
+        # raising KeyError assures that no context in IDPConfGen
+        # will handle it. @joaomcteixeira never handles pure Python
+        # exceptions, those are treated as bugs.
+        raise KeyError(_) from err
 
 
 def format_chainid(chain):
@@ -254,6 +278,7 @@ class PDBList:
 
     @property
     def name_chains_dict(self):
+        """Export PDBIDs: Chains dictionary map."""
         name_chains = defaultdict(list)
         for pdbid in self:
             name_chains[pdbid.name].append(pdbid.chain)

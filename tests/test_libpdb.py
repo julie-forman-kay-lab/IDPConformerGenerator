@@ -35,21 +35,20 @@ def test_is_function(is_func, structure, expected):
         ('N', 'N', ' N  '),
         ('CO', 'C', ' CO '),
         ('CA', 'CA', 'CA  '),
-        ('CHA', 'C', ' CHA'),
+        (' CHA', 'C', ' CHA'),
         ('HD11', 'H', 'HD11'),
-        ('FE', 'FE', 'FE  '),
-        ('OD1', 'O', ' OD1'),
+        ('HD1', 'H', ' HD1'),
+        ('FE  ', 'FE', 'FE  '),
+        ('FE1', 'FE', 'FE1 '),
+        ('P3B', 'P', ' P3B'),
+        (' P3B', 'P', ' P3B'),
+        (' OD1', 'O', ' OD1'),
+        ('OXT', 'O', ' OXT'),
         ]
     )
 def test_format_atoms(atom, element, expected):
     """Test format atom."""
     assert libpdb.format_atom_name(atom, element) == expected
-
-
-def test_format_atoms_error():
-    """Test error with wrong atom."""
-    with pytest.raises(EXCPTS.PDBFormatError):
-        libpdb.format_atom_name('FES', 'FE')
 
 
 def test_format_chain():
