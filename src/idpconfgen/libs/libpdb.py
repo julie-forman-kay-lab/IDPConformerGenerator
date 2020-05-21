@@ -284,6 +284,10 @@ class PDBList:
         return len(self.set)
 
     @property
+    def pdbids(self):
+        return (pdbid.name for pdbid in self)
+
+    @property
     def name_chains_dict(self):
         """Export PDBIDs: Chains dictionary map."""
         name_chains = defaultdict(list)

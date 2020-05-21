@@ -16,6 +16,7 @@ import argparse
 import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
+from idpconfgen import cli_pdb_raw_downloader as raw_pdbdl
 from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
 from idpconfgen import cli_fastaext as fastaext

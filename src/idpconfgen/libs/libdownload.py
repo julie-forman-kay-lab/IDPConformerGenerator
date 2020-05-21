@@ -19,6 +19,15 @@ POSSIBLELINKS = [
     ]
 
 
+def download_raw_PDBS(pdbid, folder=''):
+    """
+    Download raw PDBs without any filtering.
+    """
+    downloaded_data = fetch_pdb_id_from_RCSB(pdid)
+    fout = Path(folder, f'{pdbid}.pdb')
+    fout.write_bytes(downloaded_data)
+
+
 def download_structure(pdbid, **kwargs):
     """
     Download a PDB/CIF structure chains.
