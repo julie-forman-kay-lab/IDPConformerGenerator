@@ -27,6 +27,7 @@ import argparse
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libparse import filter_pdb_for_db
 from idpconfgen.libs.libdownload import download_structure
 from idpconfgen.libs.libio import (
     concatenate_entries,
@@ -40,8 +41,8 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = '.pdbdownloader'
 
-_name = 'pdbdl'
-_help = 'Downloads filtered structures from RCSB.'
+_name = 'pdb_filter'
+_help = 'Filters PDBs for the database according to criteria.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
@@ -52,50 +53,10 @@ ap = libcli.CustomParser(
     )
 # https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    'pdblist',
-    help='PDBID:CHAIN identifiers to download.',
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-d',
-    '--destination',
-    help=(
-        'Destination folder where PDB files will be stored.'
-        ' Defaults to current working directory.'
-        ),
-    type=Path,
-    default=Path.cwd(),
-    )
-
-ap.add_argument(
-    '-u',
-    '--update',
-    help=(
-        'Updates destination folder according to input PDB list. '
-        'If not provided a comparison between input and destination '
-        'is provided.'
-        ),
-    action='store_true',
-    )
-
-ap.add_argument(
-    '-rn',
-    '--record_name',
-    help='The coordinate PDB record name. Default: ("ATOM",)',
-    default=('ATOM',),
-    action=libcli.ArgsToTuple,
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-n',
-    '--ncores',
-    help='Number of cores to use.',
-    type=int,
-    default=1,
-    )
+libcli.add_parser_pdbs(ap)
+libcli.add_parser_destination_folder(ap)
+libcli.add_argument_update(ap)
+libcli.add_argument_cores(ap)
 
 
 def _load_args():
@@ -104,18 +65,18 @@ def _load_args():
 
 
 def main(
-        pdblist,
+        pdbs,
         destination=None,
-        update=False,
-        record_name=('ATOM',),
         ncores=1,
+        update=False,
         **kwargs
         ):
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
 
-    pdbids_to_read = concatenate_entries(pdblist)
-    pdblist = PDBList(pdbids_to_read)
+    pdbs = libio.read_path_bundle(pdbs)
+    #pdbids_to_read = concatenate_entries(pdblist)
+    #pdblist = PDBList(pdbids_to_read)
 
     log.info(T('reading input PDB list'))
     log.info(S(f'from: {pdblist}'))
@@ -140,12 +101,11 @@ def main(
         dest = make_destination_folder(destination)
 
         pool_function(
-            download_structure,
-            pdblist_comparison.name_chains_dict.items(),
+            filter_pdb_for_db,
+            pdbs,
             ncores=ncores,
             # other kwargs for target function
             folder=dest,
-            record_name=record_name,
             )
 
         pdblist_updated = \

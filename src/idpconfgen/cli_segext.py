@@ -17,6 +17,8 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAMES = '.idpconfgen_segext'
 
+_name = 'segsplit'
+_help = 'Split PDB into secondary structure segments.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(

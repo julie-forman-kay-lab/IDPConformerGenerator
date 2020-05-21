@@ -316,3 +316,114 @@ def group_by(data):
     assert isinstance(groups[0][1], slice)
     return groups
 
+
+# considers solvent and DNA/RNA
+# http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
+_discarded_residues = ('HOH', 'SOL', 'I', 'C', 'G', 'A',
+    'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N')
+_allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
+
+
+def filter_pdb_for_db(
+        pdb_file,
+        record_name=('ATOM', 'HETATM'),
+        altlocs=('A', '', ' '),
+        folder='',
+        ):
+    """
+    """
+    _DR = _discarded_residues
+    _AE = _allowed_elements
+
+    pdbid = PDBIDFactory(pdb_file)
+
+    s = Structure(Path(pdb_file))
+    s.build()
+
+    pdbdata.add_filter_record_name(record_name)
+    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+
+    chains = pdbid.chains or pdbdata.chain_set
+
+    for chain in chains:
+        pdbdata.add_filter_chain(chain)
+
+        fout = Path(folder, f'{pdbid.name}_{chain}_filtered.pdb')
+        with try_to_write(downloaded_data, fout):
+            pdbdata.write_PDB(fout)
+
+        pdbdata.pop_last_filter()
+
+
+@contextmanager
+def try_to_write(data, fout):
+    """Context to download."""
+    try:
+        yield except EXCPTS.IDPConfGenException as err:
+        log.debug(traceback.format_exc())
+        log.error(S('error found for {}: {}', fout, repr(err)))
+        erp = Path(fout.myparents(), 'errors')
+        erp.mkdir(parents=True, exist_ok=True)
+        p = Path(erp, fout.stem).with_suffix('.structure')
+        if p.exists():
+            return
+        else:
+            try:
+                p.write_bytes(data)
+            except TypeError:
+                p.write_text(data)
+
+
+def save_structure_chains_and_segments(
+        downloaded_data,
+        pdbname,
+        chains=None,
+        record_name='ATOM',
+        altlocs=('A', '', ' '),
+        folder='',
+        ):
+
+    _DR = _discarded_residues
+    _AE = _allowed_elements
+
+    pdbdata = Structure(downloaded_data)
+    pdbdata.build()
+
+    chains = chains or pdbdata.chain_set
+
+    pdbdata.add_filter_record_name(record_name)
+    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+
+    for chain in chains:
+        pdbdata.add_filter_chain(chain)
+
+        # passar esto a una function
+        pdbsegs = pdbdata.residue_segments
+
+        # more than one residue
+        valid_segments = filter(
+            lambda x: set(line[col_resSeq] for line in x),
+            pdbsegs,
+            )
+
+        if len(pdbsegs) > 1:
+            for i, segment in enumerate(valid_segments):
+                fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb')
+                with try_to_write(downloaded_data, fout_seg):
+                    # because segments are pure arrays
+                    # and not Structure objects
+                    write_PDB(structure_to_pdb(segment), fout_seg)
+        #
+
+        else:
+            fout = Path(folder, f'{pdbname}_{chain}.pdb')
+            with try_to_write(downloaded_data, fout):
+                pdbdata.write_PDB(fout)
+
+        pdbdata.pop_last_filter()
+
+

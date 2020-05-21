@@ -469,7 +469,7 @@ def is_backbone(atom, element, minimal=False):
     return e in pure_atoms[minimal] and a in ('N', 'CA', 'O', 'C')
 
 
-def split_residue_segments(atom_lines)
+def split_residue_segments(atom_lines):
     """
     Splits a sequence of atoms into consecutive residue segments.
 

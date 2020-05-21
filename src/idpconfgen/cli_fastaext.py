@@ -14,6 +14,9 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = 'idpconfgen_fastaext'
 
+_name = 'fastaext'
+_help = 'Extract FASTA sequence from PDBs.'
+
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(

@@ -27,7 +27,7 @@ import argparse
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libdownload import download_structure
+from idpconfgen.libs.libdownload import download_raw_PDBS
 from idpconfgen.libs.libio import (
     concatenate_entries,
     glob_folder,
@@ -38,7 +38,10 @@ from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = '.pdbdownloader'
+LOGFILESNAME = '.raw_pdbdl'
+
+_name = 'raw_pdbdl'
+_help = 'Downloads raw structures from RCSB.'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -129,7 +132,7 @@ def main(
 
         pool_function(
             download_raw_PDBS,
-            pdblist_comparison.pdbids,
+            list(pdblist_comparison.pdbids),
             ncores=ncores,
             # other kwargs for target function
             folder=dest,
