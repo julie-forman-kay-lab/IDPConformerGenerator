@@ -8,15 +8,16 @@ Structure
 """
 import warnings
 from collections import defaultdict
-from pathlib import Path as _Path
+from functools import reduce
 
 import numpy as np
 
-from idpconfgen import Path
+from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
+from idpconfgen.logger import S
 
 
 # module variables are defined at the end.
@@ -68,9 +69,6 @@ class Structure:
         self.clear_filters()
         assert isinstance(self.filters, list)
 
-    def __getitem__(self, vals):
-        return self.filtered_atoms[vals[0], vals[1]]
-
     def build(self):
         """
         Read structure raw data in :attr:`rawdata`.
@@ -111,10 +109,12 @@ class Structure:
         list
             The data in PDB format after filtering.
         """
-        filtered_data = self.data_array
-        for f in self.filters:
-            filtered_data = filter(f, filtered_data)
-        return filtered_data
+        apply_filter = _APPLY_FILTER
+        return np.array(list(reduce(
+            apply_filter,
+            self.filters,
+            self.data_array,
+            )))
 
     @property
     def chain_set(self):
@@ -139,14 +139,18 @@ class Structure:
             for chain, residues in chains.items()
             }
 
+    #@property
+    #def residue_segments(self):
+    #    fa = self.filtered_atoms
+    #    return np.split(fa, np.where(np.diff(fa[:, col_resSeq]) != 1)[0]+1)
+
     @property
-    def residue_seguments(self):
-        # https://stackoverflow.com/questions/7352684
-        fa = self.filtered_atoms
-        return np.split(
-            fa,
-            np.where(np.diff(fa[:, col_resSeq]) != 1)[0]+1
-            )
+    def residue_segments(self):
+    # this is crude implementation compatible with multiprocessing.Pool
+    # the numpy version is commented above
+    # if you are reading this, rise an issue and let me know how to
+    # handle the creation of new arrays with Pool.map/imap :-)
+        return split_into_segments(self.filtered_atoms)
 
     def pop_last_filter(self):
         """Pop last filter."""
@@ -166,6 +170,13 @@ class Structure:
         """Add filters for chain."""
         self.filters.append(lambda x: x[col_chainID] == chain)
 
+    def add_filter_backbone(self, minimal=False):
+        """Add filter to consider only backbone atoms."""
+        ib = is_backbone
+        self.filters.append(
+            lambda x: ib(x[col_name], x[col_element], minimal=minimal)
+            )
+
     def write_PDB(self, filename):
         """Write Structure to PDB file."""
         lines = structure_to_pdb(self.filtered_atoms)
@@ -174,7 +185,7 @@ class Structure:
             try:
                 write_PDB(lines, filename)
             except UserWarning:
-                raise EXCPTS.EmptyFilterError(filename)
+                raise EXCPTS.EmptyFilterError
 
 
 def parse_pdb_to_array(datastr, which='both', **kwargs):
@@ -219,7 +230,7 @@ def parse_cif_to_array(datastr, **kwargs):
 
     Array is as given by :func:`gen_empty_structure_data_array`.
     """
-    cif = CIFParser(datastr, **kwargs)
+    cif = CIFParser(datastr)
     number_of_atoms = len(cif)
     data_array = gen_empty_structure_data_array(number_of_atoms)
 
@@ -356,7 +367,7 @@ def write_PDB(lines, filename):
         with open(filename, 'w') as fh:
             fh.write(concat_lines)
             fh.write('\n')
-        # log.info(S(f'saved: {filename}'))
+        #log.info(S(f'saved: {filename}'))
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
@@ -400,6 +411,10 @@ col_segid = 13
 col_element = 14
 col_model = 15
 
+
+cols_coords = [col_x, col_y, col_z]
+
+
 # this servers read_pdb_data_to_array mainly
 # it is here for performance
 record_line_headings = {
@@ -412,7 +427,6 @@ record_line_headings = {
 # all should return a string
 # used for control flow
 type2string = {
-    type(_Path()): lambda x: x.read_text(),
     type(Path()): lambda x: x.read_text(),
     bytes: lambda x: x.decode('utf_8'),
     str: lambda x: x,
@@ -423,3 +437,55 @@ structure_parsers = [
     (is_cif, parse_cif_to_array),
     (libpdb.is_pdb, parse_pdb_to_array),
     ]
+
+
+def _APPLY_FILTER(it, func):
+    return filter(func, it)
+
+
+
+def is_backbone(atom, element, minimal=False):
+    """
+    Whether `atom` is a protein backbone atom or not.
+
+    Parameters
+    ----------
+    atom : str
+        The atom name.
+
+    element : str
+        The element name.
+
+    minimal : bool
+        If `True` considers only `C` and `N` elements.
+        `False`, considers also `O`.
+    """
+    e = element.strip()
+    a = atom.strip()
+    pure_atoms = {
+        True: ('N', 'C'),
+        False: ('N', 'C', 'O'),
+        }
+    return e in pure_atoms[minimal] and a in ('N', 'CA', 'O', 'C')
+
+
+def split_residue_segments(atom_lines)
+    """
+    Splits a sequence of atoms into consecutive residue segments.
+
+    Parameters
+    ----------
+    atom_lines : np.ndarray of shape (N, col*)
+        A :class:`Structure.data_array` like.
+    """
+    segments = [[]]
+    prev = int(atom_lines[0, col_resSeq])
+    for line in atom_lines:
+        curr = int(line[col_resSeq])
+        if 0 <= curr - prev < 2:
+            segments[-1].append(line)
+        else:
+            segments.append([])
+            segments[-1].append(line)
+        prev = curr
+    return segments
