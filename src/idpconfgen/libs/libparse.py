@@ -1,12 +1,17 @@
 """Contain different parsing strategies for different files."""
 import sys
+import traceback
+from contextlib import contextmanager
 
 import numpy as np
 
-from idpconfgen import Path
+from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs import libcheck, libpdb
+from idpconfgen.libs import libcheck
+from idpconfgen.libs.libpdb import PDBIDFactory
+from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element
+from idpconfgen.logger import S, T
 
 
 class DSSPParser:
@@ -130,7 +135,7 @@ class DSSPParser:
         Tuple of type (PDBID, DSSP DATA).
         """
         return cls(
-            pdbid=libpdb.PDBIDFactory(subcmd_tuple[0]),
+            pdbid=PDBIDFactory(subcmd_tuple[0]),
             data=subcmd_tuple[1],
             **kwargs,
             )
@@ -317,6 +322,24 @@ def group_by(data):
     return groups
 
 
+def group_consecutive_ints(sequence):
+    """
+    """
+    prev = sequence[0]
+    start = 0
+    slices = []
+    for i, integer in enumerate(sequence[1:], start=1):
+        if integer - prev not in (0, 1):
+            slices.append(slice(start, i))
+            start = i
+        prev = integer
+    else:
+        slices.append(slice(start, i + 1))
+    return slices
+
+
+
+
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
 _discarded_residues = ('HOH', 'SOL', 'I', 'C', 'G', 'A',
@@ -337,22 +360,25 @@ def filter_pdb_for_db(
 
     pdbid = PDBIDFactory(pdb_file)
 
-    s = Structure(Path(pdb_file))
-    s.build()
+    pdbdata = Structure(Path(pdb_file))
+    pdbdata.build()
 
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
     pdbdata.add_filter(lambda x: x[col_element] in _AE)
     pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
-    chains = pdbid.chains or pdbdata.chain_set
+    chains = pdbid.chain or pdbdata.chain_set
 
     for chain in chains:
         pdbdata.add_filter_chain(chain)
 
         fout = Path(folder, f'{pdbid.name}_{chain}_filtered.pdb')
-        with try_to_write(downloaded_data, fout):
+        try:
             pdbdata.write_PDB(fout)
+        except EXCPTS.IDPConfGenException as err:
+            log.error(S('* Something went wrong with {}: {}', pdbid, repr(err)))
+            log.debug(traceback.format_exc())
 
         pdbdata.pop_last_filter()
 
@@ -361,7 +387,8 @@ def filter_pdb_for_db(
 def try_to_write(data, fout):
     """Context to download."""
     try:
-        yield except EXCPTS.IDPConfGenException as err:
+        yield
+    except EXCPTS.IDPConfGenException as err:
         log.debug(traceback.format_exc())
         log.error(S('error found for {}: {}', fout, repr(err)))
         erp = Path(fout.myparents(), 'errors')
@@ -380,7 +407,7 @@ def save_structure_chains_and_segments(
         downloaded_data,
         pdbname,
         chains=None,
-        record_name='ATOM',
+        record_name=('ATOM', 'HETATM'),
         altlocs=('A', '', ' '),
         folder='',
         ):
@@ -402,27 +429,27 @@ def save_structure_chains_and_segments(
         pdbdata.add_filter_chain(chain)
 
         # passar esto a una function
-        pdbsegs = pdbdata.residue_segments
+        #pdbsegs = pdbdata.residue_segments
 
-        # more than one residue
-        valid_segments = filter(
-            lambda x: set(line[col_resSeq] for line in x),
-            pdbsegs,
-            )
+        ## more than one residue
+        #valid_segments = filter(
+        #    lambda x: set(line[col_resSeq] for line in x),
+        #    pdbsegs,
+        #    )
 
-        if len(pdbsegs) > 1:
-            for i, segment in enumerate(valid_segments):
-                fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb')
-                with try_to_write(downloaded_data, fout_seg):
-                    # because segments are pure arrays
-                    # and not Structure objects
-                    write_PDB(structure_to_pdb(segment), fout_seg)
-        #
+        #if len(pdbsegs) > 1:
+        #    for i, segment in enumerate(valid_segments):
+        #        fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb')
+        #        with try_to_write(downloaded_data, fout_seg):
+        #            # because segments are pure arrays
+        #            # and not Structure objects
+        #            write_PDB(structure_to_pdb(segment), fout_seg)
+        ##
 
-        else:
-            fout = Path(folder, f'{pdbname}_{chain}.pdb')
-            with try_to_write(downloaded_data, fout):
-                pdbdata.write_PDB(fout)
+        #else:
+        fout = Path(folder, f'{pdbname}_{chain}.pdb')
+        with try_to_write(downloaded_data, fout):
+            pdbdata.write_PDB(fout)
 
         pdbdata.pop_last_filter()
 

@@ -17,6 +17,7 @@ from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB,
 from idpconfgen.libs.libtimer import ProgressBar
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libio import make_destination_folder
+from idpconfgen.libs import libmulticore
 
 LOGFILESNAME = '.pdb_segsplit'
 
@@ -50,41 +51,51 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
 
     dssp_data = read_pipe_file(Path(dssp).read_text())
 
-    dssp_output_dict = {}
-    with ProgressBar(len(pdbs_paths)) as pb:
-        for pdbid in pdbs_paths:
+    manager = Manager()
+    dssp_output_dict = manager.dict()
 
-            s = Structure(pdbid)
-            s.build()
-
-            residues = list(set(int(i) for i in s.filtered_atoms[:, col_resSeq]))
-
-            segments = group_consecutive_ints(residues)
-
-            above_2 = filter(
-                lambda x: x.stop - x.start > 2,
-                segments,
-                )
-
-            for i, seg in enumerate(above_2):
-                pdbout = f'{pdbid.stem}_seg{i}'
-                fout_seg = Path(destination, pdbout).with_suffix('.pdb')
-
-
-                s.add_filter(lambda x: x[col_resSeq] in residues[seg])
-
-                try:
-                    s.write_PDB(fout_seg)
-                except EXCPTS.IDPConfGenException as err:
-                    log.error(S('* Something went wrong with {}: {}', pdbid, repr(err)))
-                    log.debug(traceback.format_exc())
-
-                s.pop_last_filter()
-
-                dssp_output_dict[pdbout] = dssp_data[pdbid.stem][seg]
-            pb.increment()
+    libmulticore.pool_function(
+        split_segs,
+        pdbs_paths,
+        dssps=dssp_data,
+        minimum=2,
+        dssp_out=dssp_output_dict,
+        destination=destination,
+        )
 
     Path(destination, 'dssp_segs.dssp').write_text(
-        '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
+    '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
+    )
+
+
+
+def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
+    s = Structure(pdbdata)
+    s.build()
+
+    residues = list(set(int(i) for i in s.filtered_atoms[:, col_resSeq]))
+
+    segments = group_consecutive_ints(residues)
+
+    above_2 = filter(
+        lambda x: x.stop - x.start > minimum,
+        segments,
         )
+
+    for i, seg in enumerate(above_2):
+        pdbout = f'{pdbdata.stem}_seg{i}'
+        fout_seg = Path(destination, pdbout).with_suffix('.pdb')
+
+
+        s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
+
+        try:
+            s.write_PDB(fout_seg)
+        except EXCPTS.IDPConfGenException as err:
+            log.error(S('* Something went wrong with {}: {}', pdbdata, repr(err)))
+            log.debug(traceback.format_exc())
+
+        s.pop_last_filter()
+
+        dssp_out[pdbout] = dssps[pdbdata.stem][seg]
 

@@ -87,7 +87,7 @@ class TestDSSPParser:
         assert list(dobj.ss) == expected
 
 
-    def test_dssp4(self):
+    def test_dssp4_1(self):
         """Test secondary structure parsing."""
         dobj = libparse.DSSPParser(fin=self.dssp_file, reduced=True)
         expected = ['L', 'H', 'H', 'H', 'E', 'E', 'L', 'L', 'L', 'L']
@@ -247,3 +247,19 @@ class Test_dssp_ss_saver:
             self.obj2,
             output=None,
             )
+
+@pytest.mark.parametrize(
+    'in1, expected',
+    [
+        ([1, 2, 3, 4, 5, 6, 7], [slice(0, 7)]),
+        ([1, 1, 1, 1, 5, 5, 9], [slice(0, 4), slice(4, 6), slice(6, 7)]),
+        ([-4, -3, -2, -1, 5, 5, 9], [slice(0, 4), slice(4, 6), slice(6, 7)]),
+        ([-1, 0, 1, 2, 5, 5, 9], [slice(0, 4), slice(4, 6), slice(6, 7)]),
+        ]
+    )
+def test_grou_consecutive_ints(in1, expected):
+    """
+    """
+    result = libparse.group_consecutive_ints(in1)
+    assert result == expected
+

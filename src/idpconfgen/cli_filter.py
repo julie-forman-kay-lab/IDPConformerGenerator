@@ -30,6 +30,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libparse import filter_pdb_for_db
 from idpconfgen.libs.libdownload import download_structure
 from idpconfgen.libs.libio import (
+    read_path_bundle,
     concatenate_entries,
     glob_folder,
     make_destination_folder,
@@ -39,7 +40,7 @@ from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = '.pdbdownloader'
+LOGFILESNAME = '.filter'
 
 _name = 'pdb_filter'
 _help = 'Filters PDBs for the database according to criteria.'
@@ -53,10 +54,12 @@ ap = libcli.CustomParser(
     )
 # https://stackoverflow.com/questions/24180527
 
+
+
 libcli.add_parser_pdbs(ap)
 libcli.add_parser_destination_folder(ap)
 libcli.add_argument_update(ap)
-libcli.add_argument_cores(ap)
+libcli.add_argument_ncores(ap)
 
 
 def _load_args():
@@ -66,7 +69,8 @@ def _load_args():
 
 def main(
         pdbs,
-        destination=None,
+        pdb_chains,
+        destination=Path.cwd(),
         ncores=1,
         update=False,
         **kwargs
@@ -74,27 +78,26 @@ def main(
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
 
-    pdbs = libio.read_path_bundle(pdbs)
-    #pdbids_to_read = concatenate_entries(pdblist)
-    #pdblist = PDBList(pdbids_to_read)
+    pdbs_paths = list(read_path_bundle(pdbs))
+    pdbids_to_read = concatenate_entries(pdb_chains)
+    pdb_chains = PDBList(pdbids_to_read)
 
     log.info(T('reading input PDB list'))
-    log.info(S(f'from: {pdblist}'))
-    log.info(S(f'{str(pdblist)}'))
+    log.info(S(f'from: {pdbs}'))
+    #log.info(S(f'{str(pdblist)}'))
     log.info(S('done\n'))
 
-    if destination:
-        pdblist_destination = \
-            PDBList(glob_folder(destination, '*.pdb'))
-        log.info(T('reading destination folder'))
-        log.info(S(f'from: {destination}'))
-        log.info(S(f'{str(pdblist_destination)}'))
-        log.info(S('done\n'))
+    pdblist_destination = \
+        PDBList(glob_folder(destination, '*.pdb'))
+    log.info(T('reading destination folder'))
+    log.info(S(f'from: {destination}'))
+    log.info(S(f'{str(pdblist_destination)}'))
+    log.info(S('done\n'))
 
-        pdblist_comparison = pdblist.difference(pdblist_destination)
-        log.info(T('Comparison between input and destination'))
-        log.info(S(f'{str(pdblist_comparison)}'))
-        log.info(S('done\n'))
+    pdblist_comparison = pdb_chains.difference(pdblist_destination)
+    log.info(T('Comparison between input and destination'))
+    log.info(S(f'{str(pdblist_comparison)}'))
+    log.info(S('done\n'))
 
     if update:
 
@@ -102,17 +105,17 @@ def main(
 
         pool_function(
             filter_pdb_for_db,
-            pdbs,
+            pdbs_paths,
             ncores=ncores,
             # other kwargs for target function
             folder=dest,
             )
 
-        pdblist_updated = \
-            PDBList(glob_folder(destination, '*.pdb'))
-        log.info(T('Reading UPDATED destination'))
-        log.info(S(f'{str(pdblist_updated)}'))
-        log.info(S('done\n'))
+    #pdblist_updated = \
+    #    PDBList(glob_folder(destination, '*.pdb'))
+    #log.info(T('Reading UPDATED destination'))
+    #log.info(S(f'{str(pdblist_updated)}'))
+    #log.info(S('done\n'))
 
     return
 

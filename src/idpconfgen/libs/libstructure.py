@@ -150,7 +150,7 @@ class Structure:
     # the numpy version is commented above
     # if you are reading this, rise an issue and let me know how to
     # handle the creation of new arrays with Pool.map/imap :-)
-        return split_into_segments(self.filtered_atoms)
+        return split_residue_segments(self.filtered_atoms)
 
     def pop_last_filter(self):
         """Pop last filter."""
@@ -185,7 +185,7 @@ class Structure:
             try:
                 write_PDB(lines, filename)
             except UserWarning:
-                raise EXCPTS.EmptyFilterError
+                raise EXCPTS.EmptyFilterError(filename)
 
 
 def parse_pdb_to_array(datastr, which='both', **kwargs):

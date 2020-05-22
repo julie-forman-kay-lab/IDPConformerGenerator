@@ -17,6 +17,8 @@ import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
 from idpconfgen import cli_pdb_raw_downloader as raw_pdbdl
+from idpconfgen import cli_filter as cli_filter
+from idpconfgen import cli_segsplit as cli_segsplit
 from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
 from idpconfgen import cli_fastaext as fastaext
@@ -45,9 +47,11 @@ subparsers = ap.add_subparsers(
 libcli.add_version(ap)
 libcli.add_subparser(subparsers, raw_pdbdl)
 libcli.add_subparser(subparsers, pdbdl)
+libcli.add_subparser(subparsers, cli_filter)
 libcli.add_subparser(subparsers, fastaext)
 libcli.add_subparser(subparsers, ssext)
 libcli.add_subparser(subparsers, segext)
+libcli.add_subparser(subparsers, cli_segsplit)
 
 
 def load_args():

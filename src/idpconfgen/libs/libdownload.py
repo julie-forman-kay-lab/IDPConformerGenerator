@@ -8,7 +8,7 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element
-from idpconfgen.libs.libdownload import save_structure_chains_and_segments
+from idpconfgen.libs.libparse import save_structure_chains_and_segments
 from idpconfgen.logger import S
 
 

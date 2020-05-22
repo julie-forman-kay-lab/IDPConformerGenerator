@@ -103,7 +103,7 @@ def add_version(parser):
         )
 
 def add_argument_ncores(parser):
-    ap.add_argument(
+    parser.add_argument(
         '-n',
         '--ncores',
         help='Number of cores to use.',
