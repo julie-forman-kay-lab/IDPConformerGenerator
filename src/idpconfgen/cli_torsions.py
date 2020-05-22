@@ -65,7 +65,7 @@ def main(pdbs, degrees=True, **kwargs):
     log.info(T('reading input paths'))
     # tee is used to keep memory footprint low
     # though it would be faster to create a list from path_bundle
-    pdbs = libio.read_path_bundle(pdbs)
+    pdbs = libio.read_path_bundle(pdbs, ext='.pdb')
     log.info(S('done'))
 
     with Pool() as pool:
@@ -75,7 +75,7 @@ def main(pdbs, degrees=True, **kwargs):
             )
 
         for i in imuo:
-            log.info(f'Done {i}')
+            pass#log.info(f'Done {i}')
 
     return
 
@@ -83,7 +83,7 @@ def main(pdbs, degrees=True, **kwargs):
 def get_torsions(pdbfile, degrees=False):
     structure = libstructure.Structure(pdbfile)
     structure.build()
-    structure.add_filter_record_name('ATOM')
+    structure.add_filter_record_name(('ATOM', 'HETATM'))
     structure.add_filter_backbone(minimal=True)
 
     data = structure.filtered_atoms
