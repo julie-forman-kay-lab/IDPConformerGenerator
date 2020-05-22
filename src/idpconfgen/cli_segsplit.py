@@ -11,7 +11,7 @@ from multiprocessing import Manager
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import read_path_bundle
 from idpconfgen.logger import init_files, S, T
-from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints
+from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps
 from idpconfgen import log, Path
 from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
@@ -64,8 +64,8 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
         )
 
     Path(destination, 'dssp_segs.dssp').write_text(
-    '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
-    )
+        '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
+        )
 
 
 
@@ -73,8 +73,10 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     s = Structure(pdbdata)
     s.build()
 
-    residues = list(set(int(i) for i in s.filtered_atoms[:, col_resSeq]))
+    residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
+    #print(residues)
 
+    # returns slices
     segments = group_consecutive_ints(residues)
 
     above_2 = filter(
@@ -83,24 +85,43 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
         )
 
     for i, seg in enumerate(above_2):
-        pdbout = f'{pdbdata.stem}_seg{i}'
-        fout_seg = Path(destination, pdbout).with_suffix('.pdb')
-
 
         s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
-
 
         if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
             s.pop_last_filter()
             continue
 
-        try:
-            s.write_PDB(fout_seg)
-        except EXCPTS.IDPConfGenException as err:
-            log.error(S('* Something went wrong with {}: {}', pdbdata, repr(err)))
-            log.debug(traceback.format_exc())
 
+        # split regions with missing backbone
+        s.add_filter_backbone(minimal=True)
+        backbone_segs_in_resSeq_sets = \
+            identify_backbone_gaps(s.filtered_atoms)
+        #
         s.pop_last_filter()
 
-        dssp_out[pdbout] = dssps[pdbdata.stem][seg]
+        for resSeq_set in backbone_segs_in_resSeq_sets:
+            #print(resSeq_se
+            s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
+
+            pdbout = f'{pdbdata.stem}_seg{i}'
+            fout_seg = Path(destination, pdbout).with_suffix('.pdb')
+
+            try:
+                s.write_PDB(fout_seg)
+            except EXCPTS.EmptyFilterError as err:
+                log.error(f'Empty filter for: {repr(err)}')
+            except EXCPTS.IDPConfGenException as err:
+                log.error(S('* Something went wrong with {}: {}', pdbdata, repr(err)))
+                log.debug(traceback.format_exc())
+
+            s.pop_last_filter()
+
+            dssp_slicing = slice(
+                residues.index(int(resSeq_set[0])),
+                residues.index(int(resSeq_set[-1])) + 1,
+                None,
+                )
+
+            dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
 

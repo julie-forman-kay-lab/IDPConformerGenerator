@@ -10,7 +10,7 @@ from idpconfgen.core import definitions as DEFS
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
-from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element
+from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name
 from idpconfgen.logger import S, T
 
 
@@ -300,7 +300,7 @@ def group_by(data):
     >>> group_by('LLLLLSSSSSSEEEEE')
     [['L', slice(0, 5)], ['S', slice(5, 11)], ['E', slice(11,16)]]
     """
-    assert data
+    assert len(data) > 0
 
     prev = data[0]
     start = 0
@@ -454,3 +454,40 @@ def save_structure_chains_and_segments(
         pdbdata.pop_last_filter()
 
 
+def identify_backbone_gaps(atoms):
+    """
+    Atoms is expected already only minimal backbone.
+    """
+    # this is a tricky implementation, PRs welcomed :-)
+    assert set(atoms[:, col_name]) == {'N', 'CA', 'C'}
+
+    resSeq, slices = zip(*group_by(atoms[:, col_resSeq]))
+    assert all(isinstance(i, slice) for i in slices)
+
+    # calculates the length of each slice
+    # each slice corresponds to a residue
+    slc_len = np.array([slc.stop - slc.start for slc in slices])
+
+    # identifies indexes where len slice differ from three.
+    # considering that atoms contains only minimal backbone atoms
+    # (N, CA, C) this would mean that some atoms are missing
+    aw = np.argwhere(slc_len != 3)
+
+    # splits the slices according to the indexes where != 3
+    s = np.split(slices, aw[:,0])
+
+    # np.split keeps the index where it was split, contrarily to str.split
+    # here I filter out those unwanted indexes
+    # parsed_split should contain a list of list with only the slices
+    # for residues with 3 backbone atoms
+    # the first index is a special case because of np.split
+    parsed_split = \
+        [list(i) for i in s[0:1] if i[1:].size > 0] \
+        + [list(i[1:]) for i in s[1:] if i[1:].size > 0]
+
+    # concatenate residue slices in segments
+    segment_slices = [slice(i[0].start, i[-1].stop) for i in parsed_split]
+
+    # returns a list of array views
+    #return [atoms[seg, :] for seg in segment_slices]
+    return [list(dict.fromkeys(atoms[seg, col_resSeq])) for seg in segment_slices]

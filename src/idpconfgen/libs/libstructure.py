@@ -489,3 +489,5 @@ def split_residue_segments(atom_lines):
             segments[-1].append(line)
         prev = curr
     return segments
+
+
