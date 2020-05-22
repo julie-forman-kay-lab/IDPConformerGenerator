@@ -13,7 +13,7 @@ from idpconfgen.libs.libio import read_path_bundle
 from idpconfgen.logger import init_files, S, T
 from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints
 from idpconfgen import log, Path
-from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq
+from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libio import make_destination_folder
@@ -88,6 +88,11 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
 
         s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
+
+
+        if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
+            s.pop_last_filter()
+            continue
 
         try:
             s.write_PDB(fout_seg)
