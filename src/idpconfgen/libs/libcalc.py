@@ -262,7 +262,7 @@ def validate_array_for_torsion(data):
     if data.shape[0] % 3:
         return 'Number of backbone atoms is not module of 3.'
 
-    if set(data[: libstructure.col_name]) != {'N', 'C', 'CA'}:
+    if set(data[:, libstructure.col_name]) != {'N', 'C', 'CA'}:
         return 'There are atoms other than N, C and CA.'
 
     return ''

@@ -14,6 +14,7 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli, libio, libpdb, libstructure, libcalc
 from idpconfgen.logger import S, T, init_files
+from idpconfgen.core import exceptions as EXCPTS
 
 
 LOGFILESNAME = 'idpconfgen_torsion'
@@ -81,7 +82,11 @@ def main(pdbs, degrees=True, **kwargs):
 
 
 def get_torsions(pdbfile, degrees=False):
-    structure = libstructure.Structure(pdbfile)
+    try:
+        structure = libstructure.Structure(pdbfile)
+    except EXCPTS.ParserNotFoundError as err:
+        log.error(f'Could not treat: {pdbfile}: {repr(err)}')
+        return
     structure.build()
     structure.add_filter_record_name(('ATOM', 'HETATM'))
     structure.add_filter_backbone(minimal=True)
