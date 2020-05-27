@@ -121,6 +121,12 @@ def main(
 
     log.info(T('preparing task execution'))
     log.info(S('for {} cores', ncores))
+
+    manager = Manager()
+    mdict = manager.dict()
+
+
+
     ss_ext_exec = libmulticore.JoinedResults(
         pdbs,
         ss_cmd,
