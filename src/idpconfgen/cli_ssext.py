@@ -7,9 +7,13 @@ USAGE:
     $ idpconfgen ssext [PDBS]
 """
 import argparse
+import os
+import subprocess
+from multiprocessing import Manager, Pool
+
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libmulticore, libparse
+from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 
 
@@ -116,28 +120,46 @@ def main(
     init_files(log, LOGFILESNAME)
 
     log.info(T('reading input paths'))
-    pdbs = libio.read_path_bundle(pdbs, ext='pdb')
+    pdbs = list(libio.read_path_bundle(pdbs, ext='pdb'))
     log.info(S('done'))
 
     log.info(T('preparing task execution'))
     log.info(S('for {} cores', ncores))
-    ss_ext_exec = libmulticore.JoinedResults(
+
+    manager = Manager()
+    mdict = manager.dict()
+
+    libmulticore.pool_function(
+        mkdssp,
         pdbs,
-        ss_cmd,
-        ncores=ncores,
-        TaskMethod=libmulticore.DSSPTask,
-        results_parser=libparse.DSSPParser.from_data_id_tuple,
+        ss_cmd=ss_cmd,
+        dssp_dict=mdict,
         reduced=reduced,
         )
-    log.info(S('executing...'))
-    ss_ext_exec.run()
 
-    log.info(T('exporting output to: {}', output))
-    libparse.export_ss_from_DSSP(*ss_ext_exec.results, output=output)
+    with open(output, 'w') as fout:
+        fout.write('\n'.join(f'{k}|{v}' for k, v in mdict.items()))
 
     log.info(S('All done. Thanks!'))
     return
 
+
+def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):
+
+    cmd = [ss_cmd, '-i', os.fspath(pdb.resolve())]
+    result = subprocess.run(cmd, capture_output=True)
+
+    dssp_parser = libparse.DSSPParser(
+        data=result.stdout.decode('utf8'),
+        reduced=reduced,
+        )
+
+    try:
+        dssp_dict[libpdb.PDBIDFactory(pdb)] = ''.join(dssp_parser.ss)
+    except Exception:
+        log.error(f'Error while saving to dict: {pdb}')
+
+    return
 
 if __name__ == '__main__':
     maincli()

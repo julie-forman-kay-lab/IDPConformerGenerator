@@ -112,12 +112,13 @@ class DSSPParser:
 
         Assigns :attr:`ss`.
         """
-        self.ss = list_index_to_array(self.data, index=16)
+        ss_tmp = list_index_to_array(self.data, index=16)
 
         if self.reduced:
-            self.ss = np.char.translate(self.ss, DEFS.dssp_trans)
+            ss_tmp = np.char.translate(ss_tmp, DEFS.dssp_trans)
 
-        self._confirm_ss_data(self.ss)
+        self._confirm_ss_data(ss_tmp)
+        self.ss = ss_tmp
 
     def read_fasta(self):
         """
