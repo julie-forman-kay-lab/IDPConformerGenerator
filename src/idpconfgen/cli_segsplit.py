@@ -61,6 +61,7 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
         minimum=2,
         dssp_out=dssp_output_dict,
         destination=destination,
+        ncores=ncores,
         )
 
     Path(destination, 'dssp_segs.dssp').write_text(
@@ -79,12 +80,14 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     # returns slices
     segments = group_consecutive_ints(residues)
 
+    # removes ligands
     above_2 = filter(
         lambda x: x.stop - x.start > minimum,
         segments,
         )
 
-    for i, seg in enumerate(above_2):
+    seg_counter = 0
+    for seg in above_2:
 
         s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
 
@@ -104,7 +107,7 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
             #print(resSeq_se
             s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
 
-            pdbout = f'{pdbdata.stem}_seg{i}'
+            pdbout = f'{pdbdata.stem}_seg{seg_counter}'
             fout_seg = Path(destination, pdbout).with_suffix('.pdb')
 
             try:
@@ -124,4 +127,5 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
                 )
 
             dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
+            seg_counter += 1
 

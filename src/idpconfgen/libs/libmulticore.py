@@ -175,7 +175,7 @@ class SubprocessTask(Task):
 
         May brake if .prepare_cmd() was not executed beforehand.
         """
-        log.info(S('running {}', self.cmd))
+        #log.info(S('running {}', self.cmd))
         self.result = subprocess.run(
             self.cmd,
             capture_output=True,
@@ -295,3 +295,4 @@ class JoinedResults:
                     )
                 )
             numjobs -= 1
+

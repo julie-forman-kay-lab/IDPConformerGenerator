@@ -116,7 +116,7 @@ def main(
     init_files(log, LOGFILESNAME)
 
     log.info(T('reading input paths'))
-    pdbs = libio.read_path_bundle(pdbs)
+    pdbs = libio.read_path_bundle(pdbs, ext='pdb')
     log.info(S('done'))
 
     log.info(T('preparing task execution'))
