@@ -16,7 +16,7 @@ from idpconfgen import log, Path
 from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs.libio import make_destination_folder
+from idpconfgen.libs.libio import make_destination_folder, glob_folder
 from idpconfgen.libs import libmulticore
 
 LOGFILESNAME = '.pdb_segsplit'
@@ -49,6 +49,10 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
 
     pdbs_paths = list(read_path_bundle(pdbs))
 
+    #already_done = set(f'{i.name}_{i.chain}' for i in PDBList(libio.glob_folder('*.pdb')))
+
+    #pdb_filtered = [pp for pp in pdb_paths if pp.stem in already_done]
+
     dssp_data = read_pipe_file(Path(dssp).read_text())
 
     manager = Manager()
@@ -74,7 +78,6 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     s.build()
 
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
-    #print(residues)
 
     # returns slices
     segments = group_consecutive_ints(residues)
@@ -87,7 +90,7 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
     seg_counter = 0
     for seg in above_2:
-
+    
         s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
 
         if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
@@ -100,7 +103,8 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
         try:
             backbone_segs_in_resSeq_sets = \
             identify_backbone_gaps(s.filtered_atoms)
-        except AssertionError:
+        except Exception as err:
+            log.error(repr(err))
             log.error(f'error in {pdbdata}')
             seg_counter += 1
             continue

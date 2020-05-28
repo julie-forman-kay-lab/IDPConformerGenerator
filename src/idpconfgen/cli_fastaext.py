@@ -6,9 +6,10 @@ USAGE:
 """
 import argparse
 import itertools as it
+from multiprocessing import Manager
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libpdb, libstructure
+from idpconfgen.libs import libcli, libio, libpdb, libstructure, libmulticore
 from idpconfgen.logger import S, T, init_files
 
 
@@ -36,14 +37,15 @@ ap.add_argument(
 ap.add_argument(
     '-o',
     '--output',
-    help=(
-        "The output file containing the PDBID and "
+    help=( "The output file containing the PDBID and "
         "respective FASTA sequence information. "
         "Defaults to sys.stdout (prints to console)."
         ),
     type=Path,
     default=None,
     )
+
+libcli.add_argument_ncores(ap)
 
 
 def _load_args():
@@ -64,6 +66,7 @@ def maincli():
 def main(
         pdbs,
         output=None,
+        ncores=1,
         **kwargs,
         ):
     """
@@ -84,19 +87,34 @@ def main(
     log.info(T('reading input paths'))
     # tee is used to keep memory footprint low
     # though it would be faster to create a list from path_bundle
-    _, pdbs = it.tee(libio.read_path_bundle(pdbs))
-    log.info(S('done'))
-    pdbids = libpdb.PDBList(_)
+    #_, pdbs = it.tee(libio.read_path_bundle(pdbs, ext='.pdb'))
+    pdbs_ = sorted(libio.read_path_bundle(pdbs, ext='.pdb'), key=lambda x: x.stem)
+    #log.info(S('done'))
+    #pdbids = libpdb.PDBList(pdbs_)
+    #print(len(pdbids))
+    #print(len(pdbs_))
 
-    out_data = []
-    for pdbid, pdbfile in zip(pdbids, pdbs):
-        structure = libstructure.Structure(pdbfile)
-        structure.build()
-        fasta = structure.fasta
-        assert len(fasta) == 1
-        out_data.append('{}|{}'.format(pdbid, next(iter(fasta.values()))))
+    manager = Manager()
+    mdict = manager.dict()
 
-    libio.write_text('\n'.join(out_data), output)
+    libmulticore.pool_function(
+        get_fastas,
+        pdbs_,
+        mdict=mdict,
+        ncores=ncores,
+        )
+
+    libio.write_text('\n'.join(f'{k}|{v}' for k,v in mdict.items()), output)
+
+
+def get_fastas(pdbfile, mdict=None):
+    structure = libstructure.Structure(pdbfile)
+    structure.build()
+    fasta = structure.fasta
+    assert len(fasta) == 1
+    mdict[libpdb.PDBIDFactory(pdbfile)] = next(iter(fasta.values()))
+    #out_data.append('{}|{}'.format(pdbid, next(iter(fasta.values()))))
+
     return
 
 

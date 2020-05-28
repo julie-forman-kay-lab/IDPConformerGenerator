@@ -482,10 +482,12 @@ def identify_backbone_gaps(atoms):
     Atoms is expected already only minimal backbone.
     """
     # this is a tricky implementation, PRs welcomed :-)
-    assert set(atoms[:, col_name]) == {'N', 'CA', 'C'}
+    if not set(atoms[:, col_name]).issubset({'N', 'CA', 'C'}):
+        raise EXCPTS.PDBFormatError(errmsg='Back bone is not subset')
 
     resSeq, slices = zip(*group_by(atoms[:, col_resSeq]))
-    assert all(isinstance(i, slice) for i in slices)
+    if not all(isinstance(i, slice) for i in slices):
+        raise TypeError('Expected slices found something else')
 
     # calculates the length of each slice
     # each slice corresponds to a residue

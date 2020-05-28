@@ -199,7 +199,7 @@ class PDBIDFactory:
             cls.rgx_XXXX: cls._parse_XXXX,
             cls.rgx_XXXXC: cls._parse_XXXXC,
             cls.rgx_XXXX_C: cls._parse_XXXX_C,
-            cls.rgx_XXXX_C_segS: cls._parse_XXXX_C,#_segS,
+            cls.rgx_XXXX_C_segS: cls._parse_XXXX_C_segS,
             }
 
         for regex, parser in pdb_filename_regex.items():
@@ -361,7 +361,7 @@ class PDBID:
         # made manual to completely control order
         ids = {
             'chain': chain,
-            'segment': segment,
+            'seg': segment,
             }
         self.identifiers = {}
 
