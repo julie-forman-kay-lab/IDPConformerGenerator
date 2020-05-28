@@ -33,6 +33,7 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
     """
     f = partial(func, **kwargs)
 
+    print(f'using {ncores} cores')
     with \
             Pool(ncores) as pool, \
             ProgressBar(len(items)) as pb:

@@ -11,6 +11,7 @@ import argparse
 from functools import partial
 
 from idpconfgen import Path, log
+from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 
@@ -110,7 +111,7 @@ def main(
 
         log.info(S(f'working with {pdbid}'))
 
-        dssp_segments = libparse.group_by(dssp_data[pdbid.stem])
+        dssp_segments = libparse.group_by(dssp_data[pdbid.stem].translate(DEFS.dssp_trans))
 
         pdbdata = libstructure.Structure(pdbid.read_text())
         pdbdata.build()
