@@ -22,6 +22,7 @@ from idpconfgen import cli_segsplit as cli_segsplit
 from idpconfgen import cli_segext as segext
 from idpconfgen import cli_ssext as ssext
 from idpconfgen import cli_fastaext as fastaext
+from idpconfgen import cli_RCSB_dssp as cli_RCSB_dssp
 from idpconfgen.libs import libcli
 
 
@@ -52,6 +53,7 @@ libcli.add_subparser(subparsers, fastaext)
 libcli.add_subparser(subparsers, ssext)
 libcli.add_subparser(subparsers, segext)
 libcli.add_subparser(subparsers, cli_segsplit)
+libcli.add_subparser(subparsers, cli_RCSB_dssp)
 
 
 def load_args():

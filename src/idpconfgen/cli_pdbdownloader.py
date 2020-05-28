@@ -83,8 +83,8 @@ ap.add_argument(
 ap.add_argument(
     '-rn',
     '--record_name',
-    help='The coordinate PDB record name. Default: ("ATOM",)',
-    default=('ATOM',),
+    help='The coordinate PDB record name. Default: ("ATOM", "HETATM")',
+    default=('ATOM', 'HETATM'),
     action=libcli.ArgsToTuple,
     nargs='+',
     )

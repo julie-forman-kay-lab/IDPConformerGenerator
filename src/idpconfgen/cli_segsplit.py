@@ -69,7 +69,6 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
         )
 
 
-
 def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     s = Structure(pdbdata)
     s.build()
@@ -102,7 +101,7 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
             backbone_segs_in_resSeq_sets = \
             identify_backbone_gaps(s.filtered_atoms)
         except AssertionError:
-            log.error(f'error in {pdb_data}')
+            log.error(f'error in {pdbdata}')
             seg_counter += 1
             continue
         finally:
