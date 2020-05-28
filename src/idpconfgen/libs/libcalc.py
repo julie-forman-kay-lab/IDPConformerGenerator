@@ -218,8 +218,8 @@ def calc_torsion_angles(coords):
         ``np.degrees`` to the returned result.
     """
     # requires
-    assert coords.shape[0] > 3
-    assert coords.shape[1] == 3
+    #assert coords.shape[0] > 3
+    #assert coords.shape[1] == 3
 
     # Yes, I always write explicit array indices! :-)
     q_vecs = coords[1:, :] - coords[:-1, :]
@@ -255,6 +255,9 @@ def calc_torsion_angles(coords):
 
 def validate_array_for_torsion(data):
     """Validates data for torsion angle calculation."""
+
+    if data.shape[0] < 4:
+        return 'Too small segment'
 
     if data[0, libstructure.col_name] != 'N':
         return 'The first atom is not N, it should be!'
