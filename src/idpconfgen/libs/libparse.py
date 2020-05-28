@@ -1,4 +1,5 @@
 """Contain different parsing strategies for different files."""
+import string
 import sys
 import traceback
 from contextlib import contextmanager
@@ -12,6 +13,10 @@ from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
 from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name
 from idpconfgen.logger import S, T
+
+
+_ascii_lower_set = set(string.ascii_lowercase)
+_ascii_upper_set = set(string.ascii_uppercase)
 
 
 class DSSPParser:
@@ -424,7 +429,10 @@ def save_structure_chains_and_segments(
     pdbdata = Structure(pdb_data)
     pdbdata.build()
 
-    chains = chains or pdbdata.chain_set
+    chain_set = pdbdata.chain_set
+
+    chains = chains or chain_set
+
 
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
@@ -432,6 +440,14 @@ def save_structure_chains_and_segments(
     pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:
+
+        if chain not in chain_set:
+            if chain.lower() not in chain_set:
+                log.error(f'Skiping chain {chain} for {pdbname}')
+                continue
+            else:
+                chain = chain.lower()
+
         pdbdata.add_filter_chain(chain)
 
         # passar esto a una function
