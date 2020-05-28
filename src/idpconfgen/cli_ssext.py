@@ -17,7 +17,7 @@ from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = 'idpconfgen_ssext'
+LOGFILESNAME = '.idpconfgen_ssext'
 
 _name = 'ssext'
 _help = 'Extract secondary structure profile.'

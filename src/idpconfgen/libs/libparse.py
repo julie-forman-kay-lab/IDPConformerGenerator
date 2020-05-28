@@ -12,12 +12,13 @@ from idpconfgen.core.definitions import pdb_ligand_codes
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
-from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name
+from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name, col_iCode
 from idpconfgen.logger import S, T
 
 
 _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
+_minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
 
 class DSSPParser:
@@ -425,7 +426,7 @@ def save_structure_chains_and_segments(
         ):
 
     _DR = pdb_ligand_codes  # discarded residues
-    #_AE = _allowed_elements
+    _AE = _allowed_elements
 
     pdbdata = Structure(pdb_data)
     pdbdata.build()
@@ -434,10 +435,9 @@ def save_structure_chains_and_segments(
 
     chains = chains or chain_set
 
-
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    #pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    pdbdata.add_filter(lambda x: x[col_element] in _AE)
     pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:
@@ -477,6 +477,45 @@ def save_structure_chains_and_segments(
         pdbdata.pop_last_filter()
 
 
+
+def get_slice(atoms):
+
+    ref = _minimal_bb_atoms
+    start = 0
+    idx = 0
+    slices = []
+    max_size = atoms.shape[0]
+
+    bb = atoms[:, col_name]
+    resis = np.core.defchararray.add(atoms[:, col_resSeq], atoms[:, col_iCode])
+
+    while idx < max_size:
+        a = list(bb[idx: idx+3])
+        bb_continuity_lost = a != ref or len(set(resis[idx: idx + 3])) > 1
+        if bb_continuity_lost:
+            slices.append(slice(start, idx, None))
+            idx += 1
+            start = idx
+            while idx <= max_size:
+                a = list(bb[idx: idx+3])
+                bb_continuity_restored = \
+                    a == ref and len(set(resis[idx: idx + 3])) == 1
+                if bb_continuity_restored:
+                    start = idx
+                    idx += 3
+                    break  # back to the main while
+                idx += 1
+        else:
+            idx += 3
+    else:
+        slices.append(slice(start, idx + 1, None))
+
+    return [list(dict.fromkeys(atoms[seg, col_resSeq])) for seg in slices]
+
+    #return slices
+
+
+
 def identify_backbone_gaps(atoms):
     """
     Atoms is expected already only minimal backbone.
@@ -486,12 +525,14 @@ def identify_backbone_gaps(atoms):
         raise EXCPTS.PDBFormatError(errmsg='Back bone is not subset')
 
     resSeq, slices = zip(*group_by(atoms[:, col_resSeq]))
+    print(slices)
     if not all(isinstance(i, slice) for i in slices):
         raise TypeError('Expected slices found something else')
 
     # calculates the length of each slice
     # each slice corresponds to a residue
     slc_len = np.array([slc.stop - slc.start for slc in slices])
+    print(slc_len)
 
     # identifies indexes where len slice differ from three.
     # considering that atoms contains only minimal backbone atoms

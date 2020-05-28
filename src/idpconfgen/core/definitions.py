@@ -1,5 +1,6 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
+from itertools import chain
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
 
@@ -76,7 +77,11 @@ dssp_trans = str.maketrans(
     )
 
 pdb_ligand_codes_file = Path(Path(__file__).parent, 'chem_comp_parsed.txt')
+pdb_lig_codes_manual = Path(Path(__file__).parent, 'chem_comp_added.txt')
 pdb_ligand_codes = set(
     i.strip()
-    for i in pdb_ligand_codes_file.read_text().split()
+    for i in chain(
+        pdb_ligand_codes_file.read_text().split(),
+        pdb_lig_codes_manual.read_text().split(),
+        )
     )

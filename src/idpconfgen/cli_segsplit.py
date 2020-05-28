@@ -11,7 +11,7 @@ from multiprocessing import Manager
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import read_path_bundle
 from idpconfgen.logger import init_files, S, T
-from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps
+from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_slice
 from idpconfgen import log, Path
 from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
@@ -90,7 +90,6 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
     seg_counter = 0
     for seg in above_2:
-    
         s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
 
         if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
@@ -100,10 +99,13 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
         # split regions with missing backbone
         s.add_filter_backbone(minimal=True)
+
         try:
+                #identify_backbone_gaps(s.filtered_atoms)
             backbone_segs_in_resSeq_sets = \
-            identify_backbone_gaps(s.filtered_atoms)
+                get_slice(s.filtered_atoms)
         except Exception as err:
+            log.error(traceback.format_exc())
             log.error(repr(err))
             log.error(f'error in {pdbdata}')
             seg_counter += 1
@@ -112,7 +114,20 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
             s.pop_last_filter()
 
         for resSeq_set in backbone_segs_in_resSeq_sets:
-            #print(resSeq_se
+
+            dssp_slicing = slice(
+                residues.index(int(resSeq_set[0])),
+                residues.index(int(resSeq_set[-1])) + 1,
+                None,
+                )
+
+            if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
+                log.error(traceback.format_exc())
+                log.error(repr(err))
+                log.error(f'error in {pdbdata}')
+                seg_counter += 1
+                continue
+
             s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
 
             pdbout = f'{pdbdata.stem}_seg{seg_counter}'
@@ -127,12 +142,6 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
                 log.debug(traceback.format_exc())
 
             s.pop_last_filter()
-
-            dssp_slicing = slice(
-                residues.index(int(resSeq_set[0])),
-                residues.index(int(resSeq_set[-1])) + 1,
-                None,
-                )
 
             dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
             seg_counter += 1
