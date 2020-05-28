@@ -393,7 +393,7 @@ def try_to_write(data, fout):
     """Context to download."""
     try:
         yield
-    except EXCPTS.IDPConfGenException as err:
+    except Exception as err:
         log.debug(traceback.format_exc())
         log.error(S('error found for {}: {}', fout, repr(err)))
         erp = Path(fout.myparents(), 'errors')
