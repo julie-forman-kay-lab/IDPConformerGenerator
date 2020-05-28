@@ -98,10 +98,15 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
         # split regions with missing backbone
         s.add_filter_backbone(minimal=True)
-        backbone_segs_in_resSeq_sets = \
+        try:
+            backbone_segs_in_resSeq_sets = \
             identify_backbone_gaps(s.filtered_atoms)
-        #
-        s.pop_last_filter()
+        except AssertionError:
+            log.error(f'error in {pdb_data}')
+            seg_counter += 1
+            continue
+        finally:
+            s.pop_last_filter()
 
         for resSeq_set in backbone_segs_in_resSeq_sets:
             #print(resSeq_se
@@ -111,7 +116,7 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
             fout_seg = Path(destination, pdbout).with_suffix('.pdb')
 
             try:
-                s.write_PDB(fout_seg)
+                s.write_PDB(fout_seg, renumber=True)
             except EXCPTS.EmptyFilterError as err:
                 log.error(f'Empty filter for: {repr(err)}')
             except EXCPTS.IDPConfGenException as err:
