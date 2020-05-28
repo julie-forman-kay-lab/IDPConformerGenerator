@@ -8,6 +8,7 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
+from idpconfgen.core.definitions import pdb_ligand_codes
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
@@ -423,8 +424,8 @@ def save_structure_chains_and_segments(
         folder='',
         ):
 
-    _DR = _discarded_residues
-    _AE = _allowed_elements
+    _DR = pdb_ligand_codes  # discarded residues
+    #_AE = _allowed_elements
 
     pdbdata = Structure(pdb_data)
     pdbdata.build()
@@ -436,7 +437,7 @@ def save_structure_chains_and_segments(
 
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    #pdbdata.add_filter(lambda x: x[col_element] in _AE)
     pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:

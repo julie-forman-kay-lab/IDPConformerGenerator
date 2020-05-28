@@ -1,5 +1,7 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
+# does not import the Path from IDPConfgen to avoid circular imports
+from pathlib import Path
 
 # Amino-acid 3 to 1 letter code dictionary
 aa3to1 = {
@@ -71,4 +73,10 @@ dssp_trans = str.maketrans(
         'E' * len(dssp_ss_keys.all_strand),
         'L' * len(dssp_ss_keys.all_loops),
         )
+    )
+
+pdb_ligand_codes_file = Path(Path(__file__).parent, 'chem_comp_parsed.txt')
+pdb_ligand_codes = set(
+    i.strip()
+    for i in pdb_ligand_codes_file.read_text().split()
     )
