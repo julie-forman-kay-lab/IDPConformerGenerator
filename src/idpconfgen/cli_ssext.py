@@ -66,13 +66,14 @@ ap.add_argument(
     action='store_true',
     )
 
+
 ap.add_argument(
-    '-n',
-    '--ncores',
-    help='Number of cores to use',
-    default=1,
-    type=int,
+    '--complete',
+    help='A previous DSSP DB file to complete with new entries.',
     )
+
+
+libcli.add_argument_ncores(ap)
 
 
 def _load_args():
@@ -96,6 +97,7 @@ def main(
         output=None,
         ncores=1,
         reduced=False,
+        complete=None,
         **kwargs,
         ):
     """
@@ -120,8 +122,18 @@ def main(
     init_files(log, LOGFILESNAME)
 
     log.info(T('reading input paths'))
-    pdbs = list(libio.read_path_bundle(pdbs, ext='pdb'))
+    pdbs = libio.read_path_bundle(pdbs, ext='pdb')
     log.info(S('done'))
+
+    if complete:
+        log.info(T(f'reading previous DSSP file: {complete}'))
+        prev_dssp = libparse.read_pipe_file(Path(complete).read_text())
+        pdbs2operate = list(filter(
+            lambda x: x.stem not in prev_dssp.keys(),
+            pdbs))
+    else:
+        prev_dssp = {}
+        pdbs2operate = list(pdbs)
 
     log.info(T('preparing task execution'))
     log.info(S('for {} cores', ncores))
@@ -131,14 +143,20 @@ def main(
 
     libmulticore.pool_function(
         mkdssp,
-        pdbs,
+        pdbs2operate,
         ss_cmd=ss_cmd,
         dssp_dict=mdict,
         reduced=reduced,
+        ncores=ncores,
         )
 
-    with open(output, 'w') as fout:
-        fout.write('\n'.join(f'{k}|{v}' for k, v in mdict.items()))
+    prev_dssp.update(mdict)
+
+    libio.write_text(
+        '\n'.join(f'{k}|{v}' for k, v in prev_dssp.items()),
+        output=output,
+        )
+
 
     log.info(S('All done. Thanks!'))
     return
@@ -155,7 +173,7 @@ def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):
         )
 
     try:
-        dssp_dict[libpdb.PDBIDFactory(pdb)] = ''.join(dssp_parser.ss)
+        dssp_dict[str(libpdb.PDBIDFactory(pdb))] = ''.join(dssp_parser.ss)
     except Exception:
         log.error(f'Error while saving to dict: {pdb}')
 

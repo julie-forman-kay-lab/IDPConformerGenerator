@@ -1,6 +1,7 @@
 """Common operations for client interfaces."""
 import argparse
 import sys
+from os import cpu_count
 
 
 from idpconfgen import __version__, Path
@@ -102,6 +103,25 @@ def add_version(parser):
         version=__version__,
         )
 
+
+
+def add_argument_replace(parser):
+    """
+    Function description here.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+    parser.add_argument(
+        '--replace',
+        help='Replace existent entries',
+        action='store_true',
+        )
+    return
+
 def add_argument_ncores(parser):
     parser.add_argument(
         '-n',
@@ -109,6 +129,8 @@ def add_argument_ncores(parser):
         help='Number of cores to use.',
         type=int,
         default=1,
+        const=cpu_count(),
+        nargs='?',
         )
 
 

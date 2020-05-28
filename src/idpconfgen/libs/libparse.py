@@ -104,7 +104,7 @@ class DSSPParser:
         self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']
 
         self.read_sec_structure()
-        self.read_fasta()
+        #self.read_fasta()
 
     def read_sec_structure(self):
         """
@@ -273,7 +273,7 @@ def read_pipe_file(text):
 
     Returns
     -------
-    tuple (str, str)
+    dict {str: str}
         Of codes and data.
     """
     lines = text.split('\n')
@@ -343,8 +343,12 @@ def group_consecutive_ints(sequence):
 
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
-_discarded_residues = ('HOH', 'SOL', 'I', 'C', 'G', 'A',
-    'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N')
+_discarded_residues = (
+    'HOH', 'SOL', 'PO4',
+    'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
+    'TPP',
+    )
+
 _allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
 
 
@@ -405,18 +409,19 @@ def try_to_write(data, fout):
 
 
 def save_structure_chains_and_segments(
-        downloaded_data,
+        pdb_data,
         pdbname,
         chains=None,
         record_name=('ATOM', 'HETATM'),
         altlocs=('A', '', ' '),
+        renumber=True,
         folder='',
         ):
 
     _DR = _discarded_residues
     _AE = _allowed_elements
 
-    pdbdata = Structure(downloaded_data)
+    pdbdata = Structure(pdb_data)
     pdbdata.build()
 
     chains = chains or pdbdata.chain_set
@@ -449,8 +454,8 @@ def save_structure_chains_and_segments(
 
         #else:
         fout = Path(folder, f'{pdbname}_{chain}.pdb')
-        with try_to_write(downloaded_data, fout):
-            pdbdata.write_PDB(fout)
+        with try_to_write(pdb_data, fout):
+            pdbdata.write_PDB(fout, renumber=True)
 
         pdbdata.pop_last_filter()
 

@@ -89,13 +89,8 @@ ap.add_argument(
     nargs='+',
     )
 
-ap.add_argument(
-    '-n',
-    '--ncores',
-    help='Number of cores to use.',
-    type=int,
-    default=1,
-    )
+libcli.add_argument_replace(ap)
+libcli.add_argument_ncores(ap)
 
 
 def _load_args():
@@ -109,6 +104,7 @@ def main(
         update=False,
         record_name=('ATOM',),
         ncores=1,
+        replace=False,
         **kwargs
         ):
     """Run main script logic."""
@@ -139,13 +135,20 @@ def main(
 
         dest = make_destination_folder(destination)
 
+        if not replace:
+            pdb2dl = pdblist_comparison
+        else:
+            pdb2dl = pdblist
+
+
         pool_function(
             download_structure,
-            pdblist_comparison.name_chains_dict.items(),
+            pdb2dl.name_chains_dict.items(),
             ncores=ncores,
             # other kwargs for target function
             folder=dest,
             record_name=record_name,
+            renumber=True,
             )
 
         pdblist_updated = \
