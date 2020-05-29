@@ -27,7 +27,7 @@ import argparse
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libparse import filter_pdb_for_db
+from idpconfgen.libs.libparse import filter_structure
 from idpconfgen.libs.libdownload import download_structure
 from idpconfgen.libs.libio import (
     read_path_bundle,
@@ -69,7 +69,6 @@ def _load_args():
 
 def main(
         pdbs,
-        pdb_chains,
         destination=Path.cwd(),
         ncores=1,
         update=False,
@@ -78,38 +77,34 @@ def main(
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
 
-    pdbs_paths = list(read_path_bundle(pdbs))
-    pdbids_to_read = concatenate_entries(pdb_chains)
-    pdb_chains = PDBList(pdbids_to_read)
+    pdbs_paths = list(read_path_bundle(pdbs, ext='.pdb'))
 
-    log.info(T('reading input PDB list'))
-    log.info(S(f'from: {pdbs}'))
-    #log.info(S(f'{str(pdblist)}'))
-    log.info(S('done\n'))
+    #log.info(T('reading input PDB list'))
+    #log.info(S(f'from: {pdbs}'))
+    ##log.info(S(f'{str(pdblist)}'))
+    #log.info(S('done\n'))
 
-    pdblist_destination = \
-        PDBList(glob_folder(destination, '*.pdb'))
-    log.info(T('reading destination folder'))
-    log.info(S(f'from: {destination}'))
-    log.info(S(f'{str(pdblist_destination)}'))
-    log.info(S('done\n'))
+    #pdblist_destination = \
+    #    PDBList(glob_folder(destination, '*.pdb'))
+    #log.info(T('reading destination folder'))
+    #log.info(S(f'from: {destination}'))
+    #log.info(S(f'{str(pdblist_destination)}'))
+    #log.info(S('done\n'))
 
-    pdblist_comparison = pdb_chains.difference(pdblist_destination)
-    log.info(T('Comparison between input and destination'))
-    log.info(S(f'{str(pdblist_comparison)}'))
-    log.info(S('done\n'))
+    #pdblist_comparison = pdb_chains.difference(pdblist_destination)
+    #log.info(T('Comparison between input and destination'))
+    #log.info(S(f'{str(pdblist_comparison)}'))
+    #log.info(S('done\n'))
 
-    if update:
+    dest = make_destination_folder(destination)
 
-        dest = make_destination_folder(destination)
-
-        pool_function(
-            filter_pdb_for_db,
-            pdbs_paths,
-            ncores=ncores,
-            # other kwargs for target function
-            folder=dest,
-            )
+    pool_function(
+        filter_structure,
+        pdbs_paths,
+        ncores=ncores,
+        # other kwargs for target function
+        folder=dest,
+        )
 
     #pdblist_updated = \
     #    PDBList(glob_folder(destination, '*.pdb'))

@@ -359,40 +359,40 @@ _discarded_residues = (
 _allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
 
 
-def filter_pdb_for_db(
-        pdb_file,
-        record_name=('ATOM', 'HETATM'),
-        altlocs=('A', '', ' '),
-        folder='',
-        ):
-    """
-    """
-    _DR = _discarded_residues
-    _AE = _allowed_elements
-
-    pdbid = PDBIDFactory(pdb_file)
-
-    pdbdata = Structure(Path(pdb_file))
-    pdbdata.build()
-
-    pdbdata.add_filter_record_name(record_name)
-    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    pdbdata.add_filter(lambda x: x[col_element] in _AE)
-    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
-
-    chains = pdbid.chain or pdbdata.chain_set
-
-    for chain in chains:
-        pdbdata.add_filter_chain(chain)
-
-        fout = Path(folder, f'{pdbid.name}_{chain}_filtered.pdb')
-        try:
-            pdbdata.write_PDB(fout)
-        except EXCPTS.IDPConfGenException as err:
-            log.error(S('* Something went wrong with {}: {}', pdbid, repr(err)))
-            log.debug(traceback.format_exc())
-
-        pdbdata.pop_last_filter()
+#def filter_pdb_for_db(
+#        pdb_file,
+#        record_name=('ATOM', 'HETATM'),
+#        altlocs=('A', '', ' '),
+#        folder='',
+#        ):
+#    """
+#    """
+#    _DR = _discarded_residues
+#    _AE = _allowed_elements
+#
+#    pdbid = PDBIDFactory(pdb_file)
+#
+#    pdbdata = Structure(Path(pdb_file))
+#    pdbdata.build()
+#
+#    pdbdata.add_filter_record_name(record_name)
+#    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+#    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+#    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+#
+#    chains = pdbid.chain or pdbdata.chain_set
+#
+#    for chain in chains:
+#        pdbdata.add_filter_chain(chain)
+#
+#        fout = Path(folder, f'{pdbid.name}_{chain}_filtered.pdb')
+#        try:
+#            pdbdata.write_PDB(fout)
+#        except EXCPTS.IDPConfGenException as err:
+#            log.error(S('* Something went wrong with {}: {}', pdbid, repr(err)))
+#            log.debug(traceback.format_exc())
+#
+#        pdbdata.pop_last_filter()
 
 
 @contextmanager
@@ -413,6 +413,31 @@ def try_to_write(data, fout):
                 p.write_bytes(data)
             except TypeError:
                 p.write_text(data)
+
+
+def filter_structure(pdb_path, **kwargs):
+    """
+    Download a PDB/CIF structure chains.
+
+    Parameters
+    ----------
+    pdbid : tuple of 2-elements
+        0-indexed, the structure ID at RCSB.org;
+        1-indexed, a list of the chains to download.
+
+    **kwargs : as for :func:`save_structure_chains_and_segments`.
+    """
+    pdbid = PDBIDFactory(pdb_path)
+    pdbname = pdbid.name
+    chains = pdbid.chain
+    print(chains)
+
+    save_structure_chains_and_segments(
+        pdb_path,
+        pdbname,
+        chains=chains,
+        **kwargs,
+        )
 
 
 def save_structure_chains_and_segments(
