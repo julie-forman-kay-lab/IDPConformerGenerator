@@ -24,7 +24,10 @@ def download_raw_PDBS(pdbid, folder=''):
     """
     Download raw PDBs without any filtering.
     """
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbid)
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbid.name)
+    s = Structure(downloaded_data)
+    s.build()
+    s.add_filter_chain(pdbid.chain)
     fout = Path(folder, f'{pdbid}.pdb')
     fout.write_bytes(downloaded_data)
 

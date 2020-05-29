@@ -89,6 +89,13 @@ ap.add_argument(
     nargs='+',
     )
 
+ap.add_argument(
+    '-raw',
+    help='Only parse chain ID',
+    action='store_true',
+    )
+
+
 libcli.add_argument_replace(ap)
 libcli.add_argument_ncores(ap)
 
@@ -105,6 +112,7 @@ def main(
         record_name=('ATOM',),
         ncores=1,
         replace=False,
+        raw=False,
         **kwargs
         ):
     """Run main script logic."""
@@ -149,6 +157,7 @@ def main(
             folder=dest,
             record_name=record_name,
             renumber=True,
+            raw=raw,
             )
 
         pdblist_updated = \

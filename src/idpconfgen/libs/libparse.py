@@ -423,6 +423,7 @@ def save_structure_chains_and_segments(
         altlocs=('A', '', ' '),
         renumber=True,
         folder='',
+        raw=False,
         ):
 
     _DR = pdb_ligand_codes  # discarded residues
@@ -435,10 +436,11 @@ def save_structure_chains_and_segments(
 
     chains = chains or chain_set
 
-    pdbdata.add_filter_record_name(record_name)
-    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    pdbdata.add_filter(lambda x: x[col_element] in _AE)
-    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+    if raw:
+        pdbdata.add_filter_record_name(record_name)
+        pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+        pdbdata.add_filter(lambda x: x[col_element] in _AE)
+        pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:
 

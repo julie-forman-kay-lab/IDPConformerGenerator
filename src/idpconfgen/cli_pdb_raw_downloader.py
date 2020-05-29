@@ -132,7 +132,7 @@ def main(
 
         pool_function(
             download_raw_PDBS,
-            list(pdblist_comparison.pdbids),
+            pdblist_comparison,
             ncores=ncores,
             # other kwargs for target function
             folder=dest,
