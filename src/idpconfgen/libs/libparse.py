@@ -461,11 +461,11 @@ def save_structure_chains_and_segments(
 
     chains = chains or chain_set
 
-    if raw:
-        pdbdata.add_filter_record_name(record_name)
-        pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-        pdbdata.add_filter(lambda x: x[col_element] in _AE)
-        pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+    #if raw:
+    pdbdata.add_filter_record_name(record_name)
+    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:
 

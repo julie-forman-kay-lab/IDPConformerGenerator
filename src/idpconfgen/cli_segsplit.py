@@ -78,6 +78,7 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     s.build()
 
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
+    print(residues)
 
     # returns slices
     segments = group_consecutive_ints(residues)
@@ -103,7 +104,10 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
         try:
                 #identify_backbone_gaps(s.filtered_atoms)
             backbone_segs_in_resSeq_sets = \
-                get_slice(s.filtered_atoms)
+                list(filter(
+                    lambda x: len(x) > minimum,
+                    get_slice(s.filtered_atoms)
+                    ))
         except Exception as err:
             log.error(traceback.format_exc())
             log.error(repr(err))
@@ -113,20 +117,10 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
         finally:
             s.pop_last_filter()
 
+
         for resSeq_set in backbone_segs_in_resSeq_sets:
 
-            dssp_slicing = slice(
-                residues.index(int(resSeq_set[0])),
-                residues.index(int(resSeq_set[-1])) + 1,
-                None,
-                )
-
-            if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
-                log.error(traceback.format_exc())
-                log.error(repr(err))
-                log.error(f'error in {pdbdata}')
-                seg_counter += 1
-                continue
+            print(resSeq_set)
 
             s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
 
@@ -143,6 +137,23 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
             s.pop_last_filter()
 
+            dssp_slicing = slice(
+                residues.index(int(resSeq_set[0])),
+                residues.index(int(resSeq_set[-1])) + 1,
+                None,
+                )
+
+            print(dssp_slicing)
+
+            print(len(resSeq_set))
+            print(len(dssps[pdbdata.stem][dssp_slicing]))
+            print(dssps[pdbdata.stem][dssp_slicing])
+
+            if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
+                log.error(traceback.format_exc())
+                log.error(f'error in {pdbdata}')
+                seg_counter += 1
+                continue
             dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
             seg_counter += 1
 
