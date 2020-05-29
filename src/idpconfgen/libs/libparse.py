@@ -8,17 +8,76 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
+from idpconfgen.core.definitions import dssp_trans
 from idpconfgen.core.definitions import pdb_ligand_codes
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
-from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name, col_iCode
+from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element, col_name, col_iCode, type2string
 from idpconfgen.logger import S, T
 
 
 _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
 _minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
+
+
+
+
+def parse_dssp(data, reduced=False):
+    """
+    Parses DSSP file data.
+    """
+
+    DT = dssp_trans
+
+    try:
+        data_ = type2string[type(data)](data).split('\n')
+    except KeyError:  # maybe is list
+        data_ = data
+
+    #print(type(data_))
+    # RM means removed empty
+    RM1 = (i for i in data_ if i)
+
+    # exausts generator until
+    for line in RM1:
+        if line.strip().startswith('#'):
+            break
+    else:
+        # if the whole generator is exhausted
+        raise IndexError
+
+    structure_data = (i for i in RM1 if i[13] != '!')
+
+    dssp = []
+    fasta = []
+    residues = []
+    for line in structure_data:
+        dssp.append(line[16])
+        fasta.append(line[13])
+        residues.append(line[6:10].strip())
+
+    if reduced:
+        dssp = list(map(lambda x: x.translate(DT), dssp))
+
+    assert sum((len(dssp), len(fasta), len(residues))) / 3 == len(dssp)
+
+    return ''.join(dssp), ''.join(fasta), ','.join(residues)
+
+
+
+def find_dssp_data_index(data):
+    """
+    Find index for where item startswith '#'.
+
+    Evaluates after left striping white spaces.
+    """
+    for line in data:
+        if line.strip().startswith('#'):
+            return
+    else:
+        raise IndexError
 
 
 class DSSPParser:
@@ -107,11 +166,13 @@ class DSSPParser:
             raise EXCPTS.DSSPParserError(self.pdbid) from err
 
         # data starts afterthe header
+        # 
         # '!' appears in gap regions, so that line needs to be ignored.
         self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']
 
-        self.read_sec_structure()
+        #self.read_sec_structure()
         #self.read_fasta()
+        #self.read_resnum()
 
     def read_sec_structure(self):
         """
@@ -134,6 +195,12 @@ class DSSPParser:
         Assigns :attr:`fasta`.
         """
         self.fasta = list_index_to_array(self.data, index=13)
+
+    def read_resnum(self):
+        """
+        Read residue numbers, consider only pdb residue numbers
+        """
+        self.resnums = [i.strip() for i in list_index_to_array(self.data, start=6, stop=10)]
 
     @classmethod
     def from_data_id_tuple(cls, subcmd_tuple, **kwargs):

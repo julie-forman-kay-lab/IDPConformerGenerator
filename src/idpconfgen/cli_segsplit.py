@@ -7,6 +7,7 @@ USAGE:
 import argparse
 import traceback
 from multiprocessing import Manager
+import pickle
 
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import read_path_bundle
@@ -76,6 +77,8 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
 def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
     s = Structure(pdbdata)
     s.build()
+
+    print(len(dssps[pdbdata.stem]))
 
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
     print(residues)

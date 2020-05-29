@@ -9,6 +9,7 @@ USAGE:
 import argparse
 import os
 import subprocess
+import pickle
 from multiprocessing import Manager, Pool
 
 
@@ -152,10 +153,14 @@ def main(
 
     prev_dssp.update(mdict)
 
-    libio.write_text(
-        '\n'.join(f'{k}|{v}' for k, v in prev_dssp.items()),
-        output=output,
-        )
+    with open('all_dssp.pickle', 'wb') as handle:
+        pickle.dump(prev_dssp, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+    #libio.write_text(
+    #    '\n'.join(f'{k}|{v}' for k, v in prev_dssp.items()),
+    #    output=output,
+    #    )
 
 
     log.info(S('All done. Thanks!'))
@@ -167,15 +172,29 @@ def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):
     cmd = [ss_cmd, '-i', os.fspath(pdb.resolve())]
     result = subprocess.run(cmd, capture_output=True)
 
-    dssp_parser = libparse.DSSPParser(
-        data=result.stdout.decode('utf8'),
-        reduced=reduced,
-        )
+    dssp, fasta, residues = libparse.parse_dssp(
+        result.stdout.decode('utf-8'),
+        reduced=reduced)
+    dssp_dict[str(libpdb.PDBIDFactory(pdb))] = {
+        'dssp': dssp,
+        'fasta': fasta,
+        'resids': residues,
+        }
 
-    try:
-        dssp_dict[str(libpdb.PDBIDFactory(pdb))] = ''.join(dssp_parser.ss)
-    except Exception:
-        log.error(f'Error while saving to dict: {pdb}')
+
+    #dssp_parser = libparse.DSSPParser(
+    #    data=result.stdout.decode('utf8'),
+    #    reduced=reduced,
+    #    )
+
+    #try:
+    #    dssp_dict[str(libpdb.PDBIDFactory(pdb))] = {
+    #        'dssp': ''.join(dssp_parser.ss),
+    #        'fasta': ''.join(dssp_parser.fasta),
+    #        'resids': ','.join(dssp_parser.resseq),
+    #        }
+    #except Exception:
+    #    log.error(f'Error while saving to dict: {pdb}')
 
     return
 
