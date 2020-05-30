@@ -153,35 +153,42 @@ def main(
         else:
             pdb2dl = pdblist
 
-        manager = Manager()
-        mlist = manager.list()
-
-        pool_function(
-            download_structure,
-            pdb2dl.name_chains_dict.items(),
-            ncores=ncores,
-            # other kwargs for target function
-            folder=dest,
-            record_name=record_name,
-            renumber=True,
-            raw=raw,
-            mlist=mlist,
-            )
-
-        import tarfile
         tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='w:gz', compresslevel=9)
-
-        for fout, _data in mlist:
-            try:
-                sIO = BytesIO()
-                sIO.write('\n'.join(_data).encode())
-                info = tarfile.TarInfo(name=fout)
-                info.size=sIO.seek(0, SEEK_END)
-                sIO.seek(0)
-                tar.addfile(tarinfo=info, fileobj=sIO)
-            except Exception:
-                log.error(f'failed for {fout}')
         tar.close()
+
+        chunk = 10_000
+        tasks = pdb2dl.name_chains_dict.items()
+        for i in range(0, len(tasks), chunk):
+            task = tasks[i: i + chunk]
+
+            manager = Manager()
+            mlist = manager.list()
+
+            pool_function(
+                download_structure,
+                task,
+                ncores=ncores,
+                # other kwargs for target function
+                folder=dest,
+                record_name=record_name,
+                renumber=True,
+                raw=raw,
+                mlist=mlist,
+                )
+
+            tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='a:')
+
+            for fout, _data in mlist:
+                try:
+                    sIO = BytesIO()
+                    sIO.write('\n'.join(_data).encode())
+                    info = tarfile.TarInfo(name=fout)
+                    info.size=sIO.seek(0, SEEK_END)
+                    sIO.seek(0)
+                    tar.addfile(tarinfo=info, fileobj=sIO)
+                except Exception:
+                    log.error(f'failed for {fout}')
+            tar.close()
 
         #pdblist_updated = \
         #    PDBList(glob_folder(destination, '*.pdb'))
