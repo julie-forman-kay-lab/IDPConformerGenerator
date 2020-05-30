@@ -24,6 +24,11 @@ USAGE:
 
 """
 import argparse
+import os
+from multiprocessing import Manager
+from io import StringIO, BytesIO
+from os import SEEK_END
+import tarfile
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -148,6 +153,8 @@ def main(
         else:
             pdb2dl = pdblist
 
+        manager = Manager()
+        mlist = manager.list()
 
         pool_function(
             download_structure,
@@ -158,13 +165,26 @@ def main(
             record_name=record_name,
             renumber=True,
             raw=raw,
+            mlist=mlist,
             )
 
-        pdblist_updated = \
-            PDBList(glob_folder(destination, '*.pdb'))
-        log.info(T('Reading UPDATED destination'))
-        log.info(S(f'{str(pdblist_updated)}'))
-        log.info(S('done\n'))
+        import tarfile
+        tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='w:gz', compresslevel=9)
+
+        for fout, _data in mlist:
+            sIO = BytesIO()
+            sIO.write('\n'.join(_data).encode())
+            info = tarfile.TarInfo(name=fout)
+            info.size=sIO.seek(0, SEEK_END)
+            sIO.seek(0)
+            tar.addfile(tarinfo=info, fileobj=sIO)
+        tar.close()
+
+        #pdblist_updated = \
+        #    PDBList(glob_folder(destination, '*.pdb'))
+        #log.info(T('Reading UPDATED destination'))
+        #log.info(S(f'{str(pdblist_updated)}'))
+        #log.info(S('done\n'))
 
     return
 

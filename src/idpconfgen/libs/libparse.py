@@ -4,6 +4,11 @@ import sys
 import traceback
 from contextlib import contextmanager
 
+from io import StringIO
+from os import SEEK_END
+import tarfile
+
+
 import numpy as np
 
 from idpconfgen import Path, log
@@ -20,6 +25,53 @@ from idpconfgen.logger import S, T
 _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
 _minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
+
+
+def delete_insertions(lines):
+    """
+    from pdbtools
+
+    optimized for this context
+    """
+    # Keep track of residue numbering
+    # Keep track of residues read (chain, resname, resid)
+    offset = 0
+    prev_resi = None
+    seen_ids = set()
+    clean_icode = False
+    for line in lines:
+        res_uid = line[17:27]  # resname, chain, resid
+        id_res = line[21] + line[22:26].strip()  # A99, B12
+        icode = line[26]
+
+        # unfortunately, this is messy but not all PDB files follow a nice
+        # order of ' ', 'A', 'B', ... when it comes to insertion codes..
+        if prev_resi != res_uid:  # new residue
+            # Have we seen this chain + resid combination
+            # catch insertions WITHOUT icode ('A' ... ' ' ... 'B')
+            if id_res in seen_ids:
+                # Should we do something about it?
+                    clean_icode = True
+                    line = f'{line[:26]} {line[27:]}'  # clear icode
+                    offset += 1
+            # Do we have an explicit icode?
+            elif icode != ' ':
+                    if id_res in seen_ids:  # never saw this, do not offset!
+                        offset += 1
+                    clean_icode = True
+                    line = f'{line[:26]} {line[27:]}'  # clear icode
+            else:
+                clean_icode = False
+
+            prev_resi = res_uid
+
+        if clean_icode:
+            line = f'{line[:26]} {line[27:]}'
+
+        resid = int(line[22:26]) + offset
+        line = f'{line[:22]}{str(resid).rjust(4)}{line[26:]}'
+        seen_ids.add(id_res)
+        yield line
 
 
 
@@ -413,6 +465,18 @@ def group_consecutive_ints(sequence):
     return slices
 
 
+# from https://stackoverflow.com/questions/21142231
+def group_runs(li, tolerance=1):
+    out = []
+    last = li[0]
+    for x in li:
+        if x-last > tolerance:
+            yield out
+            out = []
+        out.append(x)
+        last = x
+    yield out
+
 
 
 # considers solvent and DNA/RNA
@@ -516,6 +580,7 @@ def save_structure_chains_and_segments(
         renumber=True,
         folder='',
         raw=False,
+        mlist=None,
         ):
 
     _DR = pdb_ligand_codes  # discarded residues
@@ -523,6 +588,7 @@ def save_structure_chains_and_segments(
 
     pdbdata = Structure(pdb_data)
     pdbdata.build()
+    #pdbdata.renumber_atoms()
 
     chain_set = pdbdata.chain_set
 
@@ -564,11 +630,14 @@ def save_structure_chains_and_segments(
         ##
 
         #else:
-        fout = Path(folder, f'{pdbname}_{chain}.pdb')
-        with try_to_write(pdb_data, fout):
-            pdbdata.write_PDB(fout, renumber=True)
+        #fout = Path(folder, f'{pdbname}_{chain}.pdb')
+        fout = f'{pdbname}_{chain}.pdb'
+        #with try_to_write(pdb_data, fout):
+        mlist.append((fout, list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))))
 
         pdbdata.pop_last_filter()
+
+        return
 
 
 

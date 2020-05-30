@@ -177,14 +177,25 @@ class Structure:
             lambda x: ib(x[col_name], x[col_element], minimal=minimal)
             )
 
-    def write_PDB(self, filename, renumber=False):
-        """Write Structure to PDB file."""
+    def renumber_atoms(self):
+        self.data_array[:, col_serial] = np.arange(1, self.data_array.shape[0] + 1).astype('<U8')
+
+    def get_PDB(self, pdb_filter=None):
+        """
+        """
+        def _(i, f):
+            return f(i)
+
         fs = self.filtered_atoms
+        fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+        pdb_filter = pdb_filter or []
 
-        if renumber:
-            fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+        lines = reduce(_, pdb_filter, structure_to_pdb(fs))
+        return lines
 
-        lines = structure_to_pdb(fs)
+    def write_PDB(self, filename, **kwargs):
+        """Write Structure to PDB file."""
+        lines = self.get_PDB(**kwargs)
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
             try:

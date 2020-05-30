@@ -12,7 +12,7 @@ import pickle
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import read_path_bundle
 from idpconfgen.logger import init_files, S, T
-from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_slice
+from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_slice, group_runs
 from idpconfgen import log, Path
 from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
@@ -54,7 +54,9 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
 
     #pdb_filtered = [pp for pp in pdb_paths if pp.stem in already_done]
 
-    dssp_data = read_pipe_file(Path(dssp).read_text())
+    #dssp_data = read_pipe_file(Path(dssp).read_text())
+    with open(dssp, 'rb') as handle:
+        dssp_data = pickle.load(handle)
 
     manager = Manager()
     dssp_output_dict = manager.dict()
@@ -75,26 +77,27 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
 
 
 def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
+
     s = Structure(pdbdata)
     s.build()
+    #s.renumber_atoms()
 
-    print(len(dssps[pdbdata.stem]))
-
+    # this will ignore the iCode
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
-    print(residues)
 
     # returns slices
-    segments = group_consecutive_ints(residues)
+    #segments = group_consecutive_ints(residues)
+    segments = group_runs(residues)
 
     # removes ligands
     above_2 = filter(
-        lambda x: x.stop - x.start > minimum,
+        lambda x: len(x) > minimum,
         segments,
         )
 
     seg_counter = 0
     for seg in above_2:
-        s.add_filter(lambda x: int(x[col_resSeq]) in residues[seg])
+        s.add_filter(lambda x: int(x[col_resSeq]) in seg)
 
         if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
             s.pop_last_filter()
@@ -123,15 +126,13 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
         for resSeq_set in backbone_segs_in_resSeq_sets:
 
-            print(resSeq_set)
-
             s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
 
             pdbout = f'{pdbdata.stem}_seg{seg_counter}'
             fout_seg = Path(destination, pdbout).with_suffix('.pdb')
 
             try:
-                s.write_PDB(fout_seg, renumber=True)
+                s.write_PDB(fout_seg)
             except EXCPTS.EmptyFilterError as err:
                 log.error(f'Empty filter for: {repr(err)}')
             except EXCPTS.IDPConfGenException as err:
@@ -140,23 +141,46 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
             s.pop_last_filter()
 
-            dssp_slicing = slice(
-                residues.index(int(resSeq_set[0])),
-                residues.index(int(resSeq_set[-1])) + 1,
-                None,
-                )
 
-            print(dssp_slicing)
+            # these are aligned
+            dssp_data = dssps[pdbdata.stem]
+            _fasta = dssp_data['fasta']
+            _dssp = dssp_data['dssp']
+            _res = dssp_data['resids'].split(',')
 
-            print(len(resSeq_set))
-            print(len(dssps[pdbdata.stem][dssp_slicing]))
-            print(dssps[pdbdata.stem][dssp_slicing])
 
-            if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
-                log.error(traceback.format_exc())
-                log.error(f'error in {pdbdata}')
-                seg_counter += 1
-                continue
-            dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
+            ffasta = []
+            ddssp = []
+            rres = []
+            for f, d, r in zip(_fasta, _dssp, _res):
+                if r in resSeq_set:
+                    ffasta.append(f)
+                    ddssp.append(d)
+                    rres.append(r)
+
+            dssp_out[pdbout] = {
+                'fasta': ''.join(ffasta),
+                'dssp': ''.join(ddssp),
+                'residues': ','.join(rres),
+                }
+
+            #
+            #dssp_slicing = slice(
+            #    residues.index(int(resSeq_set[0])),
+            #    residues.index(int(resSeq_set[-1])) + 1,
+            #    None,
+            #    )
+            #print(dssp_slicing)
+
+            #print(len(resSeq_set))
+            #print(len(dssps[pdbdata.stem][dssp_slicing]))
+            #print(dssps[pdbdata.stem][dssp_slicing])
+
+            #if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
+            #    log.error(traceback.format_exc())
+            #    log.error(f'error in {pdbdata}')
+            #    seg_counter += 1
+            #    continue
+            #dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
             seg_counter += 1
 
