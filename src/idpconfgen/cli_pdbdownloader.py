@@ -172,12 +172,15 @@ def main(
         tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='w:gz', compresslevel=9)
 
         for fout, _data in mlist:
-            sIO = BytesIO()
-            sIO.write('\n'.join(_data).encode())
-            info = tarfile.TarInfo(name=fout)
-            info.size=sIO.seek(0, SEEK_END)
-            sIO.seek(0)
-            tar.addfile(tarinfo=info, fileobj=sIO)
+            try:
+                sIO = BytesIO()
+                sIO.write('\n'.join(_data).encode())
+                info = tarfile.TarInfo(name=fout)
+                info.size=sIO.seek(0, SEEK_END)
+                sIO.seek(0)
+                tar.addfile(tarinfo=info, fileobj=sIO)
+            except Exception:
+                log.error(f'failed for {fout}')
         tar.close()
 
         #pdblist_updated = \
