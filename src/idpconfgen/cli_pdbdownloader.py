@@ -157,7 +157,7 @@ def main(
         tar.close()
 
         chunk = 10_000
-        tasks = pdb2dl.name_chains_dict.items()
+        tasks = list(pdb2dl.name_chains_dict.items())
         for i in range(0, len(tasks), chunk):
             task = tasks[i: i + chunk]
 
