@@ -153,11 +153,12 @@ def main(
         else:
             pdb2dl = pdblist
 
-        tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='w:gz', compresslevel=9)
+        tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar')), mode='w')#, compresslevel=9)
         tar.close()
 
         chunk = 10_000
-        tasks = list(pdb2dl.name_chains_dict.items())
+        tasks = sorted(list(pdb2dl.name_chains_dict.items()), key=lambda x: x[0])
+        print(len(tasks))
         for i in range(0, len(tasks), chunk):
             task = tasks[i: i + chunk]
 
@@ -176,9 +177,9 @@ def main(
                 mlist=mlist,
                 )
 
-            tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar.gz')), mode='a:')
+            tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar')), mode='a:')
 
-            for fout, _data in mlist:
+            for fout, _data in sorted(mlist, key=lambda x: x[0]):
                 try:
                     sIO = BytesIO()
                     sIO.write('\n'.join(_data).encode())

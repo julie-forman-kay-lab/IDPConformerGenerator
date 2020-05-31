@@ -588,7 +588,6 @@ def save_structure_chains_and_segments(
 
     pdbdata = Structure(pdb_data)
     pdbdata.build()
-    #pdbdata.renumber_atoms()
 
     chain_set = pdbdata.chain_set
 
@@ -637,7 +636,7 @@ def save_structure_chains_and_segments(
 
         pdbdata.pop_last_filter()
 
-        return
+    return
 
 
 
