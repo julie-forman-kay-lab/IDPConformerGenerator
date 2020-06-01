@@ -43,7 +43,7 @@ from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = '.pdbdownloader'
+LOGFILESNAME = '.idpconfgen_pdbdl'
 
 _name = 'pdbdl'
 _help = 'Downloads filtered structures from RCSB.'
@@ -96,7 +96,14 @@ ap.add_argument(
 
 ap.add_argument(
     '-raw',
-    help='Only parse chain ID',
+    help='Download the raw PDBs/mmCIFs, ignoring the CHAIN IDS.',
+    action='store_true',
+    )
+
+ap.add_argument(
+    '-t',
+    '--tar',
+    help='Write data in a .tar file',
     action='store_true',
     )
 
@@ -114,10 +121,11 @@ def main(
         pdblist,
         destination=None,
         update=False,
-        record_name=('ATOM',),
+        record_name=('ATOM', 'HETATM'),
         ncores=1,
         replace=False,
         raw=False,
+        tar=False,
         **kwargs
         ):
     """Run main script logic."""
