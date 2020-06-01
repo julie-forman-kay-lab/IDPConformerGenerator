@@ -71,6 +71,8 @@ def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
         ncores=ncores,
         )
 
+    #libio.save_dictionary(dssp_output_dict, output)
+
     Path(destination, 'dssp_segs.dssp').write_text(
         '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
         )

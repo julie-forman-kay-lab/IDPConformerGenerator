@@ -10,6 +10,7 @@ import argparse
 import os
 import subprocess
 import pickle
+import shutil
 from multiprocessing import Manager, Pool
 
 
@@ -122,9 +123,11 @@ def main(
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
 
+    tmpdir = '__tmpssext__'
+
     log.info(T('reading input paths'))
     if pdbs[0].endswith('.tar'):
-        pdbs2operate = [Path(i) for i in libio.extract_from_tar(pdbs[0])]
+        pdbs2operate = libio.extract_from_tar(pdbs[0], output=tmpdir)
     else:
         pdbs2operate = list(libio.read_path_bundle(pdbs, ext='pdb'))
     log.info(S('done'))
@@ -145,20 +148,25 @@ def main(
     manager = Manager()
     mdict = manager.dict()
 
-    libmulticore.pool_function(
-        mkdssp,
-        pdbs2operate,
-        ss_cmd=ss_cmd,
-        dssp_dict=mdict,
-        reduced=reduced,
-        ncores=ncores,
-        )
+    try:
+        libmulticore.pool_function(
+            mkdssp,
+            pdbs2operate,
+            ss_cmd=ss_cmd,
+            dssp_dict=mdict,
+            reduced=reduced,
+            ncores=ncores,
+            )
+    except Exception:
+        log.error('FAILED')
+    else:
+        prev_dssp.update(mdict)
+        libio.save_dictionary(prev_dssp, output=output)
+        log.info(S('All done. Thanks!'))
 
-    prev_dssp.update(mdict)
+    finally:
+        shutil.rmtree(tmpdir)
 
-    libio.save_dictionary(prev_dssp, output=output)
-
-    log.info(S('All done. Thanks!'))
     return
 
 

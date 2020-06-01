@@ -286,14 +286,14 @@ def add_existent_files(storage, source):
 
 
 
-def extract_from_tar(pdbtar):
+def extract_from_tar(pdbtar, output='.'):
     """
     """
     tar = tarfile.open(pdbtar)
     names = tar.getnames()
-    tar.extractall()
+    tar.extractall(path=output)
     tar.close()
-    return names
+    return [Path(output, i) for i in names]
 
 
 def glob_folder(folder, ext):
