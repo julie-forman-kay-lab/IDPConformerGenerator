@@ -60,10 +60,10 @@ class ProgressBarFake:
     def __init__(self, *args, **kwargs):
         return
 
-    def __enter__(self):
+    def __enter__(self, *args, **kwargs):
         return self
 
-    def __exit__(self):
+    def __exit__(self, *args, **kwargs):
         return
 
     def increment(self):

@@ -167,6 +167,10 @@ def main(
     return
 
 
+#def mkdssp_from_tar(pdbtar **kawrgs):
+    
+
+
 def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):
 
     cmd = [ss_cmd, '-i', os.fspath(pdb.resolve())]

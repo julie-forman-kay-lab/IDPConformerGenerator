@@ -49,7 +49,11 @@ def download_structure(pdbid, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    try:
+        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    except IOError:
+        log.error(f'Complete download failure for {pdbname}')
+        return
     save_structure_chains_and_segments(
         downloaded_data,
         pdbname,
@@ -81,4 +85,4 @@ def fetch_pdb_id_from_RCSB(pdbid):
             time.sleep(15)
             attempts += 1
     else:
-        raise IOError(f'Failed to download {pdbid}')
+        raise IOError(f'Failed to download {pdbid} - too much attempts')
