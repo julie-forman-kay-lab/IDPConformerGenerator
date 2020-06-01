@@ -41,6 +41,7 @@ from idpconfgen.libs.libio import (
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libio import read_PDBID_from_folder
 
 
 LOGFILESNAME = '.idpconfgen_pdbdl'
@@ -199,9 +200,6 @@ def read_PDBID_from_tar(destination):
         p = PDBList([])
     return p
 
-
-def read_PDBID_from_folder(destination):
-    return PDBList(glob_folder(destination, '*.pdb'))
 
 class PDBFileDownloader:
     def __init__(self, destination):

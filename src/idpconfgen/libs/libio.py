@@ -1,12 +1,17 @@
 """Functions and Classes regarding Input/Output."""
 import itertools as it
 import glob
+import json
 import os
 import sys
+import pickle
 from functools import partial
+import tarfile
+
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
+from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 
 
@@ -280,6 +285,17 @@ def add_existent_files(storage, source):
             log.error(S('file not found: {}', p.str()))
 
 
+
+def extract_from_tar(pdbtar):
+    """
+    """
+    tar = tarfile.open(pdbtar)
+    names = tar.getnames()
+    tar.extractall()
+    tar.close()
+    return names
+
+
 def glob_folder(folder, ext):
     """
     List files with extention `ext` in `folder`.
@@ -354,3 +370,25 @@ def read_PDBID_from_folder(folder):
     log.info(S('done\n'))
 
     return pdblist
+
+
+def save_dictionary(mydict, output='mydict.pickle'):
+    options = {
+        '.pickle': save_pickle_dict,
+        '.json': save_json_dict,
+        }
+
+    options[Path(output).suffix](mydict, output)
+
+
+def save_json_dict(mydict, output='mydict.json'):
+    """
+    """
+    with open(output, 'w') as fout:
+        json.dump(mydict, fout, indent=True, sort_keys=True)
+
+
+def save_pickle_dict(mydict, output='mydict.pickle'):
+    assert Path(output).suffix == '.pickle'
+    with open(output, 'wb') as handle:
+        pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)
