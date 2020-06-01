@@ -1,6 +1,7 @@
 """Functions and variables to download files and data."""
 import traceback
 import urllib.request
+import urllib.error.URLError as URLError
 from contextlib import contextmanager
 
 import numpy as np
@@ -60,16 +61,22 @@ def download_structure(pdbid, **kwargs):
 def fetch_pdb_id_from_RCSB(pdbid):
     possible_links = (l.format(pdbid) for l in POSSIBLELINKS)
 
-    for weblink in possible_links:
+    while attempts < 10:
         try:
-            response = urllib.request.urlopen(weblink)
-            return response.read()
-        except urllib.error.HTTPError:
-            continue
-        except (AttributeError, UnboundLocalError):  # response is None
-            #log.error(S(f'Download {pdbid} failed to read data.'))
-            continue
-    else:
-        raise IOError(f'Failed to download {pdbid}')
+            for weblink in possible_links:
+                try:
+                    response = urllib.request.urlopen(weblink)
+                    return response.read()
+                except urllib.error.HTTPError:
+                    continue
+                except (AttributeError, UnboundLocalError):  # response is None
+                    #log.error(S(f'Download {pdbid} failed to read data.'))
+                    continue
+            else:
+                raise IOError(f'Failed to download {pdbid}')
+        except (TimeoutError, URLError):
+            log.error(f'failed downlaod for {pdbid} because of TimeoutError. Retrying...')
+            time.sleep(15)
+            attempts += 1
 
 
