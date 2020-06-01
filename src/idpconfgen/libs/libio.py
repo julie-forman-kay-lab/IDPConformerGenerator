@@ -330,3 +330,27 @@ def make_destination_folder(dest):
         dest_.mkdir(parents=True, exist_ok=True)
         return dest_
 
+def read_PDBID_from_tar(tfile):
+    """
+    """
+
+
+
+def read_PDBID_from_folder(folder):
+    """
+    Function description here.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+
+    pdblist = PDBList(glob_folder(folder, '*.pdb'))
+    log.info(T('reading destination folder'))
+    log.info(S(f'from: {destination}'))
+    log.info(S(f'{str(pdblist_destination)}'))
+    log.info(S('done\n'))
+
+    return pdblist

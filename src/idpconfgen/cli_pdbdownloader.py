@@ -69,6 +69,7 @@ ap.add_argument(
     help=(
         'Destination folder where PDB files will be stored.'
         ' Defaults to current working directory.'
+        'Alternatively, you can provide a path to a .tar file'
         ),
     type=Path,
     default=Path.cwd(),
@@ -101,12 +102,11 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-t',
-    '--tar',
-    help='Write data in a .tar file',
-    action='store_true',
+    '-chunks',
+    help='Number of chunks to process in memory before saving to disk.',
+    default=10_000,
+    type=int,
     )
-
 
 libcli.add_argument_replace(ap)
 libcli.add_argument_ncores(ap)
@@ -125,69 +125,115 @@ def main(
         ncores=1,
         replace=False,
         raw=False,
-        tar=False,
+        chunks=10_000,
         **kwargs
         ):
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
 
+    #
+    log.info(T('reading input PDB list'))
+    log.info(S(f'from: {pdblist}'))
+
     pdbids_to_read = concatenate_entries(pdblist)
     pdblist = PDBList(pdbids_to_read)
 
-    log.info(T('reading input PDB list'))
-    log.info(S(f'from: {pdblist}'))
     log.info(S(f'{str(pdblist)}'))
     log.info(S('done\n'))
 
-    if destination:
-        pdblist_destination = \
-            PDBList(glob_folder(destination, '*.pdb'))
-        log.info(T('reading destination folder'))
-        log.info(S(f'from: {destination}'))
-        log.info(S(f'{str(pdblist_destination)}'))
-        log.info(S('done\n'))
-
-        pdblist_comparison = pdblist.difference(pdblist_destination)
-        log.info(T('Comparison between input and destination'))
-        log.info(S(f'{str(pdblist_comparison)}'))
-        log.info(S('done\n'))
+    #
+    pdblist_destination = list_destination(destination)
+    pdblist_comparison = pdblist.difference(pdblist_destination)
+    log.info(T('Comparison between input and destination'))
+    log.info(S(f'{str(pdblist_comparison)}'))
+    log.info(S('done\n'))
 
     if update:
 
-        dest = make_destination_folder(destination)
-
-        if not replace:
-            pdb2dl = pdblist_comparison
-        else:
+        if replace:
             pdb2dl = pdblist
+        else:
+            pdb2dl = pdblist_comparison
 
-        tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar')), mode='w')#, compresslevel=9)
+        DLER = {
+            True: PDBFileDownloader,
+            destination.suffix == '.tar': PDBFileTarDownloader,
+            }
+
+        downloader = DLER[True](destination)
+
+        downloader.download(
+            pdb2dl,
+            ncores=ncores,
+            chunks=chunks,
+            record_name=record_name,
+            )
+
+        #pdblist_updated = \
+        #    PDBList(glob_folder(destination, '*.pdb'))
+        #log.info(T('Reading UPDATED destination'))
+        #log.info(S(f'{str(pdblist_updated)}'))
+        list_destination(destination)
+
+    log.info(S('done\n'))
+    return
+
+
+def list_destination(destination):
+    if destination.suffix == '.tar':
+        pdblist_destination = read_PDBID_from_tar(destination)
+    elif destination.is_dir:
+        pdblist_destination = read_PDBID_from_folder(destination)
+
+    log.info(T(f'destination {destination}'))
+    log.info(S(str(pdblist_destination)))
+    return pdblist_destination
+
+
+def read_PDBID_from_tar(destination):
+    try:
+        tar = tarfile.open(destination.str(), 'r:*')
+        p = PDBList(tar.getnames())
         tar.close()
+    except FileNotFoundError:
+        p = PDBList([])
+    return p
 
-        chunk = 10_000
-        tasks = sorted(list(pdb2dl.name_chains_dict.items()), key=lambda x: x[0])
-        print(len(tasks))
-        for i in range(0, len(tasks), chunk):
-            task = tasks[i: i + chunk]
 
-            manager = Manager()
-            mlist = manager.list()
+def read_PDBID_from_folder(destination):
+    return PDBList(glob_folder(destination, '*.pdb'))
 
-            pool_function(
-                download_structure,
-                task,
-                ncores=ncores,
-                # other kwargs for target function
-                folder=dest,
-                record_name=record_name,
-                renumber=True,
-                raw=raw,
-                mlist=mlist,
-                )
+class PDBFileDownloader:
+    def __init__(self, destination):
+        self.dest = make_destination_folder(destination)
+        return
 
-            tar = tarfile.open(os.fspath(Path(dest, 'pdbdl.tar')), mode='a:')
+    def download(self, pdbs2dl, **kwargs):
+        for result_dict in download_script(pdbs2dl, **kwargs):
+            for fname, data in sorted(result_dict.items()):
+                with open(Path(self.dest, fname), 'w') as fout:
+                    fout.write('\n'.join(data))
 
-            for fout, _data in sorted(mlist, key=lambda x: x[0]):
+
+
+class PDBFileTarDownloader:
+    _exists = {True: 'a', False: 'w'}
+    def __init__(self, destination):
+        self.dests = destination.str()
+        dest = tarfile.open(
+            self.dests,
+            mode=self._exists[destination.exists()],
+            )
+        dest.close()
+        return
+
+
+    def download(self, pdbs2dl, **kwargs):
+        for result_dict in download_script(pdbs2dl, **kwargs):
+
+            tar = tarfile.open(self.dests, mode='a:')
+
+            for fout, _data in sorted(result_dict.items()):
                 try:
                     sIO = BytesIO()
                     sIO.write('\n'.join(_data).encode())
@@ -199,13 +245,34 @@ def main(
                     log.error(f'failed for {fout}')
             tar.close()
 
-        #pdblist_updated = \
-        #    PDBList(glob_folder(destination, '*.pdb'))
-        #log.info(T('Reading UPDATED destination'))
-        #log.info(S(f'{str(pdblist_updated)}'))
-        #log.info(S('done\n'))
 
-    return
+
+def download_script(
+        pdbids2dl,
+        ncores=1,
+        chunks=10_000,
+        record_name=None,
+        ):
+    """
+    """
+
+    tasks = sorted(list(pdbids2dl.name_chains_dict.items()), key=lambda x: x[0])
+    for i in range(0, len(tasks), chunks):
+        task = tasks[i: i + chunks]
+
+        manager = Manager()
+        mdict = manager.dict()
+
+        pool_function(
+            download_structure,
+            task,
+            ncores=ncores,
+            # other kwargs for target function
+            record_name=record_name,
+            mdict=mdict,
+            )
+
+        yield mdict
 
 
 def maincli():

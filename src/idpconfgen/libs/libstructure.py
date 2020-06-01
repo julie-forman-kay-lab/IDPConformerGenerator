@@ -187,6 +187,7 @@ class Structure:
             return f(i)
 
         fs = self.filtered_atoms
+        # renumber atoms
         fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
         pdb_filter = pdb_filter or []
 

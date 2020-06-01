@@ -33,6 +33,45 @@ def record_time(process_name='', *args, **kwargs):
 
 
 class ProgressBar:
+
+    def __new__(cls, *args, bar_length=None, **kwargs):
+        if bar_length is None:
+            try:
+                _columns, _rows = os.get_terminal_size()
+                return ProgressBarReal(*args, bar_length=_columns // 2, **kwargs)
+            except OSError:
+                log.error(
+                    'ERROR: Could not retrive size of ProgressBar '
+                    'from terminal window. Using the default of `50`. '
+                    'Everything else is normal.'
+                    )
+                return ProgressBarFake()
+                # this trick is used to guarantee 100% test coverage
+        else:
+            return ProgressBarReal(*args, bar_length=bar_length, **kwargs)
+
+
+class ProgressBarFake:
+    """
+    Simulates the interface of ProgressBarReal but does nothing.
+
+    Used in servers where ProgressBar makes no sense.
+    """
+    def __init__(self, *args, **kwargs):
+        return
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self):
+        return
+
+    def increment(self):
+        return
+
+
+
+class ProgressBarReal:
     """
     Contextualizes a Progress Bar.
 
@@ -73,21 +112,21 @@ class ProgressBar:
             prefix='',
             suffix='',
             decimals=1,
-            bar_length=None,
+            bar_length=20,
             ):
 
-        if bar_length is None:
-            try:
-                _columns, _rows = os.get_terminal_size()
-            except OSError:
-                log.error(
-                    'ERROR: Could not retrive size of ProgressBar '
-                    'from terminal window. Using the default of `50`. '
-                    'Everything else is normal.'
-                    )
-                # this trick is used to guarantee 100% test coverage
-                _columns = 100
-            bar_length = _columns // 2
+        #if bar_length is None:
+        #    try:
+        #        _columns, _rows = os.get_terminal_size()
+        #    except OSError:
+        #        log.error(
+        #            'ERROR: Could not retrive size of ProgressBar '
+        #            'from terminal window. Using the default of `50`. '
+        #            'Everything else is normal.'
+        #            )
+        #        # this trick is used to guarantee 100% test coverage
+        #        _columns = 100
+        #    bar_length = _columns // 2
 
         total = int(total)
         self.prefix = prefix

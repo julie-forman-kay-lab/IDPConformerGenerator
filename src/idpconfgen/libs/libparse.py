@@ -571,6 +571,16 @@ def filter_structure(pdb_path, **kwargs):
         )
 
 
+def eval_chain_case(chain, chain_set):
+    if chain in chain_set:
+        return chain
+    else:
+        cl = chain.lower()
+        if cl in chain_set:
+            return cl
+    raise ValueError(f'Neither {chain}/{cl} are in set {chain_set}')
+
+
 def save_structure_chains_and_segments(
         pdb_data,
         pdbname,
@@ -578,9 +588,7 @@ def save_structure_chains_and_segments(
         record_name=('ATOM', 'HETATM'),
         altlocs=('A', '', ' '),
         renumber=True,
-        folder='',
-        raw=False,
-        mlist=None,
+        mdict=None,
         ):
 
     _DR = pdb_ligand_codes  # discarded residues
@@ -593,7 +601,6 @@ def save_structure_chains_and_segments(
 
     chains = chains or chain_set
 
-    #if raw:
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
     pdbdata.add_filter(lambda x: x[col_element] in _AE)
@@ -601,38 +608,17 @@ def save_structure_chains_and_segments(
 
     for chain in chains:
 
-        if chain not in chain_set:
-            if chain.lower() not in chain_set:
-                log.error(f'Skiping chain {chain} for {pdbname}')
-                continue
-            else:
-                chain = chain.lower()
+        try:
+            chain = eval_chain_case(chain, chain_set)
+        except ValueError as err:
+            log.error(repr(err))
+            log.error(f'Skiping chain {chain} for {pdbname}')
+            continue
 
         pdbdata.add_filter_chain(chain)
 
-        # passar esto a una function
-        #pdbsegs = pdbdata.residue_segments
-
-        ## more than one residue
-        #valid_segments = filter(
-        #    lambda x: set(line[col_resSeq] for line in x),
-        #    pdbsegs,
-        #    )
-
-        #if len(pdbsegs) > 1:
-        #    for i, segment in enumerate(valid_segments):
-        #        fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb')
-        #        with try_to_write(downloaded_data, fout_seg):
-        #            # because segments are pure arrays
-        #            # and not Structure objects
-        #            write_PDB(structure_to_pdb(segment), fout_seg)
-        ##
-
-        #else:
-        #fout = Path(folder, f'{pdbname}_{chain}.pdb')
         fout = f'{pdbname}_{chain}.pdb'
-        #with try_to_write(pdb_data, fout):
-        mlist.append((fout, list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))))
+        mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
 
