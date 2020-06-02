@@ -365,8 +365,8 @@ def read_PDBID_from_folder(folder):
 
     pdblist = PDBList(glob_folder(folder, '*.pdb'))
     log.info(T('reading destination folder'))
-    log.info(S(f'from: {destination}'))
-    log.info(S(f'{str(pdblist_destination)}'))
+    log.info(S(f'from: {folder}'))
+    log.info(S(f'{str(pdblist)}'))
     log.info(S('done\n'))
 
     return pdblist

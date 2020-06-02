@@ -52,14 +52,14 @@ def delete_insertions(lines):
             if id_res in seen_ids:
                 # Should we do something about it?
                     clean_icode = True
-                    line = f'{line[:26]} {line[27:]}'  # clear icode
+                    #line = f'{line[:26]} {line[27:]}'  # clear icode
                     offset += 1
             # Do we have an explicit icode?
             elif icode != ' ':
                     if id_res in seen_ids:  # never saw this, do not offset!
                         offset += 1
                     clean_icode = True
-                    line = f'{line[:26]} {line[27:]}'  # clear icode
+                    #line = f'{line[:26]} {line[27:]}'  # clear icode
             else:
                 clean_icode = False
 
@@ -481,11 +481,9 @@ def group_runs(li, tolerance=1):
 
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
-_discarded_residues = (
-    'HOH', 'SOL', 'PO4',
-    'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
-    'TPP',
-    )
+#_discarded_residues = (
+    #'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
+    #)
 
 _allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
 

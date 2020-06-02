@@ -84,4 +84,5 @@ pdb_ligand_codes = set(
         pdb_ligand_codes_file.read_text().split(),
         pdb_lig_codes_manual.read_text().split(),
         )
+    if not i.startswith('#')
     )
