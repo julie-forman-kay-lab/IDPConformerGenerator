@@ -11,7 +11,7 @@ from . import tcommons
 
 def test_concatenate_0():
     """Test against cull.list."""
-    result = libio.concatenate_entries([tcommons.cull])
+    result = list(libio.concatenate_entries([tcommons.cull]))
     expected = [
         '# 5XLI chains renamed to lowercase\n',
         '12E8H       221  XRAY        1.900    0.22    0.27\n',
@@ -47,7 +47,7 @@ def test_concatenate_1():
         'file8',
         ]
 
-    output = libio.concatenate_entries(user_input)
+    output = list(libio.concatenate_entries(user_input))
 
     assert expected_output == output
 
@@ -62,7 +62,7 @@ def test_paths_from_flist():
 def test_concatenate_2(in1):
     """Test raises TypeError."""
     with pytest.raises(TypeError):
-        libio.concatenate_entries(in1)
+        list(libio.concatenate_entries(in1))
 
 
 def test_check_file_exists_1():

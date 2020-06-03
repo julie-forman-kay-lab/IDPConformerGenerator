@@ -52,6 +52,32 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
             #pb.increment()
 
 
+def pool_function_in_chunks(
+        #pdbids2dl,
+        func,
+        tasks,
+        ncores=1,
+        chunks=5_000,
+        **kwargs,
+        #record_name=None,
+        ):
+    """
+    """
+    #tasks = sorted(list(pdbids2dl.name_chains_dict.items()), key=lambda x: x[0])
+    for i in range(0, len(tasks), chunks):
+        task = tasks[i: i + chunks]
+
+        pool_function(
+            #download_structure,
+            func,
+            task,
+            ncores=ncores,
+            # other kwargs for target function
+            **kwargs,
+            )
+
+        yield mdict
+
 
 class Worker(multiprocessing.Process):
     """

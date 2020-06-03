@@ -4,9 +4,10 @@ import traceback
 import urllib.request
 from urllib.error import URLError
 from contextlib import contextmanager
+from os import SEEK_END
+from io import BytesIO
 
 import numpy as np
-
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element
@@ -86,3 +87,69 @@ def fetch_pdb_id_from_RCSB(pdbid):
             attempts += 1
     else:
         raise IOError(f'Failed to download {pdbid} - too much attempts')
+
+
+
+def get_pdbs_downloader(destination):
+    """Get proper function to download PDBs based on the destination type."""
+    # classes to manage the download action
+    DOWNLOADER = {
+        True: download_pdbs_to_folder,  # this is the equivalent to the else statement
+        destination.suffix == '.tar': download_pdbs_to_tar,
+        }
+    return DOWNLOADER[True]
+
+
+
+def download_pdbs_to_folder(destination, items, **kwargs):
+    """
+    Download PDBs to folder.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    dest = make_destination_folder(destination)
+
+    for result_dict in pool_function_in_chunks(
+            download_structure,
+            items,
+            **kwargs,
+            ):
+
+        for fname, data in sorted(result_dict.items()):
+            with open(Path(self.dest, fname), 'w') as fout:
+                fout.write('\n'.join(data))
+
+
+
+def download_pdbs_to_tar(destination, items, **kwargs):
+    """
+    Download PDBs to tarfile.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    _exists = {True: 'a', False: 'w'}
+    dests = destination.str()
+    dest = tarfile.open(dests, mode=_exists[destination.exists()])
+    dest.close()
+
+    for result_dict in pool_function_in_chunks(
+            download_structure,
+            items,
+            **kwargs,
+            ):
+
+        tar = tarfile.open(dests, mode='a:')
+
+        for fout, _data in sorted(result_dict.items()):
+            try:
+                sIO = BytesIO()
+                sIO.write('\n'.join(_data).encode())
+                info = tarfile.TarInfo(name=fout)
+                info.size=sIO.seek(0, SEEK_END)
+                sIO.seek(0)
+                tar.addfile(tarinfo=info, fileobj=sIO)
+            except Exception:
+                log.error(f'failed for {fout}')
+        tar.close()
+
+

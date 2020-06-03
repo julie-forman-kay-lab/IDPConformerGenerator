@@ -9,6 +9,7 @@ from functools import partial
 import tarfile
 
 
+
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBList
@@ -65,20 +66,13 @@ def concatenate_entries(entry_list):
     list
         Concatenated strings plus lines in files.
     """
-    concatenated = []
     for entry in entry_list:
         try:
             with Path(entry).open('r') as fh:
-                concatenated.extend(
-                    filter(
-                        bool,
-                        map(str.strip, fh.readlines()),
-                        ),
-                    )
+                for i in filter(bool, map(str.strip, fh)):
+                    yield i
         except (FileNotFoundError, NotADirectoryError):
-            concatenated.append(entry)
-
-    return concatenated
+            yield entry
 
 
 @libcheck.argstype(((list, tuple),))
@@ -346,10 +340,46 @@ def make_destination_folder(dest):
         dest_.mkdir(parents=True, exist_ok=True)
         return dest_
 
-def read_PDBID_from_tar(tfile):
-    """
-    """
 
+def read_PDBID_from_tar(tar_file):
+    """
+    Read PDBIDs from tarfile.
+
+    .. note::
+
+        Case-specific function, not an abstraction.
+
+    Parameters
+    ----------
+    tar_file : :class:`idpconfgen.Path`
+        The tarfile to read.
+
+    Returns
+    -------
+    :class:`idpconfgen.libs.libpdb.PDBList`
+        If file is not found returns an empty PDBList.
+    """
+    title = (
+        f"{T('Reading PDB IDs in tar file.')\n"
+        f"{S(f'from: {tar_file}'}\n"
+        )
+    log.info(title)
+
+    try:
+        tar = tarfile.open(tar_file.str(), 'r:*')
+        p = PDBList(tar.getnames())
+        tar.close()
+
+    except FileNotFoundError:
+        log.info(f'tar_file {tar_file} not found. Returning empty PDBList.')
+        p = PDBList([])
+
+    end = (
+        f"{S(f'found: {str(pdblist)}')}"
+        f"{S('done\n')}"
+        )
+    log.info(end)
+    return p
 
 
 def read_PDBID_from_folder(folder):
@@ -362,14 +392,21 @@ def read_PDBID_from_folder(folder):
     Returns
     -------
     """
-
-    pdblist = PDBList(glob_folder(folder, '*.pdb'))
     log.info(T('reading destination folder'))
     log.info(S(f'from: {folder}'))
-    log.info(S(f'{str(pdblist)}'))
+    pdblist = PDBList(glob_folder(folder, '*.pdb'))
+    log.info(S(f'found: {str(pdblist)}'))
     log.info(S('done\n'))
 
     return pdblist
+
+
+def read_PDBID_from_destination(destination):
+    options = {
+        destination.suffix == '.tar': read_PDBID_from_tar,
+        destination.is_dir(): read_PDBID_from_folder,
+        }
+    return options[True](destination)
 
 
 def save_dictionary(mydict, output='mydict.pickle'):
