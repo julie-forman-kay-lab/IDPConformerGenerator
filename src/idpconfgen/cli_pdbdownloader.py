@@ -94,7 +94,6 @@ ap.add_argument(
     type=int,
     )
 
-libcli.add_argument_replace(ap)
 libcli.add_argument_ncores(ap)
 
 
@@ -109,7 +108,6 @@ def main(
         destination=None,
         ncores=1,
         record_name=('ATOM', 'HETATM'),
-        replace=False,
         update=False,
         **kwargs,
         ):
@@ -136,8 +134,6 @@ def main(
         )
 
     if update:
-
-        pdb2dl = pdblist if replace else pdblist_comparison
 
         downloader = get_pdbs_downloader(destination)
 

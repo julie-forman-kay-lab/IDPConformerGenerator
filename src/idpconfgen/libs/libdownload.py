@@ -47,9 +47,12 @@ def download_pdbs_to_tar(destination, items, **kwargs):
 
     Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
     """
-    _exists = {True: 'a', False: 'w'}
+    # replace and append was discontinued from now because
+    # there not a direct comparison with the save in folder
+    #_exists = {True: 'a', False: 'w'}
     dests = destination.str()
-    dest = tarfile.open(dests, mode=_exists[destination.exists()])
+    #dest = tarfile.open(dests, mode=_exists[destination.exists()])
+    dest = tarfile.open(dests, mode='w')
     dest.close()
 
     for result_dict in pool_function_in_chunks(
