@@ -6,15 +6,27 @@ start
 
 partition #LIGHTGREY Examples {
     #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs/ -o dssp.json -n;
-    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle -n;
-    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle [-r|--reduced] -n;
-    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle --complete previous_dssp.json -n;
+    note right
+        where //filtered_pdbs// is a folder
+        containing //*.pdb// files.
+    end note
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json -n;
+    note right
+        where //filtered_pdb.tar// is a
+        tarfile containing pdb files.
+    end note
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json [-r|--reduced] -n;
+    note right
+        //reduced// converts all
+        DSSP tags to H, E, or L/
+    end note
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json --complete previous_dssp.json -n;
     }
 
 if (input data) then (tar file)
     :unpack tar to tmp dir;
     note left
-        expects only //.pdb// files
+        uses only //.pdb// files
     end note
     :tmp dir is deleted at the end;
 else (folder)
@@ -22,7 +34,13 @@ else (folder)
 endif
 
 if (--complete) then (reads previous)
-    :reads previous Sec. Str. information file;
+    :reads previous //sscalc//
+    information file, and completes
+    it with the new calculation;
+    note left
+        Entries with the same ID
+        are overwritten;
+    end note
 else (not given)
     :starts a blank output file;
 endif
@@ -30,16 +48,25 @@ endif
 fork
 
 :subprocess //mkdssp// on each PDB;
-:collect
-        residue number,
-        Sec Str character,
+:collects:
+        residue number
+        Sec Str character
         FASTA character;
 end fork
+note right #whitesmoke
+    This process is performed in parallel
+    where cores extract PDBs from the queue
+    until the queue is exhausted
+end note
 
 if (save data to disk) then (JSON)
     :saves dictionary to //.json// file;
 else (PICKLE)
     :saves dictionary to //pickle// object;
+    note right
+        //pickle// currently disable for security,
+        adds nothing to //json//.
+    end note
 endif
 
 stop
