@@ -1,17 +1,16 @@
 """Functions and variables to download files and data."""
+import tarfile
 import time
-import traceback
 import urllib.request
-from urllib.error import URLError
-from contextlib import contextmanager
-from os import SEEK_END
 from io import BytesIO
+from os import SEEK_END
+from urllib.error import URLError
 
-import numpy as np
 from idpconfgen import Path, log
-from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs.libstructure import Structure, col_altLoc, write_PDB, structure_to_pdb, col_resSeq, col_resName, col_element
+from idpconfgen.libs.libio import make_destination_folder
+from idpconfgen.libs.libmulticore import pool_function_in_chunks
 from idpconfgen.libs.libparse import save_structure_chains_and_segments
+from idpconfgen.libs.libstructure import Structure
 from idpconfgen.logger import S
 
 
@@ -23,10 +22,60 @@ POSSIBLELINKS = [
     ]
 
 
+def download_pdbs_to_folder(destination, items, **kwargs):
+    """
+    Download PDBs to folder.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    dest = make_destination_folder(destination)
+
+    for result_dict in pool_function_in_chunks(
+            download_structure,
+            items,
+            **kwargs,
+            ):
+
+        for fname, data in sorted(result_dict.items()):
+            with open(Path(dest, fname), 'w') as fout:
+                fout.write('\n'.join(data))
+
+
+def download_pdbs_to_tar(destination, items, **kwargs):
+    """
+    Download PDBs to tarfile.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    _exists = {True: 'a', False: 'w'}
+    dests = destination.str()
+    dest = tarfile.open(dests, mode=_exists[destination.exists()])
+    dest.close()
+
+    for result_dict in pool_function_in_chunks(
+            download_structure,
+            items,
+            **kwargs,
+            ):
+
+        tar = tarfile.open(dests, mode='a:')
+
+        for fout, _data in sorted(result_dict.items()):
+            try:
+                sIO = BytesIO()
+                sIO.write('\n'.join(_data).encode())
+                info = tarfile.TarInfo(name=fout)
+                info.size = sIO.seek(0, SEEK_END)
+                sIO.seek(0)
+                tar.addfile(tarinfo=info, fileobj=sIO)
+            except Exception:
+                log.error(f'failed for {fout}')
+        tar.close()
+
+
+# DEPRECATED
 def download_raw_PDBS(pdbid, folder=''):
-    """
-    Download raw PDBs without any filtering.
-    """
+    """Download raw PDBs without any filtering."""
     downloaded_data = fetch_pdb_id_from_RCSB(pdbid.name)
     s = Structure(downloaded_data)
     s.build()
@@ -63,8 +112,8 @@ def download_structure(pdbid, **kwargs):
         )
 
 
-
 def fetch_pdb_id_from_RCSB(pdbid):
+    """Fetch PDBID from RCSB."""
     possible_links = (l.format(pdbid) for l in POSSIBLELINKS)
 
     attempts = 0
@@ -77,79 +126,26 @@ def fetch_pdb_id_from_RCSB(pdbid):
                 except urllib.error.HTTPError:
                     continue
                 except (AttributeError, UnboundLocalError):  # response is None
-                    #log.error(S(f'Download {pdbid} failed to read data.'))
+                    log.debug(S(f'Download {weblink} failed.'))
                     continue
             else:
                 raise IOError(f'Failed to download {pdbid}')
         except (TimeoutError, URLError):
-            log.error(f'failed download for {pdbid} because of TimeoutError. Retrying...')
+            log.error(
+                f'failed download for {pdbid} because of TimeoutError. '
+                'Retrying...'
+                )
             time.sleep(15)
             attempts += 1
     else:
-        raise IOError(f'Failed to download {pdbid} - too much attempts')
-
+        raise IOError(f'Failed to download {pdbid} - attempts exhausted')
 
 
 def get_pdbs_downloader(destination):
     """Get proper function to download PDBs based on the destination type."""
     # classes to manage the download action
     DOWNLOADER = {
-        True: download_pdbs_to_folder,  # this is the equivalent to the else statement
+        True: download_pdbs_to_folder,
         destination.suffix == '.tar': download_pdbs_to_tar,
         }
     return DOWNLOADER[True]
-
-
-
-def download_pdbs_to_folder(destination, items, **kwargs):
-    """
-    Download PDBs to folder.
-
-    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
-    """
-    dest = make_destination_folder(destination)
-
-    for result_dict in pool_function_in_chunks(
-            download_structure,
-            items,
-            **kwargs,
-            ):
-
-        for fname, data in sorted(result_dict.items()):
-            with open(Path(self.dest, fname), 'w') as fout:
-                fout.write('\n'.join(data))
-
-
-
-def download_pdbs_to_tar(destination, items, **kwargs):
-    """
-    Download PDBs to tarfile.
-
-    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
-    """
-    _exists = {True: 'a', False: 'w'}
-    dests = destination.str()
-    dest = tarfile.open(dests, mode=_exists[destination.exists()])
-    dest.close()
-
-    for result_dict in pool_function_in_chunks(
-            download_structure,
-            items,
-            **kwargs,
-            ):
-
-        tar = tarfile.open(dests, mode='a:')
-
-        for fout, _data in sorted(result_dict.items()):
-            try:
-                sIO = BytesIO()
-                sIO.write('\n'.join(_data).encode())
-                info = tarfile.TarInfo(name=fout)
-                info.size=sIO.seek(0, SEEK_END)
-                sIO.seek(0)
-                tar.addfile(tarinfo=info, fileobj=sIO)
-            except Exception:
-                log.error(f'failed for {fout}')
-        tar.close()
-
-
