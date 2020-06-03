@@ -54,7 +54,6 @@ def pool_function_in_chunks(
         tasks,
         ncores=1,
         chunks=5_000,
-        mdict=None,  # is None to facilitate API
         **kwargs,
         ):
     """
@@ -63,8 +62,6 @@ def pool_function_in_chunks(
     Expects ``func`` to accept ``mdict``, a dictionary instance from
     ``multiprocessing.Manager.dict()``.
     """
-    assert mdict is not None
-
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
 
