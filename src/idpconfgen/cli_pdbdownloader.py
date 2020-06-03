@@ -153,6 +153,15 @@ def main(
         pdblist_updated = read_PDBID_from_source(destination)
         pdblist_up_comparison = pdblist.difference(pdblist_updated)
         log.info(S(f'{str(pdblist_up_comparison)}'))
+        if len(pdblist_up_comparison) > 0:
+            log.info(S('There are PDBIDs not downloaded'))
+            log.info(S(
+                'Those IDs have been registered in the '
+                f'{LOGFILESNAME}.debug file.'
+                ))
+            log.debug(
+                '\n'.join(str(_pdbid) for _pdbid in pdblist_up_comparison)
+                )
 
     log.info(S('done\n'))
     return
