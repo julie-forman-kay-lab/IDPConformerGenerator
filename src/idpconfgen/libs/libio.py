@@ -356,6 +356,40 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     return it.chain(from_folders, from_lists, f3)
 
 
+def read_dictionary_from_disk(path):
+    """
+    Reads a dictionary from disk.
+
+    Accepted formats:
+        * pickle
+        * json
+
+    Returns
+    -------
+    dict
+    """
+    _path_suffix = Path(path).suffix
+    options = {
+        #'.pickle': read_dict_from_pickle,
+        '.json': read_dict_from_json,
+        }
+
+    the_dict = options[_path_suffix](path)
+
+    assert isinstance(the_dict)
+    return the_dict
+
+
+def read_dict_from_json(path):
+    """Read dict from json."""
+    return json.loads(path)
+
+
+def read_dict_from_pickle(path):
+    """Read dictionary from pickle."""
+    return pickle.load(open( path, "rb" ))
+
+
 def read_PDBID_from_folder(folder):
     """
     Read PDBIDs from folder.

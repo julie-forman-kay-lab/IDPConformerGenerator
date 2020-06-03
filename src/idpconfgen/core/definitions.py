@@ -76,6 +76,12 @@ dssp_trans = str.maketrans(
         )
     )
 
+
+# considers solvent and DNA/RNA
+# http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
+#_discarded_residues = (
+    #'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
+    #)
 pdb_ligand_codes_file = Path(Path(__file__).parent, 'chem_comp_parsed.txt')
 pdb_lig_codes_manual = Path(Path(__file__).parent, 'chem_comp_added.txt')
 pdb_ligand_codes = set(

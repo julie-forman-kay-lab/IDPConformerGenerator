@@ -7,22 +7,27 @@ USAGE:
     $ idpconfgen sscalc [PDBS]
 """
 import argparse
-import os
-import subprocess
-import pickle
 import shutil
-from multiprocessing import Manager, Pool
-
+from multiprocessing import Manager
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
+from idpconfgen.libs import libcli
+from idpconfgen.libs.libio import (
+    extract_from_tar,
+    read_path_bundle,
+    read_dictionary_from_disk,
+    save_dictionary,
+    )
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import mkdssp
 from idpconfgen.logger import S, T, init_files
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
+TMPDIR = '__tmpsscalc__'
 
 _name = 'sscalc'
-_help = 'Extract secondary structure profile.'
+_help = 'Calculate secondary structure profile.'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -50,12 +55,13 @@ ap.add_argument(
     '-o',
     '--output',
     help=(
-        "The output file containing the PDBID and "
-        "respective secondary structure information. "
-        "Defaults to sys.stdout (prints to console)."
+        "A path to a new file where the PDBID seconda structure and FASTA"
+        " information dictionary will be saved. "
+        "Defaults to sscalc.json."
         ),
     type=Path,
-    default=None,
+    default='sscalc.json',
+    action=libcli.CheckExt({'.json'}),
     )
 
 ap.add_argument(
@@ -123,84 +129,49 @@ def main(
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
 
-    tmpdir = '__tmpsscalc__'
-
     log.info(T('reading input paths'))
     if pdbs[0].endswith('.tar'):
-        pdbs2operate = libio.extract_from_tar(pdbs[0], output=tmpdir)
+        pdbs2operate = extract_from_tar(pdbs[0], output=TMPDIR)
+        _istarfile = True
     else:
-        pdbs2operate = list(libio.read_path_bundle(pdbs, ext='pdb'))
+        pdbs2operate = list(read_path_bundle(pdbs, ext='pdb'))
+        _istarfile = False
     log.info(S('done'))
 
     if complete:
         log.info(T(f'reading previous DSSP file: {complete}'))
-        prev_dssp = libparse.read_stored_dict(complete)
-        #prev_dssp = libparse.read_pipe_file(Path(complete).read_text())
-        #pdbs2operate = list(filter(
-        #    lambda x: x.stem not in prev_dssp.keys(),
-        #    pdbs))
+        prev_dssp = read_dictionary_from_disk(complete)
     else:
         prev_dssp = {}
 
     log.info(T('preparing task execution'))
-    log.info(S('for {} cores', ncores))
 
     manager = Manager()
     mdict = manager.dict()
 
     try:
-        libmulticore.pool_function(
+        pool_function(
             mkdssp,
             pdbs2operate,
-            ss_cmd=ss_cmd,
-            dssp_dict=mdict,
-            reduced=reduced,
             ncores=ncores,
+            # kwargs for mkdssp function
+            ss_cmd=ss_cmd,
+            mdict=mdict,
+            reduced=reduced,
             )
-    except Exception:
+    except Exception as err:
         log.error('FAILED')
+        raise err
     else:
         prev_dssp.update(mdict)
-        libio.save_dictionary(prev_dssp, output=output)
+        save_dictionary(prev_dssp, output=output)
         log.info(S('All done. Thanks!'))
-
     finally:
-        shutil.rmtree(tmpdir)
+        if _istarfile:
+            shutil.rmtree(TMPDIR)
 
     return
 
-
-
-def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):
-
-    cmd = [ss_cmd, '-i', os.fspath(pdb.resolve())]
-    result = subprocess.run(cmd, capture_output=True)
-
-    dssp, fasta, residues = libparse.parse_dssp(
-        result.stdout.decode('utf-8'),
-        reduced=reduced)
-    dssp_dict[str(libpdb.PDBIDFactory(pdb))] = {
-        'dssp': dssp,
-        'fasta': fasta,
-        'resids': residues,
-        }
-
-
-    #dssp_parser = libparse.DSSPParser(
-    #    data=result.stdout.decode('utf8'),
-    #    reduced=reduced,
-    #    )
-
-    #try:
-    #    dssp_dict[str(libpdb.PDBIDFactory(pdb))] = {
-    #        'dssp': ''.join(dssp_parser.ss),
-    #        'fasta': ''.join(dssp_parser.fasta),
-    #        'resids': ','.join(dssp_parser.resseq),
-    #        }
-    #except Exception:
-    #    log.error(f'Error while saving to dict: {pdb}')
-
-    return
 
 if __name__ == '__main__':
     maincli()

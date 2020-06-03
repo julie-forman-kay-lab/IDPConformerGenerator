@@ -18,14 +18,27 @@ class ArgsToTuple(argparse.Action):
         namespace.record_name = tuple(values)
 
 
+def CheckExt(extensions):
+    class Act(argparse.Action):
+        """Confirms has JSON extension."""
+        def __call__(self, parser, namespace, path, option_string=None):
+            """Call on me :-)."""
+            suffix = path.suffix
+            if suffix not in extensions:
+                parser.error(f'Wrong extension {suffix}, expected {extensions}')
+            else:
+                setattr(namespace, self.dest, path)
+    return Act
+
+
 # https://stackoverflow.com/questions/4042452
 class CustomParser(argparse.ArgumentParser):
     """Custom Parser class."""
 
     def error(self, message):
         """Present error message."""
-        sys.stderr.write('error: %s\n' % message)
         self.print_help()
+        sys.stderr.write('\nerror: %s\n' % message)
         sys.exit(2)
 
 
