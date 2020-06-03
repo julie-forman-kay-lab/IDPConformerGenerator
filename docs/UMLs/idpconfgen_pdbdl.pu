@@ -6,7 +6,15 @@ start
 
 partition #LIGHTGREY Examples {
     #WHITE:$ idpconfgen pdbdl culled.list -d folder -u -n;
+    note right
+        where //culled.list// is a list containing PDBID[CHAIN] codes,
+        and //folder// is a destination folder that may not exist.
+    end note
     #WHITE:$ idpconfgen pdbdl 12AS_A 4YBB_B culled.list -d pdbs.tar -u -n -chunks 5000;
+    note right
+        where //pdbs.tar// is a destination
+        tar file.
+    end note
     }
 
 fork
