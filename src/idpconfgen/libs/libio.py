@@ -1,12 +1,17 @@
 """Functions and Classes regarding Input/Output."""
 import itertools as it
 import glob
+import json
 import os
 import sys
+import pickle
 from functools import partial
+import tarfile
+
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
+from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 
 
@@ -280,6 +285,17 @@ def add_existent_files(storage, source):
             log.error(S('file not found: {}', p.str()))
 
 
+
+def extract_from_tar(pdbtar, output='.'):
+    """
+    """
+    tar = tarfile.open(pdbtar)
+    names = tar.getnames()
+    tar.extractall(path=output)
+    tar.close()
+    return [Path(output, i) for i in names]
+
+
 def glob_folder(folder, ext):
     """
     List files with extention `ext` in `folder`.
@@ -330,3 +346,49 @@ def make_destination_folder(dest):
         dest_.mkdir(parents=True, exist_ok=True)
         return dest_
 
+def read_PDBID_from_tar(tfile):
+    """
+    """
+
+
+
+def read_PDBID_from_folder(folder):
+    """
+    Function description here.
+
+    Parameters
+    ----------
+
+    Returns
+    -------
+    """
+
+    pdblist = PDBList(glob_folder(folder, '*.pdb'))
+    log.info(T('reading destination folder'))
+    log.info(S(f'from: {folder}'))
+    log.info(S(f'{str(pdblist)}'))
+    log.info(S('done\n'))
+
+    return pdblist
+
+
+def save_dictionary(mydict, output='mydict.pickle'):
+    options = {
+        '.pickle': save_pickle_dict,
+        '.json': save_json_dict,
+        }
+
+    options[Path(output).suffix](mydict, output)
+
+
+def save_json_dict(mydict, output='mydict.json'):
+    """
+    """
+    with open(output, 'w') as fout:
+        json.dump(mydict, fout, indent=True, sort_keys=True)
+
+
+def save_pickle_dict(mydict, output='mydict.pickle'):
+    assert Path(output).suffix == '.pickle'
+    with open(output, 'wb') as handle:
+        pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)

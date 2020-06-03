@@ -4,3 +4,20 @@ FUL
 NAG
 PBZ
 BMA
+AMP
+SOL
+TPP
+# ribonucleotides
+I
+C
+G
+A
+U
+I
+DC
+DG
+DA
+DU
+DT
+DI
+N

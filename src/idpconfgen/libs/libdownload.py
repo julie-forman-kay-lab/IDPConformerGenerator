@@ -1,6 +1,8 @@
 """Functions and variables to download files and data."""
+import time
 import traceback
 import urllib.request
+from urllib.error import URLError
 from contextlib import contextmanager
 
 import numpy as np
@@ -47,7 +49,11 @@ def download_structure(pdbid, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    try:
+        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    except IOError:
+        log.error(f'Complete download failure for {pdbname}')
+        return
     save_structure_chains_and_segments(
         downloaded_data,
         pdbname,
@@ -60,16 +66,23 @@ def download_structure(pdbid, **kwargs):
 def fetch_pdb_id_from_RCSB(pdbid):
     possible_links = (l.format(pdbid) for l in POSSIBLELINKS)
 
-    for weblink in possible_links:
+    attempts = 0
+    while attempts < 10:
         try:
-            response = urllib.request.urlopen(weblink)
-            return response.read()
-        except urllib.error.HTTPError:
-            continue
-        except (AttributeError, UnboundLocalError):  # response is None
-            #log.error(S(f'Download {pdbid} failed to read data.'))
-            continue
+            for weblink in possible_links:
+                try:
+                    response = urllib.request.urlopen(weblink)
+                    return response.read()
+                except urllib.error.HTTPError:
+                    continue
+                except (AttributeError, UnboundLocalError):  # response is None
+                    #log.error(S(f'Download {pdbid} failed to read data.'))
+                    continue
+            else:
+                raise IOError(f'Failed to download {pdbid}')
+        except (TimeoutError, URLError):
+            log.error(f'failed download for {pdbid} because of TimeoutError. Retrying...')
+            time.sleep(15)
+            attempts += 1
     else:
-        raise IOError(f'Failed to download {pdbid}')
-
-
+        raise IOError(f'Failed to download {pdbid} - too much attempts')

@@ -33,15 +33,24 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
     """
     f = partial(func, **kwargs)
 
-    print(f'using {ncores} cores')
     with \
             Pool(ncores) as pool, \
             ProgressBar(len(items)) as pb:
 
         imap = getattr(pool, method)(f, items)
 
-        for _i in imap:
-            pb.increment()
+        while True:
+            try:
+                next(imap)
+                pb.increment()
+            except StopIteration:
+                break
+            except IndexError:
+                log.info(f'IndexError of multiprocessing, ignoring something')
+
+        #for _i in imap:
+            #pb.increment()
+
 
 
 class Worker(multiprocessing.Process):

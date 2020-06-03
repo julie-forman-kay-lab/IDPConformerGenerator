@@ -10,6 +10,7 @@ import argparse
 import os
 import subprocess
 import pickle
+import shutil
 from multiprocessing import Manager, Pool
 
 
@@ -122,19 +123,24 @@ def main(
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
 
+    tmpdir = '__tmpssext__'
+
     log.info(T('reading input paths'))
-    pdbs = libio.read_path_bundle(pdbs, ext='pdb')
+    if pdbs[0].endswith('.tar'):
+        pdbs2operate = libio.extract_from_tar(pdbs[0], output=tmpdir)
+    else:
+        pdbs2operate = list(libio.read_path_bundle(pdbs, ext='pdb'))
     log.info(S('done'))
 
     if complete:
         log.info(T(f'reading previous DSSP file: {complete}'))
-        prev_dssp = libparse.read_pipe_file(Path(complete).read_text())
-        pdbs2operate = list(filter(
-            lambda x: x.stem not in prev_dssp.keys(),
-            pdbs))
+        prev_dssp = libparse.read_stored_dict(complete)
+        #prev_dssp = libparse.read_pipe_file(Path(complete).read_text())
+        #pdbs2operate = list(filter(
+        #    lambda x: x.stem not in prev_dssp.keys(),
+        #    pdbs))
     else:
         prev_dssp = {}
-        pdbs2operate = list(pdbs)
 
     log.info(T('preparing task execution'))
     log.info(S('for {} cores', ncores))
@@ -142,29 +148,27 @@ def main(
     manager = Manager()
     mdict = manager.dict()
 
-    libmulticore.pool_function(
-        mkdssp,
-        pdbs2operate,
-        ss_cmd=ss_cmd,
-        dssp_dict=mdict,
-        reduced=reduced,
-        ncores=ncores,
-        )
+    try:
+        libmulticore.pool_function(
+            mkdssp,
+            pdbs2operate,
+            ss_cmd=ss_cmd,
+            dssp_dict=mdict,
+            reduced=reduced,
+            ncores=ncores,
+            )
+    except Exception:
+        log.error('FAILED')
+    else:
+        prev_dssp.update(mdict)
+        libio.save_dictionary(prev_dssp, output=output)
+        log.info(S('All done. Thanks!'))
 
-    prev_dssp.update(mdict)
+    finally:
+        shutil.rmtree(tmpdir)
 
-    with open('all_dssp.pickle', 'wb') as handle:
-        pickle.dump(prev_dssp, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-    #libio.write_text(
-    #    '\n'.join(f'{k}|{v}' for k, v in prev_dssp.items()),
-    #    output=output,
-    #    )
-
-
-    log.info(S('All done. Thanks!'))
     return
+
 
 
 def mkdssp(pdb, ss_cmd, dssp_dict=None, reduced=False):

@@ -1,0 +1,47 @@
+@startuml
+
+start
+
+:idpconfgen //sscalc//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs/ -o dssp.json -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle [-r|--reduced] -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.pickle --complete previous_dssp.json -n;
+    }
+
+if (input data) then (tar file)
+    :unpack tar to tmp dir;
+    note left
+        expects only //.pdb// files
+    end note
+    :tmp dir is deleted at the end;
+else (folder)
+    :uses //.pdb// files in that folder;
+endif
+
+if (--complete) then (reads previous)
+    :reads previous Sec. Str. information file;
+else (not given)
+    :starts a blank output file;
+endif
+
+fork
+
+:subprocess //mkdssp// on each PDB;
+:collect
+        residue number,
+        Sec Str character,
+        FASTA character;
+end fork
+
+if (save data to disk) then (JSON)
+    :saves dictionary to //.json// file;
+else (PICKLE)
+    :saves dictionary to //pickle// object;
+endif
+
+stop
+
+@enduml

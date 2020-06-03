@@ -1,0 +1,61 @@
+@startuml
+
+start
+
+:idpconfgen //pdbdl//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen pdbdl culled.list -d folder -u -n;
+    #WHITE:$ idpconfgen pdbdl 12AS_A 4YBB_B culled.list -d pdbs.tar -u -n -chunks 5000;
+    }
+
+fork
+
+:downloads PDB or mmCIF;
+note right
+    Attempts to download PDB,
+    if unavailable, attempts CIF.
+end note
+
+partition #e6ffe6 "filtering **in**" {
+    :converts PDB and mmCIF to the same internal format;
+    :select MODEL 1 (if multiple MODELS);
+    :select desired CHAIN;
+    :keep altLoc `A` or None;
+}
+
+partition #ffe6e6 "filter out" {
+    :non- N, C, CA, O, S, Se, H, D;
+    :non- ribonucleiotides;
+    :non- ligands (>1500);
+
+}
+
+partition "additional parsing" {
+    :renumber atoms for saved chains;
+    :delete insertion codes
+        (//pdb_delinsertion// from //pdb-tools//);
+}
+
+end fork
+note right
+    This block is performed for each
+    PDB file. In multiprocessing mode,
+    each core pick a PDB code and run the whole
+    block, once it is finished another PDB code
+    is picked.
+end note
+
+if (destination `-d`) then (TAR)
+    :save in TAR file;
+else (folder)
+    :save PDB/CIFs to folder;
+endif
+note right
+    Files are saved after each chunk
+    is completed.
+end note
+
+stop
+
+@enduml

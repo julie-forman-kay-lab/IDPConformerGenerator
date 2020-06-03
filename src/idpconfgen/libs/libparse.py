@@ -4,6 +4,11 @@ import sys
 import traceback
 from contextlib import contextmanager
 
+from io import StringIO
+from os import SEEK_END
+import tarfile
+
+
 import numpy as np
 
 from idpconfgen import Path, log
@@ -20,6 +25,53 @@ from idpconfgen.logger import S, T
 _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
 _minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
+
+
+def delete_insertions(lines):
+    """
+    from pdbtools
+
+    optimized for this context
+    """
+    # Keep track of residue numbering
+    # Keep track of residues read (chain, resname, resid)
+    offset = 0
+    prev_resi = None
+    seen_ids = set()
+    clean_icode = False
+    for line in lines:
+        res_uid = line[17:27]  # resname, chain, resid
+        id_res = line[21] + line[22:26].strip()  # A99, B12
+        icode = line[26]
+
+        # unfortunately, this is messy but not all PDB files follow a nice
+        # order of ' ', 'A', 'B', ... when it comes to insertion codes..
+        if prev_resi != res_uid:  # new residue
+            # Have we seen this chain + resid combination
+            # catch insertions WITHOUT icode ('A' ... ' ' ... 'B')
+            if id_res in seen_ids:
+                # Should we do something about it?
+                    clean_icode = True
+                    #line = f'{line[:26]} {line[27:]}'  # clear icode
+                    offset += 1
+            # Do we have an explicit icode?
+            elif icode != ' ':
+                    if id_res in seen_ids:  # never saw this, do not offset!
+                        offset += 1
+                    clean_icode = True
+                    #line = f'{line[:26]} {line[27:]}'  # clear icode
+            else:
+                clean_icode = False
+
+            prev_resi = res_uid
+
+        if clean_icode:
+            line = f'{line[:26]} {line[27:]}'
+
+        resid = int(line[22:26]) + offset
+        line = f'{line[:22]}{str(resid).rjust(4)}{line[26:]}'
+        seen_ids.add(id_res)
+        yield line
 
 
 
@@ -413,15 +465,25 @@ def group_consecutive_ints(sequence):
     return slices
 
 
+# from https://stackoverflow.com/questions/21142231
+def group_runs(li, tolerance=1):
+    out = []
+    last = li[0]
+    for x in li:
+        if x-last > tolerance:
+            yield out
+            out = []
+        out.append(x)
+        last = x
+    yield out
+
 
 
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
-_discarded_residues = (
-    'HOH', 'SOL', 'PO4',
-    'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
-    'TPP',
-    )
+#_discarded_residues = (
+    #'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
+    #)
 
 _allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
 
@@ -507,6 +569,16 @@ def filter_structure(pdb_path, **kwargs):
         )
 
 
+def eval_chain_case(chain, chain_set):
+    if chain in chain_set:
+        return chain
+    else:
+        cl = chain.lower()
+        if cl in chain_set:
+            return cl
+    raise ValueError(f'Neither {chain}/{cl} are in set {chain_set}')
+
+
 def save_structure_chains_and_segments(
         pdb_data,
         pdbname,
@@ -514,8 +586,7 @@ def save_structure_chains_and_segments(
         record_name=('ATOM', 'HETATM'),
         altlocs=('A', '', ' '),
         renumber=True,
-        folder='',
-        raw=False,
+        mdict=None,
         ):
 
     _DR = pdb_ligand_codes  # discarded residues
@@ -528,7 +599,6 @@ def save_structure_chains_and_segments(
 
     chains = chains or chain_set
 
-    #if raw:
     pdbdata.add_filter_record_name(record_name)
     pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
     pdbdata.add_filter(lambda x: x[col_element] in _AE)
@@ -536,39 +606,21 @@ def save_structure_chains_and_segments(
 
     for chain in chains:
 
-        if chain not in chain_set:
-            if chain.lower() not in chain_set:
-                log.error(f'Skiping chain {chain} for {pdbname}')
-                continue
-            else:
-                chain = chain.lower()
+        try:
+            chain = eval_chain_case(chain, chain_set)
+        except ValueError as err:
+            log.error(repr(err))
+            log.error(f'Skiping chain {chain} for {pdbname}')
+            continue
 
         pdbdata.add_filter_chain(chain)
 
-        # passar esto a una function
-        #pdbsegs = pdbdata.residue_segments
-
-        ## more than one residue
-        #valid_segments = filter(
-        #    lambda x: set(line[col_resSeq] for line in x),
-        #    pdbsegs,
-        #    )
-
-        #if len(pdbsegs) > 1:
-        #    for i, segment in enumerate(valid_segments):
-        #        fout_seg = Path(folder, f'{pdbname}_{chain}_seg{i}.pdb')
-        #        with try_to_write(downloaded_data, fout_seg):
-        #            # because segments are pure arrays
-        #            # and not Structure objects
-        #            write_PDB(structure_to_pdb(segment), fout_seg)
-        ##
-
-        #else:
-        fout = Path(folder, f'{pdbname}_{chain}.pdb')
-        with try_to_write(pdb_data, fout):
-            pdbdata.write_PDB(fout, renumber=True)
+        fout = f'{pdbname}_{chain}.pdb'
+        mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
+
+    return
 
 
 
