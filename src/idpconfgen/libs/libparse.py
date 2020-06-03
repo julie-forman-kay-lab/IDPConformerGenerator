@@ -559,7 +559,6 @@ def filter_structure(pdb_path, **kwargs):
     pdbid = PDBIDFactory(pdb_path)
     pdbname = pdbid.name
     chains = pdbid.chain
-    print(chains)
 
     save_structure_chains_and_segments(
         pdb_path,

@@ -2,7 +2,7 @@
 import multiprocessing
 import subprocess
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
@@ -67,6 +67,9 @@ def pool_function_in_chunks(
 
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
+
+        manager = Manager()
+        mdict = manager.dict()
 
         pool_function(
             func,
@@ -212,7 +215,7 @@ class SubprocessTask(Task):
 
         May brake if .prepare_cmd() was not executed beforehand.
         """
-        #log.info(S('running {}', self.cmd))
+        # log.info(S('running {}', self.cmd))
         self.result = subprocess.run(
             self.cmd,
             capture_output=True,
@@ -332,4 +335,3 @@ class JoinedResults:
                     )
                 )
             numjobs -= 1
-

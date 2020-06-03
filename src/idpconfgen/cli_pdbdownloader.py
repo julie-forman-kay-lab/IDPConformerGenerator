@@ -24,7 +24,6 @@ USAGE:
 
 """
 import argparse
-from multiprocessing import Manager
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -142,16 +141,12 @@ def main(
 
         downloader = get_pdbs_downloader(destination)
 
-        manager = Manager()
-        mdict = manager.dict()
-
         downloader(
             destination,
             sorted(list(pdb2dl.name_chains_dict.items()), key=lambda x: x[0]),
             ncores=ncores,
             chunks=chunks,
             record_name=record_name,
-            mdict=mdict,
             )
 
         log.info(T('Reading UPDATED destination'))
