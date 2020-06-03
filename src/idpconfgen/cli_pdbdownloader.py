@@ -29,10 +29,7 @@ from multiprocessing import Manager
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libdownload import get_pdbs_downloader
-from idpconfgen.libs.libio import (
-    concatenate_entries,
-    read_PDBID_from_destination,
-    )
+from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
 
@@ -132,7 +129,7 @@ def main(
 
     #
     log.info(T('Comparison between input and destination'))
-    pdblist_from_destination = read_PDBID_from_destination(destination)
+    pdblist_from_destination = read_PDBID_from_source(destination)
     pdblist_comparison = pdblist.difference(pdblist_from_destination)
     log.info(
         f"{S(f'{str(pdblist_comparison)}')}\n"
@@ -158,7 +155,7 @@ def main(
             )
 
         log.info(T('Reading UPDATED destination'))
-        pdblist_updated = read_PDBID_from_destination(destination)
+        pdblist_updated = read_PDBID_from_source(destination)
         pdblist_up_comparison = pdblist.difference(pdblist_updated)
         log.info(S(f'{str(pdblist_up_comparison)}'))
 
