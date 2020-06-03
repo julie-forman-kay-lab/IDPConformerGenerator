@@ -20,7 +20,7 @@ from idpconfgen import cli_pdb_raw_downloader as raw_pdbdl
 from idpconfgen import cli_filter as cli_filter
 from idpconfgen import cli_segsplit as cli_segsplit
 from idpconfgen import cli_segext as segext
-from idpconfgen import cli_ssext as ssext
+from idpconfgen import cli_sscalc as sscalc
 from idpconfgen import cli_fastaext as fastaext
 from idpconfgen import cli_RCSB_dssp as cli_RCSB_dssp
 from idpconfgen.libs import libcli
@@ -50,7 +50,7 @@ libcli.add_subparser(subparsers, raw_pdbdl)
 libcli.add_subparser(subparsers, pdbdl)
 libcli.add_subparser(subparsers, cli_filter)
 libcli.add_subparser(subparsers, fastaext)
-libcli.add_subparser(subparsers, ssext)
+libcli.add_subparser(subparsers, sscalc)
 libcli.add_subparser(subparsers, segext)
 libcli.add_subparser(subparsers, cli_segsplit)
 libcli.add_subparser(subparsers, cli_RCSB_dssp)

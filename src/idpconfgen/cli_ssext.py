@@ -4,7 +4,7 @@ Extracts secondary structure information from PDBs.
 Uses an external third party software.
 
 USAGE:
-    $ idpconfgen ssext [PDBS]
+    $ idpconfgen sscalc [PDBS]
 """
 import argparse
 import os
@@ -19,9 +19,9 @@ from idpconfgen.libs import libcli, libio, libmulticore, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = '.idpconfgen_ssext'
+LOGFILESNAME = '.idpconfgen_sscalc'
 
-_name = 'ssext'
+_name = 'sscalc'
 _help = 'Extract secondary structure profile.'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
@@ -123,7 +123,7 @@ def main(
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
 
-    tmpdir = '__tmpssext__'
+    tmpdir = '__tmpsscalc__'
 
     log.info(T('reading input paths'))
     if pdbs[0].endswith('.tar'):

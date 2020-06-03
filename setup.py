@@ -81,7 +81,7 @@ setup(
         'console_scripts': [
             'idpconfgen = idpconfgen.cli:maincli',
             'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
-            'icgssext = idpconfgen.cli_ssext:maincli',
+            'icgsscalc = idpconfgen.cli_sscalc:maincli',
             ]
         },
     # cmdclass={'build_ext': optional_build_ext},
