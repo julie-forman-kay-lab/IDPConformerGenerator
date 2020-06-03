@@ -164,7 +164,7 @@ def main(
         raise err
     else:
         prev_dssp.update(mdict)
-        save_dictionary(prev_dssp, output=output)
+        save_dictionary(sorted(prev_dssp.items()), output=output)
         log.info(S('All done. Thanks!'))
     finally:
         if _istarfile:
