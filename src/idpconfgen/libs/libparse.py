@@ -587,6 +587,9 @@ def save_structure_chains_and_segments(
         renumber=True,
         mdict=None,
         ):
+    """
+    Main logic to parse PDBs from RCSB.
+    """
 
     _DR = pdb_ligand_codes  # discarded residues
     _AE = _allowed_elements
@@ -614,7 +617,13 @@ def save_structure_chains_and_segments(
 
         pdbdata.add_filter_chain(chain)
 
-        fout = f'{pdbname}_{chain}.pdb'
+        # writes chains always in upper case because chain IDs given by
+        # Dunbrack lab are always in upper case letters
+        # eval_chain_case evaluates for the need for lower case,
+        # however if the lower case is kept in the final file
+        # it may create incompatibilities
+        # 03/Jun/2020
+        fout = f'{pdbname}_{chain.upper()}.pdb'
         mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
