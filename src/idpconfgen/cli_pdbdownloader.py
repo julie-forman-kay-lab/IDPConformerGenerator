@@ -133,19 +133,20 @@ def main(
         f"{S('done')}\n"
         )
 
-    if update:
+    something_to_download = len(pdblist_comparison) > 0
+    if something_to_download and update:
 
         downloader = get_pdbs_downloader(destination)
 
         downloader(
             destination,
-            sorted(list(pdb2dl.name_chains_dict.items()), key=lambda x: x[0]),
+            sorted(list(pdblist_comparison.name_chains_dict.items()), key=lambda x: x[0]),
             ncores=ncores,
             chunks=chunks,
             record_name=record_name,
             )
 
-        log.info(T('Reading UPDATED destination'))
+        #log.info(T('Reading UPDATED destination'))
         pdblist_updated = read_PDBID_from_source(destination)
         pdblist_up_comparison = pdblist.difference(pdblist_updated)
         log.info(S(f'{str(pdblist_up_comparison)}'))
@@ -158,6 +159,10 @@ def main(
             log.debug(
                 '\n'.join(str(_pdbid) for _pdbid in pdblist_up_comparison)
                 )
+    elif not something_to_download and update:
+        log.info('There is nothing to download.')
+        log.info('All requested IDs are already at the destination folder.')
+
 
     log.info(S('done\n'))
     return

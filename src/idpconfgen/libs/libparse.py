@@ -10,6 +10,7 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.core.definitions import dssp_trans, pdb_ligand_codes
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory
@@ -412,6 +413,28 @@ def save_structure_chains_and_segments(
 
     for chain in chains:
 
+        # writes chains always in upper case because chain IDs given by
+        # Dunbrack lab are always in upper case letters
+        # eval_chain_case evaluates for the need for lower case,
+        # however if the lower case is kept in the final file
+        # it may create incompatibilities
+        # 03/Jun/2020
+        chaincode = f'{pdbname}_{chain}'
+
+        # this operation can't be performed before because
+        # until here there is not way to assure if the chain being
+        # downloaded is actualy in the blocked_ids.
+        # because at the CLI level the user can add only the PDBID
+        # to indicate download all chains, while some may be restricted
+        if chaincode in blocked_ids:
+            log.info(S(
+                f'Ignored code {chaincode} because '
+                'is listed in blocked ids.'
+                ))
+            continue
+
+        fout = f'{chaincode}.pdb'
+
         try:
             chain = eval_chain_case(chain, chain_set)
         except ValueError as err:
@@ -421,13 +444,6 @@ def save_structure_chains_and_segments(
 
         pdbdata.add_filter_chain(chain)
 
-        # writes chains always in upper case because chain IDs given by
-        # Dunbrack lab are always in upper case letters
-        # eval_chain_case evaluates for the need for lower case,
-        # however if the lower case is kept in the final file
-        # it may create incompatibilities
-        # 03/Jun/2020
-        fout = f'{pdbname}_{chain.upper()}.pdb'
         mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
