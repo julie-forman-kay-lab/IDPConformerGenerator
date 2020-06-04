@@ -17,6 +17,15 @@ partition #LIGHTGREY Examples {
     end note
     }
 
+:Compares destination folder/file,
+downloads only missing entries;
+
+:filters out PDBID:CHAIN codes
+known to be conflictive;
+note right
+    1MH1_A
+end note
+
 fork
 
 :downloads PDB or mmCIF;

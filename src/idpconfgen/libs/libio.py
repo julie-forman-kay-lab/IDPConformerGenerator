@@ -521,6 +521,8 @@ def save_dict_to_pickle(mydict, output='mydict.pickle'):
         pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+
+
 def write_text(text, output=None):
     """
     Write text to output.
@@ -536,3 +538,48 @@ def write_text(text, output=None):
     else:
         opath.myparents().mkdir(parents=True, exist_ok=True)
         opath.write_text(text)
+
+
+class FileReaderIterator:
+    
+    def __new__(cls, origin, **kwargs):
+        
+        options = {
+            isinstance(origin, str) and origin.endswith('.tar'): TarFileIterator,
+            isinstance(origin, list): FileIterator,
+            }
+
+        return options[True](origin, **kwargs)
+
+
+class FileIterator:
+
+    def __init__(self, origin, ext='.pdb'):
+        self.origin = read_path_bundle(origin, ext=ext)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        fin = open(next(self.origin), 'r')
+        txt = fin.read()
+        fin.close()
+        return txt
+
+class TarFileIterator:
+    
+    def __init__(self, origin, ext='.pdb'):
+        self.origin = tarfile.open(origin)
+        self._members = filter(
+            lambda x: x.name.endswith(ext),
+            self.origin.getmembers()
+            )
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        f = self.origin.extractfile(next(self._members))
+        txt = f.read()
+        f.close()
+        return txt

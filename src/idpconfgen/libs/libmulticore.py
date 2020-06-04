@@ -80,6 +80,43 @@ def pool_function_in_chunks(
         yield mdict
 
 
+# Hell Yeah crazy name \m/, any problem?
+def pool_chunks_to_disk_and_data_at_the_end(
+        func,
+        tasks,
+        destination,
+        ncores=1,
+        **kwargs,
+        ):
+    """
+    Pools a func over data.
+
+    At each chunk saves the specified results to the disks.
+    While the other set of results are saved only at the end.
+
+    Usually there are files and a dictionary.
+    """
+    manager = Manager()
+    mdata = manager.dict()
+
+    for i in range(0, len(tasks), chunks):
+        task = tasks[i: i + chunks]
+        mfiles = manager.dict()
+
+        pool_function(
+            func,
+            tasks,
+            ncores=ncores,
+            # we expect func to receive these to dicts
+            mfiles=mfiles,
+            mdata=mdata,
+            # kwargs for func
+            **kwargs,
+            )
+
+        func_to_save_files(mfiles.items(), destination=destination)
+
+
 class Worker(multiprocessing.Process):
     """
     Multiprocessing Worker.

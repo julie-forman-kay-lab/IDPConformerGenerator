@@ -10,6 +10,17 @@ from idpconfgen import __version__, Path
 detailed = "detailed instructions:\n\n{}"
 
 
+class FolderOrTar(argparse.Action):
+    """Controls if input is folder, files or tar."""
+
+    def __call__(self, parser, namspace, values, option_string=None):
+        """Hello? """
+        if values[0].endswith('.tar'):
+            setattr(namespace, self.dest, values[0])
+        else:
+            setattr(namespace, self.dest, values)
+
+
 class ArgsToTuple(argparse.Action):
     """Convert list of arguments in tuple."""
 
@@ -159,6 +170,7 @@ def add_parser_pdbs(parser):
         'pdbs',
         help='PDB file list.',
         nargs='+',
+        action=FolderOrTar,
         )
 
 def add_parser_destination_folder(parser):

@@ -556,6 +556,14 @@ def mkdssp(pdb, ss_cmd, mdict=None, reduced=False):
     return
 
 
+def get_segsplitter(destination):
+    """
+    Select the appropriate function to write the segments
+    """
+    return
+
+
+
 # DEPECRATED
 # class DSSPParser:
 #    """

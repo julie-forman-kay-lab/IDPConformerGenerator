@@ -45,11 +45,7 @@ ap.add_argument(
     type=str,
     )
 
-ap.add_argument(
-    'pdbs',
-    help='PDB file list.',
-    nargs='+',
-    )
+libcli.add_parser_pdbs(ap)
 
 ap.add_argument(
     '-o',
@@ -130,10 +126,10 @@ def main(
     init_files(log, LOGFILESNAME)
 
     log.info(T('reading input paths'))
-    if pdbs[0].endswith('.tar'):
-        pdbs2operate = extract_from_tar(pdbs[0], output=TMPDIR)
+    try:
+        pdbs2operate = extract_from_tar(pdbs, output=TMPDIR)
         _istarfile = True
-    else:
+    except TypeError:
         pdbs2operate = list(read_path_bundle(pdbs, ext='pdb'))
         _istarfile = False
     log.info(S('done'))

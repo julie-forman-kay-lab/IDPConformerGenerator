@@ -20,10 +20,10 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libio import make_destination_folder, glob_folder
 from idpconfgen.libs import libmulticore
 
-LOGFILESNAME = '.pdb_segsplit'
+LOGFILESNAME = '.idpconfgen_segsplit'
 
-_name = 'pdb_segsplit'
-_help = 'Splits PDB into segments'
+_name = 'segsplit'
+_help = 'Splits data into backbone segments'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
@@ -43,33 +43,45 @@ libcli.add_parser_destination_folder(ap)
 libcli.add_argument_ncores(ap)
 
 
-def main(pdbs, dssp, destination=None , ncores=1, **kwargs):
-    destination = make_destination_folder(destination)
+def main(
+        pdbs,
+        dssp,
+        destination=None,
+        ncores=1,
+        **kwargs,
+        ):
+    """
+    """
 
     init_files(log, LOGFILESNAME)
 
-    pdbs_paths = list(read_path_bundle(pdbs))
+    file_iterator = FileReaderIterator(pdbs, ext='.pdb')
 
-    #already_done = set(f'{i.name}_{i.chain}' for i in PDBList(libio.glob_folder('*.pdb')))
+    # read dssp from disk (can be json or pickle)
+    data = read_dictionary_from_disk(dssp)
 
-    #pdb_filtered = [pp for pp in pdb_paths if pp.stem in already_done]
+    # needs to account for tar files
+    #destination = make_destination_folder(destination)
 
-    #dssp_data = read_pipe_file(Path(dssp).read_text())
-    with open(dssp, 'rb') as handle:
-        dssp_data = pickle.load(handle)
-
-    manager = Manager()
-    dssp_output_dict = manager.dict()
-
-    libmulticore.pool_function(
+    pool_chunks_to_disk_and_data_at_the_end(
         split_segs,
-        pdbs_paths,
-        dssps=dssp_data,
+        pdbs2operate,
+        destination,
+        data=data,
         minimum=2,
-        dssp_out=dssp_output_dict,
-        destination=destination,
         ncores=ncores,
         )
+
+
+    #libmulticore.pool_function(
+    #    split_segs,
+    #    pdbs_paths,
+    #    dssps=dssp_data,
+    #    minimum=2,
+    #    dssp_out=dssp_output_dict,
+    #    destination=destination,
+    #    ncores=ncores,
+    #    )
 
     #libio.save_dictionary(dssp_output_dict, output)
 
@@ -82,7 +94,6 @@ def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
 
     s = Structure(pdbdata)
     s.build()
-    #s.renumber_atoms()
 
     # this will ignore the iCode
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
