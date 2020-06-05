@@ -13,7 +13,7 @@ detailed = "detailed instructions:\n\n{}"
 class FolderOrTar(argparse.Action):
     """Controls if input is folder, files or tar."""
 
-    def __call__(self, parser, namspace, values, option_string=None):
+    def __call__(self, parser, namespace, values, option_string=None):
         """Hello? """
         if values[0].endswith('.tar'):
             setattr(namespace, self.dest, values[0])

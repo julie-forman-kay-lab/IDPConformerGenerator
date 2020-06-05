@@ -552,13 +552,20 @@ class FileReaderIterator:
         return options[True](origin, **kwargs)
 
 
-class FileIterator:
-
-    def __init__(self, origin, ext='.pdb'):
-        self.origin = read_path_bundle(origin, ext=ext)
+class FileIteratorBase:
 
     def __iter__(self):
         return self
+
+    def __getitem__(self, val):
+        for i in range(val.stop - val.start):
+            yield next(self)
+
+
+class FileIterator(FileIteratorBase):
+
+    def __init__(self, origin, ext='.pdb'):
+        self.origin = read_path_bundle(origin, ext=ext)
 
     def __next__(self):
         next_file = next(self.origin)
@@ -567,7 +574,9 @@ class FileIterator:
         fin.close()
         return next_file, txt
 
-class TarFileIterator:
+
+
+class TarFileIterator(FileIteratorBase):
 
     def __init__(self, origin, ext='.pdb'):
         self.origin = tarfile.open(origin)
@@ -575,9 +584,6 @@ class TarFileIterator:
             lambda x: x.name.endswith(ext),
             self.origin.getmembers()
             )
-
-    def __iter__(self):
-        return self
 
     def __next__(self):
         member = next(self._members)

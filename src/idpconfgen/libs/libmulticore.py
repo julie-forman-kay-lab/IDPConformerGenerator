@@ -113,7 +113,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
             **kwargs, # ncores go here
             )
 
-        func_to_save_files(mfiles.items(), destination=destination)
+        #func_to_save_files(mfiles.items(), destination=destination)
 
 
 class Worker(multiprocessing.Process):
