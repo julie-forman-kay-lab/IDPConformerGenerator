@@ -541,9 +541,9 @@ def write_text(text, output=None):
 
 
 class FileReaderIterator:
-    
+
     def __new__(cls, origin, **kwargs):
-        
+
         options = {
             isinstance(origin, str) and origin.endswith('.tar'): TarFileIterator,
             isinstance(origin, list): FileIterator,
@@ -561,13 +561,14 @@ class FileIterator:
         return self
 
     def __next__(self):
-        fin = open(next(self.origin), 'r')
+        next_file = next(self.origin)
+        fin = open(next_file, 'r')
         txt = fin.read()
         fin.close()
-        return txt
+        return next_file, txt
 
 class TarFileIterator:
-    
+
     def __init__(self, origin, ext='.pdb'):
         self.origin = tarfile.open(origin)
         self._members = filter(
@@ -579,7 +580,8 @@ class TarFileIterator:
         return self
 
     def __next__(self):
-        f = self.origin.extractfile(next(self._members))
+        member = next(self._members)
+        f = self.origin.extractfile(member)
         txt = f.read()
         f.close()
-        return txt
+        return member.name, txt

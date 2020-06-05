@@ -6,13 +6,14 @@ USAGE:
 """
 import argparse
 import traceback
+from collections import defaultdict
 from multiprocessing import Manager
 import pickle
 
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import read_path_bundle
 from idpconfgen.logger import init_files, S, T
-from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_slice, group_runs
+from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_segments_based_on_backbone_continuity, group_runs
 from idpconfgen import log, Path
 from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB, col_resSeq, col_record
 from idpconfgen.libs.libtimer import ProgressBar
@@ -22,7 +23,7 @@ from idpconfgen.libs import libmulticore
 
 LOGFILESNAME = '.idpconfgen_segsplit'
 
-_name = 'segsplit'
+_name = 'bbsplit'
 _help = 'Splits data into backbone segments'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -33,19 +34,21 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
+libcli.add_parser_pdbs(ap)
+
 ap.add_argument(
-    'dssp',
-    help='The DSSP file as saved by IDPConfGen SSEXT CLI',
+    '--dssp',
+    help='The DSSP file as saved by IDPConfGen SSCALC CLI',
+    default=None,
     )
 
-libcli.add_parser_pdbs(ap)
 libcli.add_parser_destination_folder(ap)
 libcli.add_argument_ncores(ap)
 
 
 def main(
         pdbs,
-        dssp,
+        dssp=None,
         destination=None,
         ncores=1,
         **kwargs,
@@ -55,42 +58,191 @@ def main(
 
     init_files(log, LOGFILESNAME)
 
-    file_iterator = FileReaderIterator(pdbs, ext='.pdb')
+    pdbs2operate = FileReaderIterator(pdbs, ext='.pdb')
 
     # read dssp from disk (can be json or pickle)
-    data = read_dictionary_from_disk(dssp)
+    dssp_data = read_dictionary_from_disk(dssp) if dssp else None
 
     # needs to account for tar files
     #destination = make_destination_folder(destination)
 
     pool_chunks_to_disk_and_data_at_the_end(
-        split_segs,
+        split_segments,
         pdbs2operate,
         destination,
-        data=data,
+        data=dssp_data,
         minimum=2,
         ncores=ncores,
         )
 
 
-    #libmulticore.pool_function(
-    #    split_segs,
-    #    pdbs_paths,
-    #    dssps=dssp_data,
-    #    minimum=2,
-    #    dssp_out=dssp_output_dict,
-    #    destination=destination,
-    #    ncores=ncores,
-    #    )
+def split_segments(
+        pdbname,
+        pdbdata,
+        mfiles,
+        sscalc_data=None,
+        mdict=None,
+        minimum=2,
+        ):
+    """
+    """
+    # this might be slightly slower but it definitively more modular
+    # and testable
+    # `structure_segments` are in residue number (str)
+    structure, structure_segments = backbone_split(pdbdata, minimum=2)
 
-    #libio.save_dictionary(dssp_output_dict, output)
+    splitted_segments = \
+        split_structure_in_segments(structure, structure_segments)
 
-    Path(destination, 'dssp_segs.dssp').write_text(
-        '\n'.join(f'{k}|{v}' for k, v in dssp_output_dict.items())
+    assert len(structure_segments) == len(splitted_segments), pdbname
+    for i, txt in enumerate(splitted_segments):
+        mfiles[f'{pdbname}_seg{i}'] = txt
+
+    # here I have to put them in the mfiles
+    try:
+        dssp_segments = split_sscalc_data(sscalc_data, splitted_segments)
+        assert len(dssp_segments) == len(structure_segments), pdbname
+    except TypeError:  # dssp_data is None
+        pass
+    else:
+        mdict.update(dssp_segments)
+
+
+def split_dssp_data(pdbname, data, segments):
+    """
+    """
+    pdbdata = data[pdbname]
+    structural_data = (k for k in pdbdata.keys() if k != 'resids')
+    residues = structural_data['resids'].split(',')
+
+    splitdata = defaultdict(dict)
+    for i, segment in enumerate(segments):
+
+        assert all(s.isdigit() for s in segment), pdbname
+
+        key = f'{pdbname}_seg{i}'
+        for datatype in structural_data:
+            splitdata[key][datatype] = \
+                ''.join(
+                    c
+                    for res, c in zip(residues, pdbdata[datatype])
+                    if res in segment
+                    )
+
+        splitdata[key]['resids'] = ','.join(segment)
+
+    return splitdata
+
+
+def split_structure_in_segments(structure, residue_segments):
+    """
+    Parameters
+    ----------
+    structure : :class:`libs.libstructure.Structure`
+
+    residue_seguments: list of str that are digits
+
+    Yields
+    ------
+    str (PDB text data) for each segment
+    """
+    for segment in residue_segments:
+        structure.clear_filters()
+        structure.add_filter(lambda x: x[col_resSeq] in segment)
+        txt = '\n'.join(structure.get_PDB())
+        yield txt
+
+
+
+def backbone_split(pdbdata, minimum=2):
+    """
+    Split PDBs in continuous backbone chunks.
+
+    Parameters
+    ----------
+    pdbdata : str
+        Text of the PDB file.
+
+    minimum : int
+        Minimum backbone to accept.
+    """
+    hetatm_set = {'HETATM'}
+
+    s = Structure(pdbdata)
+    s.build()
+
+    # this will ignore the iCode
+    # please use pdb-tool pdb_delinsertions before this step
+    # PDBs downloaded with IDPConfGen already correct for these
+    # see libs.libparse.delete_insertions
+    residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
+
+    consecutive_residue_segments = group_run(residues)
+
+    # removes segments shorter than the minimum allowed
+    above_minimum = filter(
+        lambda segment: len(segment) > minimum,
+        consecutive_residue_segments,
         )
 
+    #seg_counter = 0
+    residue_segments = []
+    for segment in above_minimum:
+        s.clear_filters()
+        s.add_filter(lambda x: int(x[col_resSeq]) in segment)
 
-def split_segs(pdbdata, dssps, minimum=2, dssp_out=None, destination=''):
+        # discard segments that might be composed only of HETATM
+        #tmp_filtered = s.filtered_atoms
+        #if set(tmp_filtered[:, col_record]) == hetatm_set:
+        #    log.debug(
+        #        'Found a segment with only HETATM.\n'
+        #        'You may wish to record those HETATM residue codes:\n'
+        #        f'{set(tmp_filtered[:, col_resName])}\n'
+        #        )
+        #    continue
+
+        # identify backbone gaps
+        s.add_filter_backbone(minimal=True)
+        #try:
+        residue_segments.extend(
+            list(filter(
+                lambda segment: len(segment) > minimum,
+                get_segments_based_on_backbone_continuity(s.filtered_atoms),
+                ))
+            )
+        #except Exception as err:
+        #    log.error(traceback.format_ext())
+        #    log.error(repr(err))
+        #    log.error(f'error in {pdbname}')
+        #    continue
+        #finally:
+        #s.pop_last_filter()
+
+        # this loop will go at least once
+        #for resSeq_set in consecutive_backbone_segs:
+        #    s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
+
+        #    pdbout = f'{pdbname}_seg{seg_counter}'
+        #    mfiles[pdbout] = '\n'.join(s.get_PDB())
+
+        #    s.pop_last_filter()
+        #    seg_counter += 1
+    s.clear_filters()
+    return s, residue_segments
+
+
+
+
+
+
+
+
+
+
+
+
+
+def split_segs(pdbdata, dssps=None, minimum=2, dssp_out=None, destination=''):
 
     s = Structure(pdbdata)
     s.build()

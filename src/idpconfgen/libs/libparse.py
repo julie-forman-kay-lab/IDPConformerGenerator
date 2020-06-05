@@ -451,7 +451,7 @@ def save_structure_chains_and_segments(
     return
 
 
-def get_slice(atoms):
+def get_segments_based_on_backbone_continuity(atoms):
     """
     Split backbones in chunks of continuity.
 

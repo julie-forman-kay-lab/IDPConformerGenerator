@@ -85,7 +85,6 @@ def pool_chunks_to_disk_and_data_at_the_end(
         func,
         tasks,
         destination,
-        ncores=1,
         **kwargs,
         ):
     """
@@ -101,17 +100,17 @@ def pool_chunks_to_disk_and_data_at_the_end(
 
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
+
         mfiles = manager.dict()
 
         pool_function(
             func,
-            tasks,
-            ncores=ncores,
+            task,
             # we expect func to receive these to dicts
             mfiles=mfiles,
             mdata=mdata,
             # kwargs for func
-            **kwargs,
+            **kwargs, # ncores go here
             )
 
         func_to_save_files(mfiles.items(), destination=destination)
