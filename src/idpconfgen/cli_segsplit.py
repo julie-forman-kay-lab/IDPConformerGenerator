@@ -11,7 +11,7 @@ from multiprocessing import Manager
 import pickle
 
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import read_path_bundle
+from idpconfgen.libs.libio import read_path_bundle, read_dictionary_from_disk, FileReaderIterator
 from idpconfgen.logger import init_files, S, T
 from idpconfgen.libs.libparse import read_pipe_file, group_consecutive_ints, identify_backbone_gaps, get_segments_based_on_backbone_continuity, group_runs
 from idpconfgen import log, Path
@@ -19,7 +19,7 @@ from idpconfgen.libs.libstructure import Structure, structure_to_pdb, write_PDB,
 from idpconfgen.libs.libtimer import ProgressBar
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs.libio import make_destination_folder, glob_folder
-from idpconfgen.libs import libmulticore
+from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end
 
 LOGFILESNAME = '.idpconfgen_segsplit'
 
@@ -51,6 +51,7 @@ def main(
         dssp=None,
         destination=None,
         ncores=1,
+        chunks=5000,
         **kwargs,
         ):
     """
@@ -73,6 +74,7 @@ def main(
         data=dssp_data,
         minimum=2,
         ncores=ncores,
+        chunks=chunks,
         )
 
 
@@ -108,7 +110,7 @@ def split_segments(
         mdict.update(dssp_segments)
 
 
-def split_dssp_data(pdbname, data, segments):
+def split_sscalc_data(pdbname, data, segments):
     """
     """
     pdbdata = data[pdbname]
@@ -177,7 +179,7 @@ def backbone_split(pdbdata, minimum=2):
     # see libs.libparse.delete_insertions
     residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
 
-    consecutive_residue_segments = group_run(residues)
+    consecutive_residue_segments = group_runs(residues)
 
     # removes segments shorter than the minimum allowed
     above_minimum = filter(
@@ -192,14 +194,14 @@ def backbone_split(pdbdata, minimum=2):
         s.add_filter(lambda x: int(x[col_resSeq]) in segment)
 
         # discard segments that might be composed only of HETATM
-        #tmp_filtered = s.filtered_atoms
-        #if set(tmp_filtered[:, col_record]) == hetatm_set:
+        tmp_filtered = s.filtered_atoms
+        if set(tmp_filtered[:, col_record]) == hetatm_set:
         #    log.debug(
         #        'Found a segment with only HETATM.\n'
         #        'You may wish to record those HETATM residue codes:\n'
         #        f'{set(tmp_filtered[:, col_resName])}\n'
         #        )
-        #    continue
+            continue
 
         # identify backbone gaps
         s.add_filter_backbone(minimal=True)
@@ -241,111 +243,111 @@ def backbone_split(pdbdata, minimum=2):
 
 
 
-
-def split_segs(pdbdata, dssps=None, minimum=2, dssp_out=None, destination=''):
-
-    s = Structure(pdbdata)
-    s.build()
-
-    # this will ignore the iCode
-    residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
-
-    # returns slices
-    #segments = group_consecutive_ints(residues)
-    segments = group_runs(residues)
-
-    # removes ligands
-    above_2 = filter(
-        lambda x: len(x) > minimum,
-        segments,
-        )
-
-    seg_counter = 0
-    for seg in above_2:
-        s.add_filter(lambda x: int(x[col_resSeq]) in seg)
-
-        if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
-            s.pop_last_filter()
-            continue
-
-
-        # split regions with missing backbone
-        s.add_filter_backbone(minimal=True)
-
-        try:
-                #identify_backbone_gaps(s.filtered_atoms)
-            backbone_segs_in_resSeq_sets = \
-                list(filter(
-                    lambda x: len(x) > minimum,
-                    get_slice(s.filtered_atoms)
-                    ))
-        except Exception as err:
-            log.error(traceback.format_exc())
-            log.error(repr(err))
-            log.error(f'error in {pdbdata}')
-            seg_counter += 1
-            continue
-        finally:
-            s.pop_last_filter()
-
-
-        for resSeq_set in backbone_segs_in_resSeq_sets:
-
-            s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
-
-            pdbout = f'{pdbdata.stem}_seg{seg_counter}'
-            fout_seg = Path(destination, pdbout).with_suffix('.pdb')
-
-            try:
-                s.write_PDB(fout_seg)
-            except EXCPTS.EmptyFilterError as err:
-                log.error(f'Empty filter for: {repr(err)}')
-            except EXCPTS.IDPConfGenException as err:
-                log.error(S('* Something went wrong with {}: {}', pdbdata, repr(err)))
-                log.debug(traceback.format_exc())
-
-            s.pop_last_filter()
-
-
-            # these are aligned
-            dssp_data = dssps[pdbdata.stem]
-            _fasta = dssp_data['fasta']
-            _dssp = dssp_data['dssp']
-            _res = dssp_data['resids'].split(',')
-
-
-            ffasta = []
-            ddssp = []
-            rres = []
-            for f, d, r in zip(_fasta, _dssp, _res):
-                if r in resSeq_set:
-                    ffasta.append(f)
-                    ddssp.append(d)
-                    rres.append(r)
-
-            dssp_out[pdbout] = {
-                'fasta': ''.join(ffasta),
-                'dssp': ''.join(ddssp),
-                'residues': ','.join(rres),
-                }
-
-            #
-            #dssp_slicing = slice(
-            #    residues.index(int(resSeq_set[0])),
-            #    residues.index(int(resSeq_set[-1])) + 1,
-            #    None,
-            #    )
-            #print(dssp_slicing)
-
-            #print(len(resSeq_set))
-            #print(len(dssps[pdbdata.stem][dssp_slicing]))
-            #print(dssps[pdbdata.stem][dssp_slicing])
-
-            #if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
-            #    log.error(traceback.format_exc())
-            #    log.error(f'error in {pdbdata}')
-            #    seg_counter += 1
-            #    continue
-            #dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
-            seg_counter += 1
-
+#def split_segs(pdbdata, dssps=None, minimum=2, dssp_out=None, destination=''):
+#    """
+#    """
+#    s = Structure(pdbdata)
+#    s.build()
+#
+#    # this will ignore the iCode
+#    residues = [int(i) for i in dict.fromkeys(s.filtered_atoms[:, col_resSeq])]
+#
+#    # returns slices
+#    #segments = group_consecutive_ints(residues)
+#    segments = group_runs(residues)
+#
+#    # removes ligands
+#    above_2 = filter(
+#        lambda x: len(x) > minimum,
+#        segments,
+#        )
+#
+#    seg_counter = 0
+#    for seg in above_2:
+#        s.add_filter(lambda x: int(x[col_resSeq]) in seg)
+#
+#        if set(s.filtered_atoms[:, col_record]) == {'HETATM'}:
+#            s.pop_last_filter()
+#            continue
+#
+#
+#        # split regions with missing backbone
+#        s.add_filter_backbone(minimal=True)
+#
+#        try:
+#                #identify_backbone_gaps(s.filtered_atoms)
+#            backbone_segs_in_resSeq_sets = \
+#                list(filter(
+#                    lambda x: len(x) > minimum,
+#                    get_slice(s.filtered_atoms)
+#                    ))
+#        except Exception as err:
+#            log.error(traceback.format_exc())
+#            log.error(repr(err))
+#            log.error(f'error in {pdbdata}')
+#            seg_counter += 1
+#            continue
+#        finally:
+#            s.pop_last_filter()
+#
+#
+#        for resSeq_set in backbone_segs_in_resSeq_sets:
+#
+#            s.add_filter(lambda x: x[col_resSeq] in resSeq_set)
+#
+#            pdbout = f'{pdbdata.stem}_seg{seg_counter}'
+#            fout_seg = Path(destination, pdbout).with_suffix('.pdb')
+#
+#            try:
+#                s.write_PDB(fout_seg)
+#            except EXCPTS.EmptyFilterError as err:
+#                log.error(f'Empty filter for: {repr(err)}')
+#            except EXCPTS.IDPConfGenException as err:
+#                log.error(S('* Something went wrong with {}: {}', pdbdata, repr(err)))
+#                log.debug(traceback.format_exc())
+#
+#            s.pop_last_filter()
+#
+#
+#            # these are aligned
+#            dssp_data = dssps[pdbdata.stem]
+#            _fasta = dssp_data['fasta']
+#            _dssp = dssp_data['dssp']
+#            _res = dssp_data['resids'].split(',')
+#
+#
+#            ffasta = []
+#            ddssp = []
+#            rres = []
+#            for f, d, r in zip(_fasta, _dssp, _res):
+#                if r in resSeq_set:
+#                    ffasta.append(f)
+#                    ddssp.append(d)
+#                    rres.append(r)
+#
+#            dssp_out[pdbout] = {
+#                'fasta': ''.join(ffasta),
+#                'dssp': ''.join(ddssp),
+#                'residues': ','.join(rres),
+#                }
+#
+#            #
+#            #dssp_slicing = slice(
+#            #    residues.index(int(resSeq_set[0])),
+#            #    residues.index(int(resSeq_set[-1])) + 1,
+#            #    None,
+#            #    )
+#            #print(dssp_slicing)
+#
+#            #print(len(resSeq_set))
+#            #print(len(dssps[pdbdata.stem][dssp_slicing]))
+#            #print(dssps[pdbdata.stem][dssp_slicing])
+#
+#            #if not len(resSeq_set) == len(dssps[pdbdata.stem][dssp_slicing]):
+#            #    log.error(traceback.format_exc())
+#            #    log.error(f'error in {pdbdata}')
+#            #    seg_counter += 1
+#            #    continue
+#            #dssp_out[pdbout] = dssps[pdbdata.stem][dssp_slicing]
+#            seg_counter += 1
+#

@@ -85,6 +85,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
         func,
         tasks,
         destination,
+        chunks=5000,
         **kwargs,
         ):
     """
@@ -110,7 +111,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
             mfiles=mfiles,
             mdata=mdata,
             # kwargs for func
-            **kwargs, # ncores go here
+            **kwargs,  # ncores go here
             )
 
         #func_to_save_files(mfiles.items(), destination=destination)

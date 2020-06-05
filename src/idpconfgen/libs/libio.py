@@ -376,7 +376,7 @@ def read_dictionary_from_disk(path):
 
     the_dict = options[_path_suffix](path)
 
-    assert isinstance(the_dict)
+    assert isinstance(the_dict, dict)
     return the_dict
 
 
