@@ -58,19 +58,12 @@ def download_pdbs_to_tar(destination, items, **kwargs):
             **kwargs,
             ):
 
-        tar = tarfile.open(dests, mode='a:')
-
-        for fout, _data in sorted(result_dict.items()):
-            try:
-                sIO = BytesIO()
-                sIO.write('\n'.join(_data).encode())
-                info = tarfile.TarInfo(name=fout)
-                info.size = sIO.seek(0, SEEK_END)
-                sIO.seek(0)
-                tar.addfile(tarinfo=info, fileobj=sIO)
-            except Exception:
-                log.error(f'failed for {fout}')
-        tar.close()
+        with tarfile.open(dests, mode='a:') as tar:
+            for fout, _data in sorted(result_dict.items()):
+                try:
+                    save_file_to_tar(tar, fout, _data)
+                except Exception:
+                    log.error(f'failed for {fout}')
 
 
 # DEPRECATED

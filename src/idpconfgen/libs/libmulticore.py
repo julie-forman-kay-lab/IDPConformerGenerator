@@ -7,7 +7,8 @@ from multiprocessing import Pool, Manager
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
 from idpconfgen.logger import S
-from idpconfgen.libs.libtimer import ProgressBar
+from idpconfgen.libs.libtimer import ProgressWatcher
+from idpconfgen.libs.libio import save_pairs_to_disk, save_dictionary
 
 
 def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
@@ -35,7 +36,7 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
 
     with \
             Pool(ncores) as pool, \
-            ProgressBar(len(items)) as pb:
+            ProgressWatcher(items) as pb:
 
         imap = getattr(pool, method)(f, items)
 
@@ -85,6 +86,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
         func,
         tasks,
         destination,
+        mdata_dest='mdata_dest.json',
         chunks=5000,
         **kwargs,
         ):
@@ -114,7 +116,8 @@ def pool_chunks_to_disk_and_data_at_the_end(
             **kwargs,  # ncores go here
             )
 
-        #func_to_save_files(mfiles.items(), destination=destination)
+        save_pairs_to_disk(mfiles.items(), destination=destination)
+    save_dictionary(mdata.copy(), mdata_dest)
 
 
 class Worker(multiprocessing.Process):

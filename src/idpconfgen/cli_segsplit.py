@@ -42,14 +42,21 @@ ap.add_argument(
     default=None,
     )
 
+ap.add_argument(
+    '--dssp-dest',
+    help='The DSSP file after split.',
+    default=None,
+    )
+
 libcli.add_parser_destination_folder(ap)
 libcli.add_argument_ncores(ap)
 
 
 def main(
         pdbs,
+        destination,
         dssp=None,
-        destination=None,
+        dssp_dest=None,
         ncores=1,
         chunks=5000,
         **kwargs,
@@ -62,7 +69,7 @@ def main(
     pdbs2operate = FileReaderIterator(pdbs, ext='.pdb')
 
     # read dssp from disk (can be json or pickle)
-    dssp_data = read_dictionary_from_disk(dssp) if dssp else None
+    sscalc_data = read_dictionary_from_disk(dssp) if dssp else None
 
     # needs to account for tar files
     #destination = make_destination_folder(destination)
@@ -71,7 +78,8 @@ def main(
         split_segments,
         pdbs2operate,
         destination,
-        data=dssp_data,
+        sscalc_data=sscalc_data,
+        mdata_dest=dssp_dest,
         minimum=2,
         ncores=ncores,
         chunks=chunks,
@@ -79,22 +87,24 @@ def main(
 
 
 def split_segments(
-        pdbname,
-        pdbdata,
+        pdbid,
         mfiles,
         sscalc_data=None,
-        mdict=None,
+        mdata=None,
         minimum=2,
         ):
     """
     """
+    pdbname = Path(pdbid[0]).stem
+    pdbdata = pdbid[1]
+
     # this might be slightly slower but it definitively more modular
     # and testable
     # `structure_segments` are in residue number (str)
     structure, structure_segments = backbone_split(pdbdata, minimum=2)
 
     splitted_segments = \
-        split_structure_in_segments(structure, structure_segments)
+        list(split_structure_in_segments(structure, structure_segments))
 
     assert len(structure_segments) == len(splitted_segments), pdbname
     for i, txt in enumerate(splitted_segments):
@@ -102,20 +112,20 @@ def split_segments(
 
     # here I have to put them in the mfiles
     try:
-        dssp_segments = split_sscalc_data(sscalc_data, splitted_segments)
+        dssp_segments = split_sscalc_data(pdbname, sscalc_data, structure_segments)
         assert len(dssp_segments) == len(structure_segments), pdbname
-    except TypeError:  # dssp_data is None
+    except IOError:  # dssp_data is None
         pass
     else:
-        mdict.update(dssp_segments)
+        mdata.update(dssp_segments)
 
 
 def split_sscalc_data(pdbname, data, segments):
     """
     """
     pdbdata = data[pdbname]
-    structural_data = (k for k in pdbdata.keys() if k != 'resids')
-    residues = structural_data['resids'].split(',')
+    structural_data = [k for k in pdbdata.keys() if k != 'resids']
+    residues = pdbdata['resids'].split(',')
 
     splitdata = defaultdict(dict)
     for i, segment in enumerate(segments):
@@ -151,8 +161,7 @@ def split_structure_in_segments(structure, residue_segments):
     for segment in residue_segments:
         structure.clear_filters()
         structure.add_filter(lambda x: x[col_resSeq] in segment)
-        txt = '\n'.join(structure.get_PDB())
-        yield txt
+        yield list(structure.get_PDB())
 
 
 

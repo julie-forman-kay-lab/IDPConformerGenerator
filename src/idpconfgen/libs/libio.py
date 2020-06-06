@@ -7,6 +7,8 @@ import os
 import pickle
 import sys
 import tarfile
+from io import BytesIO
+from os import SEEK_END
 from functools import partial
 
 from idpconfgen import Path, log
@@ -382,7 +384,8 @@ def read_dictionary_from_disk(path):
 
 def read_dict_from_json(path):
     """Read dict from json."""
-    return json.loads(path)
+    with open(path) as fin:
+        return json.load(fin)
 
 
 def read_dict_from_pickle(path):
@@ -521,6 +524,47 @@ def save_dict_to_pickle(mydict, output='mydict.pickle'):
         pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
+def save_pairs_to_disk(pairs, destination=None):
+    """
+    Save pairs to files.
+
+    First indexes are used as file names,
+    second indexes as info to write to files.
+
+    Parameters
+    ----------
+    destination : str or Path-like
+        The folder where to save files.
+        Defaults to CWD.
+    """
+    dest = Path(destination) if destination else Path.cwd()
+
+    options = {
+        True: save_pairs_to_files,
+        dest.suffix == '.tar': save_pairs_to_tar,
+        }
+    options[True](pairs, destination)
+
+
+def save_pairs_to_tar(pairs, destination):
+    with tarfile.open(os.fspath(destination), mode='w') as tar:
+        for fout, data in pairs:
+            save_file_to_tar(tar, fout, data)
+
+
+def save_file_to_tar(tar, fout, data):
+    sIO = BytesIO()
+    sIO.write('\n'.join(data).encode())
+    info = tarfile.TarInfo(name=fout)
+    info.size = sIO.seek(0, SEEK_END)
+    sIO.seek(0)
+    tar.addfile(tarinfo=info, fileobj=sIO)
+
+
+def save_pairs_to_files(pairs, destination):
+    dest = make_destination_folder(destination)
+    for k, v in pairs:
+        Path(dest, k).write_text(v)
 
 
 def write_text(text, output=None):
@@ -559,16 +603,26 @@ class FileIteratorBase:
 
     def __getitem__(self, val):
         for i in range(val.stop - val.start):
-            yield next(self)
+            # I had problems with the exhaustion of this generator
+            # raising RuntimeError -> this solved
+            # https://stackoverflow.com/questions/51700960
+            try:
+                yield next(self)
+            except StopIteration:
+                return
+
+    def __len__(self):
+        return self._len
 
 
 class FileIterator(FileIteratorBase):
 
     def __init__(self, origin, ext='.pdb'):
-        self.origin = read_path_bundle(origin, ext=ext)
+        self.members = list(read_path_bundle(origin, ext=ext))
+        self._len = len(self.members)
 
     def __next__(self):
-        next_file = next(self.origin)
+        next_file = next(self.members)
         fin = open(next_file, 'r')
         txt = fin.read()
         fin.close()
@@ -580,13 +634,15 @@ class TarFileIterator(FileIteratorBase):
 
     def __init__(self, origin, ext='.pdb'):
         self.origin = tarfile.open(origin)
-        self._members = filter(
+        self._members = self.origin.getmembers()
+        self._len = len(self._members)
+        self.members = filter(
             lambda x: x.name.endswith(ext),
-            self.origin.getmembers()
+            self._members,
             )
 
     def __next__(self):
-        member = next(self._members)
+        member = next(self.members)
         f = self.origin.extractfile(member)
         txt = f.read()
         f.close()

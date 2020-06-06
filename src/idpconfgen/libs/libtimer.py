@@ -32,8 +32,42 @@ def record_time(process_name='', *args, **kwargs):
     return decorator
 
 
-class ProgressBar:
+class ProgressWatcher:
+    def __new__(cls, items, *args, **kwargs):
+        try:
+            os.get_terminal_size()
+        except OSError:
+            return ProgressFake()
 
+        try:
+            litems = len(items)
+        except TypeError:
+            return ProgressCounter()
+        else:
+            return ProgressBar(litems, *args, **kwargs)
+
+
+class ProgressCounter:
+    def __init__(self):
+        self.counter = 0
+
+    def __enter__(self, *args, **kwargs):
+        sys.stdout.write('\r0')
+        return self
+
+    def __exit__(self, *args):
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def increment(self):
+        self.counter += 1
+        sys.stdout.write(f'\r{self.counter}')
+        return
+
+
+class ProgressBar:
+    """
+    """
     def __new__(cls, *args, bar_length=None, **kwargs):
         if bar_length is None:
             try:
@@ -45,13 +79,13 @@ class ProgressBar:
                     'from terminal window. Using the default of `50`. '
                     'Everything else is normal.'
                     )
-                return ProgressBarFake()
+                return ProgressFake()
                 # this trick is used to guarantee 100% test coverage
         else:
             return ProgressBarReal(*args, bar_length=bar_length, **kwargs)
 
 
-class ProgressBarFake:
+class ProgressFake:
     """
     Simulates the interface of ProgressBarReal but does nothing.
 
@@ -100,7 +134,7 @@ class ProgressBarReal:
     Examples
     --------
 
-    >>> with ProgressBar(5000, suffix='frames') as PB:
+    >>> with ProgressBarReal(5000, suffix='frames') as PB:
     >>>     for i in trajectory:
     >>>         # do something
     >>>         PB.increment()
