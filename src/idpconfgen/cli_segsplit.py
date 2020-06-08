@@ -102,48 +102,80 @@ def split_segments(
     # and testable
     # `structure_segments` are in residue number (str)
     structure, structure_segments = backbone_split(pdbdata, minimum=2)
+    assert isinstance(structure_segments, list)
+
+    # here I have to put them in the mfiles
+    if sscalc_data:
+        dssp_segments, structure_segments = split_sscalc_data(
+            pdbname,
+            sscalc_data,
+            structure_segments,
+            )
+        assert len(dssp_segments) == len(structure_segments), pdbname
+        mdata.update(dssp_segments)
+
 
     splitted_segments = \
         list(split_structure_in_segments(structure, structure_segments))
+
+    # tenho de arranjar a maneira para que os segments que parso a structure
+    # sao ja o merge entre os que saem do dssp e os segmentos do pdb
+    # ha pdbs cujo dssp do ultimo residue nao le!
 
     assert len(structure_segments) == len(splitted_segments), pdbname
     for i, txt in enumerate(splitted_segments):
         mfiles[f'{pdbname}_seg{i}'] = txt
 
-    # here I have to put them in the mfiles
-    try:
-        dssp_segments = split_sscalc_data(pdbname, sscalc_data, structure_segments)
-        assert len(dssp_segments) == len(structure_segments), pdbname
-    except IOError:  # dssp_data is None
-        pass
-    else:
-        mdata.update(dssp_segments)
+
+    # this is not necessary
+    #for key,values in dssp_segments.items():
+        #assert len(Structure(mfiles[key]).fasta) == len(value['resids']), pdbname
 
 
 def split_sscalc_data(pdbname, data, segments):
     """
     """
-    pdbdata = data[pdbname]
-    structural_data = [k for k in pdbdata.keys() if k != 'resids']
-    residues = pdbdata['resids'].split(',')
+    pdb_dssp_data = data[pdbname]
+    structural_data = [k for k in pdb_dssp_data.keys() if k != 'resids']
+
+    # residues as identified by DSSP
+    residues = pdb_dssp_data['resids'].split(',')
+    assert all(s.isdigit() for s in residues), pdbname
 
     splitdata = defaultdict(dict)
+    segs_in_dssp = []
+
     for i, segment in enumerate(segments):
 
         assert all(s.isdigit() for s in segment), pdbname
+        # this is done with list instead of sets because I want to keep order
+        # two reduction step
+
+        # reduces residues in DSSP to the residues in the segment
+        reduction = [res for res in residues if res in segment]
+
+        # some residues can be in the DSSP and not on the segment
+        # residues in the segment must be reduced accordingly
+        segs_in_dssp.append([res for res in segment if res in reduction])
+        assert len(reduction) == len(segs_in_dssp[-1])
 
         key = f'{pdbname}_seg{i}'
         for datatype in structural_data:
             splitdata[key][datatype] = \
                 ''.join(
                     c
-                    for res, c in zip(residues, pdbdata[datatype])
-                    if res in segment
+                    for res, c in zip(residues, pdb_dssp_data[datatype])
+                    if res in reduction
                     )
 
-        splitdata[key]['resids'] = ','.join(segment)
+        assert all(
+            len(value) == len(reduction)
+            for value in splitdata[key].values()
+            ), pdbname
 
-    return splitdata
+        splitdata[key]['resids'] = ','.join(reduction)
+
+    return splitdata, segs_in_dssp
 
 
 def split_structure_in_segments(structure, residue_segments):

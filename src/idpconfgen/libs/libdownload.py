@@ -7,7 +7,7 @@ from os import SEEK_END
 from urllib.error import URLError
 
 from idpconfgen import Path, log
-from idpconfgen.libs.libio import make_destination_folder
+from idpconfgen.libs.libio import make_destination_folder, save_file_to_tar
 from idpconfgen.libs.libmulticore import pool_function_in_chunks
 from idpconfgen.libs.libparse import save_structure_chains_and_segments
 from idpconfgen.libs.libstructure import Structure
