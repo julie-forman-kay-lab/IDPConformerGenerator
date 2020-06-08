@@ -51,7 +51,7 @@ ap.add_argument(
     '-o',
     '--output',
     help=(
-        "A path to a new file where the PDBID seconda structure and FASTA"
+        "A path to a new file where the PDBID secondary structure and FASTA"
         " information dictionary will be saved. "
         "Defaults to sscalc.json."
         ),
@@ -70,8 +70,8 @@ ap.add_argument(
     action='store_true',
     )
 
-
 ap.add_argument(
+    '-c',
     '--complete',
     help='A previous DSSP DB file to complete with new entries.',
     )
@@ -98,10 +98,10 @@ def maincli():
 def main(
         ss_cmd,
         pdbs,
-        output=None,
-        ncores=1,
-        reduced=False,
         complete=None,
+        ncores=1,
+        output='sscalc_output.json',
+        reduced=False,
         **kwargs,
         ):
     """

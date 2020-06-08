@@ -13,14 +13,20 @@ from functools import reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core import definitions as DEFS
+from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
+from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.libs.libcif import CIFParser, is_cif
+from idpconfgen.libs.libparse import eval_chain_case, group_runs, type2string
 from idpconfgen.logger import S
 
 
+_allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
+_minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 # module variables are defined at the end.
+
+
 class Structure:
     """
     Hold structural data from PDB/mmCIF files.
@@ -122,6 +128,16 @@ class Structure:
         return set(self.data_array[:, col_chainID])
 
     @property
+    def consecutive_residues(self):
+        """Consecutive residue groups from filtered atoms."""
+        # the structure.consecutive_residues
+        # this will ignore the iCode
+        # please use pdb-tool pdb_delinsertions before this step
+        # PDBs downloaded with IDPConfGen already correct for these
+        # see libs.libparse.delete_insertions
+        return group_runs(self.residues)
+
+    @property
     def fasta(self):
         """
         FASTA sequence of the :attr:`filtered_atoms` lines.
@@ -132,12 +148,25 @@ class Structure:
 
         chains = defaultdict(dict)
         for row in self.filtered_atoms:
-            chains[row[c]].setdefault(row[rs], DEFS.aa3to1.get(row[rn], 'X'))
+            chains[row[c]].setdefault(row[rs], aa3to1.get(row[rn], 'X'))
 
         return {
             chain: ''.join(residues.values())
             for chain, residues in chains.items()
             }
+
+    @property
+    def filtered_residues(self):
+        FA = self.filtered_atoms
+        return [int(i) for i in dict.fromkeys(FA[:, col_resSeq])]
+
+    @property
+    def residues(self):
+        """
+        Residues of the structure.
+        Without filtering, without chain separation.
+        """
+        return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
 
     #@property
     #def residue_segments(self):
@@ -440,14 +469,6 @@ record_line_headings = {
     'HETATM': 'HETATM',
     }
 
-# possible data inputs in __init__
-# all should return a string
-# used for control flow
-type2string = {
-    type(Path()): lambda x: x.read_text(),
-    bytes: lambda x: x.decode('utf_8'),
-    str: lambda x: x,
-    }
 
 # order matters
 structure_parsers = [
@@ -506,5 +527,180 @@ def split_residue_segments(atom_lines):
             segments[-1].append(line)
         prev = curr
     return segments
+
+
+def eval_bb_gaps(structure, ignore_hetatms_segments=True, minimum=2):
+    """
+    Split PDBs in continuous backbone chunkstructure.
+
+    Parameters
+    ----------
+    pdbdata : str
+        Text of the PDB file.
+
+    minimum : int
+        Minimum backbone to accept.
+    """
+    hetatm_set = {'HETATM'}
+
+    # removes segments shorter than the minimum allowed
+    # creates a list because the next loop will operate on the filters
+    # and .consecutive_residues does uses filters
+    above_minimum = list(filter(
+        lambda segment: len(segment) > minimum,
+        structure.consecutive_residues,
+        ))
+
+    #seg_counter = 0
+    residue_segments = []
+    for segment in above_minimum:
+        structure.clear_filters()
+        structure.add_filter(lambda x: int(x[col_resSeq]) in segment)
+
+        # discard segments that might be composed only of HETATM
+        if ignore_hetatms_segments:
+            tmp_filtered = structure.filtered_atoms
+            if set(tmp_filtered[:, col_record]) == hetatm_set:
+                continue
+
+        # identify backbone gaps
+        structure.add_filter_backbone(minimal=True)
+        residue_segments.extend(
+            list(filter(
+                lambda segment: len(segment) > minimum,
+                get_segments_based_on_backbone_continuity(structure.filtered_atoms),
+                ))
+            )
+    structure.clear_filters()
+    return residue_segments
+
+
+def get_segments_based_on_backbone_continuity(atoms):
+    """
+    Split backbones in chunks of continuity.
+
+    Consideres only minimal backbone
+
+    Have to explain big thing here.
+    """
+    ref = _minimal_bb_atoms
+    start = 0
+    idx = 0
+    slices = []
+    max_size = atoms.shape[0]
+
+    bb = atoms[:, col_name]
+    resis = np.core.defchararray.add(atoms[:, col_resSeq], atoms[:, col_iCode])
+
+    while idx < max_size:
+        a = list(bb[idx: idx + 3])
+        bb_continuity_lost = a != ref or len(set(resis[idx: idx + 3])) > 1
+        if bb_continuity_lost:
+            slices.append(slice(start, idx, None))
+            idx += 1
+            start = idx
+            while idx <= max_size:
+                a = list(bb[idx: idx + 3])
+                bb_continuity_restored = \
+                    a == ref and len(set(resis[idx: idx + 3])) == 1
+                if bb_continuity_restored:
+                    start = idx
+                    idx += 3
+                    break  # back to the main while
+                idx += 1
+        else:
+            idx += 3
+    else:
+        slices.append(slice(start, idx + 1, None))
+
+    return [list(dict.fromkeys(atoms[seg, col_resSeq])) for seg in slices]
+
+
+def get_PDB_from_residues(structure, residue_segments):
+    """
+    Parameters
+    ----------
+    structure : :class:`libs.libstructure.Structure`
+
+    residue_seguments: list of str that are digits
+
+    Yields
+    ------
+    str (PDB text data) for each segment
+    """
+    for segment in residue_segments:
+        structure.clear_filters()
+        structure.add_filter(lambda x: x[col_resSeq] in segment)
+        yield list(structure.get_PDB())
+
+
+def save_structure_chains_and_segments(
+        pdb_data,
+        pdbname,
+        chains=None,
+        record_name=('ATOM', 'HETATM'),
+        altlocs=('A', '', ' '),
+        renumber=True,
+        mdict=None,
+        ):
+    """
+    Prase structure.
+
+    Logic to parse PDBs from RCSB.
+    """
+    _DR = pdb_ligand_codes  # discarded residues
+    _AE = _allowed_elements
+
+    pdbdata = Structure(pdb_data)
+    pdbdata.build()
+
+    chain_set = pdbdata.chain_set
+
+    chains = chains or chain_set
+
+    pdbdata.add_filter_record_name(record_name)
+    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
+    pdbdata.add_filter(lambda x: x[col_element] in _AE)
+    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+
+    for chain in chains:
+
+        # writes chains always in upper case because chain IDs given by
+        # Dunbrack lab are always in upper case letters
+        # eval_chain_case evaluates for the need for lower case,
+        # however if the lower case is kept in the final file
+        # it may create incompatibilities
+        # 03/Jun/2020
+        chaincode = f'{pdbname}_{chain}'
+
+        # this operation can't be performed before because
+        # until here there is not way to assure if the chain being
+        # downloaded is actualy in the blocked_ids.
+        # because at the CLI level the user can add only the PDBID
+        # to indicate download all chains, while some may be restricted
+        if chaincode in blocked_ids:
+            log.info(S(
+                f'Ignored code {chaincode} because '
+                'is listed in blocked ids.'
+                ))
+            continue
+
+        fout = f'{chaincode}.pdb'
+
+        try:
+            chain = eval_chain_case(chain, chain_set)
+        except ValueError as err:
+            log.error(repr(err))
+            log.error(f'Skiping chain {chain} for {pdbname}')
+            continue
+
+        pdbdata.add_filter_chain(chain)
+
+        mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
+
+        pdbdata.pop_last_filter()
+
+    return
+
 
 

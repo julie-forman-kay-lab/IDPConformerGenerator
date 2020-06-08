@@ -31,6 +31,54 @@ _atom_format_dict = {
     }
 
 
+def delete_insertions(lines):
+    """
+    Delete insertions.
+
+    Adapted from pdbtools and optimized for this context.
+
+    Visit pdb-tools at:
+    https://github.com/haddocking/pdb-tools/blob/master/pdbtools/pdb_delinsertion.py
+    """  # noqa: E501
+    # Keep track of residue numbering
+    # Keep track of residues read (chain, resname, resid)
+    offset = 0
+    prev_resi = None
+    seen_ids = set()
+    clean_icode = False
+    for line in lines:
+        res_uid = line[17:27]  # resname, chain, resid
+        id_res = line[21] + line[22:26].strip()  # A99, B12
+        icode = line[26]
+
+        # unfortunately, this is messy but not all PDB files follow a nice
+        # order of ' ', 'A', 'B', ... when it comes to insertion codes..
+        if prev_resi != res_uid:  # new residue
+            # Have we seen this chain + resid combination
+            # catch insertions WITHOUT icode ('A' ... ' ' ... 'B')
+            if id_res in seen_ids:
+                # Should we do something about it?
+                clean_icode = True
+                offset += 1
+            # Do we have an explicit icode?
+            elif icode != ' ':
+                if id_res in seen_ids:  # never saw this, do not offset!
+                    offset += 1
+                clean_icode = True
+            else:
+                clean_icode = False
+
+            prev_resi = res_uid
+
+        if clean_icode:
+            line = f'{line[:26]} {line[27:]}'
+
+        resid = int(line[22:26]) + offset
+        line = f'{line[:22]}{str(resid).rjust(4)}{line[26:]}'
+        seen_ids.add(id_res)
+        yield line
+
+
 def format_atom_name(atom, element):
     """
     Format PDB Record line Atom name.

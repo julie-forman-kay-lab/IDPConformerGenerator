@@ -4,8 +4,10 @@ Higher level functions.
 Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
+from collections import defaultdict
+
 from idpconfgen import Path
-from idpconfgen.libs.libstructure import eval_bb_gaps, get_PDB_from_residues
+from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues
 
 
 def split_backbone_segments(
@@ -32,11 +34,13 @@ def split_backbone_segments(
     """
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1]
+    structure = Structure(pdbdata)
+    structure.build()
 
     # this might be slightly slower but it definitively more modular
     # and testable
     # `structure_segments` are in residue number (str)
-    structure, structure_segments = eval_bb_gaps(Structure(pdbdata), minimum=2)
+    structure_segments = eval_bb_gaps(structure, minimum=2)
     assert isinstance(structure_segments, list)
 
     # here I have to put them in the mfiles

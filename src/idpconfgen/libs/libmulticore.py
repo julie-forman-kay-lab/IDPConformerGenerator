@@ -116,9 +116,9 @@ def pool_chunks_to_disk_and_data_at_the_end(
             **kwargs,  # ncores go here
             )
 
-        save_pairs_to_disk(mfiles.items(), destination=destination)
+        save_pairs_to_disk(dict(sorted(mfiles.items())).items(), destination=destination)
     if mdata:
-        save_dictionary(mdata.copy(), mdata_dest)
+        save_dictionary(dict(sorted(mdata.items())), mdata_dest)
 
 
 class Worker(multiprocessing.Process):

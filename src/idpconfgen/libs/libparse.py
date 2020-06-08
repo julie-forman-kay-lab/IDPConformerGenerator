@@ -1,4 +1,9 @@
-"""Contain different parsing strategies for different files."""
+"""
+Parsing routines for different data structure.
+
+All functions in this module receive a certain Python native datastructure,
+parse the information inside and return/yield the parsed information.
+"""
 import string
 import subprocess
 import sys
@@ -10,71 +15,24 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.core.definitions import blocked_ids
-from idpconfgen.core.definitions import dssp_trans, pdb_ligand_codes
+from idpconfgen.core.definitions import dssp_trans
 from idpconfgen.libs import libcheck
-from idpconfgen.libs.libpdb import PDBIDFactory
-from idpconfgen.libs.libstructure import (
-    Structure,
-    col_altLoc,
-    col_element,
-    col_iCode,
-    col_name,
-    col_resName,
-    col_resSeq,
-    type2string,
-    )
+from idpconfgen.libs.libpdb import PDBIDFactory, delete_insertions
 from idpconfgen.logger import S
 
 
 _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
-_minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
 
-def delete_insertions(lines):
-    """
-    Delete insertions.
-
-    Adapted from pdbtools and optimized for this context.
-    """
-    # Keep track of residue numbering
-    # Keep track of residues read (chain, resname, resid)
-    offset = 0
-    prev_resi = None
-    seen_ids = set()
-    clean_icode = False
-    for line in lines:
-        res_uid = line[17:27]  # resname, chain, resid
-        id_res = line[21] + line[22:26].strip()  # A99, B12
-        icode = line[26]
-
-        # unfortunately, this is messy but not all PDB files follow a nice
-        # order of ' ', 'A', 'B', ... when it comes to insertion codes..
-        if prev_resi != res_uid:  # new residue
-            # Have we seen this chain + resid combination
-            # catch insertions WITHOUT icode ('A' ... ' ' ... 'B')
-            if id_res in seen_ids:
-                # Should we do something about it?
-                clean_icode = True
-                offset += 1
-            # Do we have an explicit icode?
-            elif icode != ' ':
-                if id_res in seen_ids:  # never saw this, do not offset!
-                    offset += 1
-                clean_icode = True
-            else:
-                clean_icode = False
-
-            prev_resi = res_uid
-
-        if clean_icode:
-            line = f'{line[:26]} {line[27:]}'
-
-        resid = int(line[22:26]) + offset
-        line = f'{line[:22]}{str(resid).rjust(4)}{line[26:]}'
-        seen_ids.add(id_res)
-        yield line
+# possible data inputs in __init__
+# all should return a string
+# used for control flow
+type2string = {
+    type(Path()): lambda x: x.read_text(),
+    bytes: lambda x: x.decode('utf_8'),
+    str: lambda x: x,
+    }
 
 
 def parse_dssp(data, reduced=False):
@@ -315,9 +273,6 @@ def group_runs(li, tolerance=1):
     yield out
 
 
-_allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
-
-
 @contextmanager
 def try_to_write(data, fout):
     """Context to download."""
@@ -381,113 +336,6 @@ def eval_chain_case(chain, chain_set):
             return cl
     raise ValueError(f'Neither {chain}/{cl} are in set {chain_set}')
 
-
-def save_structure_chains_and_segments(
-        pdb_data,
-        pdbname,
-        chains=None,
-        record_name=('ATOM', 'HETATM'),
-        altlocs=('A', '', ' '),
-        renumber=True,
-        mdict=None,
-        ):
-    """
-    Prase structure.
-
-    Logic to parse PDBs from RCSB.
-    """
-    _DR = pdb_ligand_codes  # discarded residues
-    _AE = _allowed_elements
-
-    pdbdata = Structure(pdb_data)
-    pdbdata.build()
-
-    chain_set = pdbdata.chain_set
-
-    chains = chains or chain_set
-
-    pdbdata.add_filter_record_name(record_name)
-    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    pdbdata.add_filter(lambda x: x[col_element] in _AE)
-    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
-
-    for chain in chains:
-
-        # writes chains always in upper case because chain IDs given by
-        # Dunbrack lab are always in upper case letters
-        # eval_chain_case evaluates for the need for lower case,
-        # however if the lower case is kept in the final file
-        # it may create incompatibilities
-        # 03/Jun/2020
-        chaincode = f'{pdbname}_{chain}'
-
-        # this operation can't be performed before because
-        # until here there is not way to assure if the chain being
-        # downloaded is actualy in the blocked_ids.
-        # because at the CLI level the user can add only the PDBID
-        # to indicate download all chains, while some may be restricted
-        if chaincode in blocked_ids:
-            log.info(S(
-                f'Ignored code {chaincode} because '
-                'is listed in blocked ids.'
-                ))
-            continue
-
-        fout = f'{chaincode}.pdb'
-
-        try:
-            chain = eval_chain_case(chain, chain_set)
-        except ValueError as err:
-            log.error(repr(err))
-            log.error(f'Skiping chain {chain} for {pdbname}')
-            continue
-
-        pdbdata.add_filter_chain(chain)
-
-        mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
-
-        pdbdata.pop_last_filter()
-
-    return
-
-
-def get_segments_based_on_backbone_continuity(atoms):
-    """
-    Split backbones in chunks of continuity.
-
-    Have to explain big thing here.
-    """
-    ref = _minimal_bb_atoms
-    start = 0
-    idx = 0
-    slices = []
-    max_size = atoms.shape[0]
-
-    bb = atoms[:, col_name]
-    resis = np.core.defchararray.add(atoms[:, col_resSeq], atoms[:, col_iCode])
-
-    while idx < max_size:
-        a = list(bb[idx: idx + 3])
-        bb_continuity_lost = a != ref or len(set(resis[idx: idx + 3])) > 1
-        if bb_continuity_lost:
-            slices.append(slice(start, idx, None))
-            idx += 1
-            start = idx
-            while idx <= max_size:
-                a = list(bb[idx: idx + 3])
-                bb_continuity_restored = \
-                    a == ref and len(set(resis[idx: idx + 3])) == 1
-                if bb_continuity_restored:
-                    start = idx
-                    idx += 3
-                    break  # back to the main while
-                idx += 1
-        else:
-            idx += 3
-    else:
-        slices.append(slice(start, idx + 1, None))
-
-    return [list(dict.fromkeys(atoms[seg, col_resSeq])) for seg in slices]
 
 
 def identify_backbone_gaps(atoms):
