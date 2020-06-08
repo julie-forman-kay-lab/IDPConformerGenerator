@@ -15,6 +15,7 @@ from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
+from idpconfgen.libs.libtimer import record_time
 
 
 @libcheck.argstype(list)
@@ -543,11 +544,14 @@ def save_pairs_to_disk(pairs, destination=None):
         True: save_pairs_to_files,
         dest.suffix == '.tar': save_pairs_to_tar,
         }
-    options[True](pairs, destination)
+    options[True](pairs, dest)
 
 
 def save_pairs_to_tar(pairs, destination):
-    with tarfile.open(os.fspath(destination), mode='w') as tar:
+    modes = {True: 'a', False: 'w'}
+    with tarfile.open(
+            os.fspath(destination),
+            mode=modes[destination.exists()]) as tar:
         for fout, data in pairs:
             save_file_to_tar(tar, fout, data)
 
@@ -619,10 +623,11 @@ class FileIterator(FileIteratorBase):
 
     def __init__(self, origin, ext='.pdb'):
         self.members = list(read_path_bundle(origin, ext=ext))
+        self.imembers = iter(self.members)
         self._len = len(self.members)
 
     def __next__(self):
-        next_file = next(self.members)
+        next_file = next(self.imembers)
         fin = open(next_file, 'r')
         txt = fin.read()
         fin.close()
@@ -646,4 +651,5 @@ class TarFileIterator(FileIteratorBase):
         f = self.origin.extractfile(member)
         txt = f.read()
         f.close()
+        print(member.name)
         return member.name, txt

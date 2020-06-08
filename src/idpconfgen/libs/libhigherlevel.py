@@ -7,10 +7,46 @@ and are defined here to avoid circular imports.
 from collections import defaultdict
 
 from idpconfgen import Path
-from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues
+from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues, col_resSeq
+from idpconfgen.libs.libparse import group_runs
+from idpconfgen.libs.libtimer import record_time
 
 
 def split_backbone_segments(
+        pdbid,
+        mfiles,
+        sscalc_data,
+        mdata=None,
+        minimum=2,
+        ):
+    """
+    """
+    pdbname = Path(pdbid[0]).stem
+    pdbdata = pdbid[1]
+    pdb_dssp_data = sscalc_data[pdbname]
+    residues = pdb_dssp_data['resids'].split(',')
+    dssp_residues = [int(i) for i in residues]
+    residues_groups = [[str(i) for i in seg] for seg in group_runs(dssp_residues)]
+    structural_data = [k for k in pdb_dssp_data.keys() if k != 'resids']
+    splitdata = defaultdict(dict)
+    for i, segment in enumerate(residues_groups):
+        key = f'{pdbname}_seg{i}'
+        for datatype in structural_data:
+            splitdata[key][datatype] = \
+                ''.join(
+                    c
+                    for res, c in zip(residues, pdb_dssp_data[datatype])
+                    if res in segment
+                    )
+        splitdata[key]['resids'] = ','.join(segment)
+
+        structure = Structure(pdbdata)
+        structure.build()
+        structure.add_filter(lambda x: x[col_resSeq] in segment)
+        mfiles[f'{key}.pdb'] = '\n'.join(structure.get_PDB())
+
+
+def _split_backbone_segments(
         pdbid,
         mfiles,
         sscalc_data=None,

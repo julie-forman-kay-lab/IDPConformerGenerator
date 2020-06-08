@@ -4,16 +4,19 @@ Split PDB into segments.
 USAGE:
     do something
 """
+import shutil
 import argparse
+import os
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import split_backbone_segments
-from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator
+from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, extract_from_tar
 from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end
 from idpconfgen.logger import init_files, S, T
 
 
+TMPDIR = '__tmpsscalc__'
 LOGFILESNAME = '.idpconfgen_segsplit'
 
 _name = 'bbsplit'
@@ -41,6 +44,14 @@ ap.add_argument(
     default='dssp_split.json',
     )
 
+ap.add_argument(
+    '-c',
+    '--chunks',
+    help='Number of chunks to process in memory before saving to disk.',
+    default=5_000,
+    type=int,
+    )
+
 libcli.add_parser_destination_folder(ap)
 libcli.add_argument_ncores(ap)
 
@@ -58,6 +69,8 @@ def main(
     init_files(log, LOGFILESNAME)
 
     pdbs2operate = FileReaderIterator(pdbs, ext='.pdb')
+    #extract_from_tar(pdbs, output=TMPDIR)
+    #pdbs2operate = FileReaderIterator([TMPDIR], ext='.pdb')
 
     sscalc_data = read_dictionary_from_disk(dssp) if dssp else None
 
