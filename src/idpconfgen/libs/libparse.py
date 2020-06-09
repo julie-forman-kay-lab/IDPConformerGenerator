@@ -17,7 +17,7 @@ from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import dssp_trans
 from idpconfgen.libs import libcheck
-from idpconfgen.libs.libpdb import PDBIDFactory, delete_insertions
+from idpconfgen.libs.libpdb import PDBIDFactory, delete_insertions, atom_resSeq
 from idpconfgen.logger import S
 
 
@@ -35,14 +35,12 @@ type2string = {
     }
 
 
+# JSON doesn't accept bytes
 def parse_dssp(data, reduced=False):
     """Parse DSSP file data."""
     DT = dssp_trans
 
-    try:
-        data_ = type2string[type(data)](data).split('\n')
-    except KeyError:  # maybe is list
-        data_ = data
+    data_ = data.split('\n')
 
     # RM means removed empty
     RM1 = (i for i in data_ if i)
@@ -55,22 +53,35 @@ def parse_dssp(data, reduced=False):
         # if the whole generator is exhausted
         raise IndexError
 
-    structure_data = (i for i in RM1 if i[13] != '!')
-
+    #structure_data = (i for i in RM1 if i[13] != '!')
+    
     dssp = []
     fasta = []
     residues = []
-    for line in structure_data:
-        dssp.append(line[16])
-        fasta.append(line[13])
-        residues.append(line[6:10].strip())
+    for line in RM1:
+        if line[13:14] != '!':
+            dssp.append(line[16:17])
+            fasta.append(line[13:14])
+            residues.append(line[6:10].strip())
+        else:
+            dssp_ = ''.join(dssp)
+            if reduced:
+                dssp_ = dssp_.translate(DT)
+            yield dssp_, ''.join(fasta), residues
+            dssp = []
+            fasta = []
+            residues = []
+    else:
+        dssp_ = ''.join(dssp)
+        if reduced:
+            dssp_ = dssp_.translate(DT)
+        yield dssp_, ''.join(fasta), residues
 
-    if reduced:
-        dssp = list(map(lambda x: x.translate(DT), dssp))
 
-    assert sum((len(dssp), len(fasta), len(residues))) / 3 == len(dssp)
 
-    return ''.join(dssp), ''.join(fasta), ','.join(residues)
+    #assert sum((len(dssp), len(fasta), len(residues))) / 3 == len(dssp)
+
+    #return ''.join(dssp), ''.join(fasta), ','.join(residues)
 
 
 def find_dssp_data_index(data):
@@ -382,24 +393,48 @@ def identify_backbone_gaps(atoms):
         ]
 
 
-def mkdssp(pdb, ss_cmd, mdict=None, reduced=False):
+def mkdssp(pdb, ss_cmd, destination=None, mdict=None, reduced=False):
     """
     Execute `mkdssp` from DSSP.
 
     https://github.com/cmbi/dssp
     """
-    cmd = [ss_cmd, '-i', fspath(pdb.resolve())]
+    pdbfile = fspath(pdb.resolve())
+    cmd = [ss_cmd, '-i', pdbfile]
     result = subprocess.run(cmd, capture_output=True)
 
-    dssp, fasta, residues = parse_dssp(
-        result.stdout.decode('utf-8'),
-        reduced=reduced,
-        )
-    mdict[str(PDBIDFactory(pdb))] = {
-        'dssp': dssp,
-        'fasta': fasta,
-        'resids': residues,
-        }
+    # did not use the pathlib interface read_bytes on purpose.
+    with open(pdbfile, 'rb') as fin:
+        pdb_bytes = fin.readlines()
+
+    segs = 0
+    for dssp, fasta, residues in parse_dssp(result.stdout.decode('utf-8'), reduced=reduced):
+        fname =f'{str(PDBIDFactory(pdb))}_seg{segs}'
+        residues_bytes = set(c.encode() for c in residues)
+
+        with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
+            fout.writelines(
+                line for line in pdb_bytes
+                if line[atom_resSeq].strip() in residues_bytes
+                )
+
+        mdict[fname] = {
+            'dssp': dssp,
+            'fasta': fasta,
+            'resids': ','.join(residues),
+            }
+        segs += 1
+
+
+    #dssp, fasta, residues = parse_dssp(
+    #    result.stdout,#.decode('utf-8'),
+    #    reduced=reduced,
+    #    )
+    #mdict[str(PDBIDFactory(pdb))] = {
+    #    'dssp': dssp,
+    #    'fasta': fasta,
+    #    'resids': residues,
+    #    }
 
     return
 

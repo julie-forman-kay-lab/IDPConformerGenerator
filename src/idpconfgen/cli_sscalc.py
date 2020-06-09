@@ -17,6 +17,7 @@ from idpconfgen.libs.libio import (
     read_path_bundle,
     read_dictionary_from_disk,
     save_dictionary,
+    make_destination_folder,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import mkdssp
@@ -144,6 +145,7 @@ def main(
 
     manager = Manager()
     mdict = manager.dict()
+    destination = make_destination_folder('sscalc')
 
     try:
         pool_function(
@@ -154,6 +156,7 @@ def main(
             ss_cmd=ss_cmd,
             mdict=mdict,
             reduced=reduced,
+            destination=destination,
             )
     except Exception as err:
         log.error('FAILED')

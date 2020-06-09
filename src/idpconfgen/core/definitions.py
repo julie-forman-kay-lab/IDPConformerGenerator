@@ -79,6 +79,14 @@ dssp_trans = str.maketrans(
     )
 
 
+dssp_trans_bytes = bytes.maketrans(
+    b''.join(c.encode() for c in dssp_ss_keys.all),
+    b'H' * len(dssp_ss_keys.all_helix) \
+    + b'E' * len(dssp_ss_keys.all_strand) \
+    + b'L' * len(dssp_ss_keys.all_loops),
+        )
+
+
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
 #_discarded_residues = (
