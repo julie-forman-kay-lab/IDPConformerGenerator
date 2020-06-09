@@ -393,7 +393,7 @@ def identify_backbone_gaps(atoms):
         ]
 
 
-def mkdssp(pdb, ss_cmd, destination=None, mdict=None, reduced=False):
+def mkdssp(pdb, ss_cmd, minimum=2, destination=None, mdict=None, reduced=False):
     """
     Execute `mkdssp` from DSSP.
 
@@ -410,13 +410,20 @@ def mkdssp(pdb, ss_cmd, destination=None, mdict=None, reduced=False):
     segs = 0
     for dssp, fasta, residues in parse_dssp(result.stdout.decode('utf-8'), reduced=reduced):
         fname =f'{str(PDBIDFactory(pdb))}_seg{segs}'
+        if len(residues) < minimum:
+            continue
         residues_bytes = set(c.encode() for c in residues)
 
-        with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
-            fout.writelines(
+        lines2write = [
                 line for line in pdb_bytes
                 if line[atom_resSeq].strip() in residues_bytes
-                )
+                ]
+
+        if all(l.startswith(b'HETATM') for l in lines2write):
+            continue
+
+        with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
+            fout.writelines(lines2write)
 
         mdict[fname] = {
             'dssp': dssp,
