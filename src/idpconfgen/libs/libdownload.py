@@ -60,7 +60,7 @@ def download_pdbs_to_tar(destination, items, **kwargs):
         with tarfile.open(dests, mode='a:') as tar:
             for fout, _data in sorted(result_dict.items()):
                 try:
-                    save_file_to_tar(tar, fout, _data)
+                    save_file_to_tar(tar, fout, ''.join(_data))
                 except Exception:
                     log.error(f'failed for {fout}')
 

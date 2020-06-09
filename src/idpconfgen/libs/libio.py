@@ -18,7 +18,7 @@ from idpconfgen.logger import S, T
 from idpconfgen.libs.libtimer import record_time
 
 
-@libcheck.argstype(list)
+#@libcheck.argstype(list)
 # NOT USED ANYWHERE
 def add_existent_files(storage, source):
     """
@@ -36,6 +36,7 @@ def add_existent_files(storage, source):
             log.error(S('file not found: {}', p.str()))
 
 
+#@libcheck.argstype(((list, tuple),))
 def check_file_exist(files_list):
     """
     Confirm all files in a list exist.
@@ -67,7 +68,7 @@ def check_file_exist(files_list):
     return not bool(files_not_found), files_not_found
 
 
-@libcheck.argstype(((list, tuple),))
+#@libcheck.argstype(((list, tuple),))
 def concatenate_entries(entry_list):
     """
     Concatente entries.
@@ -242,7 +243,7 @@ def make_destination_folder(dest):
         return dest_
 
 
-@libcheck.argstype(((list, tuple),))
+#@libcheck.argstype(((list, tuple),))
 def paths_from_flist(path):
     """
     Read Paths from file listing paths.
@@ -285,6 +286,7 @@ def period_suffix(ext):
     return f'.{ext[ext.find(".") + 1:]}'
 
 
+#@libcheck.argstype(((list, tuple),))
 def read_path_bundle(path_bundle, ext=None, listext='.list'):
     """
     Read path bundle.
@@ -327,21 +329,22 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     p_suff_list = partial(has_suffix, ext=listext)
 
     pbundle = map(Path, path_bundle)
-    pbundle2 = map(Path, path_bundle)
+    paths_exists = list(filter(Path.exists, pbundle))
 
     # files that do not exist
+    pbundle2 = map(Path, path_bundle)
     log_nonexistent(pbundle2)
 
     # files that exist
-    p1 = filter(Path.exists, pbundle)
-    p2 = filter(Path.exists, pbundle)
-    p3 = filter(Path.exists, pbundle)
+    #jp1 = filter(Path.exists, pbundle)
+    #jp2 = filter(Path.exists, pbundle)
+    #jp3 = filter(Path.exists, pbundle)
 
     # is dir filter
-    f1 = filter(Path.is_dir, p1)
+    f1 = filter(Path.is_dir, paths_exists)
 
     # reads list files
-    f2 = filter(p_suff_list, p2)
+    f2 = filter(p_suff_list, paths_exists)
 
     # files with valid extension
     def _is_f3(x):
@@ -351,7 +354,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
             has_suffix(x, ext=ext),
             ))
 
-    f3 = filter(_is_f3, p3)
+    f3 = filter(_is_f3, paths_exists)
 
     from_folders = CFI(map(p_lfr_ext, f1))
     from_lists = CFI(map(paths_from_flist, f2))
@@ -558,7 +561,10 @@ def save_pairs_to_tar(pairs, destination):
 
 def save_file_to_tar(tar, fout, data):
     sIO = BytesIO()
-    sIO.write('\n'.join(data).encode())
+    try:
+        sIO.write(data.encode())
+    except AttributeError:
+        sIO.write(data)
     info = tarfile.TarInfo(name=fout)
     info.size = sIO.seek(0, SEEK_END)
     sIO.seek(0)
@@ -606,6 +612,7 @@ class FileIteratorBase:
         return self
 
     def __getitem__(self, val):
+        #return [next(self) for i in range(val.stop - val.start)]
         for i in range(val.stop - val.start):
             # I had problems with the exhaustion of this generator
             # raising RuntimeError -> this solved
@@ -628,7 +635,7 @@ class FileIterator(FileIteratorBase):
 
     def __next__(self):
         next_file = next(self.imembers)
-        fin = open(next_file, 'r')
+        fin = open(next_file, 'rb')
         txt = fin.read()
         fin.close()
         return next_file, txt
@@ -651,5 +658,4 @@ class TarFileIterator(FileIteratorBase):
         f = self.origin.extractfile(member)
         txt = f.read()
         f.close()
-        print(member.name)
         return member.name, txt
