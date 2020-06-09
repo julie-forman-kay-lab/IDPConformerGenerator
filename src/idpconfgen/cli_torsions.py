@@ -88,7 +88,7 @@ def get_torsions(pdbfile, degrees=False):
         log.error(f'Could not treat: {pdbfile}: {repr(err)}')
         return
     structure.build()
-    structure.add_filter_record_name(('ATOM', 'HETATM'))
+    #structure.add_filter_record_name(('ATOM', 'HETATM'))
     structure.add_filter_backbone(minimal=True)
 
     data = structure.filtered_atoms
