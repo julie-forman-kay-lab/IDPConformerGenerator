@@ -29,14 +29,14 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-libcli.add_parser_pdbs(ap)
+libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
     'dssp',
     help='The DSSP file as saved by IDPConfGen SSEXT CLI',
     )
 
-libcli.add_parser_destination_folder(ap)
+libcli.add_argument_destination_folder(ap)
 
 ap.add_argument(
     '-s',

@@ -648,20 +648,25 @@ def save_structure_chains_and_segments(
 
     Logic to parse PDBs from RCSB.
     """
+    # local assignments for speed boost :D
     _DR = pdb_ligand_codes  # discarded residues
     _AE = _allowed_elements
+    _S = Structure
+    _ECC = eval_chain_case
+    _BI = blocked_ids
 
-    pdbdata = Structure(pdb_data)
+    pdbdata = _S(pdb_data)
     pdbdata.build()
 
     chain_set = pdbdata.chain_set
 
     chains = chains or chain_set
 
+    add_filter = pdbdata.add_filter
     pdbdata.add_filter_record_name(record_name)
-    pdbdata.add_filter(lambda x: x[col_resName] not in _DR)
-    pdbdata.add_filter(lambda x: x[col_element] in _AE)
-    pdbdata.add_filter(lambda x: x[col_altLoc] in altlocs)
+    add_filter(lambda x: x[col_resName] not in _DR)
+    add_filter(lambda x: x[col_element] in _AE)
+    add_filter(lambda x: x[col_altLoc] in altlocs)
 
     for chain in chains:
 
@@ -678,7 +683,7 @@ def save_structure_chains_and_segments(
         # downloaded is actualy in the blocked_ids.
         # because at the CLI level the user can add only the PDBID
         # to indicate download all chains, while some may be restricted
-        if chaincode in blocked_ids:
+        if chaincode in _BI:
             log.info(S(
                 f'Ignored code {chaincode} because '
                 'is listed in blocked ids.'
@@ -688,7 +693,7 @@ def save_structure_chains_and_segments(
         fout = f'{chaincode}.pdb'
 
         try:
-            chain = eval_chain_case(chain, chain_set)
+            chain = _ECC(chain, chain_set)
         except ValueError as err:
             log.error(repr(err))
             log.error(f'Skiping chain {chain} for {pdbname}')

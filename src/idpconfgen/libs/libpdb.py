@@ -311,7 +311,7 @@ class PDBList:
             )
 
     def __str__(self):
-        return '{} with {} element(s).'.format(
+        return '{} with {} element(s)'.format(
             self.__class__.__name__,
             len(self),
             )

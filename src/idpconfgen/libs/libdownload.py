@@ -21,6 +21,17 @@ POSSIBLELINKS = [
     ]
 
 
+def download_pdbs_from_ids(destination, *args, **kwargs):
+    """Get proper function to download PDBs based on the destination type."""
+    # specific functions for the download action
+    # functions are based on the destination type
+    DOWNLOADER = {
+        True: download_pdbs_to_folder,
+        destination.suffix == '.tar': download_pdbs_to_tar,
+        }
+    return DOWNLOADER[True](destination, *args, **kwargs)
+
+
 def download_pdbs_to_folder(destination, items, **kwargs):
     """
     Download PDBs to folder.
@@ -35,7 +46,7 @@ def download_pdbs_to_folder(destination, items, **kwargs):
             **kwargs,
             ):
 
-        for fname, data in sorted(result_dict.items()):
+        for fname, data in result_dict.items():
             with open(Path(dest, fname), 'w') as fout:
                 fout.write('\n'.join(data))
 
@@ -46,6 +57,8 @@ def download_pdbs_to_tar(destination, items, **kwargs):
 
     Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
     """
+    # append 'a' here combos with the 
+    # read_PDBID_from_source(destination), in cli_pdbdownloader
     _exists = {True: 'a', False: 'w'}
     dests = destination.str()
     dest = tarfile.open(dests, mode=_exists[destination.exists()])
@@ -60,7 +73,7 @@ def download_pdbs_to_tar(destination, items, **kwargs):
         with tarfile.open(dests, mode='a:') as tar:
             for fout, _data in sorted(result_dict.items()):
                 try:
-                    save_file_to_tar(tar, fout, ''.join(_data))
+                    save_file_to_tar(tar, fout, '\n'.join(_data))
                 except Exception:
                     log.error(f'failed for {fout}')
 
@@ -133,11 +146,3 @@ def fetch_pdb_id_from_RCSB(pdbid):
         raise IOError(f'Failed to download {pdbid} - attempts exhausted')
 
 
-def get_pdbs_downloader(destination):
-    """Get proper function to download PDBs based on the destination type."""
-    # classes to manage the download action
-    DOWNLOADER = {
-        True: download_pdbs_to_folder,
-        destination.suffix == '.tar': download_pdbs_to_tar,
-        }
-    return DOWNLOADER[True]

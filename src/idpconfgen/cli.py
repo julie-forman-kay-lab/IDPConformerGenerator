@@ -78,5 +78,4 @@ def maincli():
 
 
 if __name__ == '__main__':
-
     maincli()

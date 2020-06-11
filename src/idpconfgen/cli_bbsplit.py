@@ -33,7 +33,7 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-libcli.add_parser_pdbs(ap)
+libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
     '--dssp',
@@ -62,7 +62,7 @@ ap.add_argument(
     default=2,
     )
 
-libcli.add_parser_destination_folder(ap)
+libcli.add_argument_destination_folder(ap)
 libcli.add_argument_ncores(ap)
 
 

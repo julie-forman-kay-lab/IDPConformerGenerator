@@ -45,7 +45,7 @@ ap.add_argument(
     type=str,
     )
 
-libcli.add_parser_pdbs(ap)
+libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
     '-o',

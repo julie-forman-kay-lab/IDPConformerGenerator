@@ -96,4 +96,7 @@ pdb_ligand_codes = set(
     )
 
 blocked_ids_file = Path(core_folder, 'discarded_ids.txt')
-blocked_ids = [i for i in blocked_ids_file.read_text().split('\n') if i and not i.startswith('#')]
+blocked_ids = [
+    i for i in blocked_ids_file.read_text().split('\n')
+    if i and not i.startswith('#')
+    ]

@@ -15,19 +15,36 @@ The following PDBID formats are allowed:
 
 where, XXXX is the PDB ID code and Y the chain identifier. Y can have
 more then one character, for example, XXXXAB, will select chain 'AB'
-of PDB ID XXXX. Digits are also allowed.
+of PDB ID XXXX (for mmCIF cases); digits are also allowed. If no chainID
+is provided, saves each chain of the PDB file separately.
+
+Detailed procedures:
+* PDBs/mmCIFs are saved parsed in PDB format.
+* Known solvent and ligands are removed
+* Considers only altLoc 'A' or ' '.
+* Considers only elements composing aminoacids
+* selects only the first model in multi MODEL structures
+* renumbers atoms for saved chains
+* parses output through pdb-tools `pdb_delinsert` filter.
+
+Accepts TAR files as output destination.
+
+DO NOT forget to use the `-u` parameter to perform the actual download.
+Otherwise a simple comparison between source and destination is performed.
 
 USAGE:
-    $ icgpdbdl XXXX
-    $ icgpdbdl XXXXY -d raw_pdbs
-    $ icgpdbdl pdb.list -d raw_pdbs -u
-
+    $ idpconfgen pdbdl XXXX
+    $ idpconfgen pdbdl XXXXY -d <FOLDER>
+    $ idpconfgen pdbdl pdbid.list -d <FOLDER> -u
+    $ idpconfgen pdbdl pdbid.list -d <DESTINATION TAR FILE> -u -d
 """
 import argparse
+from functools import reduce
 
 from idpconfgen import Path, log
+from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libdownload import get_pdbs_downloader
+from idpconfgen.libs.libdownload import download_pdbs_from_ids
 from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T, init_files
@@ -45,71 +62,34 @@ ap = libcli.CustomParser(
     usage=_us,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-# https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    'pdbids',
-    help='PDBID:CHAIN identifiers to download.',
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-d',
-    '--destination',
-    help=(
-        'Destination folder where PDB files will be stored. '
-        'Defaults to current working directory.'
-        'Alternatively, you can provide a path to a .tar file '
-        'where PDBs will be saved.'
-        ),
-    type=Path,
-    default=Path.cwd(),
-    )
-
-ap.add_argument(
-    '-u',
-    '--update',
-    help=(
-        'Updates destination folder/file according to input PDB list. '
-        'If not provided, a comparison between input and destination '
-        'is made.'
-        ),
-    action='store_true',
-    )
-
-ap.add_argument(
-    '-rn',
-    '--record_name',
-    help='The coordinate PDB record name. Default: ("ATOM", "HETATM")',
-    default=('ATOM', 'HETATM'),
-    action=libcli.ArgsToTuple,
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-c',
-    '--chunks',
-    help='Number of chunks to process in memory before saving to disk.',
-    default=5_000,
-    type=int,
-    )
-
+libcli.add_argument_pdbids(ap)
+libcli.add_argument_destination_folder(ap)
+libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
+libcli.add_argument_chunks(ap)
 
 
 def _load_args():
+    """Load arguments."""
     cmd = ap.parse_args()
     return cmd
+
+
+def maincli():
+    """Command-line interface entry point."""
+    cmd = _load_args()
+    main(**vars(cmd))
 
 
 def main(
         pdbids,
         chunks=5_000,
         destination=None,
+        func=None,
         ncores=1,
         record_name=('ATOM', 'HETATM'),
         update=False,
-        **kwargs,
         ):
     """Run main script logic."""
     init_files(log, LOGFILESNAME)
@@ -125,53 +105,57 @@ def main(
         )
 
     #
-    log.info(T('Comparison between input and destination'))
-    pdblist_from_destination = read_PDBID_from_source(destination)
-    pdblist_comparison = pdblist.difference(pdblist_from_destination)
+    log.info(T('Filtering input'))
+    destination = destination or Path.cwd()
     log.info(
-        f"{S(f'{str(pdblist_comparison)}')}\n"
-        f"{S('done')}\n"
+        f"{S(f'from destination: {destination}')}\n"
+        f"{S('and other sources...')}"
         )
+
+    # comparison block
+    def diff(first, other):
+        return first.difference(other)
+
+    remove_from_input = [
+        read_PDBID_from_source(destination),
+        PDBList(blocked_ids),
+        ]
+
+    # yes, there are just two items in remove_from_input, why use reduce?
+    # what if more are added in the future? :-P the engine is already created
+    pdblist_comparison = reduce(diff, remove_from_input, pdblist)
+    log.info(S(f'Found {str(pdblist_comparison)} to download'))
+    #
 
     something_to_download = len(pdblist_comparison) > 0
     if something_to_download and update:
 
-        downloader = get_pdbs_downloader(destination)
-
-        downloader(
+        download_pdbs_from_ids(
             destination,
-            sorted(list(pdblist_comparison.name_chains_dict.items()), key=lambda x: x[0]),
+            sorted(pdblist_comparison.name_chains_dict.items()),
             ncores=ncores,
             chunks=chunks,
             record_name=record_name,
             )
 
-        #log.info(T('Reading UPDATED destination'))
+        log.info(T('Reading UPDATED destination'))
         pdblist_updated = read_PDBID_from_source(destination)
         pdblist_up_comparison = pdblist.difference(pdblist_updated)
         log.info(S(f'{str(pdblist_up_comparison)}'))
         if len(pdblist_up_comparison) > 0:
-            log.info(S('There are PDBIDs not downloaded'))
             log.info(S(
+                'There are PDBIDs not downloaded\n.'
                 'Those IDs have been registered in the '
                 f'{LOGFILESNAME}.debug file.'
                 ))
-            log.debug(
-                '\n'.join(str(_pdbid) for _pdbid in pdblist_up_comparison)
-                )
+            log.debug('\n'.join(str(_id) for _id in pdblist_up_comparison))
+
     elif not something_to_download and update:
-        log.info('There is nothing to download.')
-        log.info('All requested IDs are already at the destination folder.')
+        log.info(S('There is nothing to download.'))
+        log.info(S('All requested IDs are already at the destination folder.'))
 
-
-    log.info(S('done\n'))
+    log.info(T('PDB Downloader finished'))
     return
-
-
-def maincli():
-    """Command-line interface entry point."""
-    cmd = _load_args()
-    main(**vars(cmd))
 
 
 if __name__ == '__main__':
