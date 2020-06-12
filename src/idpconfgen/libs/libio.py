@@ -410,13 +410,10 @@ def read_PDBID_from_folder(folder):
     -------
     :class:`idpconfgen.libs.libpdb.PDBList`
     """
-    log.info(T('reading destination folder'))
-    log.info(S(f'from: {folder}'))
+    #log.info(S('reading destination folder'))
+    #log.info(S(f'from: {folder}'))
     pdblist = PDBList(glob_folder(folder, '*.pdb'))
-    log.info(
-        f"{S(f'found: {str(pdblist)}')}\n"
-        f"{S('done')}\n"
-        )
+    #log.info(S(f'found: {str(pdblist)}'))
     return pdblist
 
 
@@ -433,8 +430,8 @@ def read_PDBID_from_source(source):
     :class:`idpconfgen.libs.libpdb.PDBList`.
     """
     options = {
+        True: read_PDBID_from_folder,  # considers it is a folder if not a tar
         source.suffix == '.tar': read_PDBID_from_tar,
-        source.is_dir(): read_PDBID_from_folder,
         }
     return options[True](source)
 
@@ -457,26 +454,22 @@ def read_PDBID_from_tar(tar_file):
     :class:`idpconfgen.libs.libpdb.PDBList`
         If file is not found returns an empty PDBList.
     """
-    title = (
-        f"{T('Reading PDB IDs in tar file.')}\n"
-        f"{S(f'from: {tar_file}')}\n"
-        )
-    log.info(title)
+    #title = (
+    #    f"{T('Reading PDB IDs in tar file.')}\n"
+    #    f"{S(f'from: {tar_file}')}\n"
+    #    )
+    #log.info(title)
 
     try:
         tar = tarfile.open(tar_file.str(), 'r:*')
         p = PDBList(tar.getnames())
         tar.close()
+        log.info(S(f'found: {str(tar_file)}'))
 
     except FileNotFoundError:
-        log.info(f'tar_file {tar_file} not found. Returning empty PDBList.')
+        log.info(S(f'tar_file {tar_file} not found. Returning empty PDBList.'))
         p = PDBList([])
 
-    end = (
-        f"{S(f'found: {str(tar_file)}')}"
-        f"{S('done')}\n"
-        )
-    log.info(end)
     return p
 
 

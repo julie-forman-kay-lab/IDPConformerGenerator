@@ -311,7 +311,7 @@ class PDBList:
             )
 
     def __str__(self):
-        return '{} with {} element(s).'.format(
+        return '{} with {} element(s)'.format(
             self.__class__.__name__,
             len(self),
             )
@@ -340,7 +340,11 @@ class PDBList:
         """Export PDBIDs: Chains dictionary map."""
         name_chains = defaultdict(list)
         for pdbid in self:
-            name_chains[pdbid.name].append(pdbid.chain)
+            pc = pdbid.chain
+            if pc:
+                name_chains[pdbid.name].append(pc)
+            else:
+                name_chains[pdbid.name]
         return name_chains
 
     def to_tuple(self):

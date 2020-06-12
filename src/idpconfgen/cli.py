@@ -16,7 +16,7 @@ import argparse
 import sys
 
 from idpconfgen import cli_pdbdownloader as pdbdl
-from idpconfgen import cli_pdb_raw_downloader as raw_pdbdl
+from idpconfgen import cli_fetch
 from idpconfgen import cli_filter as cli_filter
 from idpconfgen import cli_bbsplit as cli_bbsplit
 from idpconfgen import cli_segext as segext
@@ -46,7 +46,7 @@ subparsers = ap.add_subparsers(
     )
 
 libcli.add_version(ap)
-libcli.add_subparser(subparsers, raw_pdbdl)
+libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, pdbdl)
 libcli.add_subparser(subparsers, cli_filter)
 libcli.add_subparser(subparsers, fastaext)
@@ -78,5 +78,4 @@ def maincli():
 
 
 if __name__ == '__main__':
-
     maincli()

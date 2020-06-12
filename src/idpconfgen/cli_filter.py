@@ -56,8 +56,8 @@ ap = libcli.CustomParser(
 
 
 
-libcli.add_parser_pdbs(ap)
-libcli.add_parser_destination_folder(ap)
+libcli.add_argument_pdb_files(ap)
+libcli.add_argument_destination_folder(ap)
 libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 

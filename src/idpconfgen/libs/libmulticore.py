@@ -3,13 +3,12 @@ import multiprocessing
 import subprocess
 from functools import partial
 from multiprocessing import Pool, Manager
-import time
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
-from idpconfgen.logger import S
-from idpconfgen.libs.libtimer import ProgressWatcher
 from idpconfgen.libs.libio import save_pairs_to_disk, save_dictionary
+from idpconfgen.libs.libtimer import ProgressWatcher
+from idpconfgen.logger import S
 
 
 def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
@@ -46,8 +45,8 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
                 pb.increment()
             except StopIteration:
                 break
-            #j#jexcept IndexError:
-             #   log.info(f'IndexError of multiprocessing, ignoring something')
+            except IndexError:
+                log.info(f'IndexError of multiprocessing, ignoring something')
 
 
 def pool_function_in_chunks(

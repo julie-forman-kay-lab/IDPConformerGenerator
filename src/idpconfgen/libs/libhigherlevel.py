@@ -5,12 +5,102 @@ Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
 from collections import defaultdict
+from functools import reduce
 
-from idpconfgen import Path
-from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues, col_resSeq
+from idpconfgen import Path, log
+from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
 from idpconfgen.libs.libparse import group_runs
-from idpconfgen.libs.libtimer import record_time
+from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.libs.libpdb import atom_resSeq
+from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues
+from idpconfgen.libs.libtimer import record_time
+from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libdownload import download_dispacher
+
+
+
+def download_pipeline(func, logfilename='.download'):
+    """
+    """
+    LOGFILESNAME = logfilename
+    def main(
+            pdbids,
+            chunks=5_000,
+            destination=None,
+            ncores=1,
+            update=False,
+            **kwargs,
+            ):
+        """Run main script logic."""
+        init_files(log, LOGFILESNAME)
+
+        #
+        log.info(T('reading input PDB list'))
+
+        pdblist = PDBList(concatenate_entries(pdbids))
+
+        log.info(
+            f"{S(str(pdblist))}\n"
+            f"{S('done')}\n"
+            )
+
+        #
+        log.info(T('Filtering input'))
+        destination = destination or Path.cwd()
+        log.info(
+            f"{S(f'from destination: {destination}')}\n"
+            f"{S('and other sources...')}"
+            )
+
+        # comparison block
+        def diff(first, other):
+            return first.difference(other)
+
+        remove_from_input = [
+            read_PDBID_from_source(destination),
+            PDBList(blocked_ids),
+            ]
+
+        # yes, there are just two items in remove_from_input, why use reduce?
+        # what if more are added in the future? :-P the engine is already created
+        pdblist_comparison = reduce(diff, remove_from_input, pdblist)
+        log.info(S(f'Found {str(pdblist_comparison)} to download'))
+        #
+
+        something_to_download = len(pdblist_comparison) > 0
+        if something_to_download and update:
+
+            download_dispacher(
+                func,
+                destination,
+                sorted(pdblist_comparison.name_chains_dict.items()),
+                ncores=ncores,
+                chunks=chunks,
+                **kwargs,
+                )
+
+            log.info(T('Reading UPDATED destination'))
+            pdblist_updated = read_PDBID_from_source(destination)
+            pdblist_up_comparison = pdblist.difference(pdblist_updated)
+            log.info(S(f'{str(pdblist_up_comparison)}'))
+            if len(pdblist_up_comparison) > 0:
+                log.info(S(
+                    'There are PDBIDs not downloaded\n.'
+                    'Those IDs have been registered in the '
+                    f'{LOGFILESNAME}.debug file.'
+                    ))
+                log.debug('\n'.join(str(_id) for _id in pdblist_up_comparison))
+
+        elif not something_to_download and update:
+            log.info(S('There is nothing to download.'))
+            log.info(S('All requested IDs are already at the destination folder.'))
+
+        log.info(T('PDB Downloader finished'))
+        return
+
+    return main
+
 
 
 def split_backbone_segments(
@@ -102,6 +192,7 @@ def _split_backbone_segments(
 
 def split_sscalc_data(pdbname, data, segments):
     """
+    To do.
     """
     pdb_dssp_data = data[pdbname]
     structural_data = [k for k in pdb_dssp_data.keys() if k != 'resids']
@@ -144,4 +235,3 @@ def split_sscalc_data(pdbname, data, segments):
         splitdata[key]['resids'] = ','.join(reduction)
 
     return splitdata, segs_in_dssp
-
