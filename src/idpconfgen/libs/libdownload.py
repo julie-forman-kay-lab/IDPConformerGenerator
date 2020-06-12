@@ -2,14 +2,12 @@
 import tarfile
 import time
 import urllib.request
-from io import BytesIO
-from os import SEEK_END
 from urllib.error import URLError
 
 from idpconfgen import Path, log
 from idpconfgen.libs.libio import make_destination_folder, save_file_to_tar
 from idpconfgen.libs.libmulticore import pool_function_in_chunks
-from idpconfgen.libs.libstructure import Structure, save_structure_chains_and_segments
+from idpconfgen.libs.libstructure import save_structure_chains_and_segments
 from idpconfgen.logger import S
 
 
@@ -21,72 +19,48 @@ POSSIBLELINKS = [
     ]
 
 
-def download_pdbs_from_ids(destination, *args, **kwargs):
-    """Get proper function to download PDBs based on the destination type."""
-    # specific functions for the download action
-    # functions are based on the destination type
+def download_dispacher(func, destination, *args, **kwargs):
+    """Dispaches the appropriate download env based on `destination`."""
     DOWNLOADER = {
         True: download_pdbs_to_folder,
         destination.suffix == '.tar': download_pdbs_to_tar,
         }
-    return DOWNLOADER[True](destination, *args, **kwargs)
+    return DOWNLOADER[True](destination, *args, func=func, **kwargs)
 
 
-def download_pdbs_to_folder(destination, items, **kwargs):
+def download_pdbs_to_folder(destination, items, func=None, **kwargs):
     """
     Download PDBs to folder.
 
     Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
     """
     dest = make_destination_folder(destination)
-
-    for result_dict in pool_function_in_chunks(
-            download_structure,
-            items,
-            **kwargs,
-            ):
-
+    for result_dict in pool_function_in_chunks(func, items, **kwargs):
         for fname, data in result_dict.items():
             with open(Path(dest, fname), 'w') as fout:
-                fout.write('\n'.join(data))
+                fout.write(data)
 
 
-def download_pdbs_to_tar(destination, items, **kwargs):
+def download_pdbs_to_tar(destination, items, func=None, **kwargs):
     """
     Download PDBs to tarfile.
 
     Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
     """
-    # append 'a' here combos with the 
+    # append 'a' here combos with the
     # read_PDBID_from_source(destination), in cli_pdbdownloader
     _exists = {True: 'a', False: 'w'}
     dests = destination.str()
     dest = tarfile.open(dests, mode=_exists[destination.exists()])
     dest.close()
 
-    for result_dict in pool_function_in_chunks(
-            download_structure,
-            items,
-            **kwargs,
-            ):
-
+    for result_dict in pool_function_in_chunks(func, items, **kwargs):
         with tarfile.open(dests, mode='a:') as tar:
             for fout, _data in sorted(result_dict.items()):
                 try:
-                    save_file_to_tar(tar, fout, '\n'.join(_data))
+                    save_file_to_tar(tar, fout, _data)
                 except Exception:
                     log.error(f'failed for {fout}')
-
-
-# DEPRECATED
-def download_raw_PDBS(pdbid, folder=''):
-    """Download raw PDBs without any filtering."""
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbid.name)
-    s = Structure(downloaded_data)
-    s.build()
-    s.add_filter_chain(pdbid.chain)
-    fout = Path(folder, f'{pdbid}.pdb')
-    fout.write_bytes(downloaded_data)
 
 
 def download_structure(pdbid, **kwargs):
@@ -146,3 +120,11 @@ def fetch_pdb_id_from_RCSB(pdbid):
         raise IOError(f'Failed to download {pdbid} - attempts exhausted')
 
 
+def fetch_raw_PDBs(pdbid, mdict=None, **kwargs):
+    """Download raw PDBs without any filtering."""
+    pdbname = pdbid[0]
+    try:
+        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    except IOError:
+        log.error(f'Complete download failure for {pdbname}')
+    mdict[f'{pdbname}.pdb'] = downloaded_data.decode('utf-8')

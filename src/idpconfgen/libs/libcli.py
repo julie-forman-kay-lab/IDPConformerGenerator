@@ -9,6 +9,17 @@ from idpconfgen import Path, __version__
 detailed = "detailed instructions:\n\n{}"
 
 
+def load_args(ap):
+    cmd = ap.parse_args()
+    return cmd
+
+
+def maincli(ap, main):
+    """Command-line interface entry point."""
+    cmd = load_args(ap)
+    main(**vars(cmd))
+
+
 class FolderOrTar(argparse.Action):
     """Controls if input is folder, files or tar."""
 

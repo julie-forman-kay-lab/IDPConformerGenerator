@@ -701,7 +701,7 @@ def save_structure_chains_and_segments(
 
         pdbdata.add_filter_chain(chain)
 
-        mdict[fout] = list(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
+        mdict[fout] = '\n'.join(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
 

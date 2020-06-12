@@ -430,8 +430,8 @@ def read_PDBID_from_source(source):
     :class:`idpconfgen.libs.libpdb.PDBList`.
     """
     options = {
+        True: read_PDBID_from_folder,  # considers it is a folder if not a tar
         source.suffix == '.tar': read_PDBID_from_tar,
-        source.is_dir(): read_PDBID_from_folder,
         }
     return options[True](source)
 
