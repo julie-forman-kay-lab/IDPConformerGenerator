@@ -2,6 +2,7 @@
 import tarfile
 import time
 import urllib.request
+import traceback
 from urllib.error import URLError
 
 from idpconfgen import Path, log
@@ -83,12 +84,16 @@ def download_structure(pdbid, **kwargs):
     except IOError:
         log.error(f'Complete download failure for {pdbname}')
         return
-    save_structure_chains_and_segments(
-        downloaded_data,
-        pdbname,
-        chains=chains,
-        **kwargs,
-        )
+    try:
+        save_structure_chains_and_segments(
+            downloaded_data,
+            pdbname,
+            chains=chains,
+            **kwargs,
+            )
+    except Exception as err:
+        log.debug(traceback.format_exc())
+        log.error(err)
 
 
 def fetch_pdb_id_from_RCSB(pdbid):
