@@ -342,9 +342,13 @@ def eval_chain_case(chain, chain_set):
     if chain in chain_set:
         return chain
     else:
-        cl = chain.lower()
-        if cl in chain_set:
-            return cl
+        #cl = chain.lower()
+        for i in range(len(chain) + 1):
+            cl = f'{chain[:i]}{chain[i:].lower()}'
+            print(cl)
+            if cl in chain_set:
+                return cl
+
     raise ValueError(f'Neither {chain}/{cl} are in set {chain_set}')
 
 

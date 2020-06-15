@@ -10,6 +10,7 @@ import tarfile
 from io import BytesIO
 from os import SEEK_END
 from functools import partial
+from pprint import pprint
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
@@ -495,12 +496,21 @@ def save_dictionary(mydict, output='mydict.pickle'):
     KeyError
         If extension is not a compatible format.
     """
+    # some dicts come from multiprocessing.Manager
+    # this solves the problem always
+    _d = dict(mydict)
+    try:
+        suffix = Path(output).suffix
+    except TypeError:
+        pprint(_d, indent=4, sort_dicts=True)
+        return
+
     options = {
         '.pickle': save_dict_to_pickle,
         '.json': save_dict_to_json,
         }
 
-    options[Path(output).suffix](mydict, output)
+    options[suffix](_d, output, sort_keys=False)
 
 
 def save_dict_to_json(
@@ -515,7 +525,7 @@ def save_dict_to_json(
         json.dump(mydict, fout, indent=indent, sort_keys=sort_keys)
 
 
-def save_dict_to_pickle(mydict, output='mydict.pickle'):
+def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
     """Save dictionary to pickle file."""
     assert Path(output).suffix == '.pickle'
     with open(output, 'wb') as handle:

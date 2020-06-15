@@ -49,7 +49,7 @@ setup(
         'Intended Audience :: Science/Research',
         'Natural Language :: English',
         'Operating System :: POSIX',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
     project_urls={
@@ -61,7 +61,7 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
         ],
-    python_requires='==3.7.*',
+    python_requires='==3.8.*',
     install_requires=[
         'matplotlib>=3',
         'numpy>=1.7',

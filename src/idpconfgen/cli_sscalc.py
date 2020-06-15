@@ -43,7 +43,7 @@ ap.add_argument(
     '-o',
     '--output',
     help=(
-        "A path to a new file where the PDBID secondary structure and FASTA"
+        "A path to the file where the PDBID secondary structure and FASTA"
         " information dictionary will be saved. "
         "Defaults to sscalc.json."
         ),

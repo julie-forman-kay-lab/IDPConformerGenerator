@@ -9,14 +9,13 @@ from functools import reduce
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.libs.libdownload import download_dispacher
 from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
 from idpconfgen.libs.libparse import group_runs
-from idpconfgen.libs.libpdb import PDBList
-from idpconfgen.libs.libpdb import atom_resSeq
+from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues
 from idpconfgen.libs.libtimer import record_time
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libdownload import download_dispacher
 
 
 
@@ -101,6 +100,18 @@ def download_pipeline(func, logfilename='.download'):
 
     return main
 
+
+def get_fastas(pdbid, mdict=None):
+    pdbname = Path(pdbid[0]).stem
+    pdbdata = pdbid[1]
+    structure = Structure(pdbdata)
+    structure.build()
+    fasta = structure.fasta
+    assert len(fasta) == 1
+    mdict[str(PDBIDFactory(pdbname))] = next(iter(fasta.values()))
+    #out_data.append('{}|{}'.format(pdbid, next(iter(fasta.values()))))
+
+    return
 
 
 def split_backbone_segments(

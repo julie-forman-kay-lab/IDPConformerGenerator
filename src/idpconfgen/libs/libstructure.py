@@ -690,8 +690,6 @@ def save_structure_chains_and_segments(
                 ))
             continue
 
-        fout = f'{chaincode}.pdb'
-
         try:
             chain = _ECC(chain, chain_set)
         except ValueError as err:
@@ -701,6 +699,7 @@ def save_structure_chains_and_segments(
 
         pdbdata.add_filter_chain(chain)
 
+        fout = f'{chaincode}.pdb'
         mdict[fout] = '\n'.join(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
 
         pdbdata.pop_last_filter()
