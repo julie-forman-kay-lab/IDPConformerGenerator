@@ -1,6 +1,7 @@
 """Multi-core related objects."""
 import multiprocessing
 import subprocess
+from contextlib import suppress
 from functools import partial
 from multiprocessing import Pool, Manager
 
@@ -85,6 +86,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
         func,
         tasks,
         destination,
+        mdata_source=None,
         mdata_dest='mdata_dest.json',
         chunks=5000,
         **kwargs,
@@ -99,6 +101,8 @@ def pool_chunks_to_disk_and_data_at_the_end(
     """
     manager = Manager()
     mdata = manager.dict()
+    with suppress(TypeError):
+        mdata.update(mdata_source)
 
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]

@@ -160,11 +160,13 @@ def add_argument_chunks(parse):
 # pdbids
 
 # optional:
-# destination folder: -d, --destination
-# number of cores: -n, --ncores
-# replace (whatever it shall replace): --replace
-# PDB RECORD name: -rn, --record-name
-# update (whatever it shall update): -u, --update
+# -d, --destination       : destination folder
+# -n, --ncores            : number of cores
+# --replace               : replace (whatever shalls replace)
+# -rd, --reduced          : reduces secondary structure representation
+# -rn, --record-name      : PDB RECORD name
+# -u, --update            : update (whatever shalls update)
+
 
 def add_argument_destination_folder(parser):
     """
@@ -235,6 +237,18 @@ def add_argument_pdbids(parser):
         nargs='+',
         )
 
+def add_argument_reduced(parser):
+    """Add `reduced` argument."""
+    parser.add_argument(
+        '-rd',
+        '--reduced',
+        help=(
+            'Reduces nomenclature for secondary structure identity '
+            'to \'L\', \'H\' and \'E\'.'
+            ),
+        action='store_true',
+        )
+
 
 def add_argument_replace(parser):
     """Add argument `replace`."""
@@ -258,6 +272,21 @@ def add_argument_record(parser):
         )
 
 
+def add_argument_source(parser):
+    """Add `source` argument to parser."""
+    parser.add_argument(
+        '-sc',
+        '--source',
+        help=(
+            'Builds the output on top of the source, '
+            'instead of starting from scratch. '
+            'Replaces prexisting entries'
+            ),
+        type=Path,
+        default=None,
+        )
+
+
 def add_argument_update(parser):
     """Add update argument to argument parser."""
     parser.add_argument(
@@ -269,4 +298,12 @@ def add_argument_update(parser):
             'is provided.'
             ),
         action='store_true',
+        )
+
+def add_argument_cmd(parser):
+    """Add the command for the external executable."""
+    parser.add_argument(
+        'cmd',
+        help='The path to the executable file used in this routine.',
+        type=str,
         )

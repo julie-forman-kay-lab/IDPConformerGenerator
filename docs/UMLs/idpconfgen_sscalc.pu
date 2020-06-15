@@ -3,6 +3,12 @@
 start
 
 :idpconfgen //sscalc//;
+note right
+    This pipeline currently uses //mkdssp//
+    but can be configured to others by dispaching
+    different functions without altering the main
+    pipeline
+end note
 
 partition #LIGHTGREY Examples {
     #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs/ -o dssp.json -n;
@@ -15,10 +21,10 @@ partition #LIGHTGREY Examples {
         where //filtered_pdb.tar// is a
         tarfile containing pdb files.
     end note
-    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json [-r|--reduced] -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json [-rd|--reduced] -n;
     note right
         //reduced// converts all
-        DSSP tags to H, E, or L/
+        DSSP tags to H, E, or L
     end note
     #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json --complete previous_dssp.json -n;
     }
@@ -39,7 +45,7 @@ if (--complete) then (reads previous)
     it with the new calculation;
     note left
         Entries with the same ID
-        are overwritten;
+        are overwritten
     end note
 else (not given)
     :starts a blank output file;
@@ -47,11 +53,36 @@ endif
 
 fork
 
-:subprocess //mkdssp// on each PDB;
+:subprocess //mkdssp// for the PDB;
+note right
+    At this stage, single chain
+    PDBs are expected;
+end note
+:identify backbone discontinuity
+    as given by DSSP;
+note right
+    This considers also carbonyl oxigen,
+    different from my initial approach;
+end note
 :collects:
         residue number
         Sec Str character
         FASTA character;
+
+:open PDB file;
+ while (for each backbone segment)
+
+if (length segment) then (< minimum)
+    :ignore;
+    end
+elseif (records) then (are all HETATM)
+    :ignore;
+    end
+else (all good)
+    :saves segment from PDB in new file;
+endif
+
+endwhile (no more segments)
 end fork
 note right #whitesmoke
     This process is performed in parallel

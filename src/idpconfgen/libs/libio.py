@@ -102,7 +102,7 @@ def concatenate_entries(entry_list):
             yield entry
 
 
-def extract_from_tar(tar_file, output='.'):
+def extract_from_tar(tar_file, output=None, ext='.pdb'):
     """
     Extract files from tarfile.
 
@@ -120,11 +120,12 @@ def extract_from_tar(tar_file, output='.'):
     list
         A list of Path-objects pointing to the extracted files.
     """
+    output = output or Path.cwd()
     tar = tarfile.open(tar_file)
-    names = tar.getnames()
-    tar.extractall(path=output)
+    members = [member for member in tar.getmembers() if member.name.endswith(ext)]
+    tar.extractall(path=output, members=members)
     tar.close()
-    return [Path(output, i) for i in names]
+    return [Path(output, i.name) for i in members]
 
 
 def glob_folder(folder, ext):
@@ -555,9 +556,9 @@ def save_pairs_to_tar(pairs, destination):
 def save_file_to_tar(tar, fout, data):
     sIO = BytesIO()
     try:
-        sIO.write(data.encode())
-    except AttributeError:
         sIO.write(data)
+    except TypeError:
+        sIO.write(data.encode())
     info = tarfile.TarInfo(name=fout)
     info.size = sIO.seek(0, SEEK_END)
     sIO.seek(0)
@@ -567,7 +568,10 @@ def save_file_to_tar(tar, fout, data):
 def save_pairs_to_files(pairs, destination):
     dest = make_destination_folder(destination)
     for k, v in pairs:
-        Path(dest, k).write_text(v)
+        try:
+            Path(dest, k).write_text(v)
+        except TypeError:
+            Path(dest, k).write_bytes(v)
 
 
 def write_text(text, output=None):

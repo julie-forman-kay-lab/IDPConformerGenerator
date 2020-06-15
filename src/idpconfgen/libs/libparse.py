@@ -393,25 +393,36 @@ def identify_backbone_gaps(atoms):
         ]
 
 
-def mkdssp(pdb, ss_cmd, minimum=2, destination=None, mdict=None, reduced=False):
+def mkdssp_w_split(
+        pdb,
+        cmd,
+        minimum=2,
+        destination=None,
+        mdata=None,
+        mfiles=None,
+        reduced=False,
+        ):
     """
     Execute `mkdssp` from DSSP.
 
     https://github.com/cmbi/dssp
     """
     pdbfile = fspath(pdb.resolve())
-    cmd = [ss_cmd, '-i', pdbfile]
-    result = subprocess.run(cmd, capture_output=True)
+    _cmd = [cmd, '-i', pdbfile]
+    result = subprocess.run(_cmd, capture_output=True)
 
     # did not use the pathlib interface read_bytes on purpose.
     with open(pdbfile, 'rb') as fin:
         pdb_bytes = fin.readlines()
 
     segs = 0
-    for dssp, fasta, residues in parse_dssp(result.stdout.decode('utf-8'), reduced=reduced):
-        fname =f'{str(PDBIDFactory(pdb))}_seg{segs}'
+    dssp_text = result.stdout.decode('utf-8')
+    for dssp, fasta, residues in parse_dssp(dssp_text, reduced=reduced):
         if len(residues) < minimum:
             continue
+
+        fname =f'{str(PDBIDFactory(pdb))}_seg{segs}'
+
         residues_bytes = set(c.encode() for c in residues)
 
         lines2write = [
@@ -422,10 +433,11 @@ def mkdssp(pdb, ss_cmd, minimum=2, destination=None, mdict=None, reduced=False):
         if all(l.startswith(b'HETATM') for l in lines2write):
             continue
 
-        with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
-            fout.writelines(lines2write)
+        mfiles[f'{fname}.pdb'] = b''.join(lines2write)
+        #with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
+            #fout.writelines(lines2write)
 
-        mdict[fname] = {
+        mdata[fname] = {
             'dssp': dssp,
             'fasta': fasta,
             'resids': ','.join(residues),

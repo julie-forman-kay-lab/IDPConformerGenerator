@@ -8,7 +8,6 @@ USAGE:
 """
 import argparse
 import shutil
-from multiprocessing import Manager
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -16,11 +15,9 @@ from idpconfgen.libs.libio import (
     extract_from_tar,
     read_path_bundle,
     read_dictionary_from_disk,
-    save_dictionary,
-    make_destination_folder,
     )
-from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libparse import mkdssp
+from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end
+from idpconfgen.libs.libparse import mkdssp_w_split
 from idpconfgen.logger import S, T, init_files
 
 
@@ -38,14 +35,8 @@ ap = libcli.CustomParser(
     usage=_us,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-# https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    'ss_cmd',
-    help='The path to the DSSP executable file.',
-    type=str,
-    )
-
+libcli.add_argument_cmd(ap)
 libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
@@ -61,48 +52,23 @@ ap.add_argument(
     action=libcli.CheckExt({'.json'}),
     )
 
-ap.add_argument(
-    '-r',
-    '--reduced',
-    help=(
-        'Reduces nomenclature for secondary structure identity '
-        'to \'L\', \'H\' and \'E\'.'
-        ),
-    action='store_true',
-    )
-
-ap.add_argument(
-    '-c',
-    '--complete',
-    help='A previous DSSP DB file to complete with new entries.',
-    )
-
-
+libcli.add_argument_reduced(ap)
+libcli.add_argument_chunks(ap)
+#libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 
 
-def _load_args():
-    cmd = ap.parse_args()
-    return cmd
-
-
-def maincli():
-    """
-    Execute main client function.
-
-    Reads command line arguments and executes logic.
-    """
-    cmd = _load_args()
-    main(**vars(cmd))
-
-
 def main(
-        ss_cmd,
-        pdbs,
-        complete=None,
+        cmd,
+        pdb_files,
+        chunks=5000,
+        func=None,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
+        minimum=2,
+        split_destination='sscalc_splitted.tar',
+        #update=False,
         **kwargs,
         ):
     """
@@ -128,49 +94,37 @@ def main(
 
     log.info(T('reading input paths'))
     try:
-        pdbs2operate = extract_from_tar(pdbs, output=TMPDIR)
+        pdbs2operate = extract_from_tar(pdb_files, output=TMPDIR, ext='.pdb')
         _istarfile = True
     except TypeError:
-        pdbs2operate = list(read_path_bundle(pdbs, ext='pdb'))
+        pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
 
-    if complete:
-        log.info(T(f'reading previous DSSP file: {complete}'))
-        prev_dssp = read_dictionary_from_disk(complete)
-    else:
-        prev_dssp = {}
-
     log.info(T('preparing task execution'))
 
-    manager = Manager()
-    mdict = manager.dict()
-    destination = make_destination_folder('sscalc')
-
     try:
-        pool_function(
-            mkdssp,
+        pool_chunks_to_disk_and_data_at_the_end(
+            mkdssp_w_split,
             pdbs2operate,
+            destination=split_destination,
             ncores=ncores,
+            chunks=chunks,
+            #mdata_source=prev_dssp,
+            mdata_dest=output,
             # kwargs for mkdssp function
-            ss_cmd=ss_cmd,
-            mdict=mdict,
+            cmd=cmd,
             reduced=reduced,
-            destination=destination,
+            minimum=minimum,
             )
     except Exception as err:
         log.error('FAILED')
         raise err
-    else:
-        prev_dssp.update(mdict)
-        save_dictionary(dict(sorted(prev_dssp.items())), output=output)
-        log.info(S('All done. Thanks!'))
     finally:
         if _istarfile:
             shutil.rmtree(TMPDIR)
-
     return
 
 
 if __name__ == '__main__':
-    maincli()
+    libcli.maincli(ap, main)
