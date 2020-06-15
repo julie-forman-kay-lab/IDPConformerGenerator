@@ -32,8 +32,8 @@ ap = libcli.CustomParser(
 libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
-    'dssp',
-    help='The DSSP file as saved by IDPConfGen SSEXT CLI',
+    'sscalc_file',
+    help='The DSSP file as saved by IDPConfGen SSCALC CLI',
     )
 
 libcli.add_argument_destination_folder(ap)
@@ -56,7 +56,7 @@ ap.add_argument(
         'List of atom names to save in the selection.\n'
         'Defaults to `N`, `CA`, and `C`.'
         ),
-    default=('N', 'CA', 'C'),
+    default='all',  # ('N', 'CA', 'C'),
     nargs='+',
     )
 
@@ -68,44 +68,49 @@ def filter_dssp_segments(seg, required='all'):
         return seg == required
 
 
-def _load_args():
-    cmd = ap.parse_args()
-    return cmd
-
-
-def maincli():
-    """
-    Execute main client function.
-
-    Reads command line arguments and executes logic.
-    """
-    cmd = _load_args()
-    main(**vars(cmd))
-
-
 def main(
-        pdbs,
-        dssp,
+        pdb_files,
+        sscalc_file,
         atoms,
         minimum_size=4,
         destination=None,
         structure='all',
         func=None,
+        chunks=5000,
         ):
+
+    ssdata = read_dictionary_from_disk(sscalc_file)
+    pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
+
+    execute = partial(pool_function_in_chunks(
+        segment_split,
+        pdbs2operate,
+        ncores=ncores,
+        chunks=chunks,
+        ssdata=ssdata,
+        structure=structure,
+        ))
+
+    for run in execute:
+        save_pairs_to_disk(run, destination=destination)
+
+
+
+
+
+
+def segment_split(pdbid, ssdata):
+    pdbname = pdbid[0]
+    pdbdata = pdbid[1]
+    pdbdd = ssdata[pdbname]
+
+    ss_identified = set(pdbdd['dssp'])
+
 
     slice_jump = len(atoms)
     minimum_size = slice_jump * minimum_size
 
-    dest = Path(destination)
-    dest.mkdir(exist_ok=True, parents=True)
 
-    log.info(T('spliting PDBs into secondary structure components'))
-
-    pdb_list = libio.read_path_bundle(pdbs)
-    log.info(S('read pdb bundle'))
-
-    dssp_data = libparse.read_pipe_file(Path(dssp).read_text())
-    log.info(S('read dssp'))
 
     for pdbid in pdb_list:
 
