@@ -14,11 +14,12 @@ from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libhigherlevel import segment_split
 
 
 LOGFILESNAMES = '.idpconfgen_segext'
 
-_name = 'segsplit'
+_name = 'segsext'
 _help = 'Split PDB into secondary structure segments.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -91,67 +92,8 @@ def main(
         structure=structure,
         ))
 
-    for run in execute:
+    for run in execute():
         save_pairs_to_disk(run, destination=destination)
-
-
-
-
-
-
-def segment_split(pdbid, ssdata):
-    pdbname = pdbid[0]
-    pdbdata = pdbid[1]
-    pdbdd = ssdata[pdbname]
-
-    ss_identified = set(pdbdd['dssp'])
-
-
-    slice_jump = len(atoms)
-    minimum_size = slice_jump * minimum_size
-
-
-
-    for pdbid in pdb_list:
-
-        log.info(S(f'working with {pdbid}'))
-
-        dssp_segments = libparse.group_by(dssp_data[pdbid.stem].translate(DEFS.dssp_trans))
-
-        pdbdata = libstructure.Structure(pdbid.read_text())
-        pdbdata.build()
-        pdbdata.add_filter(lambda x: x[libstructure.col_name] in atoms)
-
-        counter = 1
-
-        user_required_dssp_segments = filter(
-            lambda x: x[0] == structure,
-            dssp_segments,
-            )
-
-        for segtype, segslice in user_required_dssp_segments:
-
-            res_slice = slice(
-                segslice.start * slice_jump,
-                segslice.stop * slice_jump,
-                None,
-                )
-
-            if res_slice.stop - res_slice.start < minimum_size:
-                continue
-
-            to_write = list(pdbdata.filtered_atoms)[res_slice]
-
-            libstructure.write_PDB(
-                libstructure.structure_to_pdb(to_write),
-                Path(dest, f'{pdbid.stem}_{segtype}_{counter}.pdb'),
-                )
-            counter += 1
-
-
-
-
-    return
 
 
 if __name__ == '__main__':

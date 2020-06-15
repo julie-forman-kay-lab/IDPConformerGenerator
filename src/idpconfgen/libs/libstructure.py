@@ -6,6 +6,8 @@ Classes
 Structure
     The main API that represents a protein structure in IDPConfGen.
 """
+import itertools as it
+import traceback
 import warnings
 from collections import defaultdict
 from functools import reduce
@@ -217,7 +219,12 @@ class Structure:
 
         fs = self.filtered_atoms
         # renumber atoms
-        fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+        try:
+            fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+        except IndexError:
+            log.debug(traceback.format_exc())
+            raise
+
         pdb_filter = pdb_filter or []
 
         lines = reduce(_, pdb_filter, structure_to_pdb(fs))
@@ -652,13 +659,14 @@ def save_structure_chains_and_segments(
     _DR = pdb_ligand_codes  # discarded residues
     _AE = _allowed_elements
     _S = Structure
-    _ECC = eval_chain_case
+    #_ECC = eval_chain_case
     _BI = blocked_ids
 
     pdbdata = _S(pdb_data)
     pdbdata.build()
 
     chain_set = pdbdata.chain_set
+    #print('chain set', chain_set)
 
     chains = chains or chain_set
 
@@ -677,6 +685,7 @@ def save_structure_chains_and_segments(
         # it may create incompatibilities
         # 03/Jun/2020
         chaincode = f'{pdbname}_{chain}'
+        #print('chaincode', chaincode)
 
         # this operation can't be performed before because
         # until here there is not way to assure if the chain being
@@ -690,19 +699,40 @@ def save_structure_chains_and_segments(
                 ))
             continue
 
-        try:
-            chain = _ECC(chain, chain_set)
-        except ValueError as err:
-            log.error(repr(err))
-            log.error(f'Skiping chain {chain} for {pdbname}')
-            continue
+        possible_cases = set(map(''.join, it.product(*zip(chain.upper(), chain.lower()))))
+        cases_that_actually_exist = chain_set.intersection(possible_cases)
+        cases_that_actually_exist.discard(chain)
+        probe_cases = [chain] + list(cases_that_actually_exist)
 
-        pdbdata.add_filter_chain(chain)
+        #print('probe_cases', probe_cases)
 
-        fout = f'{chaincode}.pdb'
-        mdict[fout] = '\n'.join(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
+        for chain_case in probe_cases:
 
-        pdbdata.pop_last_filter()
+        #try:
+        #    chain = _ECC(chain, chain_set)
+        #except ValueError as err:
+        #    log.error(repr(err))
+        #    log.error(f'Skiping chain {chain} for {pdbname}')
+        #    continue
+
+            pdbdata.add_filter_chain(chain_case)
+            fout = f'{chaincode}.pdb'
+            try:
+                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
+            except IndexError as err:
+                #print(f'FAILED FOR CHAIN {chain_case}')
+                err = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
+                log.debug(repr(err))
+                log.debug('continuing to new chain')
+                continue
+            else:
+                mdict[fout] = pdb_lines
+                #print(f'ACHIEVED FOR CHAIN {chain_case}')
+                break
+            finally:
+                pdbdata.pop_last_filter()
+        else:
+            log.debug(f'Failed to download {chaincode}')
 
     return
 

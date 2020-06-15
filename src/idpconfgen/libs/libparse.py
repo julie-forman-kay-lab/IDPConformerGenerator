@@ -234,20 +234,17 @@ def group_by(data):
     """
     assert len(data) > 0
 
-    prev = data[0]
+    datum_hold = prev = data[0]
     start = 0
-    current = [prev]
     groups = []
+    GA = groups.append
     for i, datum in enumerate(data):
         if datum != prev:
-            current.append(slice(start, i))
-            groups.append(current)
-            start = i
-            current = [datum]
+            GA([datum_hold, slice(start, i)])
+            datum_hold, start = datum, i
         prev = datum
     else:
-        current.append(slice(start, i + 1))
-        groups.append(current)
+        GA([datum_hold, slice(start, i + 1)])
 
     assert isinstance(groups[0][0], str)
     assert isinstance(groups[0][1], slice)
@@ -465,6 +462,7 @@ def get_segsplitter(destination):
     Select the appropriate function to write the segments
     """
     return
+
 
 
 

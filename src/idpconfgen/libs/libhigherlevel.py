@@ -11,9 +11,9 @@ from idpconfgen import Path, log
 from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libdownload import download_dispacher
 from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
-from idpconfgen.libs.libparse import group_runs
+from idpconfgen.libs.libparse import group_runs, group_by
 from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq
-from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues
+from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues, col_resSeq
 from idpconfgen.libs.libtimer import record_time
 from idpconfgen.logger import S, T, init_files
 
@@ -246,3 +246,38 @@ def split_sscalc_data(pdbname, data, segments):
         splitdata[key]['resids'] = ','.join(reduction)
 
     return splitdata, segs_in_dssp
+
+
+def segment_split(
+        pdbid,
+        ssdata,
+        minimum=0,
+        structure='all',
+        mdict=None,
+        ):
+    """
+    """
+    pdbname = pdbid[0]
+    pdbdata = pdbid[1]
+    pdbdd = ssdata[pdbname]
+
+    ss_identified = set(pdbdd['dssp'])
+    sel_structure = \
+        (lambda x: True) if structure == 'all' else (lambda x: x in structure)
+    ss_to_isolate = set(s for s in ss_identified if sel_structure(s))
+
+    dssp_slices = group_by(pdbdd['dssp'])
+    DR = pdbdd['resids'].split(',')  # DR -> dssp residues
+
+    counter = 0
+    for ss in ss_to_isolate:
+        ssfilter = (slice_ for char, slice_ in dssp_slices if char == ss)
+        minimum_size = (s for s in ssfilter if s.stop - s.start > minimum)
+        for seg_slice in minimum_size:
+            structure = Structure(pdbdata)
+            structure.build()
+            structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
+            pdb = structure.get_PDB()
+            mdict[f'{pdbname}_{ss}_{counter}'] = pdb
+            del structure
+
