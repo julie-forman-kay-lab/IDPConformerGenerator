@@ -52,10 +52,12 @@ ap.add_argument(
     action=libcli.CheckExt({'.json'}),
     )
 
+libcli.add_argument_destination_folder(ap)
 libcli.add_argument_reduced(ap)
 libcli.add_argument_chunks(ap)
 #libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
+
 
 
 def main(
@@ -67,7 +69,7 @@ def main(
         output='sscalc_output.json',
         reduced=False,
         minimum=2,
-        split_destination='sscalc_splitted.tar',
+        destination='sscalc_splitted.tar',
         #update=False,
         **kwargs,
         ):
@@ -107,7 +109,7 @@ def main(
         pool_chunks_to_disk_and_data_at_the_end(
             mkdssp_w_split,
             pdbs2operate,
-            destination=split_destination,
+            destination=destination,
             ncores=ncores,
             chunks=chunks,
             #mdata_source=prev_dssp,
