@@ -14,6 +14,7 @@ USAGE:
 """
 import argparse
 import sys
+import tracemalloc
 
 from idpconfgen import cli_pdbdownloader as pdbdl
 from idpconfgen import cli_fetch
@@ -74,7 +75,17 @@ def maincli():
         ap.exit()
 
     cmd = load_args()
-    cmd.func(**vars(cmd))
+
+    tracemalloc.start()
+    try:
+        cmd.func(**vars(cmd))
+    except KeyboardInterrupt:
+        pass
+    snapshot = tracemalloc.take_snapshot()
+    top_stats = snapshot.statistics('lineno')
+    print('top 10')
+    for stat in top_stats[:10]:
+        print(stat)
 
 
 if __name__ == '__main__':

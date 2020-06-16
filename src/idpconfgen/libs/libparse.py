@@ -19,6 +19,7 @@ from idpconfgen.core.definitions import dssp_trans
 from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBIDFactory, delete_insertions, atom_resSeq
 from idpconfgen.logger import S
+from idpconfgen.libs.libio import save_pairs_to_disk
 
 
 _ascii_lower_set = set(string.ascii_lowercase)
@@ -392,13 +393,16 @@ def identify_backbone_gaps(atoms):
         ]
 
 
+def mkdssp_w_split_w_save(*args, destination=None, **kwargs):
+     for fname, split_dssp, split_pdb_bytes in mkdssp_w_split(*args, **kwargs):
+        save_pairs_to_disk(((f'{fname}.pdb', split_pdb_bytes),), destination=destination)
+        yield fname, split_dssp
+
+
 def mkdssp_w_split(
         pdb,
         cmd,
         minimum=2,
-        destination=None,
-        mdata=None,
-        mfiles=None,
         reduced=False,
         ):
     """
@@ -416,6 +420,7 @@ def mkdssp_w_split(
 
     segs = 0
     dssp_text = result.stdout.decode('utf-8')
+    pairs = []
     for dssp, fasta, residues in parse_dssp(dssp_text, reduced=reduced):
         if len(residues) < minimum:
             continue
@@ -432,29 +437,14 @@ def mkdssp_w_split(
         if all(l.startswith(b'HETATM') for l in lines2write):
             continue
 
-        mfiles[f'{fname}.pdb'] = b''.join(lines2write)
-        #with open(Path(destination, f'{fname}.pdb'), 'wb') as fout:
-            #fout.writelines(lines2write)
-
-        mdata[fname] = {
+        __data = {
             'dssp': dssp,
             'fasta': fasta,
             'resids': ','.join(residues),
             }
+
+        yield fname, __data , b''.join(lines2write)
         segs += 1
-
-
-    #dssp, fasta, residues = parse_dssp(
-    #    result.stdout,#.decode('utf-8'),
-    #    reduced=reduced,
-    #    )
-    #mdict[str(PDBIDFactory(pdb))] = {
-    #    'dssp': dssp,
-    #    'fasta': fasta,
-    #    'resids': residues,
-    #    }
-
-    return
 
 
 def get_segsplitter(destination):

@@ -38,14 +38,31 @@ partition #e6ffe6 "filtering **in**" {
     :converts PDB and mmCIF to the same internal format;
     :select MODEL 1 (if multiple MODELS);
     :select desired CHAIN;
+    note right
+        details later
+    end note
     :keep altLoc `A` or None;
 }
 
 partition #ffe6e6 "filter out" {
     :non- N, C, CA, O, S, Se, H, D;
     :non- ribonucleiotides;
-    :non- ligands (>1500);
+    :non- ligand/solvent (>1500);
 
+}
+
+partition "probing chains" {
+    :attempt the selected chain;
+    note right
+        However, Dunbrack PISCES culled list
+        provides all chains in UPPER case, this
+        many times conflicts with mmCIF format.
+    end note
+    while (chain selection) is (empty selection)
+        :probe another UPPER/LOWER case combination;
+        :Example: AA, Aa, aA, aa.;
+    endwhile (meaningful selection)
+    :continue;
 }
 
 partition "additional parsing" {

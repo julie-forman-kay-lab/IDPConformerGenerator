@@ -8,6 +8,10 @@ USAGE:
 """
 import argparse
 import shutil
+import traceback
+from functools import partial
+from multiprocessing import Pool
+from pprint import pprint
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -16,9 +20,10 @@ from idpconfgen.libs.libio import (
     read_path_bundle,
     read_dictionary_from_disk,
     )
-from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end
-from idpconfgen.libs.libparse import mkdssp_w_split
+from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end, pool_function, consume_iterable_in_list
+from idpconfgen.libs.libparse import mkdssp_w_split_w_save
 from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libio import save_dictionary
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -52,6 +57,7 @@ ap.add_argument(
     action=libcli.CheckExt({'.json'}),
     )
 
+# can't use the libcli option because this one is different
 ap.add_argument(
     '-d',
     '--destination',
@@ -67,7 +73,7 @@ ap.add_argument(
 
 libcli.add_argument_reduced(ap)
 libcli.add_argument_chunks(ap)
-#libcli.add_argument_update(ap)
+#libcli.add_argument_update(ap)  # discarded for now
 libcli.add_argument_ncores(ap)
 
 
@@ -76,13 +82,12 @@ def main(
         cmd,
         pdb_files,
         chunks=5000,
+        destination='sscalc_splitted.tar',
         func=None,
+        minimum=2,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
-        minimum=2,
-        destination='sscalc_splitted.tar',
-        #update=False,
         **kwargs,
         ):
     """
@@ -118,21 +123,26 @@ def main(
     log.info(T('preparing task execution'))
 
     try:
-        pool_chunks_to_disk_and_data_at_the_end(
-            mkdssp_w_split,
-            pdbs2operate,
-            destination=destination,
+        execute = partial(
+            pool_function,
+            consume_iterable_in_list,
+            pdbs2operate, # items
+            # args to consume_iterable_in_list
+            mkdssp_w_split_w_save,
             ncores=ncores,
-            chunks=chunks,
-            #mdata_source=prev_dssp,
-            mdata_dest=output,
             # kwargs for mkdssp function
             cmd=cmd,
+            destination=destination,
             reduced=reduced,
             minimum=minimum,
             )
+
+        d_ = {k: v for L in execute() for k, v in L}
+        save_dictionary(d_, output)
+
     except Exception as err:
         log.error('FAILED')
+        log.debug(traceback.format_exc())
         raise err
     finally:
         if _istarfile:

@@ -498,7 +498,7 @@ def save_dictionary(mydict, output='mydict.pickle'):
     """
     # some dicts come from multiprocessing.Manager
     # this solves the problem always
-    _d = dict(mydict)
+    #_d = dict(mydict)
     try:
         suffix = Path(output).suffix
     except TypeError:
@@ -521,15 +521,25 @@ def save_dict_to_json(
         ):
     """Save dictionary to JSON."""
     assert Path(output).suffix == '.json'
+    jsondump = partial(json.dump, indent=indent, sort_keys=sort_keys)
     with open(output, 'w') as fout:
-        json.dump(mydict, fout, indent=indent, sort_keys=sort_keys)
+        try:
+            jsondump(mydict)
+        except TypeError:
+            # it may come a Manager.dict()
+            # we need to convert it to dict before json it
+            jsondump(dict(mydict))
 
 
 def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
     """Save dictionary to pickle file."""
     assert Path(output).suffix == '.pickle'
+    pickledump = partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
     with open(output, 'wb') as handle:
-        pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)
+        try:
+            pickledump(mydict, handle)
+        except TypeError:
+            pickledump(dict(mydict), handle)
 
 
 def save_pairs_to_disk(pairs, destination=None):

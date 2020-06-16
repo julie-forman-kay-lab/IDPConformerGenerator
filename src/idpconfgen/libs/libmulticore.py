@@ -4,6 +4,8 @@ import subprocess
 from contextlib import suppress
 from functools import partial
 from multiprocessing import Pool, Manager
+import tracemalloc
+import gc
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcheck
@@ -12,7 +14,11 @@ from idpconfgen.libs.libtimer import ProgressWatcher
 from idpconfgen.logger import S
 
 
-def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
+def consume_iterable_in_list(func, *args, **kwargs):
+    return list(i for i in func(*args, **kwargs))
+
+
+def pool_function(func, items, *args, method='imap_unordered', ncores=1, **kwargs):
     """Multiprocess Pools a function.
 
     Parameters
@@ -33,16 +39,13 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
     kwargs :
         The named arguments to pass to `func`.
     """
-    f = partial(func, **kwargs)
+    f = partial(func, *args, **kwargs)
 
-    with \
-            Pool(ncores) as pool, \
-            ProgressWatcher(items) as pb:
-
+    with Pool(ncores) as pool, ProgressWatcher(items) as pb:
         imap = getattr(pool, method)(f, items)
         while True:
             try:
-                next(imap)
+                yield next(imap)
                 pb.increment()
             except StopIteration:
                 break
@@ -82,6 +85,7 @@ def pool_function_in_chunks(
 
 
 # Hell Yeah crazy name \m/, any problem?
+# Attention: this function has severe memory leakage
 def pool_chunks_to_disk_and_data_at_the_end(
         func,
         tasks,
@@ -100,10 +104,12 @@ def pool_chunks_to_disk_and_data_at_the_end(
 
     Usually there are files and a dictionary.
     """
+
     manager = Manager()
     mdata = manager.dict()
     with suppress(TypeError):
         mdata.update(mdata_source)
+
 
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
@@ -130,6 +136,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
         else:
             save_pairs_to_disk(mfiles.items(), destination=destination)
             del mfiles
+
     if mdata:
         if sort:
             sorted_ = sorted(mdata.items())
