@@ -47,7 +47,7 @@ def pool_function(func, items, method='imap_unordered', ncores=1, **kwargs):
             except StopIteration:
                 break
             except IndexError:
-                log.info(f'IndexError of multiprocessing, ignoring something')
+                log.info('IndexError of multiprocessing, ignoring something')
 
 
 def pool_function_in_chunks(
@@ -89,6 +89,7 @@ def pool_chunks_to_disk_and_data_at_the_end(
         mdata_source=None,
         mdata_dest='mdata_dest.json',
         chunks=5000,
+        sort=False,
         **kwargs,
         ):
     """
@@ -119,9 +120,15 @@ def pool_chunks_to_disk_and_data_at_the_end(
             **kwargs,  # ncores go here
             )
 
-        save_pairs_to_disk(dict(sorted(mfiles.items())).items(), destination=destination)
+        if sort:
+            save_pairs_to_disk(dict(sorted(mfiles.items())).items(), destination=destination)
+        else:
+            save_pairs_to_disk(mfiles, destination=destination)
     if mdata:
-        save_dictionary(dict(sorted(mdata.items())), mdata_dest)
+        if sort:
+            save_dictionary(dict(sorted(mdata.items())), mdata_dest)
+        else:
+            save_dictionary(mdata, mdata_dest)
 
 
 class Worker(multiprocessing.Process):
