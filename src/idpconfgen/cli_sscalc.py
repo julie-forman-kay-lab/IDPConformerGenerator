@@ -52,14 +52,26 @@ ap.add_argument(
     action=libcli.CheckExt({'.json'}),
     )
 
-libcli.add_argument_destination_folder(ap)
+ap.add_argument(
+    '-d',
+    '--destination',
+    help=(
+        'Destination folder where the split PDB files will be stored. '
+        'Defaults to current working directory.'
+        'Alternatively, you can provide a path to a .tar file '
+        'where PDBs will be saved.'
+        ),
+    type=Path,
+    default='sscalc_splitted.tar',
+    )
+
 libcli.add_argument_reduced(ap)
 libcli.add_argument_chunks(ap)
 #libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 
 
-
+# add posibilitiy not to split???
 def main(
         cmd,
         pdb_files,

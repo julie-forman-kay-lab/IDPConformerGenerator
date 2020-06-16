@@ -60,7 +60,7 @@ dssp_ss_keys.all_loops = (
     dssp_ss_keys.turn,
     dssp_ss_keys.bend,
     dssp_ss_keys.loop,
-    dssp_ss_keys.bbridge,
+    dssp_ss_keys.bbridge,  # convention break!
     )
 
 dssp_ss_keys.all = \

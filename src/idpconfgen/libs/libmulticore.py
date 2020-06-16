@@ -121,14 +121,26 @@ def pool_chunks_to_disk_and_data_at_the_end(
             )
 
         if sort:
-            save_pairs_to_disk(dict(sorted(mfiles.items())).items(), destination=destination)
+            sorted_ = sorted(mfiles.items())
+            del mfiles
+            dsorted = dict(sorted_)
+            del sorted_
+            save_pairs_to_disk(dsorted.items(), destination=destination)
+            del dsorted
         else:
-            save_pairs_to_disk(mfiles, destination=destination)
+            save_pairs_to_disk(mfiles.items(), destination=destination)
+            del mfiles
     if mdata:
         if sort:
-            save_dictionary(dict(sorted(mdata.items())), mdata_dest)
+            sorted_ = sorted(mdata.items())
+            del mdata
+            dsorted = dict(sorted_)
+            del sorted_
+            save_dictionary(dsorted.items(), mdata_dest)
+            del dsorted
         else:
-            save_dictionary(mdata, mdata_dest)
+            save_dictionary(mdata.items(), mdata_dest)
+            del mdata
 
 
 class Worker(multiprocessing.Process):
