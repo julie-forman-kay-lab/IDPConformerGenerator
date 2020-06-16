@@ -8,6 +8,7 @@ AMP
 SOL
 TPP
 HEM
+WO4
 # ribonucleotides
 I
 C

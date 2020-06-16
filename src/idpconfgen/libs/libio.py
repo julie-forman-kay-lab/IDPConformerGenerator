@@ -502,7 +502,7 @@ def save_dictionary(mydict, output='mydict.pickle'):
     try:
         suffix = Path(output).suffix
     except TypeError:
-        pprint(_d, indent=4, sort_dicts=True)
+        pprint(mydict, indent=4, sort_dicts=True)
         return
 
     options = {
@@ -510,7 +510,7 @@ def save_dictionary(mydict, output='mydict.pickle'):
         '.json': save_dict_to_json,
         }
 
-    options[suffix](_d, output, sort_keys=False)
+    options[suffix](mydict, output, sort_keys=False)
 
 
 def save_dict_to_json(
@@ -524,11 +524,11 @@ def save_dict_to_json(
     jsondump = partial(json.dump, indent=indent, sort_keys=sort_keys)
     with open(output, 'w') as fout:
         try:
-            jsondump(mydict)
+            jsondump(mydict, fout)
         except TypeError:
             # it may come a Manager.dict()
             # we need to convert it to dict before json it
-            jsondump(dict(mydict))
+            jsondump(dict(mydict), fout)
 
 
 def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
@@ -565,7 +565,7 @@ def save_pairs_to_disk(pairs, destination=None):
 
 
 def save_pairs_to_tar(pairs, destination):
-    modes = {True: 'a', False: 'w'}
+    modes = {True: 'a:', False: 'w'}
     with tarfile.open(
             os.fspath(destination),
             mode=modes[destination.exists()]) as tar:

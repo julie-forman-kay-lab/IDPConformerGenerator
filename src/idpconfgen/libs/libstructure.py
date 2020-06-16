@@ -649,6 +649,7 @@ def save_structure_chains_and_segments(
         altlocs=('A', '', ' '),
         renumber=True,
         mdict=None,
+        **kwargs,
         ):
     """
     Prase structure.
@@ -726,7 +727,8 @@ def save_structure_chains_and_segments(
                 log.debug('continuing to new chain')
                 continue
             else:
-                mdict[fout] = pdb_lines
+                #mdict[fout] = pdb_lines
+                yield fout, pdb_lines
                 #print(f'ACHIEVED FOR CHAIN {chain_case}')
                 break
             finally:
@@ -734,7 +736,7 @@ def save_structure_chains_and_segments(
         else:
             log.debug(f'Failed to download {chaincode}')
 
-    return
+    #return
 
 
 
