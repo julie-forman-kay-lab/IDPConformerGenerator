@@ -257,8 +257,9 @@ def segment_split(
         ):
     """
     """
-    pdbname = pdbid[0]
+    pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1]
+
     pdbdd = ssdata[pdbname]
 
     ss_identified = set(pdbdd['dssp'])
@@ -269,15 +270,14 @@ def segment_split(
     dssp_slices = group_by(pdbdd['dssp'])
     DR = pdbdd['resids'].split(',')  # DR -> dssp residues
 
-    counter = 0
     for ss in ss_to_isolate:
         ssfilter = (slice_ for char, slice_ in dssp_slices if char == ss)
         minimum_size = (s for s in ssfilter if s.stop - s.start > minimum)
-        for seg_slice in minimum_size:
+        for counter, seg_slice in enumerate(minimum_size):
             structure = Structure(pdbdata)
             structure.build()
             structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
-            pdb = structure.get_PDB()
-            mdict[f'{pdbname}_{ss}_{counter}'] = pdb
+            pdb = '\n'.join(structure.get_PDB())
+            mdict[f'{pdbname}_{ss}_{counter}.pdb'] = pdb
             del structure
-
+            counter += 1

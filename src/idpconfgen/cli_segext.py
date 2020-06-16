@@ -15,6 +15,8 @@ from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libhigherlevel import segment_split
+from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, save_pairs_to_disk
+from idpconfgen.libs.libmulticore import pool_function_in_chunks
 
 
 LOGFILESNAMES = '.idpconfgen_segext'
@@ -77,24 +79,26 @@ def main(
         destination=None,
         structure='all',
         func=None,
+        ncores=1,
         chunks=5000,
         ):
 
     ssdata = read_dictionary_from_disk(sscalc_file)
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
-    execute = partial(pool_function_in_chunks(
+    execute = partial(
+        pool_function_in_chunks,
         segment_split,
         pdbs2operate,
         ncores=ncores,
         chunks=chunks,
         ssdata=ssdata,
         structure=structure,
-        ))
+        )
 
     for run in execute():
-        save_pairs_to_disk(run, destination=destination)
+        save_pairs_to_disk(run.items(), destination=destination)
 
 
 if __name__ == '__main__':
-    maincli()
+    libcli.maincli()
