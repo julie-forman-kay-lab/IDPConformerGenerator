@@ -12,6 +12,7 @@ import traceback
 from functools import partial
 from multiprocessing import Pool
 from pprint import pprint
+from copy import copy
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -21,9 +22,10 @@ from idpconfgen.libs.libio import (
     read_dictionary_from_disk,
     )
 from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end, pool_function, consume_iterable_in_list
-from idpconfgen.libs.libparse import mkdssp_w_split_w_save
+from idpconfgen.libs.libparse import mkdssp_w_split
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libio import save_dictionary
+from idpconfgen.libs.libio import save_dictionary, save_pairs_to_disk
+from idpconfgen.libs.libtimer import ProgressWatcher
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -81,7 +83,7 @@ libcli.add_argument_ncores(ap)
 def main(
         cmd,
         pdb_files,
-        chunks=5000,
+        chunks=1000,
         destination='sscalc_splitted.tar',
         func=None,
         minimum=2,
@@ -124,21 +126,38 @@ def main(
 
     try:
         execute = partial(
-            pool_function,
+            #pool_function,
             consume_iterable_in_list,
-            pdbs2operate, # items
+            #pdbs2operate, # items
             # args to consume_iterable_in_list
-            mkdssp_w_split_w_save,
-            ncores=ncores,
+            mkdssp_w_split,
+            #ncores=ncores,
             # kwargs for mkdssp function
             cmd=cmd,
-            destination=destination,
+            #destination=destination,
             reduced=reduced,
             minimum=minimum,
             )
 
-        d_ = {k: v for L in execute() for k, v in L}
-        save_dictionary(d_, output)
+        #d_ = {k: v for L in execute() for k, v in L}
+        #save_dictionary(d_, output)
+
+        tasks = pdbs2operate
+        dssp_data = {}
+        pdb_data = {}
+        with ProgressWatcher(tasks) as pw:
+            for i in range(0, len(tasks), chunks):
+                task = tasks[i: i + chunks]
+                with Pool(ncores) as pool:
+                    imap = pool.imap_unordered(execute, task)
+                    for result in imap:
+                        for fname, dsspdict, pdb_split in result:
+                            dssp_data[fname] = dsspdict
+                            pdb_data[copy(fname)] = pdb_split
+                        pw.increment()
+                save_pairs_to_disk(pdb_data.items(), destination=destination)
+                pdb_data.clear()
+        save_dictionary(dssp_data, output)
 
     except Exception as err:
         log.error('FAILED')

@@ -149,6 +149,86 @@ class ProgressBarReal:
             bar_length=20,
             ):
 
+        total = int(total)
+        self.prefix = prefix
+        self.suffix = suffix
+        self.str_format = "{0:." + str(int(decimals)) + "f}"
+        self.counter = 0
+        self.total = total
+        self.bar_length = bar_length
+
+    def __enter__(self):
+        bar = '-' * self.bar_length
+        percents = self.str_format.format(0)
+        sys.stdout.write(
+            f'\r{self.prefix} '
+            f'{percents}% {self.counter}/{self.total} {self.suffix} |bar|'
+            )
+        self.counter += 1
+        return self
+
+    def __exit__(self, *args):
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def increment(self):
+        """Print next progress bar increment."""
+        t = self.total
+        c = self.counter
+        bl = self.bar_length
+        SFF = self.str_format.format
+        percents = SFF(c / t * 100)
+        fl = int(round(bl * c // t))
+        bar = f"{'█' * fl}{'-' * (bl - fl)}"
+        sys.stdout.write(f'\r{self.prefix} |{bar}| {percents}% {c}/{t} {self.suffix}')
+        self.counter += 1
+
+# previous version that stored Bar in numpy instead of
+# calculating per loop
+class _ProgressBarReal:
+    """
+    Contextualizes a Progress Bar.
+
+    Parameters
+    ----------
+    total : int convertable
+        The total number o iteractions expected.
+
+    prefix : str
+        Some prefix to enhance readability.
+
+    suffix : str
+        Some suffix to enhance readability.
+
+    decimals : int-convertable
+        The demicals to show in percentage.
+        Defaults to `1`.
+
+    bar_length : int, float, -convertable
+        The length of the bar.
+        If not provided (``None``), uses half of the terminal window.
+
+    Thanks to for the initial template function:
+    https://dev.to/natamacm/progressbar-in-python-a3n
+
+    Examples
+    --------
+
+    >>> with ProgressBarReal(5000, suffix='frames') as PB:
+    >>>     for i in trajectory:
+    >>>         # do something
+    >>>         PB.increment()
+    """
+
+    def __init__(
+            self,
+            total,
+            prefix='',
+            suffix='',
+            decimals=1,
+            bar_length=20,
+            ):
+
         #if bar_length is None:
         #    try:
         #        _columns, _rows = os.get_terminal_size()
