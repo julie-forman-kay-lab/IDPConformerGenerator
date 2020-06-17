@@ -180,7 +180,7 @@ class ProgressBarReal:
         percents = SFF(c / t * 100)
         fl = int(round(bl * c // t))
         bar = f"{'█' * fl}{'-' * (bl - fl)}"
-        sys.stdout.write(f'\r{self.prefix} |{bar}| {percents}% {c}/{t} {self.suffix}')
+        sys.stdout.write(f'\r{self.prefix} {percents}% {c}/{t} {self.suffix} |{bar}|')
         self.counter += 1
 
 # previous version that stored Bar in numpy instead of
