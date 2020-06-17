@@ -21,7 +21,7 @@ from idpconfgen.libs.libio import (
     read_path_bundle,
     read_dictionary_from_disk,
     )
-from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end, pool_function, consume_iterable_in_list
+from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end, pool_function, consume_iterable_in_list, pool_function_in_chunks
 from idpconfgen.libs.libparse import mkdssp_w_split
 from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libio import save_dictionary, save_pairs_to_disk
@@ -126,15 +126,16 @@ def main(
 
     try:
         execute = partial(
-            #pool_function,
-            consume_iterable_in_list,
-            #pdbs2operate, # items
+            pool_function_in_chunks,
+            consume_iterable_in_list,  # function to execute - list wrapper
+            pdbs2operate,              # items to process
             # args to consume_iterable_in_list
             mkdssp_w_split,
-            #ncores=ncores,
-            # kwargs for mkdssp function
+            # kwargs to pool functions
+            ncores=ncores,
+            chunks=chunks,
+            # kwargs for mkdssp_w_split
             cmd=cmd,
-            #destination=destination,
             reduced=reduced,
             minimum=minimum,
             )
@@ -142,27 +143,56 @@ def main(
         #d_ = {k: v for L in execute() for k, v in L}
         #save_dictionary(d_, output)
 
-        tasks = pdbs2operate
-        dssp_data = {}
-        pdb_data = {}
-        with ProgressWatcher(tasks) as pw:
-            for i in range(0, len(tasks), chunks):
-                task = tasks[i: i + chunks]
-                with Pool(ncores) as pool:
-                    imap = pool.imap_unordered(execute, task)
-                    for result in imap:
-                        for fname, dsspdict, pdb_split in result:
-                            dssp_data[fname] = dsspdict
-                            pdb_data[copy(fname)] = pdb_split
-                        pw.increment()
-                save_pairs_to_disk(pdb_data.items(), destination=destination)
-                pdb_data.clear()
+        # this implementation is very specific for this case
+        # this is why I haven spread it into functions for now
+        dssp_data = {}  # stores DSSP data to save at the end
+        pdb_data = {}  # temporarily stores data to be writen to the disk
+        for chunk in execute():
+            for result in chunk:
+                for fname, dsspdict, pdb_split in result:
+                    dssp_data[fname] = dsspdict
+
+                    # notice the copy, this is needed for the .clear()
+                    # to work later on
+                    pdb_data[copy(fname)] = pdb_split
+            save_pairs_to_disk(pdb_data.items(), destination=destination)
+            pdb_data.clear()  # clears the dictionary to release memory
         save_dictionary(dssp_data, output)
+
+
+        #with ProgressWatcher(tasks) as pw:  # <- is just a progress bar
+        #    # prepares a chunk
+        #    for i in range(0, len(tasks), chunks):
+        #        task = tasks[i: i + chunks]
+
+        #        # starts a multiprocessing with the chunk
+        #        with Pool(ncores) as pool:
+        #            imap = pool.imap_unordered(execute, task)
+        #            try:
+        #                for result in imap:
+        #                    for fname, dsspdict, pdb_split in result:
+        #                        dssp_data[fname] = dsspdict
+
+        #                        # notice the copy, this is needed for the .clear()
+        #                        # to work later on
+        #                        pdb_data[copy(fname)] = pdb_split
+        #            except IndexError as err:
+        #                log.info(repr(err))
+        #            pw.increment()  # increments progressbar step
+
+        #        # after each chunk the temporary data is saved to the disk
+        #        # within a single process
+                #save_pairs_to_disk(pdb_data.items(), destination=destination)
+                #pdb_data.clear()  # clears the dictionary to release memory
+
+        # at the end saves the dssp data dictionary to the disk
+        #save_dictionary(dssp_data, output)
 
     except Exception as err:
         log.error('FAILED')
         log.debug(traceback.format_exc())
         raise err
+
     finally:
         if _istarfile:
             shutil.rmtree(TMPDIR)

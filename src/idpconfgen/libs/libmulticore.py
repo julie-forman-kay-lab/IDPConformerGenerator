@@ -56,7 +56,8 @@ def pool_function(func, items, *args, method='imap_unordered', ncores=1, **kwarg
 def pool_function_in_chunks(
         func,
         tasks,
-        ncores=1,
+        *args,
+        #ncores=1,
         chunks=5_000,
         **kwargs,
         ):
@@ -69,19 +70,20 @@ def pool_function_in_chunks(
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
 
-        manager = Manager()
-        mdict = manager.dict()
+        #manager = Manager()
+        #mdict = manager.dict()
 
-        pool_function(
+        a = [i for i in pool_function(
             func,
             task,
-            ncores=ncores,
+            *args,
+            #ncores=ncores,
             # other kwargs for target function
-            mdict=mdict,
+            #mdict=mdict,
             **kwargs,
-            )
+            )]
 
-        yield mdict
+        yield a
 
 
 # Hell Yeah crazy name \m/, any problem?

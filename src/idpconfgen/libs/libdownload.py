@@ -36,10 +36,11 @@ def download_pdbs_to_folder(destination, items, func=None, **kwargs):
     Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
     """
     dest = make_destination_folder(destination)
-    for result in pool_function(consume_iterable_in_list, items, func, **kwargs):
-        for fname, data in result:
-            with open(Path(dest, fname), 'w') as fout:
-                fout.write(data)
+    for chunk in pool_function_in_chunks(consume_iterable_in_list, items, func, **kwargs):
+        for result in chunk:
+            for fname, data in result:
+                with open(Path(dest, fname), 'w') as fout:
+                    fout.write(data)
 
 
 def download_pdbs_to_tar(destination, items, func=None, **kwargs):
@@ -53,12 +54,10 @@ def download_pdbs_to_tar(destination, items, func=None, **kwargs):
     _exists = {True: 'a', False: 'w'}
     dests = destination.str()
     with tarfile.open(dests, mode=_exists[destination.exists()]) as tar:
-        for result in pool_function(consume_iterable_in_list, items, func, **kwargs):
-            for fout, data in result:
-                #try:
-                save_file_to_tar(tar, fout, data)
-                #except Exception:
-                    #log.error(f'failed for {fout}')
+        for chunk in pool_function_in_chunks(consume_iterable_in_list, items, func, **kwargs):
+            for result in chunk:
+                for fout, data in result:
+                    save_file_to_tar(tar, fout, data)
 
 
 def download_structure(pdbid, **kwargs):
