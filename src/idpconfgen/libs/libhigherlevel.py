@@ -83,8 +83,9 @@ def download_pipeline(func, logfilename='.download'):
             save_pairs = save_pairs_dispacher(destination)
 
             for chunk in execute():
-                for result in chunk:
-                    save_pairs(result, destination)
+                flatted = (item for result in chunk for item in result)
+                #for result in chunk:
+                save_pairs(flatted, destination)
             #download_dispacher(
             #    func,
             #    destination,
