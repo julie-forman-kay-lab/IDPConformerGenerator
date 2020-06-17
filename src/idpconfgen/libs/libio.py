@@ -649,6 +649,7 @@ class FileIterator(FileIteratorBase):
         self.members = list(read_path_bundle(origin, ext=ext))
         self.imembers = iter(self.members)
         self._len = len(self.members)
+        self.names = [p.stem for p in self.members]
 
     def __next__(self):
         next_file = next(self.imembers)
@@ -665,10 +666,8 @@ class TarFileIterator(FileIteratorBase):
         self.origin = tarfile.open(origin)
         self._members = self.origin.getmembers()
         self._len = len(self._members)
-        self.members = filter(
-            lambda x: x.name.endswith(ext),
-            self._members,
-            )
+        self.members = (m for m in self._members if m.name.endswith(ext))
+        self.names = [Path(m.name).stem for m in self._members if m.name.endswith(ext)]
 
     def __next__(self):
         member = next(self.members)

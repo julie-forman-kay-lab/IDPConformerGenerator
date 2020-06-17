@@ -161,6 +161,7 @@ def add_argument_chunks(parse):
 
 # optional:
 # -d, --destination       : destination folder
+# -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # --replace               : replace (whatever shalls replace)
 # -rd, --reduced          : reduces secondary structure representation
@@ -192,6 +193,17 @@ def add_argument_destination_folder(parser):
         )
 
 
+def add_argument_minimum(parser):
+    """Add argument for minimum size of fragments."""
+    parser.add_argument(
+        '-m',
+        '--minimum',
+        help='The minimum size accepted for fragment/segment.',
+        type=int,
+        default=2,
+        )
+
+
 def add_argument_ncores(parser):
     """Add argument for number of cores to use."""
     parser.add_argument(
@@ -200,7 +212,7 @@ def add_argument_ncores(parser):
         help='Number of cores to use.',
         type=int,
         default=1,
-        const=cpu_count(),
+        const=cpu_count() - 1,
         nargs='?',
         )
 

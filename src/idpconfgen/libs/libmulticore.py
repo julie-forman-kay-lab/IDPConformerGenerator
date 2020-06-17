@@ -57,7 +57,6 @@ def pool_function_in_chunks(
         func,
         tasks,
         *args,
-        #ncores=1,
         chunks=5_000,
         **kwargs,
         ):
@@ -69,21 +68,7 @@ def pool_function_in_chunks(
     """
     for i in range(0, len(tasks), chunks):
         task = tasks[i: i + chunks]
-
-        #manager = Manager()
-        #mdict = manager.dict()
-
-        a = [i for i in pool_function(
-            func,
-            task,
-            *args,
-            #ncores=ncores,
-            # other kwargs for target function
-            #mdict=mdict,
-            **kwargs,
-            )]
-
-        yield a
+        yield [i for i in pool_function(func, task, *args, **kwargs)]
 
 
 # Hell Yeah crazy name \m/, any problem?

@@ -26,7 +26,10 @@ partition #LIGHTGREY Examples {
         //reduced// converts all
         DSSP tags to H, E, or L
     end note
-    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json --complete previous_dssp.json -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json -d splitted.json -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json -u previous.json -d splitted.json -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json -u previous.json -d splitted.json -m 2 -n;
+    #WHITE:$ idpconfgen sscalc mkdssp filtered_pdbs.tar -o dssp.json -u previous.json -d splitted.json -m 2 -n -c 1000;
     }
 
 if (input data) then (tar file)
@@ -41,8 +44,8 @@ endif
 
 if (--complete) then (reads previous)
     :reads previous //sscalc//
-    information file, and completes
-    it with the new calculation;
+    information file, stores it
+    for later;
     note left
         Entries with the same ID
         are overwritten
@@ -51,6 +54,7 @@ else (not given)
     :starts a blank output file;
 endif
 
+#FFD3F2:repeat ://for each chunk of paths//;
 fork
 
 :subprocess //mkdssp// for the PDB;
@@ -89,7 +93,26 @@ note right #whitesmoke
     where cores extract PDBs from the queue
     until the queue is exhausted
 end note
+if (chunk finished to process) then (TAR)
+    :save in TAR file;
+else (folder)
+    :save PDB/CIFs to folder;
+endif
+backward://launch another chunk//;
+repeat while (//more PDBs to process?//)
 
+if (--complete) then (updates previous)
+    :updates previous //sscalc//
+    information file, with the information
+    generated in this run;
+    note left
+        Entries with the same ID
+        are overwritten
+    end note
+else (not given)
+    :saves the secondary structure informatio
+    from this run;
+endif
 if (save data to disk) then (JSON)
     :saves dictionary to //.json// file;
 else (PICKLE)

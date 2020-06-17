@@ -253,12 +253,11 @@ def segment_split(
         ssdata,
         minimum=0,
         structure='all',
-        mdict=None,
         ):
     """
     """
     pdbname = Path(pdbid[0]).stem
-    pdbdata = pdbid[1]
+    pdbdata = pdbid[1].split(b'\n')
 
     pdbdd = ssdata[pdbname]
 
@@ -268,16 +267,16 @@ def segment_split(
     ss_to_isolate = set(s for s in ss_identified if sel_structure(s))
 
     dssp_slices = group_by(pdbdd['dssp'])
-    DR = pdbdd['resids'].split(',')  # DR -> dssp residues
+    DR = [c.encode() for c in pdbdd['resids'].split(',')]  # DR -> dssp residues
 
     for ss in ss_to_isolate:
         ssfilter = (slice_ for char, slice_ in dssp_slices if char == ss)
-        minimum_size = (s for s in ssfilter if s.stop - s.start > minimum)
+        minimum_size = (s for s in ssfilter if s.stop - s.start >= minimum)
         for counter, seg_slice in enumerate(minimum_size):
-            structure = Structure(pdbdata)
-            structure.build()
-            structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
-            pdb = '\n'.join(structure.get_PDB())
-            mdict[f'{pdbname}_{ss}_{counter}.pdb'] = pdb
-            del structure
+            #structure = Structure(pdbdata)
+            #structure.build()
+            #structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
+            #pdb = '\n'.join(structure.get_PDB())
+            pdb = b'\n'.join(l for l in pdbdata if l[atom_resSeq].strip() in DR[seg_slice])
+            yield f'{pdbname}_{ss}_{counter}.pdb', pdb
             counter += 1

@@ -73,9 +73,16 @@ ap.add_argument(
     default='sscalc_splitted.tar',
     )
 
+ap.add_argument(
+    '-u',
+    '--update',
+    help='Updates a previous SSCALC JSON file.',
+    type=Path,
+    default=None,
+    )
+
 libcli.add_argument_reduced(ap)
 libcli.add_argument_chunks(ap)
-#libcli.add_argument_update(ap)  # discarded for now
 libcli.add_argument_ncores(ap)
 
 
@@ -85,6 +92,7 @@ def main(
         pdb_files,
         chunks=1000,
         destination='sscalc_splitted.tar',
+        update=None,
         func=None,
         minimum=2,
         ncores=1,
@@ -112,6 +120,11 @@ def main(
     """
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
+
+    # update is inspected here because it can raise errors and it is better
+    # that such errors are spotted before performing the expensive calculations
+    if update:
+        previous = read_dictionary_from_disk(update)
 
     log.info(T('reading input paths'))
     try:
@@ -151,10 +164,9 @@ def main(
 
                     # notice the copy, this is needed for the .clear()
                     # to work later on
-                    pdb_data[copy(fname)] = pdb_split
+                    pdb_data[f'{fname}.pdb'] = pdb_split
             save_pairs_to_disk(pdb_data.items(), destination=destination)
             pdb_data.clear()  # clears the dictionary to release memory
-        save_dictionary(dssp_data, output)
 
     except Exception as err:
         log.error('FAILED')
@@ -164,6 +176,13 @@ def main(
     finally:
         if _istarfile:
             shutil.rmtree(TMPDIR)
+
+    if update:
+        save_dictionary(previous.update(dssp_data), output)
+    else:
+        save_dictionary(dssp_data, output)
+
+
     return
 
 

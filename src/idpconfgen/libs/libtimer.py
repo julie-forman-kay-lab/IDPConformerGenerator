@@ -52,7 +52,7 @@ class ProgressCounter:
         self.counter = 0
 
     def __enter__(self, *args, **kwargs):
-        sys.stdout.write('\r0')
+        sys.stdout.write('\rRunning operations: 0')
         return self
 
     def __exit__(self, *args):
@@ -61,7 +61,7 @@ class ProgressCounter:
 
     def increment(self):
         self.counter += 1
-        sys.stdout.write(f'\r{self.counter}')
+        sys.stdout.write(f'\rRunning operations: {self.counter}')
         return
 
 
@@ -162,7 +162,7 @@ class ProgressBarReal:
         percents = self.str_format.format(0)
         sys.stdout.write(
             f'\r{self.prefix} '
-            f'{percents}% {self.counter}/{self.total} {self.suffix} |bar|'
+            f'{percents}% {self.counter}/{self.total} {self.suffix} |{bar}|'
             )
         self.counter += 1
         return self

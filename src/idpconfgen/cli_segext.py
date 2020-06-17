@@ -16,7 +16,7 @@ from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libhigherlevel import segment_split
 from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, save_pairs_to_disk
-from idpconfgen.libs.libmulticore import pool_function_in_chunks
+from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterable_in_list
 
 
 LOGFILESNAMES = '.idpconfgen_segext'
@@ -62,20 +62,16 @@ ap.add_argument(
     default='all',  # ('N', 'CA', 'C'),
     nargs='+',
     )
+libcli.add_argument_minimum(ap)
+libcli.add_argument_ncores(ap)
 
-
-def filter_dssp_segments(seg, required='all'):
-    if required == 'all':
-        return True
-    else:
-        return seg == required
 
 
 def main(
         pdb_files,
         sscalc_file,
         atoms,
-        minimum_size=4,
+        minimum=4,
         destination=None,
         structure='all',
         func=None,
@@ -88,16 +84,19 @@ def main(
 
     execute = partial(
         pool_function_in_chunks,
-        segment_split,
+        consume_iterable_in_list,
         pdbs2operate,
+        segment_split,
         ncores=ncores,
         chunks=chunks,
         ssdata=ssdata,
         structure=structure,
+        minimum=minimum,
         )
 
-    for run in execute():
-        save_pairs_to_disk(run.items(), destination=destination)
+    for chunk in execute():
+        for pairs in chunk:
+            save_pairs_to_disk(pairs, destination=destination)
 
 
 if __name__ == '__main__':
