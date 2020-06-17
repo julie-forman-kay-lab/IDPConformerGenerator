@@ -5,17 +5,18 @@ Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
 from collections import defaultdict
-from functools import reduce
+from functools import reduce, partial
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libdownload import download_dispacher
-from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source
+from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_dispacher
 from idpconfgen.libs.libparse import group_runs, group_by
 from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues, col_resSeq
 from idpconfgen.libs.libtimer import record_time
 from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterable_in_list
 
 
 
@@ -70,14 +71,28 @@ def download_pipeline(func, logfilename='.download'):
         something_to_download = len(pdblist_comparison) > 0
         if something_to_download and update:
 
-            download_dispacher(
+            execute = partial(
+                pool_function_in_chunks,
+                consume_iterable_in_list,
+                list(pdblist_comparison.name_chains_dict.items()),
                 func,
-                destination,
-                sorted(pdblist_comparison.name_chains_dict.items()),
                 ncores=ncores,
                 chunks=chunks,
-                **kwargs,
                 )
+
+            save_pairs = save_pairs_dispacher(destination)
+
+            for chunk in execute():
+                for result in chunk:
+                    save_pairs(result, destination)
+            #download_dispacher(
+            #    func,
+            #    destination,
+            #    sorted(pdblist_comparison.name_chains_dict.items()),
+            #    ncores=ncores,
+            #    chunks=chunks,
+            #    **kwargs,
+            #    )
 
             log.info(T('Reading UPDATED destination'))
             pdblist_updated = read_PDBID_from_source(destination)

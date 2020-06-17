@@ -542,6 +542,14 @@ def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
             pickledump(dict(mydict), handle)
 
 
+def save_pairs_dispacher(destination):
+    options = {
+        True: save_pairs_to_files,
+        destination.suffix == '.tar': save_pairs_to_tar,
+        }
+    return options[True]
+
+
 def save_pairs_to_disk(pairs, destination=None):
     """
     Save pairs to files.
@@ -556,19 +564,13 @@ def save_pairs_to_disk(pairs, destination=None):
         Defaults to CWD.
     """
     dest = Path(destination) if destination else Path.cwd()
-
-    options = {
-        True: save_pairs_to_files,
-        dest.suffix == '.tar': save_pairs_to_tar,
-        }
-    options[True](pairs, dest)
+    save_pairs_dispacher(dest)(pairs, dest)
 
 
 def save_pairs_to_tar(pairs, destination):
     modes = {True: 'a:', False: 'w'}
-    with tarfile.open(
-            os.fspath(destination),
-            mode=modes[destination.exists()]) as tar:
+    mode = modes[Path(destination).exists()]
+    with tarfile.open(os.fspath(destination), mode=mode) as tar:
         for fout, data in pairs:
             save_file_to_tar(tar, fout, data)
 
