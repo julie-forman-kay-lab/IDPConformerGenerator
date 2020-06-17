@@ -9,6 +9,7 @@ SOL
 TPP
 HEM
 WO4
+WO2
 # ribonucleotides
 I
 C

@@ -393,6 +393,7 @@ def identify_backbone_gaps(atoms):
         ]
 
 
+# not used
 def mkdssp_w_split_w_save(*args, destination=None, **kwargs):
      for fname, split_dssp, split_pdb_bytes in mkdssp_w_split(*args, **kwargs):
         save_pairs_to_disk(((f'{fname}.pdb', split_pdb_bytes),), destination=destination)
