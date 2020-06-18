@@ -15,10 +15,14 @@ partition #LIGHTGREY Examples {
         where //pdbs.tar// is a destination
         tar file.
     end note
+    #WHITE:$ idpconfgen pdbdl 12AS -d pdbs.tar -u;
     }
 
+:tokenizes input, identifying PDBIDs
+and respective chains;
+
 :Compares destination folder/file,
-downloads only missing entries;
+to download only missing entries;
 
 :filters out PDBID:CHAIN codes
 known to be conflictive;
@@ -26,6 +30,7 @@ note right
     1MH1_A
 end note
 
+#FFD3F2:repeat ://for each chunk of paths//;
 fork
 
 :downloads PDB or mmCIF;
@@ -71,6 +76,7 @@ partition "additional parsing" {
         (//pdb_delinsertion// from //pdb-tools//);
 }
 
+
 end fork
 note right
     This block is performed for each
@@ -79,16 +85,18 @@ note right
     block, once it is finished another PDB code
     is picked.
 end note
-
+:Data is saved per chunk to the disk;
 if (destination `-d`) then (TAR)
-    :save in TAR file;
+    :save PDBs to TAR file;
 else (folder)
-    :save PDB/CIFs to folder;
+    :save PDBs to folder;
+    note right #lightgrey
+    mmCIF chains have been parsed
+    to PDB format
+    end note
 endif
-note right
-    Files are saved after each chunk
-    is completed.
-end note
+backward://launch another chunk//;
+repeat while (//more PDBs to process?//)
 
 stop
 

@@ -84,16 +84,7 @@ def download_pipeline(func, logfilename='.download'):
 
             for chunk in execute():
                 flatted = (item for result in chunk for item in result)
-                #for result in chunk:
                 save_pairs(flatted, destination)
-            #download_dispacher(
-            #    func,
-            #    destination,
-            #    sorted(pdblist_comparison.name_chains_dict.items()),
-            #    ncores=ncores,
-            #    chunks=chunks,
-            #    **kwargs,
-            #    )
 
             log.info(T('Reading UPDATED destination'))
             pdblist_updated = read_PDBID_from_source(destination)
