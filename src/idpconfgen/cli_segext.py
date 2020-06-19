@@ -21,8 +21,8 @@ from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterab
 
 LOGFILESNAMES = '.idpconfgen_segext'
 
-_name = 'segsext'
-_help = 'Split PDB into secondary structure segments.'
+_name = 'ssext'
+_help = 'Extract secondary structure elements from PDBs.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
@@ -70,7 +70,7 @@ libcli.add_argument_ncores(ap)
 def main(
         pdb_files,
         sscalc_file,
-        atoms,
+        atoms='all',
         minimum=4,
         destination=None,
         structure='all',
@@ -83,12 +83,19 @@ def main(
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
     execute = partial(
+        # multiprocessing function
         pool_function_in_chunks,
+        # wrapper around generator
         consume_iterable_in_list,
+        # items
         pdbs2operate,
+        # func to oeprate
         segment_split,
+        # multicore kwargs
         ncores=ncores,
         chunks=chunks,
+        # func kwargs
+        atoms=atoms,
         ssdata=ssdata,
         structure=structure,
         minimum=minimum,

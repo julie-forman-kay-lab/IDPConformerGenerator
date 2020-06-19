@@ -12,7 +12,7 @@ from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libdownload import download_dispacher
 from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_dispacher
 from idpconfgen.libs.libparse import group_runs, group_by
-from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq
+from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq, atom_name
 from idpconfgen.libs.libstructure import Structure, eval_bb_gaps, get_PDB_from_residues, col_resSeq
 from idpconfgen.libs.libtimer import record_time
 from idpconfgen.logger import S, T, init_files
@@ -20,8 +20,22 @@ from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterab
 
 
 
+# USED OKAY!
 def download_pipeline(func, logfilename='.download'):
     """
+    Context pipeline to download PDB/mmCIF files.
+
+    Exists because fetching and download filtered PDBs shared the same
+    operational contextm, only differing on the function which
+    orchestrates the download process.
+
+    Parameters
+    ----------
+    func : function
+        The actual function that orchestrates the download operation.
+
+    logfilename : str, optional
+        The common stem name of the log files.
     """
     LOGFILESNAME = logfilename
     def main(
@@ -30,7 +44,6 @@ def download_pipeline(func, logfilename='.download'):
             destination=None,
             ncores=1,
             update=False,
-            **kwargs,
             ):
         """Run main script logic."""
         init_files(log, LOGFILESNAME)
@@ -255,9 +268,11 @@ def split_sscalc_data(pdbname, data, segments):
     return splitdata, segs_in_dssp
 
 
+# USED OKAY
 def segment_split(
         pdbid,
         ssdata,
+        atoms='all',
         minimum=0,
         structure='all',
         ):
@@ -265,16 +280,25 @@ def segment_split(
     """
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1].split(b'\n')
-
     pdbdd = ssdata[pdbname]
 
     ss_identified = set(pdbdd['dssp'])
+
+    # structure filter
     sel_structure = \
         (lambda x: True) if structure == 'all' else (lambda x: x in structure)
     ss_to_isolate = set(s for s in ss_identified if sel_structure(s))
 
+    # in atoms filter
+    if atoms != 'all':
+        atoms_ = [c.encode() for c in atoms]
+        in_atoms = lambda x: x[atom_name].strip() in atoms_
+    else:
+        in_atoms = lambda x: True
+
     dssp_slices = group_by(pdbdd['dssp'])
-    DR = [c.encode() for c in pdbdd['resids'].split(',')]  # DR -> dssp residues
+    # DR stands for dssp residues
+    DR = [c.encode() for c in pdbdd['resids'].split(',')]
 
     for ss in ss_to_isolate:
         ssfilter = (slice_ for char, slice_ in dssp_slices if char == ss)
@@ -284,6 +308,10 @@ def segment_split(
             #structure.build()
             #structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
             #pdb = '\n'.join(structure.get_PDB())
-            pdb = b'\n'.join(l for l in pdbdata if l[atom_resSeq].strip() in DR[seg_slice])
+
+
+            filter1 = (l for l in pdbdata if l[atom_resSeq].strip() in DR[seg_slice])
+            filter2 = (l for l in filter1 if in_atoms(l))
+            pdb = b'\n'.join(filter2)
             yield f'{pdbname}_{ss}_{counter}.pdb', pdb
             counter += 1

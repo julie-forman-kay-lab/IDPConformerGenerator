@@ -277,6 +277,7 @@ class PDBIDFactory:
         return pdbid, chainid, segID.lstrip('seg')
 
 
+# USED OKAY
 class PDBList:
     """
     List of PDBID objects.
@@ -376,6 +377,7 @@ class PDBList:
         log.info(S(f'PDBIDs written to {filename}'))
 
 
+# USED OKAY
 @functools.total_ordering
 class PDBID:
     """

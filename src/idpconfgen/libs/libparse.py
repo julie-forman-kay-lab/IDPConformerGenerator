@@ -26,7 +26,7 @@ _ascii_lower_set = set(string.ascii_lowercase)
 _ascii_upper_set = set(string.ascii_uppercase)
 
 
-# possible data inputs in __init__
+# USED OKAY
 # all should return a string
 # used for control flow
 type2string = {
@@ -36,9 +36,14 @@ type2string = {
     }
 
 
-# JSON doesn't accept bytes
+# USED OKAY
 def parse_dssp(data, reduced=False):
-    """Parse DSSP file data."""
+    """
+    Parse DSSP file data.
+
+    JSON doesn't accept bytes
+    That is why `data` is expected as str.
+    """
     DT = dssp_trans
 
     data_ = data.split('\n')
@@ -54,8 +59,6 @@ def parse_dssp(data, reduced=False):
         # if the whole generator is exhausted
         raise IndexError
 
-    #structure_data = (i for i in RM1 if i[13] != '!')
-    
     dssp = []
     fasta = []
     residues = []
@@ -77,25 +80,6 @@ def parse_dssp(data, reduced=False):
         if reduced:
             dssp_ = dssp_.translate(DT)
         yield dssp_, ''.join(fasta), residues
-
-
-
-    #assert sum((len(dssp), len(fasta), len(residues))) / 3 == len(dssp)
-
-    #return ''.join(dssp), ''.join(fasta), ','.join(residues)
-
-
-def find_dssp_data_index(data):
-    """
-    Find index for where item startswith '#'.
-
-    Evaluates after left striping white spaces.
-    """
-    for line in data:
-        if line.strip().startswith('#'):
-            return
-    else:
-        raise IndexError
 
 
 def list_index_to_array(
@@ -409,7 +393,25 @@ def mkdssp_w_split(
     """
     Execute `mkdssp` from DSSP.
 
+    Saves the data splitted accoring to backbone continuity
+    as identified by `mkdssp`. Splits the input PDB into bb continuity
+    segments.
+
     https://github.com/cmbi/dssp
+
+    Parameters
+    ----------
+    pdb : Path
+        The path to the pdb file.
+
+    cmd : str
+        The command to execute the external DSSP program.
+
+    minimum : int
+        The minimum length allowed for a segment.
+
+    reduce : bool
+        Whether to reduce the DSSP nomemclature to H/E/L.
     """
     pdbfile = fspath(pdb.resolve())
     _cmd = [cmd, '-i', pdbfile]
@@ -446,177 +448,3 @@ def mkdssp_w_split(
 
         yield fname, __data , b''.join(lines2write)
         segs += 1
-
-
-def get_segsplitter(destination):
-    """
-    Select the appropriate function to write the segments
-    """
-    return
-
-
-
-
-# DEPECRATED
-# class DSSPParser:
-#    """
-#    Provides an interface for `DSSP files`_.
-#
-#    .. _DSSP files: https://github.com/cmbi/xssp
-#
-#    If neither `fin` nor `data` parameters are given, initiates
-#    an data empty parser.
-#
-#    Parameters
-#    ----------
-#    fin : str or Path object, optional
-#        The path to the dssp text file to read.
-#        Defaults to ``None``.
-#
-#    data : str or list, optional
-#        A string containing the dssp file data, or a list of lines
-#        of such file.
-#        Defaults to ``None``.
-#
-#    pdbid : any, optional
-#        An identification for the DSSP file being parsed.
-#        Deafults to None.
-#
-#    reduced : bool
-#        Whether or not to reduce secondary structure representation
-#        only three types: loops 'L', helices 'H', and sheets 'E'.
-#
-#    Attributes
-#    ----------
-#    ss : array
-#        If `data` or `fin` are given :attr:`ss` stores the secondary
-#        structure information DSSP Keys of the protein.
-#
-#    """
-#
-#    def __init__(
-#            self,
-#            *,
-#            fin=None,
-#            data=None,
-#            pdbid=None,
-#            reduced=False,
-#            ):
-#
-#        self.pdbid = pdbid
-#        self.reduced = reduced
-#
-#        if fin:
-#            self.read_dssp_data(Path(fin).read_text())
-#        elif data:
-#            self.read_dssp_data(data)
-#        else:
-#            self.data = None
-#
-#
-#    def __eq__(self, other):
-#        is_equal = [
-#            self.data == other.data,
-#            self.pdbid == other.pdbid,
-#            ]
-#
-#        return all(is_equal)
-#
-#    def read_dssp_data(self, data):
-#        """
-#        Read DSSP data into the parser object.
-#
-#        Parameters
-#        ----------
-#        data : str or list of strings
-#            Has the same value as Class parameter `data`.
-#        """
-#        try:
-#            data = data.split('\n')
-#        except AttributeError:  # data already a list
-#            pass
-#
-#        data = [i for i in data if i]  # removes empty strings
-#
-#        try:
-#            data_header_index = self._finds_data_index(data)
-#        except IndexError as err:
-#            raise EXCPTS.DSSPParserError(self.pdbid) from err
-#
-#        # data starts afterthe header
-#        #
-#        # '!' appears in gap regions, so that line needs to be ignored.
-#        self.data = [d for d in data[data_header_index + 1:] if d[13] != '!']
-#
-#        #self.read_sec_structure()
-#        #self.read_fasta()
-#        #self.read_resnum()
-#
-#    def read_sec_structure(self):
-#        """
-#        Read secondary structure information from DSSP files.
-#
-#        Assigns :attr:`ss`.
-#        """
-#        ss_tmp = list_index_to_array(self.data, index=16)
-#
-#        if self.reduced:
-#            ss_tmp = np.char.translate(ss_tmp, DEFS.dssp_trans)
-#
-#        self._confirm_ss_data(ss_tmp)
-#        self.ss = ss_tmp
-#
-#    def read_fasta(self):
-#        """
-#        Read FASTA (primary sequence) information from DSSP data.
-#
-#        Assigns :attr:`fasta`.
-#        """
-#        self.fasta = list_index_to_array(self.data, index=13)
-#
-#    def read_resnum(self):
-#        """Read residue numbers, consider only pdb residue numbers."""
-#        self.resnums = list(
-#            map(
-#                str.strip,
-#                list_index_to_array(self.data, start=6, stop=10),
-#                )
-#            )
-#
-#    @classmethod
-#    def from_data_id_tuple(cls, subcmd_tuple, **kwargs):
-#        """
-#        Initiate from a tuple.
-#
-#        Tuple of type (PDBID, DSSP DATA).
-#        """
-#        return cls(
-#            pdbid=PDBIDFactory(subcmd_tuple[0]),
-#            data=subcmd_tuple[1],
-#            **kwargs,
-#            )
-#
-#    @staticmethod
-#    def _confirm_ss_data(data):
-#        """Confirm secondary structure data characters are valid."""
-#        if not all((i in DEFS.dssp_ss_keys.valid for i in data)):
-#            raise EXCPTS.DSSPSecStructError()
-#
-#    @staticmethod
-#    def _finds_data_index(data):
-#        """
-#        Find index for where item startswith '#'.
-#
-#        Evaluates after left striping white spaces.
-#        """
-#        # brute force index finding
-#        i = 0
-#        line = data[i]
-#        # if not exausted, while breaks with IndexError
-#        while not line.lstrip().startswith('#'):
-#            i += 1
-#            line = data[i]
-#        else:
-#            return i
-#
-#

@@ -14,10 +14,12 @@ from idpconfgen.libs.libtimer import ProgressWatcher
 from idpconfgen.logger import S
 
 
+# USED OKAY
 def consume_iterable_in_list(func, *args, **kwargs):
     return list(i for i in func(*args, **kwargs))
 
 
+# USED OKAY
 def pool_function(func, items, *args, method='imap_unordered', ncores=1, **kwargs):
     """Multiprocess Pools a function.
 
@@ -53,6 +55,7 @@ def pool_function(func, items, *args, method='imap_unordered', ncores=1, **kwarg
                 log.info('IndexError of multiprocessing, ignoring something')
 
 
+# USED OKAY
 def pool_function_in_chunks(
         func,
         tasks,
@@ -70,71 +73,6 @@ def pool_function_in_chunks(
         task = tasks[i: i + chunks]
         yield [i for i in pool_function(func, task, *args, **kwargs)]
 
-
-# Hell Yeah crazy name \m/, any problem?
-# Attention: this function has severe memory leakage
-def pool_chunks_to_disk_and_data_at_the_end(
-        func,
-        tasks,
-        destination,
-        mdata_source=None,
-        mdata_dest='mdata_dest.json',
-        chunks=5000,
-        sort=False,
-        **kwargs,
-        ):
-    """
-    Pools a func over data.
-
-    At each chunk saves the specified results to the disks.
-    While the other set of results are saved only at the end.
-
-    Usually there are files and a dictionary.
-    """
-
-    manager = Manager()
-    mdata = manager.dict()
-    with suppress(TypeError):
-        mdata.update(mdata_source)
-
-
-    for i in range(0, len(tasks), chunks):
-        task = tasks[i: i + chunks]
-
-        mfiles = manager.dict()
-
-        pool_function(
-            func,
-            task,
-            # we expect func to receive these to dicts
-            mfiles=mfiles,
-            mdata=mdata,
-            # kwargs for func
-            **kwargs,  # ncores go here
-            )
-
-        if sort:
-            sorted_ = sorted(mfiles.items())
-            del mfiles
-            dsorted = dict(sorted_)
-            del sorted_
-            save_pairs_to_disk(dsorted.items(), destination=destination)
-            del dsorted
-        else:
-            save_pairs_to_disk(mfiles.items(), destination=destination)
-            del mfiles
-
-    if mdata:
-        if sort:
-            sorted_ = sorted(mdata.items())
-            del mdata
-            dsorted = dict(sorted_)
-            del sorted_
-            save_dictionary(dsorted.items(), mdata_dest)
-            del dsorted
-        else:
-            save_dictionary(mdata.items(), mdata_dest)
-            del mdata
 
 
 class Worker(multiprocessing.Process):

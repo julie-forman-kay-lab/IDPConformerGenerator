@@ -288,7 +288,7 @@ def period_suffix(ext):
     return f'.{ext[ext.find(".") + 1:]}'
 
 
-#@libcheck.argstype(((list, tuple),))
+# USE OKAY
 def read_path_bundle(path_bundle, ext=None, listext='.list'):
     """
     Read path bundle.
@@ -336,11 +336,6 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     # files that do not exist
     pbundle2 = map(Path, path_bundle)
     log_nonexistent(pbundle2)
-
-    # files that exist
-    #jp1 = filter(Path.exists, pbundle)
-    #jp2 = filter(Path.exists, pbundle)
-    #jp3 = filter(Path.exists, pbundle)
 
     # is dir filter
     f1 = filter(Path.is_dir, paths_exists)
@@ -399,6 +394,7 @@ def read_dict_from_pickle(path):
     return pickle.load(open( path, "rb" ))
 
 
+# USED OKAY
 def read_PDBID_from_folder(folder):
     """
     Read PDBIDs from folder.
@@ -412,13 +408,10 @@ def read_PDBID_from_folder(folder):
     -------
     :class:`idpconfgen.libs.libpdb.PDBList`
     """
-    #log.info(S('reading destination folder'))
-    #log.info(S(f'from: {folder}'))
-    pdblist = PDBList(glob_folder(folder, '*.pdb'))
-    #log.info(S(f'found: {str(pdblist)}'))
-    return pdblist
+    return PDBList(glob_folder(folder, '*.pdb'))
 
 
+# USED OKAY
 def read_PDBID_from_source(source):
     """
     Read PDBIDs from destination.
@@ -438,6 +431,7 @@ def read_PDBID_from_source(source):
     return options[True](source)
 
 
+# USED OKAY
 def read_PDBID_from_tar(tar_file):
     """
     Read PDBIDs from tarfile.
@@ -456,12 +450,6 @@ def read_PDBID_from_tar(tar_file):
     :class:`idpconfgen.libs.libpdb.PDBList`
         If file is not found returns an empty PDBList.
     """
-    #title = (
-    #    f"{T('Reading PDB IDs in tar file.')}\n"
-    #    f"{S(f'from: {tar_file}')}\n"
-    #    )
-    #log.info(title)
-
     try:
         tar = tarfile.open(tar_file.str(), 'r:*')
         p = PDBList(tar.getnames())
@@ -541,7 +529,7 @@ def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
         except TypeError:
             pickledump(dict(mydict), handle)
 
-
+# USED OKAY
 def save_pairs_dispacher(destination):
     options = {
         True: save_pairs_to_files,
@@ -550,6 +538,7 @@ def save_pairs_dispacher(destination):
     return options[True]
 
 
+# USED OKAY
 def save_pairs_to_disk(pairs, destination=None):
     """
     Save pairs to files.
@@ -567,6 +556,7 @@ def save_pairs_to_disk(pairs, destination=None):
     save_pairs_dispacher(dest)(pairs, dest)
 
 
+# USED OKAY
 def save_pairs_to_tar(pairs, destination):
     modes = {True: 'a:', False: 'w'}
     mode = modes[Path(destination).exists()]
@@ -575,6 +565,7 @@ def save_pairs_to_tar(pairs, destination):
             save_file_to_tar(tar, fout, data)
 
 
+# USED OKAY
 def save_file_to_tar(tar, fout, data):
     sIO = BytesIO()
     try:
@@ -587,6 +578,7 @@ def save_file_to_tar(tar, fout, data):
     tar.addfile(tarinfo=info, fileobj=sIO)
 
 
+# USED OKAY
 def save_pairs_to_files(pairs, destination):
     dest = make_destination_folder(destination)
     for k, v in pairs:

@@ -16,7 +16,7 @@ import argparse
 import sys
 
 from idpconfgen import cli_RCSB_dssp
-from idpconfgen import cli_bbsplit
+#from idpconfgen import cli_bbsplit
 from idpconfgen import cli_fastaext
 from idpconfgen import cli_fetch
 from idpconfgen import cli_filter
@@ -40,7 +40,6 @@ Other useful routines:
 
     * {cli_fetch._name}
     * {cli_segext._name}
-    * {cli_bbsplit._name}
     * {cli_fastaext._name}
     * {cli_RCSB_dssp._name}
 """
@@ -68,7 +67,7 @@ libcli.add_subparser(subparsers, cli_sscalc)
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_segext)
 libcli.add_subparser(subparsers, cli_fetch)
-libcli.add_subparser(subparsers, cli_bbsplit)
+#libcli.add_subparser(subparsers, cli_bbsplit)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_RCSB_dssp)
 

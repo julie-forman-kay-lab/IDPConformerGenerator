@@ -10,22 +10,22 @@ import argparse
 import shutil
 import traceback
 from functools import partial
-from multiprocessing import Pool
-from pprint import pprint
-from copy import copy
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
-    read_path_bundle,
     read_dictionary_from_disk,
+    read_path_bundle,
+    save_dictionary,
+    save_pairs_to_disk,
     )
-from idpconfgen.libs.libmulticore import pool_chunks_to_disk_and_data_at_the_end, pool_function, consume_iterable_in_list, pool_function_in_chunks
+from idpconfgen.libs.libmulticore import (
+    consume_iterable_in_list,
+    pool_function_in_chunks,
+    )
 from idpconfgen.libs.libparse import mkdssp_w_split
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libio import save_dictionary, save_pairs_to_disk
-from idpconfgen.libs.libtimer import ProgressWatcher
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -52,7 +52,7 @@ ap.add_argument(
     help=(
         "A path to the file where the PDBID secondary structure and FASTA"
         " information dictionary will be saved. "
-        "Defaults to sscalc.json."
+        "Defaults to sscalc.json, requires \'.json\' extension."
         ),
     type=Path,
     default='sscalc.json',
@@ -81,24 +81,33 @@ ap.add_argument(
     default=None,
     )
 
+ap.add_argument(
+    '-tmpdir',
+    help=(
+        'Temporary directory to store data during calculation '
+        'if needed.'
+        ),
+    type=Path,
+    default='__sscalc_tmpdir__',
+    )
+
 libcli.add_argument_reduced(ap)
 libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
 
 
-# add posibilitiy not to split???
 def main(
         cmd,
         pdb_files,
         chunks=1000,
         destination='sscalc_splitted.tar',
-        update=None,
-        func=None,
+        func=None,  # here just to receive from main cli.py
         minimum=2,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
-        **kwargs,
+        tmpdir=TMPDIR,
+        update=None,
         ):
     """
     Run main cli logic.
@@ -115,6 +124,13 @@ def main(
         If given prints output to that file, else prints to console.
         Defaults to `None`.
 
+    chunks : int, optional
+        The number of items to process in memory before saving the
+        results from the disk.
+
+    reduced : Bool, optional
+        Whether to reduce secondary structure information to H/E/L
+
     ncores : int
         The numbers of cores to use.
     """
@@ -128,7 +144,7 @@ def main(
 
     log.info(T('reading input paths'))
     try:
-        pdbs2operate = extract_from_tar(pdb_files, output=TMPDIR, ext='.pdb')
+        pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
         _istarfile = True
     except TypeError:
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
@@ -175,13 +191,12 @@ def main(
 
     finally:
         if _istarfile:
-            shutil.rmtree(TMPDIR)
+            shutil.rmtree(tmpdir)
 
     if update:
         save_dictionary(previous.update(dssp_data), output)
     else:
         save_dictionary(dssp_data, output)
-
 
     return
 

@@ -1,8 +1,8 @@
 """
-Conformer Generator PDB Downloader.
+PDB/mmCIF Downloader.
 
-Downloads structures from RCSB Databank provided a list of PDB
-identifiers.
+Downloads structures from RCSB Databank for PDB formatted files of
+individual chains.
 
 The PDB ID list can be given in the format of a file listing the PDBIDs
 or as a list of arguments passed to the script call.
@@ -23,9 +23,9 @@ Detailed procedures:
 * Known solvent and ligands are removed
 * Considers only altLoc 'A' or ' '.
 * Considers only elements composing aminoacids
-* selects only the first model in multi MODEL structures
+* selects only the first model for multi MODEL structures
 * renumbers atoms for saved chains
-* parses output through pdb-tools `pdb_delinsert` filter.
+* passes through pdb-tools `pdb_delinsert` filter.
 
 Accepts TAR files as output destination.
 
