@@ -9,50 +9,67 @@ USAGE:
     >>> idpconfgen -h
 
     Using PDB Downloader:
-    >>> idpconfgen pdbdl
+    >>> idpconfgen cli_pdbdl
 
 """
 import argparse
 import sys
 
-from idpconfgen import cli_pdbdownloader as pdbdl
+from idpconfgen import cli_RCSB_dssp
+from idpconfgen import cli_bbsplit
+from idpconfgen import cli_fastaext
 from idpconfgen import cli_fetch
-from idpconfgen import cli_filter as cli_filter
-from idpconfgen import cli_bbsplit as cli_bbsplit
-from idpconfgen import cli_segext as segext
-from idpconfgen import cli_sscalc as sscalc
-from idpconfgen import cli_fastaext as fastaext
-from idpconfgen import cli_RCSB_dssp as cli_RCSB_dssp
+from idpconfgen import cli_filter
+from idpconfgen import cli_pdbdownloader as cli_pdbdl
+from idpconfgen import cli_segext
+from idpconfgen import cli_sscalc
 from idpconfgen.libs import libcli
 
 
-# https://stackoverflow.com/questions/14988397
-# https://stackoverflow.com/questions/4042452
-#def _load_args():
-
 prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
+
+description = f"""
+{description_}
+
+Individual routines for DB creation:
+
+    * {cli_pdbdl._name}
+    * {cli_sscalc._name}
+
+Other useful routines:
+
+    * {cli_fetch._name}
+    * {cli_segext._name}
+    * {cli_bbsplit._name}
+    * {cli_fastaext._name}
+    * {cli_RCSB_dssp._name}
+"""
 
 ap = libcli.CustomParser(
     prog='idpconfgen',  # prog_,
-    description=libcli.detailed.format(description_),
+    description=libcli.detailed.format(description),
     usage=usage_,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-subparsers = ap.add_subparsers(
-    title='SUBROUTINES',
-    description='DESCRIPTION',
-    help='IDP Conf Gen subroutines:',
-    )
-
 libcli.add_version(ap)
-libcli.add_subparser(subparsers, cli_fetch)
-libcli.add_subparser(subparsers, pdbdl)
+
+# routines from the main DB creation pipeline
+subparsers = ap.add_subparsers(
+    title='IDP Conformer Generator routines',
+    help='Short description:',
+        )
+
+# argument parsers for main DB creation routines
+libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_filter)
-libcli.add_subparser(subparsers, fastaext)
-libcli.add_subparser(subparsers, sscalc)
-libcli.add_subparser(subparsers, segext)
+libcli.add_subparser(subparsers, cli_sscalc)
+
+# argument parsers for secondary routines
+libcli.add_subparser(subparsers, cli_segext)
+libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_bbsplit)
+libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_RCSB_dssp)
 
 
