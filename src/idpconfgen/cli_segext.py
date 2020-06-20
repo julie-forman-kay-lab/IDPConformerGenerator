@@ -14,7 +14,7 @@ from idpconfgen import Path, log
 from idpconfgen.core import definitions as DEFS
 from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libhigherlevel import segment_split
+from idpconfgen.libs.libhigherlevel import extract_secondary_structure
 from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, save_pairs_to_disk
 from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterable_in_list
 
@@ -89,8 +89,8 @@ def main(
         consume_iterable_in_list,
         # items
         pdbs2operate,
-        # func to oeprate
-        segment_split,
+        # func to operate
+        extract_secondary_structure,
         # multicore kwargs
         ncores=ncores,
         chunks=chunks,

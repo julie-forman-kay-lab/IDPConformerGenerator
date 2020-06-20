@@ -18,6 +18,8 @@ from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 from idpconfgen.libs.libtimer import record_time
 
+# Dispachers are at the bottom
+
 
 #@libcheck.argstype(list)
 # NOT USED ANYWHERE
@@ -359,6 +361,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
     return it.chain(from_folders, from_lists, f3)
 
 
+# USED OKAY
 def read_dictionary_from_disk(path):
     """
     Reads a dictionary from disk.
@@ -371,24 +374,21 @@ def read_dictionary_from_disk(path):
     -------
     dict
     """
-    _path_suffix = Path(path).suffix
-    options = {
-        #'.pickle': read_dict_from_pickle,
-        '.json': read_dict_from_json,
-        }
-
-    the_dict = options[_path_suffix](path)
-
+    dispacher = read_dictionary_from_disk_dispacher  # global to local
+    suffix = Path(path).suffix
+    the_dict = dispacher[suffix](path)
     assert isinstance(the_dict, dict)
     return the_dict
 
 
+# USED OKAY
 def read_dict_from_json(path):
     """Read dict from json."""
     with open(path) as fin:
         return json.load(fin)
 
 
+# USED OKAY
 def read_dict_from_pickle(path):
     """Read dictionary from pickle."""
     return pickle.load(open( path, "rb" ))
@@ -424,11 +424,9 @@ def read_PDBID_from_source(source):
     -------
     :class:`idpconfgen.libs.libpdb.PDBList`.
     """
-    options = {
-        True: read_PDBID_from_folder,  # considers it is a folder if not a tar
-        source.suffix == '.tar': read_PDBID_from_tar,
-        }
-    return options[True](source)
+    suffix = Path(source).suffix
+    dispacher = read_PDBID_from_source_dispacher
+    return dispacher[suffix](source)
 
 
 # USED OKAY
@@ -484,21 +482,14 @@ def save_dictionary(mydict, output='mydict.pickle'):
     KeyError
         If extension is not a compatible format.
     """
-    # some dicts come from multiprocessing.Manager
-    # this solves the problem always
-    #_d = dict(mydict)
     try:
         suffix = Path(output).suffix
     except TypeError:
         pprint(mydict, indent=4, sort_dicts=True)
         return
 
-    options = {
-        '.pickle': save_dict_to_pickle,
-        '.json': save_dict_to_json,
-        }
-
-    options[suffix](mydict, output, sort_keys=False)
+    dispacher = save_dict_to_disk_dispacher
+    dispacher[suffix](mydict, output, sort_keys=False)
 
 
 def save_dict_to_json(
@@ -529,13 +520,31 @@ def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
         except TypeError:
             pickledump(dict(mydict), handle)
 
+
 # USED OKAY
-def save_pairs_dispacher(destination):
-    options = {
-        True: save_pairs_to_files,
-        destination.suffix == '.tar': save_pairs_to_tar,
-        }
-    return options[True]
+def save_file_to_tar(tar, fout, data):
+    """
+    Saves content to a file inside a tar.
+
+    Parameters
+    ----------
+    tar : openned tar-file instance
+
+    fout : str
+        The name under which to save the ``data``.
+
+    data : str or bytes
+        Data to save to `fout` named file inside `tar`.
+    """
+    sIO = BytesIO()
+    try:
+        sIO.write(data)
+    except TypeError:
+        sIO.write(data.encode())
+    info = tarfile.TarInfo(name=fout)
+    info.size = sIO.seek(0, SEEK_END)
+    sIO.seek(0)
+    tar.addfile(tarinfo=info, fileobj=sIO)
 
 
 # USED OKAY
@@ -552,8 +561,9 @@ def save_pairs_to_disk(pairs, destination=None):
         The folder where to save files.
         Defaults to CWD.
     """
+    dispacher = save_pairs_dispacher
     dest = Path(destination) if destination else Path.cwd()
-    save_pairs_dispacher(dest)(pairs, dest)
+    save_pairs_dispacher[dest.suffix](pairs, dest)
 
 
 # USED OKAY
@@ -563,19 +573,6 @@ def save_pairs_to_tar(pairs, destination):
     with tarfile.open(os.fspath(destination), mode=mode) as tar:
         for fout, data in pairs:
             save_file_to_tar(tar, fout, data)
-
-
-# USED OKAY
-def save_file_to_tar(tar, fout, data):
-    sIO = BytesIO()
-    try:
-        sIO.write(data)
-    except TypeError:
-        sIO.write(data.encode())
-    info = tarfile.TarInfo(name=fout)
-    info.size = sIO.seek(0, SEEK_END)
-    sIO.seek(0)
-    tar.addfile(tarinfo=info, fileobj=sIO)
 
 
 # USED OKAY
@@ -623,7 +620,6 @@ class FileIteratorBase:
         return self
 
     def __getitem__(self, val):
-        #return [next(self) for i in range(val.stop - val.start)]
         for i in range(val.stop - val.start):
             # I had problems with the exhaustion of this generator
             # raising RuntimeError -> this solved
@@ -653,7 +649,6 @@ class FileIterator(FileIteratorBase):
         return next_file, txt
 
 
-
 class TarFileIterator(FileIteratorBase):
 
     def __init__(self, origin, ext='.pdb'):
@@ -669,3 +664,25 @@ class TarFileIterator(FileIteratorBase):
         txt = f.read()
         f.close()
         return member.name, txt
+
+
+# dispachers
+read_PDBID_from_source_dispacher = {
+    '': read_PDBID_from_folder,
+    '.tar': read_PDBID_from_tar,
+    }
+
+read_dictionary_from_disk_dispacher = {
+    #'.pickle': read_dict_from_pickle,
+    '.json': read_dict_from_json,
+    }
+
+save_pairs_dispacher= {
+    '': save_pairs_to_files,
+    '.tar': save_pairs_to_tar,
+    }
+
+save_dict_to_disk_dispacher = {
+    '.pickle': save_dict_to_pickle,
+    '.json': save_dict_to_json,
+    }

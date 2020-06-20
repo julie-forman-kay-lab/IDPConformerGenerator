@@ -5,6 +5,7 @@ Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
 from collections import defaultdict
+from contextlib import suppress
 from functools import reduce, partial
 
 from idpconfgen import Path, log
@@ -93,7 +94,7 @@ def download_pipeline(func, logfilename='.download'):
                 chunks=chunks,
                 )
 
-            save_pairs = save_pairs_dispacher(destination)
+            save_pairs = save_pairs_dispacher[destination]
 
             for chunk in execute():
                 flatted = (item for result in chunk for item in result)
@@ -269,7 +270,7 @@ def split_sscalc_data(pdbname, data, segments):
 
 
 # USED OKAY
-def segment_split(
+def extract_secondary_structure(
         pdbid,
         ssdata,
         atoms='all',
@@ -277,41 +278,60 @@ def segment_split(
         structure='all',
         ):
     """
+    Extract secondary structure elements from PDB data.
+
+    Parameters
+    ----------
+    pdbid : tuple
+        Where index 0 is the PDB id code, for example `12AS.pdb`, or
+        `12AS_A`, or `12AS_A_seg1.pdb`.
+        And, index 1 is the PDB data itself in bytes.
+
+    ssdata : dict
+        Dictionary containing the DSSP information. Must contain a key
+        equal to `Path(pdbid).stem, where `dssp` key contains the DSSP
+        information for that PDB.
+
+    atoms : str or list of str or bytes, optional
+        The atom names to keep.
+        Defaults to `all`.
     """
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1].split(b'\n')
     pdbdd = ssdata[pdbname]
 
     ss_identified = set(pdbdd['dssp'])
+    if structure == 'all':
+        ss_to_isolate = ss_identified
+    else:
+        ss_to_isolate = set(s for s in ss_identified if s in structure)
 
-    # structure filter
-    sel_structure = \
-        (lambda x: True) if structure == 'all' else (lambda x: x in structure)
-    ss_to_isolate = set(s for s in ss_identified if sel_structure(s))
+    # general lines filters
+    line_filters = []
+    LF_append = line_filters.append
+    LF_pop = line_filters.pop
 
     # in atoms filter
     if atoms != 'all':
-        atoms_ = [c.encode() for c in atoms]
-        in_atoms = lambda x: x[atom_name].strip() in atoms_
-    else:
-        in_atoms = lambda x: True
+        with suppress(AttributeError):  # it is more common to receive str
+            atoms = [c.encode() for c in atoms]
+        line_filters.append(lambda x: x[atom_name].strip() in atoms)
 
     dssp_slices = group_by(pdbdd['dssp'])
     # DR stands for dssp residues
     DR = [c.encode() for c in pdbdd['resids'].split(',')]
 
     for ss in ss_to_isolate:
+
         ssfilter = (slice_ for char, slice_ in dssp_slices if char == ss)
         minimum_size = (s for s in ssfilter if s.stop - s.start >= minimum)
+
         for counter, seg_slice in enumerate(minimum_size):
-            #structure = Structure(pdbdata)
-            #structure.build()
-            #structure.add_filter(lambda x: x[col_resSeq] in DR[seg_slice])
-            #pdb = '\n'.join(structure.get_PDB())
 
+            LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])
+            pdb = b'\n'.join(l for l in pdbdata if all(f(l) for f in line_filters))
+            LF_pop()
 
-            filter1 = (l for l in pdbdata if l[atom_resSeq].strip() in DR[seg_slice])
-            filter2 = (l for l in filter1 if in_atoms(l))
-            pdb = b'\n'.join(filter2)
             yield f'{pdbname}_{ss}_{counter}.pdb', pdb
+
             counter += 1
