@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.core.definitions import aa3to1
 from idpconfgen.logger import S
 
 
@@ -194,6 +195,15 @@ atom_format_funcs = [
     float, float, float, _nothing, _nothing,
     _nothing,
     ]
+
+
+# USED OKAY
+def get_fasta_from_PDB(pdbid):
+    """Extract FASTA from PDB."""
+    lines = pdbid[1].decode('utf_8').split('\n')
+    rn = {line[atom_resSeq].strip(): line[atom_resName] for line in lines}
+    fasta = (aa3to1.get(f, 'X') for f in rn.values())
+    return Path(pdbid[0]).stem, ''.join(fasta)
 
 
 def is_pdb(datastr):

@@ -50,6 +50,7 @@ ap.add_argument(
         'A subfolder is created for each secondary structure type'
         ),
     default='all',
+    nargs='+',
     )
 
 ap.add_argument(

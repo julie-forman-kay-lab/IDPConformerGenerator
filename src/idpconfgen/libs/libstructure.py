@@ -15,18 +15,18 @@ from functools import reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
+from idpconfgen.core.definitions import (
+    aa3to1,
+    blocked_ids,
+    pdb_ligand_codes,
+    residue_elements as _allowed_elements,
+    )
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.libs.libcif import CIFParser, is_cif
 from idpconfgen.libs.libparse import eval_chain_case, group_runs, type2string
 from idpconfgen.logger import S
-
-
-_allowed_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
-_minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
-# module variables are defined at the end.
 
 
 class Structure:
@@ -211,8 +211,13 @@ class Structure:
     def renumber_atoms(self):
         self.data_array[:, col_serial] = np.arange(1, self.data_array.shape[0] + 1).astype('<U8')
 
-    def get_PDB(self, pdb_filter=None):
+    def get_PDB(self, pdb_filters=None):
         """
+        The filtered structure in PDB format.
+
+        Returns
+        -------
+        generator
         """
         def _(i, f):
             return f(i)
@@ -225,9 +230,9 @@ class Structure:
             log.debug(traceback.format_exc())
             raise
 
-        pdb_filter = pdb_filter or []
+        pdb_filters = pdb_filters or []
 
-        lines = reduce(_, pdb_filter, structure_to_pdb(fs))
+        lines = reduce(_, pdb_filters, structure_to_pdb(fs))
         return lines
 
     def write_PDB(self, filename, **kwargs):
@@ -508,25 +513,7 @@ def is_backbone(atom, element, minimal=False):
     return e in pure_atoms[minimal] and a in ('N', 'CA', 'C', 'O')
 
 
-def get_PDB_from_residues(structure, residue_segments):
-    """
-    Parameters
-    ----------
-    structure : :class:`libs.libstructure.Structure`
-
-    residue_seguments: list of str that are digits
-
-    Yields
-    ------
-    str (PDB text data) for each segment
-    """
-    for segment in residue_segments:
-        structure.clear_filters()
-        structure.add_filter(lambda x: x[col_resSeq] in segment)
-        yield list(structure.get_PDB())
-
-
-def save_structure_chains_and_segments(
+def save_structure_by_chains(
         pdb_data,
         pdbname,
         altlocs={'A', '', ' '},
@@ -536,7 +523,7 @@ def save_structure_chains_and_segments(
         **kwargs,
         ):
     """
-    Prase structure.
+    Save PDBs/mmCIF in separated chains (PDB format).
 
     Logic to parse PDBs from RCSB.
     """
@@ -602,7 +589,7 @@ def save_structure_chains_and_segments(
             pdbdata.add_filter_chain(chain_case)
             fout = f'{chaincode}.pdb'
             try:
-                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filter=_DI))
+                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
             except IndexError as err:
                 err = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
                 log.debug(repr(err))

@@ -88,6 +88,8 @@ dssp_trans_bytes = bytes.maketrans(
         )
 
 
+
+
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
 #_discarded_residues = (
@@ -109,3 +111,6 @@ blocked_ids = [
     i for i in blocked_ids_file.read_text().split('\n')
     if i and not i.startswith('#')
     ]
+
+residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
+minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!

@@ -19,7 +19,7 @@ from idpconfgen import cli_RCSB_dssp
 #from idpconfgen import cli_bbsplit
 from idpconfgen import cli_fastaext
 from idpconfgen import cli_fetch
-from idpconfgen import cli_filter
+#from idpconfgen import cli_filter
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import cli_segext
 from idpconfgen import cli_sscalc

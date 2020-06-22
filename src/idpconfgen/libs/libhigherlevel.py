@@ -9,8 +9,7 @@ from contextlib import suppress
 from functools import reduce, partial
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import aa3to1, blocked_ids
-from idpconfgen.libs.libdownload import download_dispacher
+from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_dispacher
 from idpconfgen.libs.libparse import group_runs, group_by
 from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq, atom_name, atom_resName, atom_resSeq
@@ -96,6 +95,7 @@ def download_pipeline(func, logfilename='.download'):
             save_pairs = save_pairs_dispacher[destination]
 
             for chunk in execute():
+                # flatted to avoid open/close tar file every loop iteration
                 flatted = (item for result in chunk for item in result)
                 save_pairs(flatted, destination)
 
@@ -147,6 +147,14 @@ def extract_secondary_structure(
     atoms : str or list of str or bytes, optional
         The atom names to keep.
         Defaults to `all`.
+
+    minimum : int, optional
+        The minimum size a segment must have in order to be considered.
+        Defaults to 0.
+
+    structure : str or list of chars
+        The secondary structure character to separate.
+        Multiple can be given in the form of a list.
     """
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1].split(b'\n')
@@ -181,18 +189,11 @@ def extract_secondary_structure(
         for counter, seg_slice in enumerate(minimum_size):
 
             LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])
-            pdb = b'\n'.join(l for l in pdbdata if all(f(l) for f in line_filters))
+            pdb = b'\n'.join(
+                l for l in pdbdata if all(f(l) for f in line_filters)
+                )
             LF_pop()
 
             yield f'{pdbname}_{ss}_{counter}.pdb', pdb
 
             counter += 1
-
-
-# USED OKAY
-def get_fasta_from_PDB(pdbid, mdict=None):
-    """Extract FASTA from PDB."""
-    lines = pdbid[1].decode('utf_8').split('\n')
-    rn = {line[atom_resSeq].strip(): line[atom_resName] for line in lines}
-    fasta = (aa3to1.get(f, 'X') for f in rn.values())
-    return Path(pdbid[0]).stem, ''.join(fasta)

@@ -286,30 +286,6 @@ def try_to_write(data, fout):
                 p.write_text(data)
 
 
-# NOT USED
-def filter_structure(pdb_path, **kwargs):
-    """
-    Download a PDB/CIF structure chains.
-
-    Parameters
-    ----------
-    pdbid : tuple of 2-elements
-        0-indexed, the structure ID at RCSB.org;
-        1-indexed, a list of the chains to download.
-
-    **kwargs : as for :func:`save_structure_chains_and_segments`.
-    """
-    pdbid = PDBIDFactory(pdb_path)
-    pdbname = pdbid.name
-    chains = pdbid.chain
-
-    save_structure_chains_and_segments(
-        pdb_path,
-        pdbname,
-        chains=chains,
-        **kwargs,
-        )
-
 
 def eval_chain_case(chain, chain_set):
     """

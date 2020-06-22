@@ -259,3 +259,71 @@ def split_sscalc_data(pdbname, data, segments):
 
     return splitdata, segs_in_dssp
 
+def download_pdbs_to_folder(destination, items, func=None, **kwargs):
+    """
+    Download PDBs to folder.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    dest = make_destination_folder(destination)
+    for chunk in pool_function_in_chunks(consume_iterable_in_list, items, func, **kwargs):
+        for result in chunk:
+            for fname, data in result:
+                with open(Path(dest, fname), 'w') as fout:
+                    fout.write(data)
+
+
+def download_pdbs_to_tar(destination, items, func=None, **kwargs):
+    """
+    Download PDBs to tarfile.
+
+    Uses :func:`idpconfgen.libs.libmulticore.pool_function_in_chunks`
+    """
+    # append 'a' here combos with the
+    # read_PDBID_from_source(destination), in cli_pdbdownloader
+    _exists = {True: 'a', False: 'w'}
+    dests = str(destination)
+    with tarfile.open(dests, mode=_exists[destination.exists()]) as tar:
+        for chunk in pool_function_in_chunks(consume_iterable_in_list, items, func, **kwargs):
+            for result in chunk:
+                for fout, data in result:
+                    save_file_to_tar(tar, fout, data)
+
+
+def download_dispacher(func, destination, *args, **kwargs):
+    """Dispaches the appropriate download env based on `destination`."""
+    dispacher = download_dispacher
+    suffix = destination.suffix
+    return dispacher[suffix](destination, *args, func=func, **kwargs)
+
+
+
+# NOT USED
+def filter_structure(pdb_path, **kwargs):
+    """
+    Download a PDB/CIF structure chains.
+
+    Parameters
+    ----------
+    pdbid : tuple of 2-elements
+        0-indexed, the structure ID at RCSB.org;
+        1-indexed, a list of the chains to download.
+
+    **kwargs : as for :func:`save_structure_by_chains`.
+    """
+    pdbid = PDBIDFactory(pdb_path)
+    pdbname = pdbid.name
+    chains = pdbid.chain
+
+    save_structure_by_chains(
+        pdb_path,
+        pdbname,
+        chains=chains,
+        **kwargs,
+        )
+
+download_dispacher = {
+    '': download_pdbs_to_folder,
+    '.tar': download_pdbs_to_tar,
+    }
+

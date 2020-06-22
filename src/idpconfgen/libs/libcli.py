@@ -312,6 +312,7 @@ def add_argument_update(parser):
         action='store_true',
         )
 
+
 def add_argument_cmd(parser):
     """Add the command for the external executable."""
     parser.add_argument(
