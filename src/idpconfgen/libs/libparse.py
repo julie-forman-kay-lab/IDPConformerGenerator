@@ -286,6 +286,7 @@ def try_to_write(data, fout):
                 p.write_text(data)
 
 
+# NOT USED
 def filter_structure(pdb_path, **kwargs):
     """
     Download a PDB/CIF structure chains.

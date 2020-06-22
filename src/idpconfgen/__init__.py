@@ -4,7 +4,7 @@ IDP Conformer Generator.
 Generates conformers for Intrinsically Disordered Proteins.
 """
 import logging
-import os
+from os import fspath
 from pathlib import Path as _Path
 
 
@@ -34,11 +34,11 @@ class Path(type(_Path())):
 
         Avoids using os.fspath around libs.
         """
-        return os.fspath(self)
+        return fspath(self)
 
     def myparents(self):
         """Return the Path to the parent folder resolved to absolute."""
-        return self.resolve().parents[0]
+        return self.resolve().parent
 
 
 __version__ = '0.1.0'

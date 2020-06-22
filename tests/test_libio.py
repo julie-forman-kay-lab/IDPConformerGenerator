@@ -30,7 +30,7 @@ def test_concatenate_1():
     user_input = [
         'ABC1D',
         'somefile_that_does_not_exist.list',
-        Path(tcommons.iofiles_folder, 'file.list').str(),
+        str(Path(tcommons.iofiles_folder, 'file.list')),
         Path(tcommons.iofiles_folder, 'file.list'),
         ]
 
@@ -91,7 +91,7 @@ def test_check_file_exists_typeerror(in1):
     'input_',
     [
         tcommons.tests_folder / '__init__.py',
-        (tcommons.tests_folder / '__init__.py').str(),
+        (str(tcommons.tests_folder / '__init__.py')),
         ],
     )
 def test_add_existent_files_1(input_):

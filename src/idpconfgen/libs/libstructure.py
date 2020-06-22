@@ -24,7 +24,7 @@ from idpconfgen.libs.libparse import eval_chain_case, group_runs, type2string
 from idpconfgen.logger import S
 
 
-_allowed_elements = ('C', 'O', 'N', 'H', 'S', 'Se', 'D')
+_allowed_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 _minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 # module variables are defined at the end.
 
@@ -346,13 +346,7 @@ def filter_record_lines(lines, which='both'):
     """Filter lines to get record lines only."""
     record_headings = record_line_headings
     try:
-        # returns lines because needs len after
-        return list(
-            filter(
-                lambda x: x.startswith(record_headings[which]),
-                lines,
-                ),
-            )
+        return [l for l in lines if l.startswith(record_headings[which])]
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
@@ -511,116 +505,7 @@ def is_backbone(atom, element, minimal=False):
         True: ('N', 'C'),
         False: ('N', 'C', 'O'),
         }
-    return e in pure_atoms[minimal] and a in ('N', 'CA', 'O', 'C')
-
-
-def split_residue_segments(atom_lines):
-    """
-    Splits a sequence of atoms into consecutive residue segments.
-
-    Parameters
-    ----------
-    atom_lines : np.ndarray of shape (N, col*)
-        A :class:`Structure.data_array` like.
-    """
-    segments = [[]]
-    prev = int(atom_lines[0, col_resSeq])
-    for line in atom_lines:
-        curr = int(line[col_resSeq])
-        if 0 <= curr - prev < 2:
-            segments[-1].append(line)
-        else:
-            segments.append([])
-            segments[-1].append(line)
-        prev = curr
-    return segments
-
-
-def eval_bb_gaps(structure, ignore_hetatms_segments=True, minimum=2):
-    """
-    Split PDBs in continuous backbone chunkstructure.
-
-    Parameters
-    ----------
-    pdbdata : str
-        Text of the PDB file.
-
-    minimum : int
-        Minimum backbone to accept.
-    """
-    hetatm_set = {'HETATM'}
-
-    # removes segments shorter than the minimum allowed
-    # creates a list because the next loop will operate on the filters
-    # and .consecutive_residues does uses filters
-    above_minimum = list(filter(
-        lambda segment: len(segment) > minimum,
-        structure.consecutive_residues,
-        ))
-
-    #seg_counter = 0
-    residue_segments = []
-    for segment in above_minimum:
-        structure.clear_filters()
-        structure.add_filter(lambda x: int(x[col_resSeq]) in segment)
-
-        # discard segments that might be composed only of HETATM
-        if ignore_hetatms_segments:
-            tmp_filtered = structure.filtered_atoms
-            if set(tmp_filtered[:, col_record]) == hetatm_set:
-                continue
-
-        # identify backbone gaps
-        structure.add_filter_backbone(minimal=True)
-        residue_segments.extend(
-            list(filter(
-                lambda segment: len(segment) > minimum,
-                get_segments_based_on_backbone_continuity(structure.filtered_atoms),
-                ))
-            )
-    structure.clear_filters()
-    return residue_segments
-
-
-def get_segments_based_on_backbone_continuity(atoms):
-    """
-    Split backbones in chunks of continuity.
-
-    Consideres only minimal backbone
-
-    Have to explain big thing here.
-    """
-    ref = _minimal_bb_atoms
-    start = 0
-    idx = 0
-    slices = []
-    max_size = atoms.shape[0]
-
-    bb = atoms[:, col_name]
-    resis = np.core.defchararray.add(atoms[:, col_resSeq], atoms[:, col_iCode])
-
-    while idx < max_size:
-        a = list(bb[idx: idx + 3])
-        bb_continuity_lost = a != ref or len(set(resis[idx: idx + 3])) > 1
-        if bb_continuity_lost:
-            slices.append(slice(start, idx, None))
-            idx += 1
-            start = idx
-            while idx <= max_size:
-                a = list(bb[idx: idx + 3])
-                bb_continuity_restored = \
-                    a == ref and len(set(resis[idx: idx + 3])) == 1
-                if bb_continuity_restored:
-                    start = idx
-                    idx += 3
-                    break  # back to the main while
-                idx += 1
-        else:
-            idx += 3
-    else:
-        slices.append(slice(start, idx + 1, None))
-
-    return [list(dict.fromkeys(atoms[seg, col_resSeq])) for seg in slices]
+    return e in pure_atoms[minimal] and a in ('N', 'CA', 'C', 'O')
 
 
 def get_PDB_from_residues(structure, residue_segments):
@@ -644,11 +529,10 @@ def get_PDB_from_residues(structure, residue_segments):
 def save_structure_chains_and_segments(
         pdb_data,
         pdbname,
+        altlocs={'A', '', ' '},
         chains=None,
         record_name=('ATOM', 'HETATM'),
-        altlocs=('A', '', ' '),
         renumber=True,
-        mdict=None,
         **kwargs,
         ):
     """
@@ -660,14 +544,13 @@ def save_structure_chains_and_segments(
     _DR = pdb_ligand_codes  # discarded residues
     _AE = _allowed_elements
     _S = Structure
-    #_ECC = eval_chain_case
     _BI = blocked_ids
+    _DI = [delete_insertions]
 
     pdbdata = _S(pdb_data)
     pdbdata.build()
 
     chain_set = pdbdata.chain_set
-    #print('chain set', chain_set)
 
     chains = chains or chain_set
 
@@ -700,43 +583,35 @@ def save_structure_chains_and_segments(
                 ))
             continue
 
-        possible_cases = set(map(''.join, it.product(*zip(chain.upper(), chain.lower()))))
+        # upper and lower case combinations:
+        possible_cases = set(
+            map(
+                ''.join,
+                it.product(*zip(chain.upper(), chain.lower())),
+                )
+            )
+        # cases that exist in the structure
         cases_that_actually_exist = chain_set.intersection(possible_cases)
+        # this trick places `chain` first in the for loop because
+        # it has the highest probability to be the one required
         cases_that_actually_exist.discard(chain)
         probe_cases = [chain] + list(cases_that_actually_exist)
 
-        #print('probe_cases', probe_cases)
-
         for chain_case in probe_cases:
-
-        #try:
-        #    chain = _ECC(chain, chain_set)
-        #except ValueError as err:
-        #    log.error(repr(err))
-        #    log.error(f'Skiping chain {chain} for {pdbname}')
-        #    continue
 
             pdbdata.add_filter_chain(chain_case)
             fout = f'{chaincode}.pdb'
             try:
-                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filter=[delete_insertions]))
+                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filter=_DI))
             except IndexError as err:
-                #print(f'FAILED FOR CHAIN {chain_case}')
                 err = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
                 log.debug(repr(err))
                 log.debug('continuing to new chain')
                 continue
             else:
-                #mdict[fout] = pdb_lines
                 yield fout, pdb_lines
-                #print(f'ACHIEVED FOR CHAIN {chain_case}')
                 break
             finally:
                 pdbdata.pop_last_filter()
         else:
             log.debug(f'Failed to download {chaincode}')
-
-    #return
-
-
-

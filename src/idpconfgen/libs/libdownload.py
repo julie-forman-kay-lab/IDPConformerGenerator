@@ -52,7 +52,7 @@ def download_pdbs_to_tar(destination, items, func=None, **kwargs):
     # append 'a' here combos with the
     # read_PDBID_from_source(destination), in cli_pdbdownloader
     _exists = {True: 'a', False: 'w'}
-    dests = destination.str()
+    dests = str(destination)
     with tarfile.open(dests, mode=_exists[destination.exists()]) as tar:
         for chunk in pool_function_in_chunks(consume_iterable_in_list, items, func, **kwargs):
             for result in chunk:

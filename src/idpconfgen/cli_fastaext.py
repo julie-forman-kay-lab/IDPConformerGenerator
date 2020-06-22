@@ -5,12 +5,12 @@ USAGE:
     $ idpconfgen fastaext [PDBS]
 """
 import argparse
-from multiprocessing import Manager
+from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libhigherlevel import get_fastas
+from idpconfgen.logger import T, init_files
+from idpconfgen.libs.libhigherlevel import get_fasta_from_PDB
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libio import FileReaderIterator, save_dictionary
 
@@ -70,20 +70,17 @@ def main(
     init_files(log, LOGFILESNAME)
 
     log.info(T('reading input paths'))
-    #pdbs_ = sorted(libio.read_path_bundle(pdbs, ext='.pdb'), key=lambda x: x.stem)
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
-    manager = Manager()
-    mdict = manager.dict()
-
-    pool_function(
-        get_fastas,
+    execute = partial(
+        pool_function,
+        get_fasta_from_PDB,
         pdbs2operate,
-        mdict=mdict,
         ncores=ncores,
         )
 
-    #libio.write_text('\n'.join(f'{k}|{v}' for k,v in mdict.items()), output)
+    mdict = {i: j  for i, j in execute()}
+
     save_dictionary(mdict, output)
 
 

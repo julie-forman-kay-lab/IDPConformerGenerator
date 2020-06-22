@@ -36,7 +36,7 @@ def add_existent_files(storage, source):
         if p.is_file():
             storage.append(p)
         else:
-            log.error(S('file not found: {}', p.str()))
+            log.error(S('file not found: {}', str(p)))
 
 
 #@libcheck.argstype(((list, tuple),))
@@ -152,7 +152,7 @@ def glob_folder(folder, ext):
         SORTED list of matching results.
     """
     ext = f'*{period_suffix(ext)}'
-    files = glob.glob(Path(folder, ext).str())
+    files = glob.glob(str(Path(folder, ext)))
     log.debug(f'folder {folder} read {len(files)} files with extension {ext}')
     return list(map(Path, files))
 
@@ -449,7 +449,7 @@ def read_PDBID_from_tar(tar_file):
         If file is not found returns an empty PDBList.
     """
     try:
-        tar = tarfile.open(tar_file.str(), 'r:*')
+        tar = tarfile.open(str(tar_file), 'r:*')
         p = PDBList(tar.getnames())
         tar.close()
         log.info(S(f'found: {str(tar_file)}'))

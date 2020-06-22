@@ -61,15 +61,15 @@ subparsers = ap.add_subparsers(
 
 # argument parsers for main DB creation routines
 libcli.add_subparser(subparsers, cli_pdbdl)
-libcli.add_subparser(subparsers, cli_filter)
 libcli.add_subparser(subparsers, cli_sscalc)
 
 # argument parsers for secondary routines
-libcli.add_subparser(subparsers, cli_segext)
-libcli.add_subparser(subparsers, cli_fetch)
+libcli.add_subparser(subparsers, cli_RCSB_dssp)
 #libcli.add_subparser(subparsers, cli_bbsplit)
 libcli.add_subparser(subparsers, cli_fastaext)
-libcli.add_subparser(subparsers, cli_RCSB_dssp)
+libcli.add_subparser(subparsers, cli_fetch)
+#libcli.add_subparser(subparsers, cli_filter)
+libcli.add_subparser(subparsers, cli_segext)
 
 
 def load_args():
