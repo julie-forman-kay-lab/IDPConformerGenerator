@@ -4,8 +4,6 @@ import os
 import sys
 import time
 
-import numpy as np
-
 from idpconfgen import log
 from idpconfgen.logger import S
 
@@ -32,9 +30,48 @@ def record_time(process_name='', *args, **kwargs):
     return decorator
 
 
+class ProgressWatcher:
+    """Construct a Progress Watcher context."""
+
+    def __new__(cls, items, *args, **kwargs):
+        """
+        Construct a progress representation.
+
+        If possible, creates a progress bar based on the terminal
+        window size and the length of items.
+
+        If terminal window size is not measurable, mostly because
+        execution is running on a server, ignores the creation of the
+        bar. That is, returns a dummy representation.
+
+        If items have no length (is a generator), returns a progression
+        counter instead.
+
+        Parameters
+        ----------
+        items : iterable
+            Items to represent.
+        """
+        try:
+            _cols, _rows = os.get_terminal_size()
+        except OSError:
+            log.warning(
+                'WARNING: Could not retrieve size from terminal window. '
+                'Ignoring progress watcher.'
+                )
+            return ProgressFake()
+
+        try:
+            litems = len(items)
+        except TypeError:
+            return ProgressCounter()
+        else:
+            return ProgressBar(litems, *args, bar_length=_cols // 2, **kwargs)
+
+
 class ProgressBar:
     """
-    Contextualizes a Progress Bar.
+    Contextualize a Progress Bar.
 
     Parameters
     ----------
@@ -53,7 +90,7 @@ class ProgressBar:
 
     bar_length : int, float, -convertable
         The length of the bar.
-        If not provided (``None``), uses half of the terminal window.
+        If not provided (``None``), uses 20.
 
     Thanks to for the initial template function:
     https://dev.to/natamacm/progressbar-in-python-a3n
@@ -73,49 +110,25 @@ class ProgressBar:
             prefix='',
             suffix='',
             decimals=1,
-            bar_length=None,
+            bar_length=20,
             ):
 
-        if bar_length is None:
-            try:
-                _columns, _rows = os.get_terminal_size()
-            except OSError:
-                log.error(
-                    'ERROR: Could not retrive size of ProgressBar '
-                    'from terminal window. Using the default of `50`. '
-                    'Everything else is normal.'
-                    )
-                # this trick is used to guarantee 100% test coverage
-                _columns = 100
-            bar_length = _columns // 2
-
-        total = int(total)
+        self.total = int(total)
         self.prefix = prefix
         self.suffix = suffix
-        self.str_format = "{0:." + str(int(decimals)) + "f}"
-
-        # using Numpy
-        self.percentages = np.linspace(0, 100, total + 1, endpoint=True)
-        # 49.7 µs ± 5.34 µs per loop (7 runs, 10000 loops each)
-        # Not using Numpy
-        # self.percentages =  [i / total * 100 for i in range(total + 1)]
-        # 974 µs ± 38.8 µs per loop (7 runs, 1000 loops each)
-
-        self.filled_length = \
-            np.round(bar_length * self.percentages / 100).astype(int)
+        self.percent_format = "{:>5." + str(int(decimals)) + "f}%"
+        totals_format = "{:>" + str(len(str(self.total))) + "}"
+        self.totals_format = f"{totals_format}/{totals_format}"
         self.counter = 0
-        self.total = total
         self.bar_length = bar_length
-
-        assert len(self.percentages) == total + 1
-        assert len(self.percentages) == len(self.filled_length)
 
     def __enter__(self):
         bar = '-' * self.bar_length
-        percents = self.str_format.format(self.percentages[0])
+        percents = self.percent_format.format(0)
+        totals = self.totals_format.format(self.counter, self.total)
         sys.stdout.write(
-            f'\r{self.prefix} |{bar}| '
-            f'{percents}% {self.counter}/{self.total} {self.suffix}'
+            f'\r{self.prefix} '
+            f'{percents} {totals} {self.suffix} |{bar}|'
             )
         self.counter += 1
         return self
@@ -128,11 +141,68 @@ class ProgressBar:
         """Print next progress bar increment."""
         t = self.total
         c = self.counter
-        prefix = self.prefix
-        suffix = self.suffix
         bl = self.bar_length
-        percents = self.str_format.format(self.percentages[c])
-        fl = self.filled_length[c]
+        percents = self.percent_format.format(c / t * 100)
+        totals = self.totals_format.format(c, t)
+        fl = int(round(bl * c // t))
         bar = f"{'█' * fl}{'-' * (bl - fl)}"
-        sys.stdout.write(f'\r{prefix} |{bar}| {percents}% {c}/{t} {suffix}')
+        sys.stdout.write(
+            f'\r{self.prefix} {percents} {totals} {self.suffix} '
+            f'|{bar}|'
+            )
         self.counter += 1
+
+
+class ProgressCounter:
+    """Represent progression via a counter."""
+
+    def __init__(self):
+        """
+        Represent a progress counter.
+
+        Used for progresses with unknown length.
+        """
+        self.counter = 0
+
+    def __enter__(self, *args, **kwargs):
+        sys.stdout.write('\rRunning operations: 0')
+        return self
+
+    def __exit__(self, *args):
+        sys.stdout.write('\n')
+        sys.stdout.flush()
+
+    def increment(self):
+        """
+        Increment counter by one.
+
+        Represent progression in terminal.
+        """
+        self.counter += 1
+        sys.stdout.write(f'\rRunning operations: {self.counter}')
+        return
+
+
+class ProgressFake:
+    """
+    Simulate the interface of ProgressBar but does nothing.
+
+    Used in servers where ProgressBar makes no sense.
+    """
+
+    def __init__(self, *args, **kwargs):
+        return
+
+    def __enter__(self, *args, **kwargs):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return
+
+    def increment(self):
+        """
+        Simulate ProgressBar interface.
+
+        Does nothing.
+        """
+        return

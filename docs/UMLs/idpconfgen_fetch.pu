@@ -1,0 +1,56 @@
+@startuml
+
+start
+
+:idpconfgen //fetch//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen fetch culled.list -d folder -u -n;
+    note right
+        where //culled.list// is a list containing PDBID[CHAIN] codes,
+        and //folder// is a destination folder that may not exist.
+    end note
+    #WHITE:$ idpconfgen fetch 12AS 4YBB culled.list -d pdbs.tar -u -n -chunks 5000;
+    note right
+        where //pdbs.tar// is a destination
+        tar file.
+    end note
+    }
+
+:Compares to destination folder/file,
+filters out existent files,
+conflictive cases,
+and downloads only missing entries;
+
+fork
+
+:downloads PDB or mmCIF;
+note left
+    Attempts to download PDB,
+    if unavailable, attempts CIF.
+end note
+
+:saves file raw data;
+
+end fork
+note right
+    This block is performed for each
+    PDB file. In multiprocessing mode,
+    each core pick a PDB code and run the whole
+    block, once it is finished another PDB code
+    is picked.
+end note
+
+if (destination `-d`) then (TAR)
+    :save in TAR file;
+else (folder)
+    :save PDB/CIFs to folder;
+endif
+note right
+    Files are saved after each chunk
+    is completed.
+end note
+
+stop
+
+@enduml

@@ -1,0 +1,25 @@
+@startuml
+
+start
+
+:idpconfgen //pdbdl//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen secextract //pdb_files// //sscalc_file// -d //folder//[.tar] -s[--structure] //L//;
+    note right
+        //--structure// parameter defines which type of secondary structure
+        elements are going to be selected.
+    end note
+    #WHITE:$ idpconfgen secextract sscalc.json 28k.tar -d segments.tar -s L;
+    note right
+        where //segments.tar// is a destination
+        tar file.
+    end note
+    #WHITE:$ idpconfgen secextract sscalc.json 28.tar -d segs.tar -s L,H -c 2000 -m 4
+    note right
+        where //-m// is the minimum size a segment is accepted.
+    end note
+    }
+stop
+
+@enduml

@@ -1,0 +1,26 @@
+DTT
+GSH
+FUL
+NAG
+PBZ
+BMA
+AMP
+SOL
+TPP
+HEM
+WO4
+WO2
+# ribonucleotides
+I
+C
+G
+A
+U
+I
+DC
+DG
+DA
+DU
+DT
+DI
+N

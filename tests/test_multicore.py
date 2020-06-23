@@ -20,11 +20,11 @@ class TestSubprocessTask:
     @pytest.mark.parametrize(
         'in1,in2,expected',
         [
-            ('ls', [tcommons.data_folder.str()], ['ls']),
-            (['ls'], [tcommons.data_folder.str()], ['ls']),
-            (['ls -ltr'], [tcommons.data_folder.str()], ['ls', '-ltr']),
-            ('ls -ltr', [tcommons.data_folder.str()], ['ls', '-ltr']),
-            (['ls', '-ltr'], [tcommons.data_folder.str()], ['ls', '-ltr']),
+            ('ls', [str(tcommons.data_folder)], ['ls']),
+            (['ls'], [str(tcommons.data_folder)], ['ls']),
+            (['ls -ltr'], [str(tcommons.data_folder)], ['ls', '-ltr']),
+            ('ls -ltr', [str(tcommons.data_folder)], ['ls', '-ltr']),
+            (['ls', '-ltr'], [str(tcommons.data_folder)], ['ls', '-ltr']),
             ],
         )
     def test_SubprocessTask_1(self, in1, in2, expected):
@@ -34,42 +34,42 @@ class TestSubprocessTask:
 
     def test_SubprocessTask_2(self):
         """Test prepare_cmd()."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         sub.prepare_cmd()
-        assert sub.cmd == ['ls', tcommons.data_folder.str()]
+        assert sub.cmd == ['ls', str(tcommons.data_folder)]
 
     def test_SubprocessTask_3(self):
         """Test execute."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         sub.prepare_cmd()
         sub.execute()
 
     def test_SubprocessTask_4(self):
         """Test result is CompletedProcess."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         sub()
         assert isinstance(sub.result, subprocess.CompletedProcess)
 
     def test_SubprocessTask_5(self):
         """Test string before prepare_cmd()."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         expected = "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
-            tcommons.data_folder.str()
+            str(tcommons.data_folder)
             )
         assert str(sub) == expected
 
     def test_SubprocessTask_6(self):
         """Test repr()."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         assert repr(sub) == \
             "SubprocessTask(cmd_exec=['ls'],input=['{}'])".format(
-                tcommons.data_folder.str())
+                str(tcommons.data_folder))
 
     def test_SubprocessTask_7(self):
         """Test str() after prepare_cmd()."""
-        sub = LM.SubprocessTask('ls', [tcommons.data_folder.str()])
+        sub = LM.SubprocessTask('ls', [str(tcommons.data_folder)])
         sub.prepare_cmd()
-        assert str(sub) == 'ls {}'.format(tcommons.data_folder.str())
+        assert str(sub) == 'ls {}'.format(str(tcommons.data_folder))
 
     def test_SubprocessTask_8(self):
         """Test input None."""

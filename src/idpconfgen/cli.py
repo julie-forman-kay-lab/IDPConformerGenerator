@@ -9,91 +9,64 @@ USAGE:
     >>> idpconfgen -h
 
     Using PDB Downloader:
-    >>> idpconfgen pdbdl
+    >>> idpconfgen cli_pdbdl
 
 """
 import argparse
 import sys
 
-from idpconfgen import cli_pdbdownloader as pdbdl
-from idpconfgen import cli_segext as segext
-from idpconfgen import cli_ssext as ssext
-from idpconfgen import cli_fastaext as fastaext
+from idpconfgen import cli_fastaext, cli_fetch
+from idpconfgen import cli_pdbdownloader as cli_pdbdl
+from idpconfgen import cli_segext, cli_sscalc, log
 from idpconfgen.libs import libcli
+from idpconfgen.logger import S
 
 
-# https://stackoverflow.com/questions/14988397
-# https://stackoverflow.com/questions/4042452
-def _load_args():
+prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
 
-    prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
+description = f"""
+{description_}
 
-    ap = libcli.CustomParser(
-        prog='idpconfgen',  # prog_,
-        description=libcli.detailed.format(description_),
-        usage=usage_,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
+Individual routines for DB creation:
 
-    subparsers = ap.add_subparsers(
-        title='SUBROUTINES',
-        description='DESCRIPTION',
-        help='IDP Conf Gen subroutines:',
-        )
+    * {cli_pdbdl._name}
+    * {cli_sscalc._name}
 
-    ap_fastaext = subparsers.add_parser(
-        'fastaext',
-        help='Extract FASTAS from PDBs',
-        parents=[fastaext.ap],
-        add_help=False,
-        description=libcli.detailed.format(fastaext._des),
-        usage=fastaext._us,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-    ap_fastaext.set_defaults(func=fastaext.main)
+Other useful routines:
 
-    ap_pdbdl = subparsers.add_parser(
-        'pdbdl',
-        help='PDB Downloader',
-        parents=[pdbdl.ap],
-        add_help=False,
-        description=libcli.detailed.format(pdbdl._des),
-        usage=pdbdl._us,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-    ap_pdbdl.set_defaults(func=pdbdl.main)
+    * {cli_fetch._name}
+    * {cli_segext._name}
+    * {cli_fastaext._name}
+"""
 
-    ap_ssext = subparsers.add_parser(
-        'ssext',
-        help='PDB Downloader',
-        parents=[ssext.ap],
-        add_help=False,
-        description=libcli.detailed.format(ssext._des),
-        usage=ssext._us,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-    ap_ssext.set_defaults(func=ssext.main)
+ap = libcli.CustomParser(
+    prog='idpconfgen',  # prog_,
+    description=libcli.detailed.format(description),
+    usage=usage_,
+    formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
 
-    ap_segext = subparsers.add_parser(
-        'segext',
-        help='Segment extract',
-        parents=[segext.ap],
-        add_help=False,
-        description=libcli.detailed.format(segext._des),
-        usage=segext._us,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        )
-    ap_segext.set_defaults(func=segext.main)
+libcli.add_version(ap)
 
-    # prints help if not arguments are passed
-    # if >2 prints help of subroutines.
-    if len(sys.argv) < 2:
-        ap.print_help()
-        ap.exit()
+# routines from the main DB creation pipeline
+subparsers = ap.add_subparsers(
+    title='IDP Conformer Generator routines',
+    help='Short description:',
+    )
 
-    cmd = ap.parse_args()
+# argument parsers for main DB creation routines
+libcli.add_subparser(subparsers, cli_pdbdl)
+libcli.add_subparser(subparsers, cli_sscalc)
 
-    return cmd
+# argument parsers for secondary routines
+libcli.add_subparser(subparsers, cli_fastaext)
+libcli.add_subparser(subparsers, cli_fetch)
+libcli.add_subparser(subparsers, cli_segext)
+
+
+def load_args():
+    """Load user input arguments."""
+    return ap.parse_args()
 
 
 def maincli():
@@ -102,10 +75,16 @@ def maincli():
 
     Arguments are read from user command line input.
     """
-    cmd = _load_args()
+    # prints help if not arguments are passed
+    # if >2 prints help of subroutines.
+    if len(sys.argv) < 2:
+        ap.print_help()
+        ap.exit()
+
+    cmd = load_args()
     cmd.func(**vars(cmd))
+    log.info(S('finished properly'))
 
 
 if __name__ == '__main__':
-
     maincli()

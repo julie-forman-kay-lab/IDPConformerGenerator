@@ -1,0 +1,45 @@
+@startuml
+
+start
+
+:idpconfgen //bbsplit//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen bbsplit filtered_pdbs/ -d split_pdbs/ -n;
+    #WHITE:$ idpconfgen bbsplit filtered_pdbs/ ~--dssp dssp.json --dssp-dest dssp_split.json -d split_pdbs/ -n;
+    #WHITE:$ idpconfgen bbsplit filtered_pdbs/ ~--dssp dssp.pickle --dssp-dest dssp_split.json -d split_pdbs.tar -n;
+    }
+
+if (input data) then (tar file)
+    :reads //.pdb// files in the
+    //tar// file without unpacking;
+else (folder)
+    :uses //.pdb// files in that folder;
+endif
+
+fork
+
+:identify gaps in //pdbs// backbones based on:
+    - discontinuity of residue numbers
+    - discontinuity of N, CA, C backbone
+    ;
+
+if (//sscalc// data) then (yes)
+    :merges residue information in sscalc and PDB;
+    :splits sscalc according to previous;
+:subprocess //mkdssp// on each PDB;
+:collect
+        residue number,
+        Sec Str character,
+        FASTA character;
+end fork
+
+if (save data to disk) then (JSON)
+    :saves dictionary to //.json// file;
+else (PICKLE)
+    :saves dictionary to //pickle// object;
+endif
+
+stop
+
+@enduml
