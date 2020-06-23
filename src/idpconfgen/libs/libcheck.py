@@ -30,16 +30,16 @@ def argstype(*types):
 def kwargstype(*types):
     """
     Decorate a function to check for kwargs types.
-    
+
     @kwargstype(type1, type2, (type3, type4))
-    
+
     For each function named argument provide a type or a tuple of types.
     """
     def decorator(func):
-        
+
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
-            
+
             errmsg = "expected type {} for named argument '{}', got  {}"
 
             for kv, type_ in zip(kwargs.items(), types):

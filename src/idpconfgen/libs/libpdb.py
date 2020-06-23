@@ -5,6 +5,7 @@ from collections import defaultdict
 
 from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.core.definitions import aa3to1
 from idpconfgen.logger import S
 
 
@@ -29,6 +30,54 @@ _atom_format_dict = {
         4: _4,
         },
     }
+
+
+def delete_insertions(lines):
+    """
+    Delete insertions.
+
+    Adapted from pdbtools and optimized for this context.
+
+    Visit pdb-tools at:
+    https://github.com/haddocking/pdb-tools/blob/master/pdbtools/pdb_delinsertion.py
+    """  # noqa: E501
+    # Keep track of residue numbering
+    # Keep track of residues read (chain, resname, resid)
+    offset = 0
+    prev_resi = None
+    seen_ids = set()
+    clean_icode = False
+    for line in lines:
+        res_uid = line[17:27]  # resname, chain, resid
+        id_res = line[21] + line[22:26].strip()  # A99, B12
+        icode = line[26]
+
+        # unfortunately, this is messy but not all PDB files follow a nice
+        # order of ' ', 'A', 'B', ... when it comes to insertion codes..
+        if prev_resi != res_uid:  # new residue
+            # Have we seen this chain + resid combination
+            # catch insertions WITHOUT icode ('A' ... ' ' ... 'B')
+            if id_res in seen_ids:
+                # Should we do something about it?
+                clean_icode = True
+                offset += 1
+            # Do we have an explicit icode?
+            elif icode != ' ':
+                if id_res in seen_ids:  # never saw this, do not offset!
+                    offset += 1
+                clean_icode = True
+            else:
+                clean_icode = False
+
+            prev_resi = res_uid
+
+        if clean_icode:
+            line = f'{line[:26]} {line[27:]}'
+
+        resid = int(line[22:26]) + offset
+        line = f'{line[:22]}{str(resid).rjust(4)}{line[26:]}'
+        seen_ids.add(id_res)
+        yield line
 
 
 def format_atom_name(atom, element):
@@ -148,6 +197,15 @@ atom_format_funcs = [
     ]
 
 
+# USED OKAY
+def get_fasta_from_PDB(pdbid):
+    """Extract FASTA from PDB."""
+    lines = pdbid[1].decode('utf_8').split('\n')
+    rn = {line[atom_resSeq].strip(): line[atom_resName] for line in lines}
+    fasta = (aa3to1.get(f, 'X') for f in rn.values())
+    return Path(pdbid[0]).stem, ''.join(fasta)
+
+
 def is_pdb(datastr):
     """Detect if `datastr` if a PDB format v3 file."""
     assert isinstance(datastr, str), \
@@ -183,6 +241,7 @@ class PDBIDFactory:
     rgx_XXXX = re.compile(r'^[0-9a-zA-Z]{4}(\s|$)')
     rgx_XXXXC = re.compile(r'^[0-9a-zA-Z]{5,}(\s|$)')
     rgx_XXXX_C = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+(\s|$)')
+    rgx_XXXX_C_segS = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+_seg\d+(\s|$)')
 
     def __new__(cls, name):
         """Construct class."""
@@ -190,7 +249,7 @@ class PDBIDFactory:
             return name
 
         namep = Path(name)
-        if namep.suffix == '.pdb':
+        if namep.suffix in ('.pdb', '.cif'):
             name = namep.stem
 
         # where XXXX is the PDBID and C the chain ID
@@ -198,6 +257,7 @@ class PDBIDFactory:
             cls.rgx_XXXX: cls._parse_XXXX,
             cls.rgx_XXXXC: cls._parse_XXXXC,
             cls.rgx_XXXX_C: cls._parse_XXXX_C,
+            cls.rgx_XXXX_C_segS: cls._parse_XXXX_C_segS,
             }
 
         for regex, parser in pdb_filename_regex.items():
@@ -218,10 +278,16 @@ class PDBIDFactory:
 
     @staticmethod
     def _parse_XXXX_C(pdbid):
-        pdbid, chainid = pdbid.split()[0].split('_')
+        pdbid, chainid, *_ = pdbid.split()[0].split('_')
         return pdbid, chainid
 
+    @staticmethod
+    def _parse_XXXX_C_segS(pdbid):
+        pdbid, chainid, segID = pdbid.split()[0].split('_')
+        return pdbid, chainid, segID.lstrip('seg')
 
+
+# USED OKAY
 class PDBList:
     """
     List of PDBID objects.
@@ -256,7 +322,7 @@ class PDBList:
             )
 
     def __str__(self):
-        return '{} with {} element(s).'.format(
+        return '{} with {} element(s)'.format(
             self.__class__.__name__,
             len(self),
             )
@@ -277,11 +343,20 @@ class PDBList:
         return len(self.set)
 
     @property
+    def pdbids(self):
+        """Generate the PDBID names."""
+        return (pdbid.name for pdbid in self)
+
+    @property
     def name_chains_dict(self):
         """Export PDBIDs: Chains dictionary map."""
         name_chains = defaultdict(list)
         for pdbid in self:
-            name_chains[pdbid.name].append(pdbid.chain)
+            pc = pdbid.chain
+            if pc:
+                name_chains[pdbid.name].append(pc)
+            else:
+                name_chains[pdbid.name]
         return name_chains
 
     def to_tuple(self):
@@ -313,6 +388,7 @@ class PDBList:
         log.info(S(f'PDBIDs written to {filename}'))
 
 
+# USED OKAY
 @functools.total_ordering
 class PDBID:
     """
@@ -341,7 +417,8 @@ class PDBID:
         The chain identifier.
     """
 
-    def __init__(self, name, chain=None):
+    # segment are chunks of the same chain
+    def __init__(self, name, chain=None, segment=None):
 
         self.name = name.upper()
         self.chain = chain
@@ -349,6 +426,7 @@ class PDBID:
         # made manual to completely control order
         ids = {
             'chain': chain,
+            'seg': segment,
             }
         self.identifiers = {}
 

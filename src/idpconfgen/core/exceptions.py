@@ -1,6 +1,6 @@
 """IDP Conf Gen Exceptions."""
-from idpconfgen import log
 from idpconfgen import contactus as CONTACTUS
+from idpconfgen import log
 from idpconfgen.core import count_string_formatters
 
 
@@ -88,7 +88,6 @@ class IDPConfGenException(Exception):
         return f'{self.__class__.__name__} * {self}'
 
 
-
 class PDBIDFactoryError(IDPConfGenException):
     """General PDBIDFactory Exception."""
 
@@ -139,6 +138,7 @@ class ParserNotFoundError(IDPConfGenException):
     """Raise when parser for PDB/CIF file is not found."""
 
     errmsg = 'Could not identity a proper parser.'
+
 
 class NotBuiltError(IDPConfGenException):
     """Raise when attempting to access data of an object before building."""

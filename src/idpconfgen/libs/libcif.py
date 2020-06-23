@@ -152,7 +152,7 @@ class CIFParser:
         """The chainID field of the current :attr:`line`."""  # noqa: D401
         value = self._auth_label('asym_id')
         if value in ('?', '.'):
-            value = self.get_value(f'_atom_site.auth_asym_id')
+            value = self.get_value('_atom_site.auth_asym_id')
         return value
 
     @property
@@ -293,9 +293,8 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
     """
     assert len(lines) > start_index
 
-    valid_len = len(cif_dict.keys())
-    counter = 0
-    for line in lines[start_index:]:
+    valid_len = len(cif_dict)
+    for counter, line in enumerate(lines[start_index:]):
         if line.startswith('#'):
             return counter
 
@@ -312,8 +311,6 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
         for i, key in enumerate(cif_dict.keys()):
             cif_dict[key].append(ls[i])
-
-        counter += 1
 
 
 def parse_cif_line(line):
