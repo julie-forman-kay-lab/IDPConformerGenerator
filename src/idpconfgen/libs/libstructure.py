@@ -25,7 +25,7 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.libs.libcif import CIFParser, is_cif
-from idpconfgen.libs.libparse import eval_chain_case, group_runs, type2string
+from idpconfgen.libs.libparse import group_runs, type2string
 from idpconfgen.logger import S
 
 
@@ -551,12 +551,7 @@ def save_structure_by_chains(
 
         # writes chains always in upper case because chain IDs given by
         # Dunbrack lab are always in upper case letters
-        # eval_chain_case evaluates for the need for lower case,
-        # however if the lower case is kept in the final file
-        # it may create incompatibilities
-        # 03/Jun/2020
         chaincode = f'{pdbname}_{chain}'
-        #print('chaincode', chaincode)
 
         # this operation can't be performed before because
         # until here there is not way to assure if the chain being

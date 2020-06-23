@@ -31,6 +31,29 @@ def consume_iterable_in_list(func, *args, **kwargs):
 
 
 # USED OKAY
+def flat_results_from_chunk(execute, func, *args, **kwargs):
+    """
+    Flattens a result coming from consume_iterable_in_list execution.
+
+    Parameters
+    ----------
+    execute : callable
+        The prepared multiprocessing function.
+        Each item of its iteration should be iterable of iterable.
+
+    func : callable
+        The function to process each yielded result from the results
+        in the multiprocessing chunk.
+    """
+    for chunk in execute():
+        # each result is a list coming from consume_iterable_in_list
+        # where each element is a list yield from
+        # extract_secondary_structure
+        flatted = (yielded for result in chunk for yielded in result)
+        func(flatted, *args, **kwargs)
+
+
+# USED OKAY
 def pool_function(
         func,
         items,

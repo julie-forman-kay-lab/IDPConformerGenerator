@@ -16,7 +16,12 @@ from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
 from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libhigherlevel import extract_secondary_structure
 from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, save_pairs_to_disk
-from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterable_in_list
+from idpconfgen.libs.libmulticore import (
+    consume_iterable_in_list,
+    flat_results_from_chunk,
+    pool_function_in_chunks,
+    )
+
 
 
 LOGFILESNAMES = '.idpconfgen_segext'
@@ -102,9 +107,8 @@ def main(
         minimum=minimum,
         )
 
-    for chunk in execute():
-        for pairs in chunk:
-            save_pairs_to_disk(pairs, destination=destination)
+    flat_results_from_chunk(execute, save_pairs_to_disk, destination=destination)
+    return
 
 
 if __name__ == '__main__':

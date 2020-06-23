@@ -10,13 +10,17 @@ from functools import reduce, partial
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import blocked_ids
-from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_dispacher
+from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_to_disk
 from idpconfgen.libs.libparse import group_runs, group_by
 from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq, atom_name, atom_resName, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, col_resSeq
 from idpconfgen.libs.libtimer import record_time
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.libs.libmulticore import pool_function_in_chunks, consume_iterable_in_list
+from idpconfgen.libs.libmulticore import (
+    consume_iterable_in_list,
+    flat_results_from_chunk,
+    pool_function_in_chunks,
+    )
 
 
 # USED OKAY!
@@ -92,12 +96,11 @@ def download_pipeline(func, logfilename='.download'):
                 chunks=chunks,
                 )
 
-            save_pairs = save_pairs_dispacher[destination]
-
-            for chunk in execute():
-                # flatted to avoid open/close tar file every loop iteration
-                flatted = (item for result in chunk for item in result)
-                save_pairs(flatted, destination)
+            flat_results_from_chunk(
+                execute,
+                save_pairs_to_disk,
+                destination=destination,
+                )
 
             log.info(T('Reading UPDATED destination'))
             pdblist_updated = read_PDBID_from_source(destination)
@@ -158,7 +161,11 @@ def extract_secondary_structure(
     """
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1].split(b'\n')
-    pdbdd = ssdata[pdbname]
+    try:
+        pdbdd = ssdata[pdbname]
+    except KeyError:
+        pdbdd = ssdata[f'{pdbname}.pdb']
+
 
     ss_identified = set(pdbdd['dssp'])
     if structure == 'all':

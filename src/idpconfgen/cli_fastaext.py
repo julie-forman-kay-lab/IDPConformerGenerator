@@ -79,9 +79,10 @@ def main(
         ncores=ncores,
         )
 
-    mdict = {i: j  for i, j in execute()}
+    mdict = {i: j for i, j in execute()}
 
     save_dictionary(mdict, output)
+    return
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
 from itertools import chain
+from collections import namedtuple
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
 
@@ -32,6 +33,13 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v:k for k, v in aa3to1.items()}
 
+# JSON structure parameter keys
+JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')
+jsonparameters = JsonParameters(
+    ss='dssp',
+    fasta='fasta',
+    resids='resids',
+    )
 
 # keys from https://github.com/cmbi/dssp/blob/7c2942773cd37d47b3e4611597d5e1eb886d95ba/src/dssp.cpp#L66-L74  # noqa:
 dssp_ss_keys = Namespace(

@@ -677,7 +677,7 @@ read_dictionary_from_disk_dispacher = {
     '.json': read_dict_from_json,
     }
 
-save_pairs_dispacher= {
+save_pairs_dispacher = {
     '': save_pairs_to_files,
     '.tar': save_pairs_to_tar,
     }
