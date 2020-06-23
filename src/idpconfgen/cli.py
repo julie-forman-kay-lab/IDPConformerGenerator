@@ -16,10 +16,8 @@ import argparse
 import sys
 
 from idpconfgen import cli_RCSB_dssp
-#from idpconfgen import cli_bbsplit
 from idpconfgen import cli_fastaext
 from idpconfgen import cli_fetch
-#from idpconfgen import cli_filter
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import cli_segext
 from idpconfgen import cli_sscalc
@@ -65,10 +63,8 @@ libcli.add_subparser(subparsers, cli_sscalc)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_RCSB_dssp)
-#libcli.add_subparser(subparsers, cli_bbsplit)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
-#libcli.add_subparser(subparsers, cli_filter)
 libcli.add_subparser(subparsers, cli_segext)
 
 

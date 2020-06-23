@@ -1,27 +1,27 @@
 """
 Parses DSSP file from RCSB.
 
-DSSP file is as provided at: https://cdn.rcsb.org/etl/kabschSander/ss_dis.txt.gz
+DSSP file is as provided at:
+    https://cdn.rcsb.org/etl/kabschSander/ss.txt.gz
 
 USAGE:
     $ idpconfgen parse_dssp DSSP COMPARE -o OUTPUT
 """
-import gzip
 import argparse
+import gzip
+from collections import defaultdict
 
-
-from idpconfgen.libs import libcli
 from idpconfgen import Path, log
+from idpconfgen.core.definitions import dssp_trans
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import concatenate_entries
-from idpconfgen.libs.libpdb import PDBList
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libio import save_dict_to_json
+from idpconfgen.logger import T
 
-LOGFILESNAME = '.parse_dssp'
 
 _name = 'parse_dssp'
 _help = 'Parse DSSP from RCSB.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
+
 
 ap = libcli.CustomParser(
     prog=_prog,
@@ -30,79 +30,56 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-
 ap.add_argument(
     'rcsb_dssp',
     help='The RCSB dssp file Gzipped.',
     )
 
-ap.add_argument(
-    '-c',
-    '--compare',
-    help='A list of PDBID_CHAIN codes to compare with.',
-    )
+libcli.add_argument_reduced(ap)
 
 ap.add_argument(
     '-o',
     '--output',
-    help='The output file.',
-    default=None,
+    help=(
+        "The output file containing the PDBID and "
+        "respective DSSP and FASTA sequence information. "
+        "Defaults to `allPDB.json`"
+        ),
+    type=Path,
+    default='allPDB.json',
+    action=libcli.CheckExt({'.json'}),
     )
 
-def _load_args():
-    cmd = ap.parse_args()
-    return cmd
 
-
-def main(
-        rcsb_dssp,
-        compare=None,
-        output=None,
-        func=None,
-        ):
-
-    #ss = Path(rcsb_dssp).read_bytes().split('>')
-    with gzip.open(rcsb_dssp, 'rb') as fin:
-        ss = fin.read().decode('utf-8').split('>')
-
-    print(len(ss))
-
-    if compare:
-        pdbids_to_read = concatenate_entries([compare])
-        pdblist = PDBList(pdbids_to_read)
-        pdbids = set(str(id_) for id_ in pdblist)
-        compare = True
-        log.info(S('parsed compare'))
+def main(rcsb_dssp, func=None, output=None, reduced=False):
+    """Perform main logic."""
+    try:
+        with gzip.open(rcsb_dssp, 'rb') as fin:
+            ss = fin.read().decode('utf-8').split('>')
+    except gzip.BadGzipFile:
+        with open(rcsb_dssp, 'r') as fin:
+            ss = fin.read().split('>')
 
     log.info(T('reading RCSB DSSP file'))
-    datass, fasta = {}, {}
+    allpdb = defaultdict(dict)
     for i, item in enumerate(ss[1:]):
         si = item.split('\n')
         pdbid, chain, _ = si[0].split(':')
-        n = f'{pdbid}_{chain.upper()}'
-
-        if compare and n not in pdbids:
-            continue
+        n = f'{pdbid}_{chain}'
 
         if i % 2 == 0:
-            fasta[n] = ''.join(si[1:])
+            allpdb[n]['fasta'] = ''.join(si[1:])
         else:
-            datass[n] = ''.join(si[1:])
+            allpdb[n]['dssp'] = ''.join(si[1:])
 
-    with open('allPDB.dssp', 'w') as fout:
-        fout.write('\n'.join(f'{k}|{v}' for k, v in datass.items()))
+    if reduced:
+        _DT = dssp_trans
+        for key in allpdb:
+            allpdb[key]['dssp'] = allpdb[key]['dssp'].translate(_DT)
 
-    with open('allPDB.fasta', 'w') as fout:
-        fout.write('\n'.join(f'{k}|{v}' for k, v in fasta.items()))
-
+    save_dict_to_json(allpdb, output)
     return
 
 
-def maincli():
-    """Command-line interface entry point."""
-    cmd = _load_args()
-    main(**vars(cmd))
-
-
 if __name__ == '__main__':
-    maincli()
+    libcli.maincli()
