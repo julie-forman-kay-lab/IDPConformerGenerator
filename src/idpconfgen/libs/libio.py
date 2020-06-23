@@ -1,5 +1,4 @@
 """Functions and Classes regarding Input/Output."""
-
 import glob
 import itertools as it
 import json
@@ -7,21 +6,19 @@ import os
 import pickle
 import sys
 import tarfile
+from functools import partial
 from io import BytesIO
 from os import SEEK_END
-from functools import partial
 from pprint import pprint
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcheck
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
-from idpconfgen.libs.libtimer import record_time
+
 
 # Dispachers are at the bottom
 
 
-#@libcheck.argstype(list)
 # NOT USED ANYWHERE
 def add_existent_files(storage, source):
     """
@@ -39,7 +36,6 @@ def add_existent_files(storage, source):
             log.error(S('file not found: {}', str(p)))
 
 
-#@libcheck.argstype(((list, tuple),))
 def check_file_exist(files_list):
     """
     Confirm all files in a list exist.
@@ -71,7 +67,6 @@ def check_file_exist(files_list):
     return not bool(files_not_found), files_not_found
 
 
-#@libcheck.argstype(((list, tuple),))
 def concatenate_entries(entry_list):
     """
     Concatente entries.
@@ -125,7 +120,8 @@ def extract_from_tar(tar_file, output=None, ext='.pdb'):
     """
     output = output or Path.cwd()
     tar = tarfile.open(tar_file)
-    members = [member for member in tar.getmembers() if member.name.endswith(ext)]
+    members = \
+        [member for member in tar.getmembers() if member.name.endswith(ext)]
     tar.extractall(path=output, members=members)
     tar.close()
     return [Path(output, i.name) for i in members]
@@ -247,7 +243,6 @@ def make_destination_folder(dest):
         return dest_
 
 
-#@libcheck.argstype(((list, tuple),))
 def paths_from_flist(path):
     """
     Read Paths from file listing paths.
@@ -364,7 +359,7 @@ def read_path_bundle(path_bundle, ext=None, listext='.list'):
 # USED OKAY
 def read_dictionary_from_disk(path):
     """
-    Reads a dictionary from disk.
+    Read a dictionary from disk.
 
     Accepted formats:
         * pickle
@@ -391,7 +386,7 @@ def read_dict_from_json(path):
 # USED OKAY
 def read_dict_from_pickle(path):
     """Read dictionary from pickle."""
-    return pickle.load(open( path, "rb" ))
+    return pickle.load(open(path, 'rb'))
 
 
 # USED OKAY
@@ -524,7 +519,7 @@ def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
 # USED OKAY
 def save_file_to_tar(tar, fout, data):
     """
-    Saves content to a file inside a tar.
+    Save content to a file inside a tar.
 
     Parameters
     ----------
@@ -548,26 +543,43 @@ def save_file_to_tar(tar, fout, data):
 
 
 # USED OKAY
-def save_pairs_to_disk(pairs, destination=None):
+def save_pairs_to_disk(pairs, destination):
     """
     Save pairs to files.
 
-    First indexes are used as file names,
-    second indexes as info to write to files.
-
     Parameters
     ----------
+    pairs : list or tuple
+        First indexes are used as file names,
+        second indexes as info to write to files.
+
     destination : str or Path-like
-        The folder where to save files.
-        Defaults to CWD.
+        Destination in the disk where to save the files.
+        Current options are: a folder, a TAR file.
     """
     dispacher = save_pairs_dispacher
     dest = Path(destination) if destination else Path.cwd()
-    save_pairs_dispacher[dest.suffix](pairs, dest)
+    dispacher[dest.suffix](pairs, dest)
 
 
 # USED OKAY
 def save_pairs_to_tar(pairs, destination):
+    """
+    Save pairs to files inside a TAR file.
+
+    Where each pair (tuple or list of length 2) is composed of:
+        (file name, data content)
+
+    Parameters
+    ----------
+    pairs : list or tuple
+        The pairs of information to save to the disk.
+        Index 0 is the file name, and index 1 is the data content.
+
+    destination: str or Path
+        The TAR file where to save the files. It is NOT the file name.
+        If exists appends, if not creates.
+    """
     modes = {True: 'a:', False: 'w'}
     mode = modes[Path(destination).exists()]
     with tarfile.open(os.fspath(destination), mode=mode) as tar:
@@ -576,7 +588,23 @@ def save_pairs_to_tar(pairs, destination):
 
 
 # USED OKAY
-def save_pairs_to_files(pairs, destination):
+def save_pairs_to_files(pairs, destination=None):
+    """
+    Save pairs to files.
+
+    Where each pair (tuple or list of length 2) is composed of:
+        (file name, data content)
+
+    Parameters
+    ----------
+    pairs : list or tuple
+        The pairs of information to save to the disk.
+        Index 0 is the file name, and index 1 is the data content.
+
+    destination: str or Path, optional
+        The folder where to save the files. It is NOT the file name.
+        Defauls to the CWD.
+    """
     dest = make_destination_folder(destination)
     for k, v in pairs:
         try:
@@ -603,11 +631,18 @@ def write_text(text, output=None):
 
 
 class FileReaderIterator:
+    """
+    Dispaches file read iteractor.
+
+    Here I created a class interface instead of a function
+    for convinience.
+    """
 
     def __new__(cls, origin, **kwargs):
-
+        """Construct a file reader iterator."""
         options = {
-            isinstance(origin, str) and origin.endswith('.tar'): TarFileIterator,
+            isinstance(origin, str) and origin.endswith('.tar'):
+                TarFileIterator,
             isinstance(origin, list): FileIterator,
             }
 
@@ -615,12 +650,13 @@ class FileReaderIterator:
 
 
 class FileIteratorBase:
+    """File iterator base class."""
 
     def __iter__(self):
         return self
 
     def __getitem__(self, val):
-        for i in range(val.stop - val.start):
+        for _ in range(val.stop - val.start):
             # I had problems with the exhaustion of this generator
             # raising RuntimeError -> this solved
             # https://stackoverflow.com/questions/51700960
@@ -634,8 +670,22 @@ class FileIteratorBase:
 
 
 class FileIterator(FileIteratorBase):
+    """Iterate over files."""
 
     def __init__(self, origin, ext='.pdb'):
+        """
+        Instantiate.
+
+        Parameters
+        ----------
+        origin : str or list
+            Paths to the files to interate over.
+
+        ext : str
+            The extention to consider in case list comes from
+            listdir.
+            Defaults to `.pdb`.
+        """
         self.members = list(read_path_bundle(origin, ext=ext))
         self.imembers = iter(self.members)
         self._len = len(self.members)
@@ -650,13 +700,27 @@ class FileIterator(FileIteratorBase):
 
 
 class TarFileIterator(FileIteratorBase):
+    """Iterate over files in tarfiule."""
 
     def __init__(self, origin, ext='.pdb'):
+        """
+        Instantiate.
+
+        Parameters
+        ----------
+        origin : str
+            The path to the tar file.
+
+        ext : str
+            The extention of the files to consider.
+            Defaults to `.pdb`.
+        """
         self.origin = tarfile.open(origin)
         self._members = self.origin.getmembers()
         self._len = len(self._members)
         self.members = (m for m in self._members if m.name.endswith(ext))
-        self.names = [Path(m.name).stem for m in self._members if m.name.endswith(ext)]
+        self.names = \
+            [Path(m.name).stem for m in self._members if m.name.endswith(ext)]
 
     def __next__(self):
         member = next(self.members)
@@ -673,7 +737,7 @@ read_PDBID_from_source_dispacher = {
     }
 
 read_dictionary_from_disk_dispacher = {
-    #'.pickle': read_dict_from_pickle,
+    # '.pickle': read_dict_from_pickle,
     '.json': read_dict_from_json,
     }
 

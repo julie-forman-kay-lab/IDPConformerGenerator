@@ -1,13 +1,9 @@
 """Functions and variables to download files and data."""
-import tarfile
 import time
 import urllib.request
-import traceback
 from urllib.error import URLError
 
-from idpconfgen import Path, log
-from idpconfgen.libs.libio import make_destination_folder, save_file_to_tar
-from idpconfgen.libs.libmulticore import pool_function_in_chunks, pool_function, consume_iterable_in_list
+from idpconfgen import log
 from idpconfgen.libs.libstructure import save_structure_by_chains
 from idpconfgen.logger import S
 
@@ -42,16 +38,16 @@ def download_structure(pdbid, **kwargs):
         return
 
     yield from save_structure_by_chains(
-            downloaded_data,
-            pdbname,
-            chains=chains,
-            **kwargs,
-            )
+        downloaded_data,
+        pdbname,
+        chains=chains,
+        **kwargs,
+        )
 
 
 def fetch_pdb_id_from_RCSB(pdbid):
     """Fetch PDBID from RCSB."""
-    possible_links = (l.format(pdbid) for l in POSSIBLELINKS)
+    possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
 
     attempts = 0
     while attempts < 10:
@@ -87,5 +83,3 @@ def fetch_raw_PDBs(pdbid, mdict=None, **kwargs):
         log.error(f'Complete download failure for {pdbname}')
         raise
     yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')
-
-

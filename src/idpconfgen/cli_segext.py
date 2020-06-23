@@ -10,12 +10,15 @@ idpcfongen segext PDBS_FOLDER DSSPFILE -d OUTPUTFOLDER -s [L/H/E/A]
 import argparse
 from functools import partial
 
-from idpconfgen import Path, log
-from idpconfgen.core import definitions as DEFS
-from idpconfgen.libs import libcli, libio, libstructure, libparse, libpdb
+from idpconfgen import log
+from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libhigherlevel import extract_secondary_structure
-from idpconfgen.libs.libio import read_dictionary_from_disk, FileReaderIterator, save_pairs_to_disk
+from idpconfgen.libs.libio import (
+    FileReaderIterator,
+    read_dictionary_from_disk,
+    save_pairs_to_disk,
+    )
 from idpconfgen.libs.libmulticore import (
     consume_iterable_in_list,
     flat_results_from_chunk,
@@ -23,8 +26,7 @@ from idpconfgen.libs.libmulticore import (
     )
 
 
-
-LOGFILESNAMES = '.idpconfgen_segext'
+LOGFILESNAME = '.idpconfgen_ssext'
 
 _name = 'ssext'
 _help = 'Extract secondary structure elements from PDBs.'
@@ -72,21 +74,57 @@ libcli.add_argument_minimum(ap)
 libcli.add_argument_ncores(ap)
 
 
-
 def main(
         pdb_files,
         sscalc_file,
         atoms='all',
-        minimum=4,
-        destination=None,
-        structure='all',
-        func=None,
-        ncores=1,
         chunks=5000,
+        destination=None,
+        func=None,
+        minimum=4,
+        ncores=1,
+        structure='all',
         ):
+    """
+    Extract secondary structure segments from PDBs.
+
+    Parameters
+    ----------
+    pdb_files : str or list
+        Paths to PDB files.
+
+    sscalc_file : str or Path
+        Path to the `sscalc` file containing PDBID codes and `dssp`
+        information.
+
+    atoms : str or list
+        Atoms to keep in the extracted segments.
+
+    minimum : int
+        The minimum residue length of the segments.
+        Segments with less than minimum are discarded.
+
+    destination : str or Path
+        Where to save the new PDBs.
+
+    structure : str or list
+        Secondary structure characters to consider.
+
+    chunks : int
+        The size of the chunk to process in memory before saving to
+        the disk.
+
+    ncores : int
+        The number of cores to use.
+        Defaults to 1.
+    """
+    log.info(T('Extracting secondary structure elements.'))
+    init_files(log, LOGFILESNAME)
 
     ssdata = read_dictionary_from_disk(sscalc_file)
+    log.info(S('read sscalc file'))
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
+    log.info(S('read PDB files'))
 
     execute = partial(
         # multiprocessing function
@@ -107,7 +145,11 @@ def main(
         minimum=minimum,
         )
 
-    flat_results_from_chunk(execute, save_pairs_to_disk, destination=destination)
+    flat_results_from_chunk(
+        execute,
+        save_pairs_to_disk,
+        destination=destination,
+        )
     return
 
 

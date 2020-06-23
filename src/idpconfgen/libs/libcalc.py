@@ -3,7 +3,6 @@ import math
 
 import numpy as np
 
-from idpconfgen import log
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],

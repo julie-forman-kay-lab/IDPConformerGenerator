@@ -14,18 +14,14 @@ from functools import reduce
 
 import numpy as np
 
-from idpconfgen import Path, log
-from idpconfgen.core.definitions import (
-    aa3to1,
-    blocked_ids,
-    pdb_ligand_codes,
-    residue_elements as _allowed_elements,
-    )
+from idpconfgen import log
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
+from idpconfgen.core.definitions import residue_elements as _allowed_elements
 from idpconfgen.libs import libpdb
-from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.libs.libcif import CIFParser, is_cif
 from idpconfgen.libs.libparse import group_runs, type2string
+from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.logger import S
 
 
@@ -159,6 +155,7 @@ class Structure:
 
     @property
     def filtered_residues(self):
+        """Filter residues according to :attr:`filters`."""
         FA = self.filtered_atoms
         return [int(i) for i in dict.fromkeys(FA[:, col_resSeq])]
 
@@ -166,22 +163,10 @@ class Structure:
     def residues(self):
         """
         Residues of the structure.
+
         Without filtering, without chain separation.
         """
         return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
-
-    #@property
-    #def residue_segments(self):
-    #    fa = self.filtered_atoms
-    #    return np.split(fa, np.where(np.diff(fa[:, col_resSeq]) != 1)[0]+1)
-
-    @property
-    def residue_segments(self):
-    # this is crude implementation compatible with multiprocessing.Pool
-    # the numpy version is commented above
-    # if you are reading this, rise an issue and let me know how to
-    # handle the creation of new arrays with Pool.map/imap :-)
-        return split_residue_segments(self.filtered_atoms)
 
     def pop_last_filter(self):
         """Pop last filter."""
@@ -208,12 +193,11 @@ class Structure:
             lambda x: ib(x[col_name], x[col_element], minimal=minimal)
             )
 
-    def renumber_atoms(self):
-        self.data_array[:, col_serial] = np.arange(1, self.data_array.shape[0] + 1).astype('<U8')
-
     def get_PDB(self, pdb_filters=None):
         """
-        The filtered structure in PDB format.
+        Convert Structure to PDB format.
+
+        Considers only filtered lines.
 
         Returns
         -------
@@ -349,9 +333,9 @@ def populate_structure_array_from_pdb(record_lines, data_array):
 
 def filter_record_lines(lines, which='both'):
     """Filter lines to get record lines only."""
-    record_headings = record_line_headings
+    RH = record_line_headings
     try:
-        return [l for l in lines if l.startswith(record_headings[which])]
+        return [line for line in lines if line.startswith(RH[which])]
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
@@ -419,7 +403,6 @@ def write_PDB(lines, filename):
         with open(filename, 'w') as fh:
             fh.write(concat_lines)
             fh.write('\n')
-        #log.info(S(f'saved: {filename}'))
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
@@ -487,7 +470,6 @@ def _APPLY_FILTER(it, func):
     return filter(func, it)
 
 
-
 def is_backbone(atom, element, minimal=False):
     """
     Whether `atom` is a protein backbone atom or not.
@@ -516,7 +498,7 @@ def is_backbone(atom, element, minimal=False):
 def save_structure_by_chains(
         pdb_data,
         pdbname,
-        altlocs={'A', '', ' '},
+        altlocs=('A', '', ' '),
         chains=None,
         record_name=('ATOM', 'HETATM'),
         renumber=True,

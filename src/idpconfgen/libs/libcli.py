@@ -10,6 +10,7 @@ detailed = "detailed instructions:\n\n{}"
 
 
 def load_args(ap):
+    """Load argparse commands."""
     cmd = ap.parse_args()
     return cmd
 
@@ -248,6 +249,7 @@ def add_argument_pdbids(parser):
         help='PDBID[CHAIN] identifiers to download.',
         nargs='+',
         )
+
 
 def add_argument_reduced(parser):
     """Add `reduced` argument."""

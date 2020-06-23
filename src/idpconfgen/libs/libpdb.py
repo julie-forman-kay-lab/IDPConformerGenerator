@@ -344,6 +344,7 @@ class PDBList:
 
     @property
     def pdbids(self):
+        """Generate the PDBID names."""
         return (pdbid.name for pdbid in self)
 
     @property

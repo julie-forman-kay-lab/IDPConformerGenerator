@@ -1,17 +1,9 @@
 """Multi-core related objects."""
-import multiprocessing
-import subprocess
-from contextlib import suppress
 from functools import partial
-from multiprocessing import Pool, Manager
-import tracemalloc
-import gc
+from multiprocessing import Pool
 
-from idpconfgen import Path, log
-from idpconfgen.libs import libcheck
-from idpconfgen.libs.libio import save_pairs_to_disk, save_dictionary
+from idpconfgen import log
 from idpconfgen.libs.libtimer import ProgressWatcher
-from idpconfgen.logger import S
 
 
 # USED OKAY

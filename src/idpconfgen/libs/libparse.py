@@ -4,26 +4,16 @@ Parsing routines for different data structure.
 All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
-import string
 import subprocess
-import sys
-import traceback
-from contextlib import contextmanager
 from os import fspath
 
-import numpy as np
-
-from idpconfgen import Path, log
-from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen import Path
 from idpconfgen.core.definitions import dssp_trans, jsonparameters
-from idpconfgen.libs import libcheck
-from idpconfgen.libs.libpdb import PDBIDFactory, delete_insertions, atom_resSeq
-from idpconfgen.logger import S
-from idpconfgen.libs.libio import save_pairs_to_disk
+from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 
 
-#_ascii_lower_set = set(string.ascii_lowercase)
-#_ascii_upper_set = set(string.ascii_uppercase)
+# _ascii_lower_set = set(string.ascii_lowercase)
+# _ascii_upper_set = set(string.ascii_uppercase)
 
 
 # USED OKAY

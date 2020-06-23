@@ -1,9 +1,10 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
-from itertools import chain
 from collections import namedtuple
+from itertools import chain
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
+
 
 core_folder = Path(__file__).parent
 
@@ -31,7 +32,7 @@ aa3to1 = {
     'VAL': 'V'}
 
 # Amino-acid 1 to 3 letter code dictionary
-aa1to3 = {v:k for k, v in aa3to1.items()}
+aa1to3 = {v: k for k, v in aa3to1.items()}
 
 # JSON structure parameter keys
 JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')
@@ -60,7 +61,7 @@ dssp_ss_keys.all_helix = (
     )
 
 dssp_ss_keys.all_strand = (
-    #dssp_ss_keys.bbridge,
+    # dssp_ss_keys.bbridge,
     dssp_ss_keys.strand,
     )
 
@@ -90,19 +91,17 @@ dssp_trans = str.maketrans(
 
 dssp_trans_bytes = bytes.maketrans(
     b''.join(c.encode() for c in dssp_ss_keys.all),
-    b'H' * len(dssp_ss_keys.all_helix) \
-    + b'E' * len(dssp_ss_keys.all_strand) \
+    b'H' * len(dssp_ss_keys.all_helix)
+    + b'E' * len(dssp_ss_keys.all_strand)
     + b'L' * len(dssp_ss_keys.all_loops),
-        )
-
-
+    )
 
 
 # considers solvent and DNA/RNA
 # http://www.wwpdb.org/documentation/file-format-content/format33/sect4.html#HET
-#_discarded_residues = (
-    #'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
-    #)
+# _discarded_residues = (
+# 'I', 'C', 'G', 'A', 'U', 'I', 'DC', 'DG', 'DA', 'DU', 'DT', 'DI', 'N',
+# )
 pdb_ligand_codes_file = Path(core_folder, 'chem_comp_parsed.txt')
 pdb_lig_codes_manual = Path(core_folder, 'chem_comp_added.txt')
 pdb_ligand_codes = set(

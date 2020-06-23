@@ -15,13 +15,11 @@ USAGE:
 import argparse
 import sys
 
-from idpconfgen import cli_RCSB_dssp
-from idpconfgen import cli_fastaext
-from idpconfgen import cli_fetch
+from idpconfgen import cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
-from idpconfgen import cli_segext
-from idpconfgen import cli_sscalc
+from idpconfgen import cli_segext, cli_sscalc, log
 from idpconfgen.libs import libcli
+from idpconfgen.logger import S
 
 
 prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
@@ -39,7 +37,6 @@ Other useful routines:
     * {cli_fetch._name}
     * {cli_segext._name}
     * {cli_fastaext._name}
-    * {cli_RCSB_dssp._name}
 """
 
 ap = libcli.CustomParser(
@@ -55,14 +52,13 @@ libcli.add_version(ap)
 subparsers = ap.add_subparsers(
     title='IDP Conformer Generator routines',
     help='Short description:',
-        )
+    )
 
 # argument parsers for main DB creation routines
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
 
 # argument parsers for secondary routines
-libcli.add_subparser(subparsers, cli_RCSB_dssp)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_segext)
@@ -87,6 +83,7 @@ def maincli():
 
     cmd = load_args()
     cmd.func(**vars(cmd))
+    log.info(S('finished properly'))
 
 
 if __name__ == '__main__':

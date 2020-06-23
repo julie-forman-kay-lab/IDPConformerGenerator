@@ -152,7 +152,7 @@ class CIFParser:
         """The chainID field of the current :attr:`line`."""  # noqa: D401
         value = self._auth_label('asym_id')
         if value in ('?', '.'):
-            value = self.get_value(f'_atom_site.auth_asym_id')
+            value = self.get_value('_atom_site.auth_asym_id')
         return value
 
     @property

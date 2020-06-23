@@ -9,10 +9,10 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.logger import T, init_files
-from idpconfgen.libs.libpdb import get_fasta_from_PDB
-from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libio import FileReaderIterator, save_dictionary
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libpdb import get_fasta_from_PDB
+from idpconfgen.logger import T, init_files
 
 
 LOGFILESNAME = 'idpconfgen_fastaext'

@@ -4,23 +4,24 @@ Higher level functions.
 Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
-from collections import defaultdict
 from contextlib import suppress
-from functools import reduce, partial
+from functools import partial, reduce
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import blocked_ids
-from idpconfgen.libs.libio import concatenate_entries, read_PDBID_from_source, save_pairs_to_disk
-from idpconfgen.libs.libparse import group_runs, group_by
-from idpconfgen.libs.libpdb import PDBList, PDBIDFactory, atom_resSeq, atom_name, atom_resName, atom_resSeq
-from idpconfgen.libs.libstructure import Structure, col_resSeq
-from idpconfgen.libs.libtimer import record_time
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libio import (
+    concatenate_entries,
+    read_PDBID_from_source,
+    save_pairs_to_disk,
+    )
 from idpconfgen.libs.libmulticore import (
     consume_iterable_in_list,
     flat_results_from_chunk,
     pool_function_in_chunks,
     )
+from idpconfgen.libs.libparse import group_by
+from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
+from idpconfgen.logger import S, T, init_files
 
 
 # USED OKAY!
@@ -41,6 +42,7 @@ def download_pipeline(func, logfilename='.download'):
         The common stem name of the log files.
     """
     LOGFILESNAME = logfilename
+
     def main(
             pdbids,
             chunks=5_000,
@@ -79,7 +81,8 @@ def download_pipeline(func, logfilename='.download'):
             ]
 
         # yes, there are just two items in remove_from_input, why use reduce?
-        # what if more are added in the future? :-P the engine is already created
+        # what if more are added in the future? :-P
+        # the engine is already created
         pdblist_comparison = reduce(diff, remove_from_input, pdblist)
         log.info(S(f'Found {str(pdblist_comparison)} to download'))
         #
@@ -116,7 +119,10 @@ def download_pipeline(func, logfilename='.download'):
 
         elif not something_to_download and update:
             log.info(S('There is nothing to download.'))
-            log.info(S('All requested IDs are already at the destination folder.'))
+            log.info(S(
+                'All requested IDs are already at '
+                'the destination folder.'
+                ))
 
         log.info(T('PDB Downloader finished'))
         return
@@ -166,7 +172,6 @@ def extract_secondary_structure(
     except KeyError:
         pdbdd = ssdata[f'{pdbname}.pdb']
 
-
     ss_identified = set(pdbdd['dssp'])
     if structure == 'all':
         ss_to_isolate = ss_identified
@@ -197,7 +202,7 @@ def extract_secondary_structure(
 
             LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])
             pdb = b'\n'.join(
-                l for l in pdbdata if all(f(l) for f in line_filters)
+                line for line in pdbdata if all(f(line) for f in line_filters)
                 )
             LF_pop()
 
