@@ -98,7 +98,6 @@ def test_checkext_error():
         ap.parse_args(['-e'] + ['myfile.txt'])
 
 
-
 # capsys, crazy pytest undeclared variable! :-o
 # https://docs.pytest.org/en/stable/reference.html?highlight=capsys#capsys
 def test_customparse(capsys):
@@ -110,7 +109,6 @@ def test_customparse(capsys):
     assert err.value.args[0] == 2
     captured = capsys.readouterr()
     assert captured.err == '\nerror: message\n'
-
 
 
 def test_add_subparse():
