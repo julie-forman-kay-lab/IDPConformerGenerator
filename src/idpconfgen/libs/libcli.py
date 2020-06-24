@@ -37,7 +37,7 @@ class ArgsToTuple(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         """Call it."""
-        namespace.record_name = tuple(values)
+        setattr(namespace, self.dest, tuple(values))
 
 
 def CheckExt(extensions):
@@ -47,7 +47,7 @@ def CheckExt(extensions):
 
         def __call__(self, parser, namespace, path, option_string=None):
             """Call on me :-)."""
-            suffix = path.suffix
+            suffix = Path(path).suffix
             if suffix not in extensions:
                 parser.error(f'Wrong extension {suffix}, expected {extensions}')
             else:
@@ -62,7 +62,7 @@ class CustomParser(argparse.ArgumentParser):
     def error(self, message):
         """Present error message."""
         self.print_help()
-        sys.stderr.write('\nerror: %s\n' % message)
+        sys.stderr.write(f'\nerror: {message}\n')
         sys.exit(2)
 
 
@@ -140,6 +140,22 @@ def add_version(parser):
         )
 
 
+# arguments index:
+# positional:
+# pdb_files
+# pdbids
+
+# optional:
+# -c, --chunks            : number of chunks to process in memory
+# -d, --destination       : destination folder
+# -m, --minimum           : minimum size
+# -n, --ncores            : number of cores
+# --replace               : replace (whatever shalls replace)
+# -rd, --reduced          : reduces secondary structure representation
+# -rn, --record-name      : PDB RECORD name
+# -u, --update            : update (whatever shalls update)
+
+
 def add_argument_chunks(parse):
     """
     Add chunks argument.
@@ -153,21 +169,6 @@ def add_argument_chunks(parse):
         default=5_000,
         type=int,
         )
-
-
-# arguments index:
-# positional:
-# pdb_files
-# pdbids
-
-# optional:
-# -d, --destination       : destination folder
-# -m, --minimum           : minimum size
-# -n, --ncores            : number of cores
-# --replace               : replace (whatever shalls replace)
-# -rd, --reduced          : reduces secondary structure representation
-# -rn, --record-name      : PDB RECORD name
-# -u, --update            : update (whatever shalls update)
 
 
 def add_argument_destination_folder(parser):
