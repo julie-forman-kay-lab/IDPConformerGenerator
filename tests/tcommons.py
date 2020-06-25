@@ -6,7 +6,6 @@ from contextlib import suppress
 from idpconfgen import Path
 
 
-
 class DummyFolder:
     def __init__(self, folder):
         self.folder = Path(folder)
@@ -18,6 +17,7 @@ class DummyFolder:
     def __exit__(self, *args, **kwargs):
         with suppress(FileNotFoundError):
             shutil.rmtree(self.folder)
+
 
 class DummyFile:
     def __init__(self, fpath):
@@ -56,6 +56,7 @@ pdb_models = Path(data_folder, 'pdb_models.pdb')
 pdb_models_output = Path(data_folder, 'pdb_models_output.pdb')
 pdbs_fasta = Path(data_folder, 'pdbs.fasta')
 dict1json = Path(data_folder, 'dict1.json')
+example_dssp = Path(data_folder, 'example.dssp')
 
 
 cif_example_headers = [
