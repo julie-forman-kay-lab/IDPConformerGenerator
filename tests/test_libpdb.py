@@ -206,7 +206,7 @@ class TestPDBList:
         """Test string representation."""
         pdblist = PDBList(('1ABC',))
         s = str(pdblist)
-        assert s == 'PDBList with 1 element(s).'
+        assert s == 'PDBList with 1 element(s)'
 
     def test_1_2(self):
         """Test intantiating from cls."""
