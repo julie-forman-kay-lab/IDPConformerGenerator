@@ -208,13 +208,14 @@ def add_argument_minimum(parser):
 
 def add_argument_ncores(parser):
     """Add argument for number of cores to use."""
+    ncpus = max(cpu_count() - 1, 1)
     parser.add_argument(
         '-n',
         '--ncores',
         help='Number of cores to use.',
         type=int,
         default=1,
-        const=cpu_count() - 1,
+        const=ncpus,
         nargs='?',
         )
 
