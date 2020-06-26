@@ -4,7 +4,6 @@ import itertools as it
 import json
 import os
 import pickle
-import sys
 import tarfile
 from functools import partial
 from io import BytesIO
@@ -34,37 +33,6 @@ def add_existent_files(storage, source):
             storage.append(p)
         else:
             log.error(S('file not found: {}', str(p)))
-
-
-def check_file_exist(files_list):
-    """
-    Confirm all files in a list exist.
-
-    Logs each entry for each file not found.
-
-    Parameters
-    ----------
-    files_list : list
-        The list of file Paths or strings.
-
-    Returns
-    -------
-    tuple of two elements
-        True
-            If all files are found. False if there is at least one file
-            missing.
-
-        list
-            A list of the missing files.
-    """
-    log.info(T('checking files exist'))
-    # I have avoided to use it.tee on purpose
-    paths1 = map(Path, files_list)
-    paths2 = map(Path, files_list)
-    log_nonexistent(paths1)
-    # list() because of the return statement
-    files_not_found = list(it.filterfalse(Path.exists, paths2))
-    return not bool(files_not_found), files_not_found
 
 
 def concatenate_entries(entry_list):
@@ -119,9 +87,15 @@ def extract_from_tar(tar_file, output=None, ext='.pdb'):
         A list of Path-objects pointing to the extracted files.
     """
     output = output or Path.cwd()
-    tar = tarfile.open(tar_file)
-    members = \
-        [member for member in tar.getmembers() if member.name.endswith(ext)]
+    tar = tarfile.open(str(tar_file))
+    if ext:
+        members = [
+            member
+            for member in tar.getmembers()
+            if member.name.endswith(ext)
+            ]
+    else:
+        members = tar.getmembers()
     tar.extractall(path=output, members=members)
     tar.close()
     return [Path(output, i.name) for i in members]
@@ -445,7 +419,9 @@ def read_PDBID_from_tar(tar_file):
     """
     try:
         tar = tarfile.open(str(tar_file), 'r:*')
-        p = PDBList(tar.getnames())
+        pdb_members = \
+            (name for name in tar.getnames() if name.endswith('.pdb'))
+        p = PDBList(pdb_members)
         tar.close()
         log.info(S(f'found: {str(tar_file)}'))
 
@@ -508,12 +484,8 @@ def save_dict_to_json(
 def save_dict_to_pickle(mydict, output='mydict.pickle', **kwargs):
     """Save dictionary to pickle file."""
     assert Path(output).suffix == '.pickle'
-    pickledump = partial(pickle.dump, protocol=pickle.HIGHEST_PROTOCOL)
     with open(output, 'wb') as handle:
-        try:
-            pickledump(mydict, handle)
-        except TypeError:
-            pickledump(dict(mydict), handle)
+        pickle.dump(mydict, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 # USED OKAY
@@ -613,23 +585,6 @@ def save_pairs_to_files(pairs, destination=None):
             Path(dest, k).write_bytes(v)
 
 
-def write_text(text, output=None):
-    """
-    Write text to output.
-
-    If output is ``None`` writes to stdout.
-    Else, writes to file.
-    If ``output`` points to a directory that does not exist, creates it.
-    """
-    try:
-        opath = Path(output)
-    except TypeError:
-        sys.stdout.write(text)
-    else:
-        opath.myparents().mkdir(parents=True, exist_ok=True)
-        opath.write_text(text)
-
-
 class FileReaderIterator:
     """
     Dispaches file read iteractor.
@@ -652,11 +607,13 @@ class FileReaderIterator:
 class FileIteratorBase:
     """File iterator base class."""
 
-    def __iter__(self):
-        return self
+    def __bool__(self):
+        return bool(self._len)
 
     def __getitem__(self, val):
-        for _ in range(val.stop - val.start):
+        start, stop, step = val.indices(self._len)
+        # self is a generator, makes no sense to apply `step`
+        for _ in range(stop - start):
             # I had problems with the exhaustion of this generator
             # raising RuntimeError -> this solved
             # https://stackoverflow.com/questions/51700960
@@ -664,6 +621,9 @@ class FileIteratorBase:
                 yield next(self)
             except StopIteration:
                 return
+
+    def __iter__(self):
+        return self
 
     def __len__(self):
         return self._len
@@ -723,7 +683,11 @@ class TarFileIterator(FileIteratorBase):
             [Path(m.name).stem for m in self._members if m.name.endswith(ext)]
 
     def __next__(self):
-        member = next(self.members)
+        try:
+            member = next(self.members)
+        except StopIteration:
+            self.origin.close()
+            raise
         f = self.origin.extractfile(member)
         txt = f.read()
         f.close()

@@ -5,7 +5,8 @@ All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
 import subprocess
-from os import fspath
+from itertools import product
+from pathlib import Path as Path_
 
 from idpconfgen import Path
 from idpconfgen.core.definitions import dssp_trans, jsonparameters
@@ -20,6 +21,7 @@ from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 # all should return a string
 # used for control flow
 type2string = {
+    type(Path_()): lambda x: x.read_text(),
     type(Path()): lambda x: x.read_text(),
     bytes: lambda x: x.decode('utf_8'),
     str: lambda x: x,
@@ -78,12 +80,7 @@ def group_runs(li, tolerance=1):
     yield out
 
 
-def mkdssp_w_split(
-        pdb,
-        cmd,
-        minimum=2,
-        reduced=False,
-        ):
+def mkdssp_w_split(pdb, cmd, **kwargs):
     """
     Execute `mkdssp` from DSSP.
 
@@ -101,6 +98,23 @@ def mkdssp_w_split(
     cmd : str
         The command to execute the external DSSP program.
 
+    """
+    # begin
+    pdbfile = pdb.resolve()
+    _cmd = [cmd, '-i', str(pdbfile)]
+    result = subprocess.run(_cmd, capture_output=True)
+    yield from split_pdb_by_dssp(
+        pdbfile,
+        result.stdout.decode('utf-8'),
+        **kwargs)
+
+
+def split_pdb_by_dssp(pdbfile, dssp_text, minimum=2, reduced=False):
+    """
+    Split PDB file based on DSSP raw data.
+
+    Parameters
+    ----------
     minimum : int
         The minimum length allowed for a segment.
 
@@ -112,23 +126,18 @@ def mkdssp_w_split(
     _fasta = jsonparameters.fasta
     _resids = jsonparameters.resids
 
-    # begin
-    pdbfile = fspath(pdb.resolve())
-    _cmd = [cmd, '-i', pdbfile]
-    result = subprocess.run(_cmd, capture_output=True)
-
     # did not use the pathlib interface read_bytes on purpose.
     with open(pdbfile, 'rb') as fin:
         pdb_bytes = fin.readlines()
 
     segs = 0
+    pdbname = str(PDBIDFactory(pdbfile.stem))
     # converted because end product is to be saved in json or used as string
-    dssp_text = result.stdout.decode('utf-8')
     for dssp, fasta, residues in parse_dssp(dssp_text, reduced=reduced):
         if len(residues) < minimum:
             continue
 
-        fname = f'{str(PDBIDFactory(pdb))}_seg{segs}'
+        fname = f'{pdbname}_seg{segs}'
 
         residues_bytes = set(c.encode() for c in residues)
 
@@ -151,6 +160,28 @@ def mkdssp_w_split(
 
 
 # USED OKAY
+def sample_case(input_string):
+    """
+    Sample all possible cases combinations from `string`.
+
+    Examples
+    --------
+    >>> sample_case('A')
+    {'A', 'a'}
+
+    >>> sample_case('Aa')
+    {'AA', 'Aa', 'aA', 'aa'}
+    """
+    possible_cases = set(
+        map(
+            ''.join,
+            product(*zip(input_string.upper(), input_string.lower())),
+            )
+        )
+    return possible_cases
+
+
+# USED OKAY
 def parse_dssp(data, reduced=False):
     """
     Parse DSSP file data.
@@ -168,6 +199,7 @@ def parse_dssp(data, reduced=False):
     # exausts generator until
     for line in RM1:
         if line.strip().startswith('#'):
+            print(line)
             break
     else:
         # if the whole generator is exhausted
