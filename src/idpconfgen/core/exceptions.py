@@ -1,6 +1,6 @@
 """IDP Conf Gen Exceptions."""
-from idpconfgen import log
 from idpconfgen import contactus as CONTACTUS
+from idpconfgen import log
 from idpconfgen.core import count_string_formatters
 
 
@@ -71,6 +71,9 @@ class IDPConfGenException(Exception):
         """Make me a string :-)."""
         return self.errmsg.format(*self.args)
 
+    def __repr__(self):
+        return f'{self.__class__.__name__}: {self}'
+
     def report(self):
         """
         Report error in the form of a string.
@@ -110,7 +113,7 @@ class DownloadFailedError(IDPConfGenException):
 class EmptyFilterError(IDPConfGenException):
     """Raise when PDB data filtering returns an empty selection."""
 
-    errmsg = 'Filter returns empty selection.'
+    errmsg = 'Filter returns empty selection, when saving file {}.'
 
 
 class DSSPParserError(IDPConfGenException):
@@ -135,6 +138,7 @@ class ParserNotFoundError(IDPConfGenException):
     """Raise when parser for PDB/CIF file is not found."""
 
     errmsg = 'Could not identity a proper parser.'
+
 
 class NotBuiltError(IDPConfGenException):
     """Raise when attempting to access data of an object before building."""

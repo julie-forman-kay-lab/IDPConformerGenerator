@@ -1,8 +1,8 @@
 """
-Conformer Generator PDB Downloader.
+PDB/mmCIF Downloader.
 
-Downloads structures from RCSB Databank provided a list of PDB
-identifiers.
+Downloads structures from RCSB Databank for PDB formatted files of
+individual chains.
 
 The PDB ID list can be given in the format of a file listing the PDBIDs
 or as a list of arguments passed to the script call.
@@ -15,23 +15,40 @@ The following PDBID formats are allowed:
 
 where, XXXX is the PDB ID code and Y the chain identifier. Y can have
 more then one character, for example, XXXXAB, will select chain 'AB'
-of PDB ID XXXX. Digits are also allowed.
+of PDB ID XXXX (for mmCIF cases); digits are also allowed. If no chainID
+is provided, saves each chain of the PDB file separately.
+
+Detailed procedures:
+* PDBs/mmCIFs are saved parsed in PDB format.
+* Known solvent and ligands are removed
+* Considers only altLoc 'A' or ' '.
+* Considers only elements composing aminoacids
+* selects only the first model for multi MODEL structures
+* renumbers atoms for saved chains
+* passes through pdb-tools `pdb_delinsert` filter.
+
+Accepts TAR files as output destination.
+
+DO NOT forget to use the `-u` parameter to perform the actual download.
+Otherwise a simple comparison between source and destination is performed.
 
 USAGE:
-    $ icgpdbdl XXXX
-    $ icgpdbdl XXXXY -d raw_pdbs
-    $ icgpdbdl pdb.list -d raw_pdbs -u
-
+    $ idpconfgen pdbdl XXXX
+    $ idpconfgen pdbdl XXXXY -d <FOLDER>
+    $ idpconfgen pdbdl pdbid.list -d <FOLDER> -u
+    $ idpconfgen pdbdl pdbid.list -d <DESTINATION TAR FILE> -u -d
 """
 import argparse
 
-from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libpdb, libdownload
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs import libcli
+from idpconfgen.libs.libdownload import download_structure
+from idpconfgen.libs.libhigherlevel import download_pipeline
 
 
-LOGFILESNAME = 'pdbdownloader'
+LOGFILESNAME = '.idpconfgen_pdbdl'
 
+_name = 'pdbdl'
+_help = 'Downloads filtered structures from RCSB.'
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
@@ -40,114 +57,19 @@ ap = libcli.CustomParser(
     usage=_us,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-# https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    'pdblist',
-    help='PDBID:CHAIN identifiers to download.',
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-d',
-    '--destination',
-    help=(
-        'Destination folder where PDB files will be stored.'
-        ' Defaults to current working directory.'
-        ),
-    type=Path,
-    default=Path.cwd(),
-    )
-
-ap.add_argument(
-    '-u',
-    '--update',
-    help=(
-        'Updates destination folder according to input PDB list. '
-        'If not provided a comparison between input and destination '
-        'is provided.'
-        ),
-    action='store_true',
-    )
-
-ap.add_argument(
-    '-rn',
-    '--record_name',
-    help='The coordinate PDB record name. Default: ("ATOM",)',
-    default=('ATOM',),
-    action=libcli.ArgsToTuple,
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-n',
-    '--ncores',
-    help='Number of cores to use.',
-    type=int,
-    default=1,
-    )
+libcli.add_argument_pdbids(ap)
+libcli.add_argument_destination_folder(ap)
+libcli.add_argument_update(ap)
+libcli.add_argument_ncores(ap)
+libcli.add_argument_chunks(ap)
 
 
-def _load_args():
-    cmd = ap.parse_args()
-    return cmd
-
-
-def main(
-        pdblist,
-        destination=None,
-        update=False,
-        record_name=('ATOM',),
-        ncores=1,
-        **kwargs
-        ):
-    """Run main script logic."""
-    init_files(log, LOGFILESNAME)
-
-    pdbids_to_read = libio.concatenate_entries(pdblist)
-    pdblist = libpdb.PDBList(pdbids_to_read)
-
-    log.info(T('reading input PDB list'))
-    log.info(S(f'from: {pdblist}'))
-    log.info(S(f'{str(pdblist)}'))
-    log.info(S('done\n'))
-
-    if destination:
-        pdblist_destination = \
-            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
-        log.info(T('reading destination folder'))
-        log.info(S(f'from: {destination}'))
-        log.info(S(f'{str(pdblist_destination)}'))
-        log.info(S('done\n'))
-
-        pdblist_comparison = pdblist.difference(pdblist_destination)
-        log.info(T('Comparison between input and destination'))
-        log.info(S(f'{str(pdblist_comparison)}'))
-        log.info(S('done\n'))
-
-    if update:
-        pdbdownloader = libdownload.PDBDownloader(
-            pdblist_comparison,
-            destination,
-            record_name=record_name,
-            ncores=ncores,
-            )
-        pdbdownloader.prepare_pdb_list()
-        pdbdownloader.run()
-        pdblist_updated = \
-            libpdb.PDBList(libio.glob_folder(destination, '*.pdb'))
-        log.info(T('Reading UPDATED destination'))
-        log.info(S(f'{str(pdblist_updated)}'))
-        log.info(S('done\n'))
-
-    return
-
-
-def maincli():
-    """Command-line interface entry point."""
-    cmd = _load_args()
-    main(**vars(cmd))
+def main(*args, func=None, **kwargs):
+    """Perform main logic."""
+    f = download_pipeline(download_structure, LOGFILESNAME)
+    f(*args, **kwargs)
 
 
 if __name__ == '__main__':
-    maincli()
+    libcli.maincli(ap, main)

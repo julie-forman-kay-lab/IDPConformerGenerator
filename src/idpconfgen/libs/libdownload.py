@@ -1,14 +1,11 @@
 """Functions and variables to download files and data."""
-import contextlib
-import traceback
+import time
 import urllib.request
-from multiprocessing.pool import ThreadPool
+from urllib.error import URLError
 
-from idpconfgen import Path, log
-from idpconfgen.core import exceptions as EXCPTS
-from idpconfgen.libs import libstructure, libtimer
-from idpconfgen.libs.libstructure import Structure
-from idpconfgen.logger import S, T
+from idpconfgen import log
+from idpconfgen.libs.libstructure import save_structure_by_chains
+from idpconfgen.logger import S
 
 
 PDB_WEB_LINK = "https://files.rcsb.org/download/{}.pdb"
@@ -19,145 +16,70 @@ POSSIBLELINKS = [
     ]
 
 
-class PDBDownloader:
+def download_structure(pdbid, **kwargs):
     """
-    Control PDB downloading operations.
-
-    Given a list of :class:`PDBID` downloads those PDB files.
+    Download a PDB/CIF structure chains.
 
     Parameters
     ----------
-    pdb_list : list
-        List of PDBIDs.
+    pdbid : tuple of 2-elements
+        0-indexed, the structure ID at RCSB.org;
+        1-indexed, a list of the chains to download.
 
-    destination : str or Path
-        Destination folder.
-
-    record_name : tuple
-        A tuple containing the atom record names to store from the
-        downloaded PDBs. Record names are as described for the PDB
-        format v3. Usually 'ATOM' and 'HETATM' can be used.
-        Defaults to ('ATOM',)
-
-    ncores : int, optional
-        Number of cores to use during the download phase.
-        All downloads operations are stored in a pool, each core
-        performs a download operation per time grabing those operations
-        from the pool. The more cores the more operations are performed
-        simultaneoursly.
-        Defaults to 1.
+    **kwargs : as for :func:`save_structure_by_chains`.
     """
+    pdbname = pdbid[0]
+    chains = pdbid[1]
 
-    def __init__(
-            self,
-            pdb_list,
-            destination,
-            ncores=1,
-            record_name=('ATOM',),
-            **kwargs,
-            ):
-
-        self.pdb_list = pdb_list
-
-        self.destination = Path(destination)
-        self.destination.mkdir(parents=True, exist_ok=True)
-
-        self.ncores = ncores
-
-        self.record_name = record_name
-
-        self.kwargs = kwargs
-
-        self.prepare_pdb_list()
-
+    try:
+        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    except IOError:
+        log.error(f'Complete download failure for {pdbname}')
         return
 
-    def prepare_pdb_list(self):
-        """Prepare a list with the PDBs to download."""
-        self.pdbs_to_download = {}
-        for pdbid in self.pdb_list:
-            pdbentry = self.pdbs_to_download.setdefault(pdbid.name, [])
-            pdbentry.append(pdbid.chain)
+    yield from save_structure_by_chains(
+        downloaded_data,
+        pdbname,
+        chains=chains,
+        **kwargs,
+        )
 
-    @libtimer.record_time()
-    def run(self):
-        """Run download operation."""
-        log.info(T('starting raw PDB download'))
-        log.info(S(
-            f'{len(self.pdbs_to_download)} PDBs will be downloaded '
-            f'and at least {len(self.pdb_list)} chains will be saved'
-            ))
 
-        results = ThreadPool(self.ncores).imap_unordered(
-            self._download_single_pdb,
-            self.pdbs_to_download.items(),
-            )
+def fetch_pdb_id_from_RCSB(pdbid):
+    """Fetch PDBID from RCSB."""
+    possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
 
-        for _r in results:
-            continue
-
-    def _download_single_pdb(self, pdbid_and_chains_tuple):
-
-        pdbname = pdbid_and_chains_tuple[0]
-        chains = pdbid_and_chains_tuple[1]
-
-        possible_links = [l.format(pdbname) for l in POSSIBLELINKS]
-
-        with self._attempt_download(pdbname):
-            response = self._download_data(possible_links)
-
+    attempts = 0
+    while attempts < 10:
         try:
-            downloaded_data = response.read()
-        except (AttributeError, UnboundLocalError):  # response is None
-            return
-
-        pdbdata = Structure(downloaded_data)
-
-        pdbdata.build()
-
-        if chains[0] is None:
-            chains = pdbdata.chain_set
-
-        for chain in chains:
-
-            pdbdata.add_filter_record_name(self.record_name)
-            pdbdata.add_filter_chain(chain)
-            pdbdata.add_filter(
-                lambda x: x[libstructure.col_altLoc] in ('A', '')
-                )
-            destination = Path(self.destination, f'{pdbname}_{chain}.pdb')
-
-            try:
-                pdbdata.write_PDB(destination)
-            except EXCPTS.EmptyFilterError:
-                log.debug(traceback.format_exc())
-                logstr = (
-                    f'Empty Filter for: \n'
-                    f'{destination} \n'
-                    f'record_name: {self.record_name} \n'
-                    f'chain filter: {chain} \n'
-                    )
-                log.info(S(logstr))
-
-            pdbdata.clear_filters()
-
-    def _download_data(self, possible_links):
-        for weblink in possible_links:
-            try:
-                response = urllib.request.urlopen(weblink)
-            except urllib.error.HTTPError:
-                log.error(S(f'failed from {weblink}'))
-                continue
+            for weblink in possible_links:
+                try:
+                    response = urllib.request.urlopen(weblink)
+                    return response.read()
+                except urllib.error.HTTPError:
+                    continue
+                except (AttributeError, UnboundLocalError):  # response is None
+                    log.debug(S(f'Download {weblink} failed.'))
+                    continue
             else:
-                log.info(S(f'completed from {weblink}'))
-                return response
-        else:
-            raise EXCPTS.DownloadFailedError
+                raise IOError(f'Failed to download {pdbid}')
+        except (TimeoutError, URLError):
+            log.error(
+                f'failed download for {pdbid} because of TimeoutError. '
+                'Retrying...'
+                )
+            time.sleep(15)
+            attempts += 1
+    else:
+        raise IOError(f'Failed to download {pdbid} - attempts exhausted')
 
-    @contextlib.contextmanager
-    def _attempt_download(self, pdbname):
-        try:
-            yield
-        except EXCPTS.DownloadFailedError as e:
-            log.error(S(f'{repr(e)}: FAILED {pdbname}'))
-            return
+
+def fetch_raw_PDBs(pdbid, mdict=None, **kwargs):
+    """Download raw PDBs without any filtering."""
+    pdbname = pdbid[0]
+    try:
+        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    except IOError:
+        log.error(f'Complete download failure for {pdbname}')
+        raise
+    yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')

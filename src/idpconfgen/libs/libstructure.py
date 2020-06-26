@@ -6,21 +6,25 @@ Classes
 Structure
     The main API that represents a protein structure in IDPConfGen.
 """
+import itertools as it
+import traceback
 import warnings
 from collections import defaultdict
 from functools import reduce
 
 import numpy as np
 
-from idpconfgen import Path, log
-from idpconfgen.core import definitions as DEFS
+from idpconfgen import log
 from idpconfgen.core import exceptions as EXCPTS
+from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
+from idpconfgen.core.definitions import residue_elements as _allowed_elements
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
+from idpconfgen.libs.libparse import group_runs, type2string, sample_case
+from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.logger import S
 
 
-# module variables are defined at the end.
 class Structure:
     """
     Hold structural data from PDB/mmCIF files.
@@ -122,6 +126,16 @@ class Structure:
         return set(self.data_array[:, col_chainID])
 
     @property
+    def consecutive_residues(self):
+        """Consecutive residue groups from filtered atoms."""
+        # the structure.consecutive_residues
+        # this will ignore the iCode
+        # please use pdb-tool pdb_delinsertions before this step
+        # PDBs downloaded with IDPConfGen already correct for these
+        # see libs.libparse.delete_insertions
+        return group_runs(self.residues)
+
+    @property
     def fasta(self):
         """
         FASTA sequence of the :attr:`filtered_atoms` lines.
@@ -132,12 +146,27 @@ class Structure:
 
         chains = defaultdict(dict)
         for row in self.filtered_atoms:
-            chains[row[c]].setdefault(row[rs], DEFS.aa3to1.get(row[rn], 'X'))
+            chains[row[c]].setdefault(row[rs], aa3to1.get(row[rn], 'X'))
 
         return {
             chain: ''.join(residues.values())
             for chain, residues in chains.items()
             }
+
+    @property
+    def filtered_residues(self):
+        """Filter residues according to :attr:`filters`."""
+        FA = self.filtered_atoms
+        return [int(i) for i in dict.fromkeys(FA[:, col_resSeq])]
+
+    @property
+    def residues(self):
+        """
+        Residues of the structure.
+
+        Without filtering, without chain separation.
+        """
+        return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
 
     def pop_last_filter(self):
         """Pop last filter."""
@@ -164,18 +193,43 @@ class Structure:
             lambda x: ib(x[col_name], x[col_element], minimal=minimal)
             )
 
-    def write_PDB(self, filename):
+    def get_PDB(self, pdb_filters=None):
+        """
+        Convert Structure to PDB format.
+
+        Considers only filtered lines.
+
+        Returns
+        -------
+        generator
+        """
+        def _(i, f):
+            return f(i)
+
+        fs = self.filtered_atoms
+        renumber_atoms(fs)
+
+        pdb_filters = pdb_filters or []
+
+        lines = list(reduce(_, pdb_filters, structure_to_pdb(fs)))
+
+        # pdb_filters may disrupt the quality of the PDB file
+        # TODO: use these filters on the data_array level?
+        assert all(len(line) == 80 for line in lines)
+        return lines
+
+    def write_PDB(self, filename, **kwargs):
         """Write Structure to PDB file."""
-        lines = structure_to_pdb(self.filtered_atoms)
+        lines = self.get_PDB(**kwargs)
         with warnings.catch_warnings():
             warnings.filterwarnings('error')
             try:
                 write_PDB(lines, filename)
             except UserWarning:
-                raise EXCPTS.EmptyFilterError
+                raise EXCPTS.EmptyFilterError(filename)
 
 
-def parse_pdb_to_array(datastr, which='both', **kwargs):
+def parse_pdb_to_array(datastr, which='both'):
     """
     Transform PDB data into an array.
 
@@ -217,7 +271,7 @@ def parse_cif_to_array(datastr, **kwargs):
 
     Array is as given by :func:`gen_empty_structure_data_array`.
     """
-    cif = CIFParser(datastr)
+    cif = CIFParser(datastr, **kwargs)
     number_of_atoms = len(cif)
     data_array = gen_empty_structure_data_array(number_of_atoms)
 
@@ -278,15 +332,9 @@ def populate_structure_array_from_pdb(record_lines, data_array):
 
 def filter_record_lines(lines, which='both'):
     """Filter lines to get record lines only."""
-    record_headings = record_line_headings
+    RH = record_line_headings
     try:
-        # returns lines because needs len after
-        return list(
-            filter(
-                lambda x: x.startswith(record_headings[which]),
-                lines,
-                ),
-            )
+        return [line for line in lines if line.startswith(RH[which])]
     except KeyError as err:
         err2 = ValueError(f'`which` got an unexpected value \'{which}\'.')
         raise err2 from err
@@ -354,9 +402,32 @@ def write_PDB(lines, filename):
         with open(filename, 'w') as fh:
             fh.write(concat_lines)
             fh.write('\n')
-        log.info(S(f'saved: {filename}'))
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
+
+
+def renumber_atoms(data_array):
+    """
+    Renumber the atoms in structure data array.
+
+    Performs in place.
+
+    Returns
+    -------
+    None
+    """
+    try:
+        data_array[:, col_serial] = \
+            np.arange(1, data_array.shape[0] + 1).astype('<U8')
+    except IndexError as err:
+        log.debug(traceback.format_exc())
+        errmsg = (
+            'Could not renumber atoms because '
+            'there are no lines in selection.'
+            )
+        err2 = EXCPTS.EmptyFilterError(errmsg)
+        log.debug(repr(err2))
+        raise err2 from err
 
 
 def structure_to_pdb(atoms):
@@ -410,14 +481,6 @@ record_line_headings = {
     'HETATM': 'HETATM',
     }
 
-# possible data inputs in __init__
-# all should return a string
-# used for control flow
-type2string = {
-    type(Path()): lambda x: x.read_text(),
-    bytes: lambda x: x.decode('utf_8'),
-    str: lambda x: x,
-    }
 
 # order matters
 structure_parsers = [
@@ -428,7 +491,6 @@ structure_parsers = [
 
 def _APPLY_FILTER(it, func):
     return filter(func, it)
-
 
 
 def is_backbone(atom, element, minimal=False):
@@ -449,8 +511,91 @@ def is_backbone(atom, element, minimal=False):
     """
     e = element.strip()
     a = atom.strip()
-    pure_atoms = {
+    elements = {
         True: ('N', 'C'),
         False: ('N', 'C', 'O'),
         }
-    return e in pure_atoms[minimal] and a in ('N', 'CA', 'O', 'C')
+    # elements is needed because of atoms in HETATM entries
+    # for example 'CA' is calcium
+    return a in ('N', 'CA', 'C', 'O') and e in elements[minimal]
+
+
+def save_structure_by_chains(
+        pdb_data,
+        pdbname,
+        altlocs=('A', '', ' '),
+        chains=None,
+        record_name=('ATOM', 'HETATM'),
+        renumber=True,
+        **kwargs,
+        ):
+    """
+    Save PDBs/mmCIF in separated chains (PDB format).
+
+    Logic to parse PDBs from RCSB.
+    """
+    # local assignments for speed boost :D
+    _DR = pdb_ligand_codes  # discarded residues
+    _AE = _allowed_elements
+    _S = Structure
+    _BI = blocked_ids
+    _DI = [delete_insertions]
+
+    pdbdata = _S(pdb_data)
+    pdbdata.build()
+
+    chain_set = pdbdata.chain_set
+
+    chains = chains or chain_set
+
+    add_filter = pdbdata.add_filter
+    pdbdata.add_filter_record_name(record_name)
+    add_filter(lambda x: x[col_resName] not in _DR)
+    add_filter(lambda x: x[col_element] in _AE)
+    add_filter(lambda x: x[col_altLoc] in altlocs)
+
+    for chain in chains:
+
+        # writes chains always in upper case because chain IDs given by
+        # Dunbrack lab are always in upper case letters
+        chaincode = f'{pdbname}_{chain}'
+
+        # this operation can't be performed before because
+        # until here there is not way to assure if the chain being
+        # downloaded is actualy in the blocked_ids.
+        # because at the CLI level the user can add only the PDBID
+        # to indicate download all chains, while some may be restricted
+        if chaincode in _BI:
+            log.info(S(
+                f'Ignored code {chaincode} because '
+                'is listed in blocked ids.'
+                ))
+            continue
+
+        # upper and lower case combinations:
+        possible_cases = sample_case(chain)
+        # cases that exist in the structure
+        cases_that_actually_exist = chain_set.intersection(possible_cases)
+        # this trick places `chain` first in the for loop because
+        # it has the highest probability to be the one required
+        cases_that_actually_exist.discard(chain)
+        probe_cases = [chain] + list(cases_that_actually_exist)
+
+        for chain_case in probe_cases:
+
+            pdbdata.add_filter_chain(chain_case)
+            fout = f'{chaincode}.pdb'
+            try:
+                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
+            except EXCPTS.EmptyFilterError as err:
+                err2 = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
+                log.debug(repr(err2))
+                log.debug('continuing to new chain')
+                continue
+            else:
+                yield fout, pdb_lines
+                break
+            finally:
+                pdbdata.pop_last_filter()
+        else:
+            log.debug(f'Failed to download {chaincode}')

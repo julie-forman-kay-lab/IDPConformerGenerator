@@ -1,0 +1,5 @@
+# discarded PDB:CHAIN IDs
+# these ids are not downloaded even upon request
+# because they encode inconsistencies in the PDB format and data
+# which currently we do not know how to treat
+1MH1_A

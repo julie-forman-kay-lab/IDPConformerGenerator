@@ -3,8 +3,6 @@ import math
 
 import numpy as np
 
-from idpconfgen import log
-from idpconfgen.libs import libstructure
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],

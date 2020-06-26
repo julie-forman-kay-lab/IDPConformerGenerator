@@ -126,7 +126,7 @@ def test_populate_cif_dictionary_errors(args):
     ])
 def cif_parsed(request):
     """Fixture parsed cif file."""
-    return CIFParser(request.param.read_text())
+    return CIFParser(request.param.read_text(), label_priority='label')
 
 
 def test_CIFParse_len(cif_parsed):
@@ -220,7 +220,30 @@ def test_CIFParse_get_values_line_3(cif_parsed):
 
 def test_CIFParse_get_values_no_chainid():
     """Also test lack of ins code."""
-    cif = CIFParser(cif_example_noasymid.read_text())
+    cif = CIFParser(cif_example_noasymid.read_text(), label_priority='label')
+    expected = [
+        'ATOM',
+        '3',
+        'C',
+        ' ',
+        'ALA',
+        'A',
+        '4',
+        ' ',
+        '13.740',
+        '38.628',
+        '27.754',
+        '1.00',
+        '24.74',
+        ' ',
+        'C',
+        ' ']
+    assert cif.get_line_elements_for_PDB(line=2) == expected
+
+
+def test_CIFParse_get_values_no_chainid_auth():
+    """Also test lack of ins code."""
+    cif = CIFParser(cif_example_noasymid.read_text(), label_priority='auth')
     expected = [
         'ATOM',
         '3',
