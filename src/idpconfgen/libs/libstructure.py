@@ -20,7 +20,7 @@ from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
 from idpconfgen.core.definitions import residue_elements as _allowed_elements
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
-from idpconfgen.libs.libparse import group_runs, type2string
+from idpconfgen.libs.libparse import group_runs, type2string, sample_case
 from idpconfgen.libs.libpdb import delete_insertions
 from idpconfgen.logger import S
 
@@ -207,16 +207,15 @@ class Structure:
             return f(i)
 
         fs = self.filtered_atoms
-        # renumber atoms
-        try:
-            fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
-        except IndexError:
-            log.debug(traceback.format_exc())
-            raise
+        renumber_atoms(fs)
 
         pdb_filters = pdb_filters or []
 
-        lines = reduce(_, pdb_filters, structure_to_pdb(fs))
+        lines = list(reduce(_, pdb_filters, structure_to_pdb(fs)))
+
+        # pdb_filters may disrupt the quality of the PDB file
+        # TODO: use these filters on the data_array level?
+        assert all(len(line) == 80 for line in lines)
         return lines
 
     def write_PDB(self, filename, **kwargs):
@@ -230,7 +229,7 @@ class Structure:
                 raise EXCPTS.EmptyFilterError(filename)
 
 
-def parse_pdb_to_array(datastr, which='both', **kwargs):
+def parse_pdb_to_array(datastr, which='both'):
     """
     Transform PDB data into an array.
 
@@ -272,7 +271,7 @@ def parse_cif_to_array(datastr, **kwargs):
 
     Array is as given by :func:`gen_empty_structure_data_array`.
     """
-    cif = CIFParser(datastr)
+    cif = CIFParser(datastr, **kwargs)
     number_of_atoms = len(cif)
     data_array = gen_empty_structure_data_array(number_of_atoms)
 
@@ -407,6 +406,30 @@ def write_PDB(lines, filename):
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
 
+def renumber_atoms(data_array):
+    """
+    Renumber the atoms in structure data array.
+
+    Performs in place.
+
+    Returns
+    -------
+    None
+    """
+    try:
+        data_array[:, col_serial] = \
+            np.arange(1, data_array.shape[0] + 1).astype('<U8')
+    except IndexError as err:
+        log.debug(traceback.format_exc())
+        errmsg = (
+            'Could not renumber atoms because '
+            'there are no lines in selection.'
+            )
+        err2 = EXCPTS.EmptyFilterError(errmsg)
+        log.debug(repr(err2))
+        raise err2 from err
+
+
 def structure_to_pdb(atoms):
     """
     Convert table to PDB formatted lines.
@@ -488,11 +511,13 @@ def is_backbone(atom, element, minimal=False):
     """
     e = element.strip()
     a = atom.strip()
-    pure_atoms = {
+    elements = {
         True: ('N', 'C'),
         False: ('N', 'C', 'O'),
         }
-    return e in pure_atoms[minimal] and a in ('N', 'CA', 'C', 'O')
+    # elements is needed because of atoms in HETATM entries
+    # for example 'CA' is calcium
+    return a in ('N', 'CA', 'C', 'O') and e in elements[minimal]
 
 
 def save_structure_by_chains(
@@ -548,12 +573,7 @@ def save_structure_by_chains(
             continue
 
         # upper and lower case combinations:
-        possible_cases = set(
-            map(
-                ''.join,
-                it.product(*zip(chain.upper(), chain.lower())),
-                )
-            )
+        possible_cases = sample_case(chain)
         # cases that exist in the structure
         cases_that_actually_exist = chain_set.intersection(possible_cases)
         # this trick places `chain` first in the for loop because
@@ -567,9 +587,9 @@ def save_structure_by_chains(
             fout = f'{chaincode}.pdb'
             try:
                 pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
-            except IndexError as err:
-                err = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
-                log.debug(repr(err))
+            except EXCPTS.EmptyFilterError as err:
+                err2 = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
+                log.debug(repr(err2))
                 log.debug('continuing to new chain')
                 continue
             else:

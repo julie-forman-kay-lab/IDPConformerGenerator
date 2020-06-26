@@ -1,4 +1,6 @@
 """Test libparse module."""
+from pathlib import Path as Path_
+
 import pytest
 
 from idpconfgen import Path
@@ -17,6 +19,7 @@ def test_t2s_dispacher():
         str: 'hello',
         bytes: b'world',
         type(Path()): Path(__file__),
+        type(Path_()): Path(__file__),
         }
 
     for k, v in types.items():
@@ -101,6 +104,20 @@ def test_parse_dssp_indexError():
         with pytest.raises(IndexError):
             for _ in libparse.parse_dssp(data):
                 pass
+
+
+@pytest.mark.parametrize(
+    'in1, expected',
+    [
+        ('A', {'A', 'a'}),
+        ('aa', {'AA', 'Aa', 'aA', 'aa'}),
+        ('a_', {'A_', 'a_'}),
+        ]
+    )
+def test_case_combinations(in1, expected):
+    """Test cases combinations."""
+    result = libparse.sample_case(in1)
+    assert result == expected
 
 
 @pytest.fixture

@@ -24,7 +24,7 @@ class DummyFile:
         self.fpath = Path(fpath)
 
     def __enter__(self):
-        return self
+        return self.fpath
 
     def __exit__(self, *args, **kwargs):
         with suppress(FileNotFoundError):
@@ -50,13 +50,16 @@ cif_example_noasymid = Path(data_folder, 'cif_example_noasymid.cif')
 cif_noatomsite = Path(data_folder, 'cif_no_atom_site.cif')
 cif_nohash = Path(data_folder, 'cif_nohash.cif')
 cull = Path(data_folder, 'cull.list')
+dict1json = Path(data_folder, 'dict1.json')
+example_dssp = Path(data_folder, 'example.dssp')
 file_tar = Path(data_folder, 'files.tar')
 pdb_example = Path(data_folder, 'pdb_example.pdb')
 pdb_models = Path(data_folder, 'pdb_models.pdb')
 pdb_models_output = Path(data_folder, 'pdb_models_output.pdb')
+pdb_res_gap = Path(data_folder, 'pdb_residue_gap.pdb')
 pdbs_fasta = Path(data_folder, 'pdbs.fasta')
-dict1json = Path(data_folder, 'dict1.json')
-example_dssp = Path(data_folder, 'example.dssp')
+EXPL_A = Path(data_folder, 'EXPL_A.pdb')
+EXPL_B = Path(data_folder, 'EXPL_B.pdb')
 
 
 cif_example_headers = [

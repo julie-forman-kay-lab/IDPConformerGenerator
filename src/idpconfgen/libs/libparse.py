@@ -5,6 +5,8 @@ All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
 import subprocess
+from itertools import product
+from pathlib import Path as Path_
 
 from idpconfgen import Path
 from idpconfgen.core.definitions import dssp_trans, jsonparameters
@@ -19,6 +21,7 @@ from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 # all should return a string
 # used for control flow
 type2string = {
+    type(Path_()): lambda x: x.read_text(),
     type(Path()): lambda x: x.read_text(),
     bytes: lambda x: x.decode('utf_8'),
     str: lambda x: x,
@@ -154,6 +157,28 @@ def split_pdb_by_dssp(pdbfile, dssp_text, minimum=2, reduced=False):
 
         yield fname, __data, b''.join(lines2write)
         segs += 1
+
+
+# USED OKAY
+def sample_case(input_string):
+    """
+    Sample all possible cases combinations from `string`.
+
+    Examples
+    --------
+    >>> sample_case('A')
+    {'A', 'a'}
+
+    >>> sample_case('Aa')
+    {'AA', 'Aa', 'aA', 'aa'}
+    """
+    possible_cases = set(
+        map(
+            ''.join,
+            product(*zip(input_string.upper(), input_string.lower())),
+            )
+        )
+    return possible_cases
 
 
 # USED OKAY
