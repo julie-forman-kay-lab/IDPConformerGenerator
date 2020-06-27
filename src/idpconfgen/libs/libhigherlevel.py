@@ -14,7 +14,7 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libcalc import (
     calc_torsion_angles,
-    validate_array_for_torsion,
+    validate_backbone_labels_for_torsion,
     )
 from idpconfgen.libs.libio import (
     concatenate_entries,
@@ -28,7 +28,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
-from idpconfgen.libs.libstructure import Structure, cols_coords
+from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
 from idpconfgen.logger import S, T, init_files
 
 
@@ -219,19 +219,20 @@ def extract_secondary_structure(
             counter += 1
 
 
-def get_torsions(fname, fdata, degrees=False):
+def get_torsions(fdata, degrees=False, decimals=3):
     """Calculate torsion angles for structure.
 
     Parameters
     ----------
-    fname : str
-        The name of the file, or job identifier.
-
-    fdata : str or bytes
-        The data of the structure, from PDB of mmCIF files.
+    fdata : str, bytes or Path
+        Any type that can be feed to :class:`libstructure.Structure`.
 
     degrees : bool, optional
         Whether to report torsion angles in degrees or radians.
+
+    decimals : int, optional
+        The number of decimals to return.
+        Defaults to 3.
 
     Returns
     -------
@@ -249,12 +250,11 @@ def get_torsions(fname, fdata, degrees=False):
     # rare are the PDBs that produce errors, still they exist.
     # errors can be from a panoply of sources, that is why I decided
     # not to attempt correcting them and instead ignore and report.
-    validation_error = validate_array_for_torsion(data)
+    validation_error = validate_backbone_labels_for_torsion(data[:, col_name])
     if validation_error:
         errmsg = (
-            f'Error found for pdb: \'{fname}\'\n'
+            'Found errors on backbone label consistency: '
             f'{validation_error}\n'
-            'ignoring this structure...\n\n'
             )
         err = EXCPTS.IDPConfGenException(errmsg)
         raise err
@@ -265,10 +265,23 @@ def get_torsions(fname, fdata, degrees=False):
     if degrees:
         torsions = np.degrees(torsions)
 
-    return torsions
+    return torsions.round(decimals=decimals)
 
 
 def get_separate_torsions(torsions_array):
+    """
+    Separate torsion angles accorindg to the protein backbone concept.
+
+    Considers torsions angles for bonds in between atom pairs:
+        - CA - C
+        - C - N
+        - N - CA
+
+    Backbone obeys the order: N-CA-C-N-CA-C(...)
+
+    And the firt value corresponds to a CA-C pair, because the
+    first N-CA pair of the protein backbone has no torsion angle.
+    """
     CA_C = torsions_array[::3].tolist()
     C_N = torsions_array[1::3].tolist()
     N_CA = torsions_array[2::3].tolist()
@@ -277,6 +290,7 @@ def get_separate_torsions(torsions_array):
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):
-    torsions = get_torsions(fname, fdata, **kwargs)
+    """Help `cli_torsion` to operate."""
+    torsions = get_torsions(fdata, **kwargs)
     CA_C, C_N, N_CA = get_separate_torsions(torsions)
     return fname, {'phi': N_CA, 'psi': CA_C, 'omega': C_N}

@@ -9,8 +9,13 @@ import argparse
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import cli_helper_calc_torsions
-from idpconfgen.libs.libio import FileReaderIterator, read_dictionary_from_disk, save_dict_to_json
-from idpconfgen.libs.libmulticore import pool_function, startunpack
+from idpconfgen.libs.libio import (
+    FileReaderIterator,
+    read_dictionary_from_disk,
+    save_dict_to_json,
+    )
+from idpconfgen.libs.libmulticore import pool_function, starunpack
+from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files
 
 
@@ -52,7 +57,7 @@ def main(
     log.info(S('done'))
 
     execute = pool_function(
-        startunpack,
+        starunpack,
         pdbs,
         cli_helper_calc_torsions,
         degrees=degrees,
@@ -61,7 +66,7 @@ def main(
 
     torsion_result = {Path(pdbid).stem: angles for pdbid, angles in execute}
 
-    assert set(database_dict.keys()) == set(torsion_result.keys())
+    pop_difference_with_log(database_dict, torsion_result)
 
     for key, value in torsion_result.items():
         # where value is a dictionary {'chi':, 'phi':, 'omega':}

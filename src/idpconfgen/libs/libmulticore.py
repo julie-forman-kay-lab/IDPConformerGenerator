@@ -9,7 +9,7 @@ from idpconfgen.libs.libtimer import ProgressWatcher
 
 
 
-def startunpack(func, *args, **kwargs):
+def starunpack(func, *args, **kwargs):
     return func(*args[0], **kwargs)
 
 

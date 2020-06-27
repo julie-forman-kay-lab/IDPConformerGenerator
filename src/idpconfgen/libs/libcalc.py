@@ -3,8 +3,6 @@ import math
 
 import numpy as np
 
-from idpconfgen.libs.libstructure import col_name
-
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],
@@ -165,7 +163,7 @@ def make_coord_from_angles(theta, phi, distance):
 
 def calc_torsion_angles(coords):
     """
-    Calculates torsion angles from sequential coordinates.
+    Calculate torsion angles from sequential coordinates.
 
     Uses ``NumPy`` to compute angles in a vectorized fashion.
     Sign of the torsion angle is also calculated.
@@ -218,8 +216,8 @@ def calc_torsion_angles(coords):
         ``np.degrees`` to the returned result.
     """
     # requires
-    #assert coords.shape[0] > 3
-    #assert coords.shape[1] == 3
+    assert coords.shape[0] > 3
+    assert coords.shape[1] == 3
 
     # Yes, I always write explicit array indices! :-)
     q_vecs = coords[1:, :] - coords[:-1, :]
@@ -253,20 +251,28 @@ def calc_torsion_angles(coords):
     return -np.arctan2(sin_theta, cos_theta)
 
 
-def validate_array_for_torsion(data):
-    """Validates data for torsion angle calculation."""
+def validate_backbone_labels_for_torsion(labels):
+    """
+    Validate labels for torsion angle calculation.
 
-    if data.shape[0] < 4:
+    Assumes labels are aligned with their corresponding coordinates.
+    Yet, coordinates have no scope in this function.
+
+    Parameters
+    ----------
+    labels : np.array of shape (N,) or alike
+    """
+
+    if len(labels) / 4 < 4:
         return 'Too small segment'
 
-    if data[0, col_name] != 'N':
+    if labels[0] != 'N':
         return 'The first atom is not N, it should be!'
 
-    if data.shape[0] % 3:
+    if len(labels) % 3:
         return 'Number of backbone atoms is not module of 3.'
 
-    if set(data[:, col_name]) != {'N', 'C', 'CA'}:
+    if set(labels) != {'N', 'C', 'CA'}:
         return 'There are atoms other than N, C and CA.'
 
     return ''
-
