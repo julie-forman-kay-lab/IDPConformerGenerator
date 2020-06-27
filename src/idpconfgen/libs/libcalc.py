@@ -3,6 +3,8 @@ import math
 
 import numpy as np
 
+from idpconfgen.libs.libstructure import col_name
+
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],
@@ -257,13 +259,13 @@ def validate_array_for_torsion(data):
     if data.shape[0] < 4:
         return 'Too small segment'
 
-    if data[0, libstructure.col_name] != 'N':
+    if data[0, col_name] != 'N':
         return 'The first atom is not N, it should be!'
 
     if data.shape[0] % 3:
         return 'Number of backbone atoms is not module of 3.'
 
-    if set(data[:, libstructure.col_name]) != {'N', 'C', 'CA'}:
+    if set(data[:, col_name]) != {'N', 'C', 'CA'}:
         return 'There are atoms other than N, C and CA.'
 
     return ''

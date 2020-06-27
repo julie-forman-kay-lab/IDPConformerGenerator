@@ -199,7 +199,6 @@ def parse_dssp(data, reduced=False):
     # exausts generator until
     for line in RM1:
         if line.strip().startswith('#'):
-            print(line)
             break
     else:
         # if the whole generator is exhausted

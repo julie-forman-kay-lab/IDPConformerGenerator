@@ -5,19 +5,19 @@ USAGE:
     $ idpconfgen torsions [PDBS]
 """
 import argparse
-import itertools as it
-from multiprocessing.pool import Pool
-from functools import partial
-
-import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.libs import libcli, libio, libpdb, libstructure, libcalc
+from idpconfgen.libs import libcli
+from idpconfgen.libs.libhigherlevel import cli_helper_calc_torsions
+from idpconfgen.libs.libio import FileReaderIterator, read_dictionary_from_disk, save_dict_to_json
+from idpconfgen.libs.libmulticore import pool_function, startunpack
 from idpconfgen.logger import S, T, init_files
-from idpconfgen.core import exceptions as EXCPTS
 
 
 LOGFILESNAME = 'idpconfgen_torsion'
+
+_name = 'torsions'
+_help = 'Calculate torsion angles for PDB files.'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -29,109 +29,47 @@ ap = libcli.CustomParser(
     )
 # https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    'pdbs',
-    help='PDB file list.',
-    nargs='+',
-    )
-
-ap.add_argument(
-    '-d',
-    '--degrees',
-    help='Write angles in degrees instead of radians. Defaults to False.',
-    action='store_true',
-    )
+libcli.add_argument_pdb_files(ap)
+libcli.add_argument_db(ap)
+libcli.add_argument_degrees(ap)
 
 
-def _load_args():
-    cmd = ap.parse_args()
-    return cmd
-
-
-def maincli():
-    """
-    Execute main client function.
-
-    Reads command line arguments and executes logic.
-    """
-    cmd = _load_args()
-    main(**vars(cmd))
-
-
-def main(pdbs, degrees=True, **kwargs):
+def main(
+        pdb_files,
+        database,
+        degrees=True,
+        func=None,
+        ncores=1,
+        ):
     """Perform main script logic."""
     log.info(T('Extracting torsion angles'))
     init_files(log, LOGFILESNAME)
 
+    database_dict = read_dictionary_from_disk(database)
+
     log.info(T('reading input paths'))
-    # tee is used to keep memory footprint low
-    # though it would be faster to create a list from path_bundle
-    pdbs = libio.read_path_bundle(pdbs, ext='.pdb')
+    pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
 
-    with Pool() as pool:
-        imuo = pool.imap_unordered(
-            partial(get_torsions, degrees=degrees),
-            pdbs,
-            )
+    execute = pool_function(
+        startunpack,
+        pdbs,
+        cli_helper_calc_torsions,
+        degrees=degrees,
+        ncores=ncores,
+        )
 
-        for i in imuo:
-            pass#log.info(f'Done {i}')
+    torsion_result = {Path(pdbid).stem: angles for pdbid, angles in execute}
 
+    assert set(database_dict.keys()) == set(torsion_result.keys())
+
+    for key, value in torsion_result.items():
+        # where value is a dictionary {'chi':, 'phi':, 'omega':}
+        database_dict[key].update(value)
+
+    save_dict_to_json(database_dict, output='torsions.json')
     return
 
 
-def get_torsions(pdbfile, degrees=False):
-    try:
-        structure = libstructure.Structure(pdbfile)
-    except EXCPTS.ParserNotFoundError as err:
-        log.error(f'Could not treat: {pdbfile}: {repr(err)}')
-        return
-    structure.build()
-    #structure.add_filter_record_name(('ATOM', 'HETATM'))
-    structure.add_filter_backbone(minimal=True)
-
-    data = structure.filtered_atoms
-
-    # validates structure data
-    # rare are the PDBs that produce errors, still they exist.
-    # errors can be from a panoply of sources, that is why I decided
-    # not to attempt correcting them and instead ignore and report.
-    validation_error = libcalc.validate_array_for_torsion(data)
-    if validation_error:
-        errmsg = (
-            f'Error found for pdb: \'{pdbfile}\'\n'
-            f'{validation_error}\n'
-            'ignoring this structure...\n\n'
-            )
-        log.error(errmsg)
-        return f'ERROR for: {pdbfile}'
-
-    coords = data[:, libstructure.cols_coords].astype(float)
-    torsions = libcalc.calc_torsion_angles(coords)
-
-    if degrees:
-        torsions = np.degrees(torsions)
-
-    CA_C = torsions[::3]
-    C_N = torsions[1::3]
-    N_CA = torsions[2::3]
-
-    result = np.zeros((CA_C.size + 1, 4))
-    result[:, 0] = np.char.strip(data[::3, libstructure.col_resSeq])
-    result[1:, 1] = N_CA
-    result[:-1, 2] = CA_C
-    result[:-1, 3] = C_N
-
-    np.savetxt(
-        Path(pdbfile).with_suffix('.torsion'),
-        result,
-        fmt=['% 4d'] + ['% +20.12f'] * 3,
-        header=f'resid,{"N_CA":>16},{"CA_C":>20},{"C_N":>20}',
-        )
-
-    return pdbfile
-
-
 if __name__ == '__main__':
-    maincli()
+    libcli.maincli()

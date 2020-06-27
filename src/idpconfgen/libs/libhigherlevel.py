@@ -7,8 +7,15 @@ and are defined here to avoid circular imports.
 from contextlib import suppress
 from functools import partial, reduce
 
+import numpy as np
+
 from idpconfgen import Path, log
+from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.libs.libcalc import (
+    calc_torsion_angles,
+    validate_array_for_torsion,
+    )
 from idpconfgen.libs.libio import (
     concatenate_entries,
     read_PDBID_from_source,
@@ -21,6 +28,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
+from idpconfgen.libs.libstructure import Structure, cols_coords
 from idpconfgen.logger import S, T, init_files
 
 
@@ -209,3 +217,66 @@ def extract_secondary_structure(
             yield f'{pdbname}_{ss}_{counter}.pdb', pdb
 
             counter += 1
+
+
+def get_torsions(fname, fdata, degrees=False):
+    """Calculate torsion angles for structure.
+
+    Parameters
+    ----------
+    fname : str
+        The name of the file, or job identifier.
+
+    fdata : str or bytes
+        The data of the structure, from PDB of mmCIF files.
+
+    degrees : bool, optional
+        Whether to report torsion angles in degrees or radians.
+
+    Returns
+    -------
+    dict
+        key: `fname`
+        value: -> dict, `phi`, `phi`, `omega` -> list of floats
+    """
+    structure = Structure(fdata)
+    structure.build()
+    structure.add_filter_backbone(minimal=True)
+
+    data = structure.filtered_atoms
+
+    # validates structure data
+    # rare are the PDBs that produce errors, still they exist.
+    # errors can be from a panoply of sources, that is why I decided
+    # not to attempt correcting them and instead ignore and report.
+    validation_error = validate_array_for_torsion(data)
+    if validation_error:
+        errmsg = (
+            f'Error found for pdb: \'{fname}\'\n'
+            f'{validation_error}\n'
+            'ignoring this structure...\n\n'
+            )
+        err = EXCPTS.IDPConfGenException(errmsg)
+        raise err
+
+    coords = data[:, cols_coords].astype(float)
+    torsions = calc_torsion_angles(coords)
+
+    if degrees:
+        torsions = np.degrees(torsions)
+
+    return torsions
+
+
+def get_separate_torsions(torsions_array):
+    CA_C = torsions_array[::3].tolist()
+    C_N = torsions_array[1::3].tolist()
+    N_CA = torsions_array[2::3].tolist()
+
+    return CA_C, C_N, N_CA
+
+
+def cli_helper_calc_torsions(fname, fdata, **kwargs):
+    torsions = get_torsions(fname, fdata, **kwargs)
+    CA_C, C_N, N_CA = get_separate_torsions(torsions)
+    return fname, {'phi': N_CA, 'psi': CA_C, 'omega': C_N}
