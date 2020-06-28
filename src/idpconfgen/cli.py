@@ -17,7 +17,7 @@ import sys
 
 from idpconfgen import cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
-from idpconfgen import cli_ssext, cli_sscalc, log
+from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
@@ -31,6 +31,7 @@ Individual routines for DB creation:
 
     * {cli_pdbdl._name}
     * {cli_sscalc._name}
+    * {cli_torsions._name}
 
 Other useful routines:
 
@@ -57,6 +58,7 @@ subparsers = ap.add_subparsers(
 # argument parsers for main DB creation routines
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
+libcli.add_subparser(subparsers, cli_torsions)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_fastaext)

@@ -142,12 +142,14 @@ def add_version(parser):
 
 # arguments index:
 # positional:
+# db                      : database being built
 # pdb_files
 # pdbids
 
 # optional:
 # -c, --chunks            : number of chunks to process in memory
 # -d, --destination       : destination folder
+# -deg, --degrees         : degrees
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # --replace               : replace (whatever shalls replace)
@@ -156,18 +158,38 @@ def add_version(parser):
 # -u, --update            : update (whatever shalls update)
 
 
-def add_argument_chunks(parse):
+def add_argument_chunks(parser):
     """
     Add chunks argument.
 
     For those routines that are split into operative chunks.
     """
-    parse.add_argument(
+    parser.add_argument(
         '-c',
         '--chunks',
         help='Number of chunks to process in memory before saving to disk.',
         default=5_000,
         type=int,
+        )
+
+
+def add_argument_db(parser):
+    """Add argument to store path from database."""
+    parser.add_argument(
+        'database',
+        help='The database being built. Must be JSON.',
+        type=Path,
+        action=CheckExt('.json'),
+        )
+
+
+def add_argument_degrees(parser):
+    """Add `degree` argument to parser."""
+    parser.add_argument(
+        '-deg',
+        '--degrees',
+        help='Whether to save angles in degrees.\nUse radians otherwise.',
+        action='store_true',
         )
 
 

@@ -3,7 +3,7 @@ from pathlib import Path as Path_
 
 import pytest
 
-from idpconfgen import Path
+from idpconfgen import Path, log
 from idpconfgen.libs import libparse
 
 from . import tcommons
@@ -219,3 +219,19 @@ def test_mkdssp_w_split(BTE_A_results):
         return
 
     _perform_dssp_split(sgen, BTE_A_results)
+
+
+def test_pop_dict_differece():
+    """Pops dict difference keys."""
+    d1 = dict.fromkeys(range(10))
+    d2 = dict.fromkeys(range(5))
+    libparse.pop_difference_with_log(d1, d2)
+    assert d1.keys() == d2.keys()
+
+
+def test_pop_dict_differece_2():
+    """Pops dict difference keys."""
+    d1 = dict.fromkeys(range(10))
+    d2 = dict.fromkeys(range(10))
+    libparse.pop_difference_with_log(d1, d2)
+    assert d1.keys() == d2.keys()

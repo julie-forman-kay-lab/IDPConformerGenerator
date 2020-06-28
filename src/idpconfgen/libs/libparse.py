@@ -8,9 +8,10 @@ import subprocess
 from itertools import product
 from pathlib import Path as Path_
 
-from idpconfgen import Path
+from idpconfgen import Path, log
 from idpconfgen.core.definitions import dssp_trans, jsonparameters
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
+from idpconfgen.logger import S
 
 
 # _ascii_lower_set = set(string.ascii_lowercase)
@@ -199,7 +200,6 @@ def parse_dssp(data, reduced=False):
     # exausts generator until
     for line in RM1:
         if line.strip().startswith('#'):
-            print(line)
             break
     else:
         # if the whole generator is exhausted
@@ -230,3 +230,32 @@ def parse_dssp(data, reduced=False):
     else:
         dssp_ = ''.join(dssp).translate(DT) if reduced else ''.join(dssp)
         yield dssp_, ''.join(fasta), residues
+
+
+def pop_difference_with_log(dict1, dict2):
+    """"
+    Pop keys in `dict1` that are not present in `dict2`.
+
+    Reports pop'ed keys to log INFO.
+
+    Operates `dict1` in place.
+
+    Parameters
+    ----------
+    dict1, dict2 : dict
+
+    Returns
+    -------
+    None
+    """
+    d1k = set(dict1.keys())
+    d2k = set(dict2.keys())
+
+    diff = d1k.difference(d2k)
+    if diff:
+        log.info(S(
+            f'The following keys will be removed from the dictionary:\n{diff}\n'
+            ))
+
+        for key in diff:
+            dict1.pop(key)
