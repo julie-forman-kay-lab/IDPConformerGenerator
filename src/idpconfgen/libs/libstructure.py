@@ -507,7 +507,7 @@ def is_backbone(atom, element, minimal=False):
 def save_structure_by_chains(
         pdb_data,
         pdbname,
-        altlocs=('A', '', ' '),
+        altlocs=('A', '', ' ', '1'),   #CIF: 6uwi chain D has altloc 1
         chains=None,
         record_name=('ATOM', 'HETATM'),
         renumber=True,
