@@ -14,6 +14,7 @@ from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
 from idpconfgen.libs.libcalc import (
     calc_torsion_angles,
+    get_separate_torsions,
     validate_backbone_labels_for_torsion,
     )
 from idpconfgen.libs.libio import (
@@ -259,34 +260,13 @@ def get_torsions(fdata, degrees=False, decimals=3):
         err = EXCPTS.IDPConfGenException(errmsg)
         raise err
 
-    coords = data[:, cols_coords].astype(float)
+    coords = (data[:, cols_coords].astype(float) * 1000).astype(int)
     torsions = calc_torsion_angles(coords)
 
     if degrees:
         torsions = np.degrees(torsions)
 
     return torsions.round(decimals=decimals)
-
-
-def get_separate_torsions(torsions_array):
-    """
-    Separate torsion angles accorindg to the protein backbone concept.
-
-    Considers torsions angles for bonds in between atom pairs:
-        - CA - C
-        - C - N
-        - N - CA
-
-    Backbone obeys the order: N-CA-C-N-CA-C(...)
-
-    And the firt value corresponds to a CA-C pair, because the
-    first N-CA pair of the protein backbone has no torsion angle.
-    """
-    CA_C = torsions_array[::3].tolist()
-    C_N = torsions_array[1::3].tolist()
-    N_CA = torsions_array[2::3].tolist()
-
-    return CA_C, C_N, N_CA
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):

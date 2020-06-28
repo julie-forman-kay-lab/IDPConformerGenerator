@@ -251,6 +251,31 @@ def calc_torsion_angles(coords):
     return -np.arctan2(sin_theta, cos_theta)
 
 
+def get_separate_torsions(torsions_array):
+    """
+    Separate torsion angles accorindg to the protein backbone concept.
+
+    Considers torsions angles for bonds in between atom pairs:
+        - CA - C
+        - C - N
+        - N - CA
+
+    Backbone obeys the order: N-CA-C-N-CA-C(...)
+
+    And the firt value corresponds to a CA-C pair, because the
+    first N-CA pair of the protein backbone has no torsion angle.
+    """
+    assert torsions_array.ndim == 1
+    assert torsions_array.size % 3 == 0
+
+    CA_C = torsions_array[::3].tolist()
+    C_N = torsions_array[1::3].tolist()
+    N_CA = torsions_array[2::3].tolist()
+
+    assert len(CA_C) == len(C_N) == len(N_CA)
+    return CA_C, C_N, N_CA
+
+
 def validate_backbone_labels_for_torsion(labels):
     """
     Validate labels for torsion angle calculation.
@@ -262,7 +287,6 @@ def validate_backbone_labels_for_torsion(labels):
     ----------
     labels : np.array of shape (N,) or alike
     """
-
     if len(labels) / 4 < 4:
         return 'Too small segment'
 

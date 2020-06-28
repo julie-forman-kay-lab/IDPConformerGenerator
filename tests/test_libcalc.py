@@ -140,3 +140,12 @@ def test_calculate_torsions(coords, expected):
     """Tests torsion calculation."""
     result = np.degrees(libcalc.calc_torsion_angles(coords))
     assert np.all(np.equal(result, expected))
+
+
+def test_separate_torsions():
+    """Test separate torsions."""
+    a = np.array([1, 2, 3] * 10)
+    q, w, e = libcalc.get_separate_torsions(a)
+    assert set(q) == {1}
+    assert set(w) == {2}
+    assert set(e) == {3}
