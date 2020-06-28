@@ -4,6 +4,7 @@ import urllib.request
 from urllib.error import URLError
 
 from idpconfgen import log
+from idpconfgen.core.exceptions import DownloadFailedError
 from idpconfgen.libs.libstructure import save_structure_by_chains
 from idpconfgen.logger import S
 
@@ -31,11 +32,7 @@ def download_structure(pdbid, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    try:
-        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
-    except IOError:
-        log.error(f'Complete download failure for {pdbname}')
-        return
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
 
     yield from save_structure_by_chains(
         downloaded_data,
@@ -62,24 +59,20 @@ def fetch_pdb_id_from_RCSB(pdbid):
                     log.debug(S(f'Download {weblink} failed.'))
                     continue
             else:
-                raise IOError(f'Failed to download {pdbid}')
-        except (TimeoutError, URLError):
+                break
+        except (TimeoutError, URLError) as err:
             log.error(
-                f'failed download for {pdbid} because of TimeoutError. '
+                f'failed download for {pdbid} because of {repr(err)}. '
                 'Retrying...'
                 )
             time.sleep(15)
             attempts += 1
     else:
-        raise IOError(f'Failed to download {pdbid} - attempts exhausted')
+        raise DownloadFailedError(f'Failed to download {pdbid}')
 
 
-def fetch_raw_PDBs(pdbid, mdict=None, **kwargs):
+def fetch_raw_PDBs(pdbid, **kwargs):
     """Download raw PDBs without any filtering."""
     pdbname = pdbid[0]
-    try:
-        downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
-    except IOError:
-        log.error(f'Complete download failure for {pdbname}')
-        raise
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
     yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')

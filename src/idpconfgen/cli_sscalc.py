@@ -88,7 +88,7 @@ ap.add_argument(
         'if needed.'
         ),
     type=Path,
-    default='__sscalc_tmpdir__',
+    default=TMPDIR,
     )
 
 libcli.add_argument_reduced(ap)

@@ -193,7 +193,7 @@ class Structure:
             lambda x: ib(x[col_name], x[col_element], minimal=minimal)
             )
 
-    def get_PDB(self, pdb_filters=None):
+    def get_PDB(self, pdb_filters=None, renumber=True):
         """
         Convert Structure to PDB format.
 
@@ -207,15 +207,23 @@ class Structure:
             return f(i)
 
         fs = self.filtered_atoms
-        renumber_atoms(fs)
+
+        # renumber atoms
+        if renumber:
+            try:
+                fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+            except IndexError as err:
+                errmsg = (
+                    'Could not renumber atoms, most likely, because '
+                    'there are no lines in selection.'
+                    )
+                err2 = EXCPTS.EmptyFilterError(errmsg)
+                raise err2 from err
 
         pdb_filters = pdb_filters or []
 
         lines = list(reduce(_, pdb_filters, structure_to_pdb(fs)))
 
-        # pdb_filters may disrupt the quality of the PDB file
-        # TODO: use these filters on the data_array level?
-        assert all(len(line) == 80 for line in lines)
         return lines
 
     def write_PDB(self, filename, **kwargs):
@@ -406,30 +414,6 @@ def write_PDB(lines, filename):
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
 
 
-def renumber_atoms(data_array):
-    """
-    Renumber the atoms in structure data array.
-
-    Performs in place.
-
-    Returns
-    -------
-    None
-    """
-    try:
-        data_array[:, col_serial] = \
-            np.arange(1, data_array.shape[0] + 1).astype('<U8')
-    except IndexError as err:
-        log.debug(traceback.format_exc())
-        errmsg = (
-            'Could not renumber atoms because '
-            'there are no lines in selection.'
-            )
-        err2 = EXCPTS.EmptyFilterError(errmsg)
-        log.debug(repr(err2))
-        raise err2 from err
-
-
 def structure_to_pdb(atoms):
     """
     Convert table to PDB formatted lines.
@@ -588,9 +572,14 @@ def save_structure_by_chains(
             try:
                 pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
             except EXCPTS.EmptyFilterError as err:
-                err2 = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
-                log.debug(repr(err2))
-                log.debug('continuing to new chain')
+                err2 = EXCPTS.EmptyFilterError(f'for chain {pdbname}_{chain_case}')
+                errlog = (
+                    f'{repr(err)}\n'
+                    f'{repr(err2)}\n'
+                    f'{traceback.format_exc()}\n'
+                    'continuing to new chain\n'
+                    )
+                log.debug(errlog)
                 continue
             else:
                 yield fout, pdb_lines

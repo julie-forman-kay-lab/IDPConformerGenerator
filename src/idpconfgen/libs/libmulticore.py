@@ -6,6 +6,7 @@ from multiprocessing import Pool
 from idpconfgen import log
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libtimer import ProgressWatcher
+from idpconfgen.logger import report_on_break
 
 
 

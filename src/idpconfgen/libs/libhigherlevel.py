@@ -10,8 +10,8 @@ from functools import partial, reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import (
     calc_torsion_angles,
     get_separate_torsions,
@@ -30,7 +30,7 @@ from idpconfgen.libs.libmulticore import (
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.logger import S, T, init_files, report_on_break
 
 
 # USED OKAY!
@@ -101,7 +101,7 @@ def download_pipeline(func, logfilename='.download'):
 
             execute = partial(
                 pool_function_in_chunks,
-                consume_iterable_in_list,
+                partial(report_on_break, consume_iterable_in_list, exception=IDPConfGenException),
                 list(pdblist_comparison.name_chains_dict.items()),
                 func,
                 ncores=ncores,
@@ -257,7 +257,7 @@ def get_torsions(fdata, degrees=False, decimals=3):
             'Found errors on backbone label consistency: '
             f'{validation_error}\n'
             )
-        err = EXCPTS.IDPConfGenException(errmsg)
+        err = IDPConfGenException(errmsg)
         raise err
 
     coords = (data[:, cols_coords].astype(float) * 1000).astype(int)

@@ -254,7 +254,8 @@ def pop_difference_with_log(dict1, dict2):
     diff = d1k.difference(d2k)
     if diff:
         log.info(S(
-            f'The following keys will be removed from the dictionary:\n{diff}\n'
+            'The following keys will be removed from the dictionary: {}\n',
+            diff
             ))
 
         for key in diff:
