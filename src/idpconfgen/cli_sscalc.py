@@ -12,6 +12,7 @@ import traceback
 from functools import partial
 
 from idpconfgen import Path, log
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
@@ -25,7 +26,7 @@ from idpconfgen.libs.libmulticore import (
     pool_function_in_chunks,
     )
 from idpconfgen.libs.libparse import mkdssp_w_split
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -154,26 +155,34 @@ def main(
     log.info(T('preparing task execution'))
 
     try:
-        execute = partial(
-            pool_function_in_chunks,
-            consume_iterable_in_list,  # function to execute - list wrapper
-            pdbs2operate,              # items to process
-            # args to consume_iterable_in_list
+        consume_func = partial(
+            consume_iterable_in_list,
             mkdssp_w_split,
-            # kwargs to pool functions
-            ncores=ncores,
-            chunks=chunks,
-            # kwargs for mkdssp_w_split
             cmd=cmd,
             reduced=reduced,
             minimum=minimum,
+            )
+
+        execute = partial(
+            report_on_crash,
+            consume_func,
+            ROC_exception=IDPConfGenException,
+            ROC_prefix=_name,
+            )
+
+        # generator
+        execute_pool = pool_function_in_chunks(
+            execute,
+            pdbs2operate,              # items to process
+            ncores=ncores,
+            chunks=chunks,
             )
 
         # this implementation is very specific for this case
         # this is why I haven spread it into functions for now
         dssp_data = {}  # stores DSSP data to save at the end
         pdb_data = {}  # temporarily stores data to be writen to the disk
-        for chunk in execute():
+        for chunk in execute_pool:
             for result in chunk:
                 for fname, dsspdict, pdb_split in result:
                     dssp_data[fname] = dsspdict

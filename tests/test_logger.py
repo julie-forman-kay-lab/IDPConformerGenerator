@@ -2,7 +2,7 @@
 import pytest
 
 from idpconfgen import Path, log
-from idpconfgen.logger import S, T, init_files, report_on_break
+from idpconfgen.logger import S, T, init_files, report_on_crash
 from idpconfgen.core.exceptions import IDPConfGenException
 
 
@@ -41,19 +41,19 @@ def test_S(msg, args, spacer, indent, expected):
     assert str(sobj) == expected
 
 
-def test_report_on_break():
+def test_report_on_crash():
     """Test record func on error to file."""
     def funca(a, b, c=1, d=2):
         raise TypeError
 
-    ext = 'testing_report_on_break'
+    ext = 'testing_ROC'
     #execute = report_on_break(TypeError, ext=ext)(funca)
     with pytest.raises(TypeError):
-        report_on_break(
+        report_on_crash(
             funca,
             'idp', 'confgen', c=range(10), d=dict.fromkeys('qwerty'),
-            exception=TypeError,
-            ROB_ext=ext,
+            ROC_exception=TypeError,
+            ROC_ext=ext,
             )
 
     errfiles = list(Path.cwd().glob(f'*.{ext}'))

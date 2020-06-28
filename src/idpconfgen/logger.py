@@ -1,11 +1,9 @@
 """Manages operations with logging."""
 import logging
-from functools import wraps
+import traceback
 from inspect import signature
 from pathlib import Path
 from time import time_ns
-from contextlib import contextmanager
-
 
 from idpconfgen import log
 
@@ -57,76 +55,53 @@ def init_files(log, logfilesname):
     log.addHandler(errorlog)
 
 
-#def report_on_break(exception, folder=Path.cwd(), ext='rpr_on_break'):
-#    """
-#    Report to a file upon exception.
-#
-#    This is a decorator function.
-#
-#    If `func` raises `exception` a detailed report of the `func`,
-#    passed `args` and `kwargs` and other details are saved to a file.
-#    File name is given by `time.time`. File saves in the CWD.
-#
-#    Propagates the `exception`.
-#
-#    Parameters
-#    ----------
-#    exception : Exception or tuple of Exceptions
-#        The Exception type(s) to consider.
-#
-#    ext : str
-#        The extension with which save the report file.
-#    """
-#    def decorator(func):
-#        #@wraps(func)
-#        def wrapper(*args, **kwargs):
-#            try:
-#                result = func(*args, **kwargs)
-#            except exception as err:
-#                sig = signature(func)
-#                s = (
-#                    '#Recording error for exception: {}\n\n'
-#                    '#function: {}\n\n' #                    '#signature: {}\n\n'
-#                    '#Args:\n\n{}\n\n'
-#                    '#Kwargs:\n\n{}\n\n'
-#                    ).format(
-#                        exception,
-#                        func.__qualname__,
-#                        sig,
-#                        '\n\n'.join(map(str, args)),
-#                        '\n\n'.join(map(str, kwargs.items())),
-#                        )
-#                fout_path = Path(folder, f'{hash(s)}_{time_ns()}.{ext}')
-#                fout_path.write_text(s)
-#                log.error(S('saved ERROR REPORT: {}', fout_path))
-#                raise err
-#            return result
-#        return wrapper
-#    return decorator
-def report_on_break(func, *args, exception=Exception, ROB_folder=Path.cwd(), ROB_ext='rpr_on_break', **kwargs):
+def report_on_crash(
+        func,
+        *args,
+        ROC_exception=Exception,
+        ROC_ext='rpr_on_crash',
+        ROC_folder=None,
+        ROC_prefix='ROC',
+        **kwargs,
+        ):
     """
-    Report to a file upon exception.
+    Report to a file upon exception(s).
 
-    This is a decorator function.
-
-    If `func` raises `exception` a detailed report of the `func`,
+    If `func` raises `exception`(s), a detailed report of the `func` and
     passed `args` and `kwargs` and other details are saved to a file.
-    File name is given by `time.time`. File saves in the CWD.
+    File name is given by:
+        * prefix
+        * hash value of the text to save
+        *`time.time_ns`.
+
+    File saves to the CWD, unless otherwise stated.
 
     Propagates the `exception`.
 
+    Keyword parameters have `ROC` verbose names to avoid collision with
+    `func`'s `kwargs`.
+
     Parameters
     ----------
-    exception : Exception or tuple of Exceptions
+    ROC_exception : Exception or tuple of Exceptions
         The Exception type(s) to consider.
 
-    ext : str
+    ROC_ext : str
         The extension with which save the report file.
+
+    ROC_folder : str or Path,
+        The folder where to save the report.
+        Defaults to the CWD.
+
+    ROC_prefix : str
+        The prefix of the report file.
     """
+    ROC_folder = ROC_folder or Path.cwd()
+
     try:
         return func(*args, **kwargs)
-        #yield
-    except exception as err:
+
+    except ROC_exception as err:
         sig = signature(func)
         s = (
             '#Recording error for exception: {}\n\n'
@@ -134,14 +109,22 @@ def report_on_break(func, *args, exception=Exception, ROB_folder=Path.cwd(), ROB
             '#signature: {}\n\n'
             '#Args:\n\n{}\n\n'
             '#Kwargs:\n\n{}\n\n'
+            '#traceback:\n\n{}\n\n'
             ).format(
-                exception,
+                ROC_exception,
                 func.__qualname__,
                 sig,
                 '\n\n'.join(map(str, args)),
                 '\n\n'.join(map(str, kwargs.items())),
+                traceback.format_exc(),
                 )
-        fout_path = Path(ROB_folder, f'{hash(s)}_{time_ns()}.{ROB_ext}')
+
+        fout_path = Path(
+            ROC_folder,
+            f'{ROC_prefix}_{hash(s)}_{time_ns()}.{ROC_ext}',
+            )
         fout_path.write_text(s)
+
         log.error(S('saved ERROR REPORT: {}', fout_path))
+
         raise err

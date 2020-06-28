@@ -1,7 +1,6 @@
 """Handle CIF data."""
 import re
 
-#  from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 
 

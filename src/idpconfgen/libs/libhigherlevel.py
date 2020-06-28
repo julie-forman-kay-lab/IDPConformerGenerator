@@ -30,7 +30,7 @@ from idpconfgen.libs.libmulticore import (
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
-from idpconfgen.logger import S, T, init_files, report_on_break
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 # USED OKAY!
@@ -99,17 +99,29 @@ def download_pipeline(func, logfilename='.download'):
         something_to_download = len(pdblist_comparison) > 0
         if something_to_download and update:
 
+            # the function to be used in multiprocessing
+            consume_func = partial(consume_iterable_in_list, func)
+
+            # context to perform a dedicated report in case function fails
+            # partial is mandatory because decorators won't pickle
             execute = partial(
+                report_on_crash,
+                consume_func,
+                ROC_exception=IDPConfGenException,
+                ROC_prefix='download',
+                )
+
+            # convinient partial
+            execute_pool = partial(
                 pool_function_in_chunks,
-                partial(report_on_break, consume_iterable_in_list, exception=IDPConfGenException),
+                execute,
                 list(pdblist_comparison.name_chains_dict.items()),
-                func,
                 ncores=ncores,
                 chunks=chunks,
                 )
 
             flat_results_from_chunk(
-                execute,
+                execute_pool,
                 save_pairs_to_disk,
                 destination=destination,
                 )

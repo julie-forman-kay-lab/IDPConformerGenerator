@@ -8,11 +8,12 @@ import argparse
 from functools import partial
 
 from idpconfgen import Path, log
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import FileReaderIterator, save_dictionary
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
-from idpconfgen.logger import T, init_files
+from idpconfgen.logger import T, init_files, report_on_crash
 
 
 LOGFILESNAME = 'idpconfgen_fastaext'
@@ -73,13 +74,15 @@ def main(
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
     execute = partial(
-        pool_function,
+        report_on_crash,
         get_fasta_from_PDB,
-        pdbs2operate,
-        ncores=ncores,
+        EOC_exception=IDPConfGenException,
+        EOC_prefix=_name,
         )
 
-    mdict = {i: j for i, j in execute()}
+    execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
+
+    mdict = {i: j for i, j in execute_pool}
 
     save_dictionary(mdict, output)
     return
