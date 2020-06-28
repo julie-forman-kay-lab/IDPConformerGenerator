@@ -454,7 +454,7 @@ def structure_to_pdb(atoms):
 
 col_record = 0
 col_serial = 1
-col_name = 2
+col_name = 2  # atom name
 col_altLoc = 3
 col_resName = 4
 col_chainID = 5

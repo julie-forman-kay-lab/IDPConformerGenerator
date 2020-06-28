@@ -100,9 +100,9 @@ def test_make_coord_from_angles(theta, phi, distance, expected):
             1,
             1,
             1,
-            np.array([.002,0.005,0.070]),
-            np.array([1123.,2432.,15232.12321]),
-            np.array([6543.654,1543.,.0023428]),
+            np.array([.002, 0.005, 0.070]),
+            np.array([1123., 2432., 15232.12321]),
+            np.array([6543.654, 1543., .0023428]),
             np.array([0.56525141, -0.66535531, -0.41308967]),
             ),
         ],
@@ -112,3 +112,40 @@ def test_make_coord(theta, phi, rad, parent, xaxis, yaxis, expected):
     res = libcalc.make_coord(theta, phi, rad, parent, xaxis, yaxis)
     res = np.round(res, decimals=3)
     assert np.all(np.abs(res - expected) < 0.0009)
+
+
+@pytest.mark.parametrize(
+    'labels,expected',
+    [
+        (['N', 'CA', 'C'], True),
+        (np.array(['N', 'CA', 'C'] * 10), False),
+        (np.array(['CA', 'N', 'C'] + ['N', 'CA', 'C'] * 9), True),
+        (np.array(['N', 'CA', 'C', 'N'] * 10), True),
+        (np.array(['N', 'CA', 'O'] * 10), True),
+        ]
+    )
+def test_validate_backbone_labels_for_torsions(labels, expected):
+    """Validate Backbone labels for torsions."""
+    assert bool(libcalc.validate_backbone_labels_for_torsion(labels)) == expected  # noqa: E501
+
+
+@pytest.mark.parametrize(
+    'coords, expected',
+    [
+        (np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1]]), np.array([90], dtype=float)),  # noqa: E501
+        (np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1], [1, 1, 1]]), np.array([90, -90], dtype=float)),  # noqa: E501
+        ]
+    )
+def test_calculate_torsions(coords, expected):
+    """Tests torsion calculation."""
+    result = np.degrees(libcalc.calc_torsion_angles(coords))
+    assert np.all(np.equal(result, expected))
+
+
+def test_separate_torsions():
+    """Test separate torsions."""
+    a = np.array([1, 2, 3] * 10)
+    q, w, e = libcalc.get_separate_torsions(a)
+    assert set(q) == {1}
+    assert set(w) == {2}
+    assert set(e) == {3}

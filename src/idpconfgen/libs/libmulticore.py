@@ -1,9 +1,16 @@
 """Multi-core related objects."""
+import traceback
 from functools import partial
 from multiprocessing import Pool
 
 from idpconfgen import log
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libtimer import ProgressWatcher
+
+
+
+def starunpack(func, *args, **kwargs):
+    return func(*args[0], **kwargs)
 
 
 # USED OKAY
@@ -95,6 +102,9 @@ def pool_function(
                 break
             except IndexError:
                 log.info('IndexError of multiprocessing, ignoring something')
+            except IDPConfGenException as err:
+                log.debug(traceback.format_exc())
+                log.error(err)
 
 
 # USED OKAY

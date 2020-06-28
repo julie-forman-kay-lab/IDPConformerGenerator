@@ -7,8 +7,16 @@ and are defined here to avoid circular imports.
 from contextlib import suppress
 from functools import partial, reduce
 
+import numpy as np
+
 from idpconfgen import Path, log
+from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.libs.libcalc import (
+    calc_torsion_angles,
+    get_separate_torsions,
+    validate_backbone_labels_for_torsion,
+    )
 from idpconfgen.libs.libio import (
     concatenate_entries,
     read_PDBID_from_source,
@@ -21,6 +29,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
+from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
 from idpconfgen.logger import S, T, init_files
 
 
@@ -209,3 +218,59 @@ def extract_secondary_structure(
             yield f'{pdbname}_{ss}_{counter}.pdb', pdb
 
             counter += 1
+
+
+def get_torsions(fdata, degrees=False, decimals=3):
+    """Calculate torsion angles for structure.
+
+    Parameters
+    ----------
+    fdata : str, bytes or Path
+        Any type that can be feed to :class:`libstructure.Structure`.
+
+    degrees : bool, optional
+        Whether to report torsion angles in degrees or radians.
+
+    decimals : int, optional
+        The number of decimals to return.
+        Defaults to 3.
+
+    Returns
+    -------
+    dict
+        key: `fname`
+        value: -> dict, `phi`, `phi`, `omega` -> list of floats
+    """
+    structure = Structure(fdata)
+    structure.build()
+    structure.add_filter_backbone(minimal=True)
+
+    data = structure.filtered_atoms
+
+    # validates structure data
+    # rare are the PDBs that produce errors, still they exist.
+    # errors can be from a panoply of sources, that is why I decided
+    # not to attempt correcting them and instead ignore and report.
+    validation_error = validate_backbone_labels_for_torsion(data[:, col_name])
+    if validation_error:
+        errmsg = (
+            'Found errors on backbone label consistency: '
+            f'{validation_error}\n'
+            )
+        err = EXCPTS.IDPConfGenException(errmsg)
+        raise err
+
+    coords = (data[:, cols_coords].astype(float) * 1000).astype(int)
+    torsions = calc_torsion_angles(coords)
+
+    if degrees:
+        torsions = np.degrees(torsions)
+
+    return torsions.round(decimals=decimals)
+
+
+def cli_helper_calc_torsions(fname, fdata, **kwargs):
+    """Help `cli_torsion` to operate."""
+    torsions = get_torsions(fdata, **kwargs)
+    CA_C, C_N, N_CA = get_separate_torsions(torsions)
+    return fname, {'phi': N_CA, 'psi': CA_C, 'omega': C_N}
