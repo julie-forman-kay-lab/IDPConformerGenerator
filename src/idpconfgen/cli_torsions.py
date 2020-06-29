@@ -39,6 +39,7 @@ ap = libcli.CustomParser(
 libcli.add_argument_pdb_files(ap)
 libcli.add_argument_db(ap)
 libcli.add_argument_degrees(ap)
+libcli.add_argument_ncores(ap)
 
 
 def main(
