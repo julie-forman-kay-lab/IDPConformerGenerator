@@ -4,7 +4,7 @@ from functools import partial
 from multiprocessing import Pool
 
 from idpconfgen import log
-from idpconfgen.core.exceptions import IDPConfGenException, ReportOnCrash
+from idpconfgen.core.exceptions import IDPConfGenException, ReportOnCrashError
 from idpconfgen.libs.libtimer import ProgressWatcher
 
 
@@ -86,7 +86,7 @@ def pool_function(func, items, method='imap_unordered', ncores=1):
                 break
             except IndexError:
                 log.error('IndexError of multiprocessing, ignoring something')
-            except ReportOnCrash:
+            except ReportOnCrashError:
                 # nothing to do, report did it already
                 continue
             except IDPConfGenException as err:

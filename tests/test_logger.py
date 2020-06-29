@@ -4,7 +4,7 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.logger import S, T, init_files, report_on_crash
-from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core.exceptions import ReportOnCrashError
 
 
 def test_init_files():
@@ -48,8 +48,7 @@ def test_report_on_crash():
         raise TypeError
 
     ext = 'testing_ROC'
-    #execute = report_on_break(TypeError, ext=ext)(funca)
-    with pytest.raises(TypeError):
+    with pytest.raises(ReportOnCrashError):
         report_on_crash(
             funca,
             'idp', 'confgen', c=range(10), d=dict.fromkeys('qwerty'),
@@ -62,6 +61,7 @@ def test_report_on_crash():
     for p in errfiles:
         p.unlink()
 
+
 def test_report_on_crash_partial():
     """Test record func on error to file."""
     def funca(a, b, c=1, d=2):
@@ -70,8 +70,7 @@ def test_report_on_crash_partial():
     funcb = partial(funca, 58)
 
     ext = 'testing_ROC'
-    #execute = report_on_break(TypeError, ext=ext)(funca)
-    with pytest.raises(TypeError):
+    with pytest.raises(ReportOnCrashError):
         report_on_crash(
             funcb,
             'confgen', c=range(10), d=dict.fromkeys('qwerty'),

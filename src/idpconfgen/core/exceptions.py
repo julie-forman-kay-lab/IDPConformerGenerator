@@ -146,7 +146,7 @@ class NotBuiltError(IDPConfGenException):
     pass
 
 
-class ReportOnCrash(IDPConfGenException):
+class ReportOnCrashError(IDPConfGenException):
     """Raised when logger.report_on_crash."""
 
     errmsg = "Crash reported to {}."""
