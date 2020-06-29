@@ -1,5 +1,6 @@
 """Test logger."""
 import pytest
+from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.logger import S, T, init_files, report_on_crash
@@ -52,6 +53,28 @@ def test_report_on_crash():
         report_on_crash(
             funca,
             'idp', 'confgen', c=range(10), d=dict.fromkeys('qwerty'),
+            ROC_exception=TypeError,
+            ROC_ext=ext,
+            )
+
+    errfiles = list(Path.cwd().glob(f'*.{ext}'))
+    assert len(errfiles) > 0
+    for p in errfiles:
+        p.unlink()
+
+def test_report_on_crash_partial():
+    """Test record func on error to file."""
+    def funca(a, b, c=1, d=2):
+        raise TypeError
+
+    funcb = partial(funca, 58)
+
+    ext = 'testing_ROC'
+    #execute = report_on_break(TypeError, ext=ext)(funca)
+    with pytest.raises(TypeError):
+        report_on_crash(
+            funcb,
+            'confgen', c=range(10), d=dict.fromkeys('qwerty'),
             ROC_exception=TypeError,
             ROC_ext=ext,
             )

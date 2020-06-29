@@ -166,7 +166,7 @@ def main(
         execute = partial(
             report_on_crash,
             consume_func,
-            ROC_exception=IDPConfGenException,
+            ROC_exception=Exception,
             ROC_prefix=_name,
             )
 

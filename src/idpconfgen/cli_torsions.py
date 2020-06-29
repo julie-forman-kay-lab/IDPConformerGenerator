@@ -64,7 +64,7 @@ def main(
     execute = partial(
         report_on_crash,
         consume,
-        ROC_exception=IDPConfGenException,
+        ROC_exception=Exception,
         ROC_prefix='download',
         )
 

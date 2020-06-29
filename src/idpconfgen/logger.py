@@ -112,7 +112,7 @@ def report_on_crash(
             '#traceback:\n\n{}\n\n'
             ).format(
                 ROC_exception,
-                func.__qualname__,
+                str(func),
                 sig,
                 '\n\n'.join(map(str, args)),
                 '\n\n'.join(map(str, kwargs.items())),
