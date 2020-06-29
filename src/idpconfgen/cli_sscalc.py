@@ -12,7 +12,6 @@ import traceback
 from functools import partial
 
 from idpconfgen import Path, log
-from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
@@ -93,6 +92,7 @@ ap.add_argument(
     )
 
 libcli.add_argument_reduced(ap)
+libcli.add_argument_minimum(ap)
 libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
 
@@ -103,7 +103,7 @@ def main(
         chunks=1000,
         destination='sscalc_splitted.tar',
         func=None,  # here just to receive from main cli.py
-        minimum=2,
+        minimum=3,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
@@ -177,7 +177,6 @@ def main(
             ncores=ncores,
             chunks=chunks,
             )
-
         # this implementation is very specific for this case
         # this is why I haven spread it into functions for now
         dssp_data = {}  # stores DSSP data to save at the end
@@ -185,6 +184,7 @@ def main(
         for chunk in execute_pool:
             for result in chunk:
                 for fname, dsspdict, pdb_split in result:
+                    assert fname not in dssp_data
                     dssp_data[fname] = dsspdict
 
                     # notice the copy, this is needed for the .clear()
