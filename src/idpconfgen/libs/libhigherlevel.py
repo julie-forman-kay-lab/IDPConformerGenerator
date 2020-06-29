@@ -104,11 +104,13 @@ def download_pipeline(func, logfilename='.download'):
 
             # context to perform a dedicated report in case function fails
             # partial is mandatory because decorators won't pickle
+            # in this way, crashes are reported for files, crashed files
+            # ignored, and the process continues
             execute = partial(
                 report_on_crash,
                 consume_func,
-                ROC_exception=IDPConfGenException,
-                ROC_prefix='download',
+                ROC_exception=Exception,
+                ROC_prefix='download_pipeline',
                 )
 
             # convinient partial
@@ -270,6 +272,8 @@ def get_torsions(fdata, degrees=False, decimals=3):
             f'{validation_error}\n'
             )
         err = IDPConfGenException(errmsg)
+        # if running through cli_torsions, `err` will be catched and reported
+        # by logger.report_on_crash
         raise err
 
     coords = (data[:, cols_coords].astype(float) * 1000).astype(int)
