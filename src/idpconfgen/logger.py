@@ -6,6 +6,7 @@ from pathlib import Path
 from time import time_ns
 
 from idpconfgen import log
+from idpconfgen.core.exceptions import ReportOnCrash
 
 
 def titlelog(msg, *args):
@@ -127,4 +128,5 @@ def report_on_crash(
 
         log.error(S('saved ERROR REPORT: {}', fout_path))
 
-        raise err
+        roc_error = ReportOnCrash(fout_path)
+        raise roc_error from err

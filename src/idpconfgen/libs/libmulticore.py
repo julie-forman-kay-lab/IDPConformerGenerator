@@ -4,7 +4,7 @@ from functools import partial
 from multiprocessing import Pool
 
 from idpconfgen import log
-from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core.exceptions import IDPConfGenException, ReportOnCrash
 from idpconfgen.libs.libtimer import ProgressWatcher
 
 
@@ -73,6 +73,7 @@ def pool_function(func, items, method='imap_unordered', ncores=1):
     ncores : int
         The number of cores to use. Defaults to `1`.
     """
+
     with Pool(ncores) as pool, ProgressWatcher(items) as pb:
         imap = getattr(pool, method)(func, items)
         # the use of `while` here is needed, instead of for
@@ -85,6 +86,9 @@ def pool_function(func, items, method='imap_unordered', ncores=1):
                 break
             except IndexError:
                 log.error('IndexError of multiprocessing, ignoring something')
+            except ReportOnCrash:
+                # nothing to do, report did it already
+                continue
             except IDPConfGenException as err:
                 log.debug(traceback.format_exc())
                 log.error(err)
