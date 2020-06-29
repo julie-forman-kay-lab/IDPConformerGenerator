@@ -8,7 +8,6 @@ import argparse
 from functools import partial
 
 from idpconfgen import Path, log
-from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import cli_helper_calc_torsions
 from idpconfgen.libs.libio import (
@@ -65,7 +64,7 @@ def main(
         report_on_crash,
         consume,
         ROC_exception=Exception,
-        ROC_prefix='download',
+        ROC_prefix=_name,
         )
 
     execute_pool = pool_function(execute, pdbs, ncores=ncores)

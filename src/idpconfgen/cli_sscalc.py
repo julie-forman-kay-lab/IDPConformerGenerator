@@ -143,11 +143,12 @@ def main(
     if update:
         previous = read_dictionary_from_disk(update)
 
+    # TODO: REFACTOR THIS BLOCK
     log.info(T('reading input paths'))
     try:
         pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
         _istarfile = True
-    except TypeError:
+    except (FileNotFoundError, TypeError):
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
