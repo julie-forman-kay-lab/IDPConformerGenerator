@@ -119,7 +119,7 @@ class EmptyFilterError(IDPConfGenException):
 class DSSPParserError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
 
-    errmsg = 'Error while parsing {}'
+    errmsg = 'Error while parsing: {}'
 
 
 class DSSPSecStructError(IDPConfGenException):
