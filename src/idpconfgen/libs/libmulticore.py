@@ -73,8 +73,8 @@ def pool_function(func, items, method='imap_unordered', ncores=1):
     ncores : int
         The number of cores to use. Defaults to `1`.
     """
-
-    with Pool(ncores) as pool, ProgressWatcher(items) as pb:
+    with Pool(ncores) as pool, \
+            ProgressWatcher(items, suffix=f'on {ncores} cpus') as pb:
         imap = getattr(pool, method)(func, items)
         # the use of `while` here is needed, instead of for
         # to allo try/catch options

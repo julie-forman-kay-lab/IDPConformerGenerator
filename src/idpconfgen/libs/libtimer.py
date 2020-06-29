@@ -64,7 +64,7 @@ class ProgressWatcher:
         try:
             litems = len(items)
         except TypeError:
-            return ProgressCounter()
+            return ProgressCounter(**kwargs)
         else:
             return ProgressBar(litems, *args, bar_length=_cols // 2, **kwargs)
 
@@ -156,16 +156,17 @@ class ProgressBar:
 class ProgressCounter:
     """Represent progression via a counter."""
 
-    def __init__(self):
+    def __init__(self, suffix='', **kwargs):
         """
         Represent a progress counter.
 
         Used for progresses with unknown length.
         """
         self.counter = 0
+        self.suffix = suffix
 
     def __enter__(self, *args, **kwargs):
-        sys.stdout.write('\rRunning operations: 0')
+        sys.stdout.write(f'\rRunning operations {self.suffix}: 0')
         return self
 
     def __exit__(self, *args):
@@ -179,7 +180,7 @@ class ProgressCounter:
         Represent progression in terminal.
         """
         self.counter += 1
-        sys.stdout.write(f'\rRunning operations: {self.counter}')
+        sys.stdout.write(f'\rRunning operations {self.suffix}: {self.counter}')
         return
 
 
