@@ -144,3 +144,9 @@ class NotBuiltError(IDPConfGenException):
     """Raise when attempting to access data of an object before building."""
 
     pass
+
+
+class ReportOnCrash(IDPConfGenException):
+    """Raised when logger.report_on_crash."""
+
+    errmsg = "Crash reported to {}."""
