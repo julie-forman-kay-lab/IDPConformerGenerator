@@ -1,15 +1,7 @@
+"""Test lib timer module."""
 from idpconfgen.libs import libtimer
 
-import pytest
 
-
-#@pytest.mark.parametrize(
-#    'items, cls',
-#    [
-#        (list(range(10)), libtimer.ProgressBar),
-#        (range(10), libtimer.ProgressCounter),
-#        ]
-#    )
 def test_ProgressWatcher():
     """
     Test ProgressWatcher constructor.
@@ -45,10 +37,12 @@ def test_ProgressBar_2():
             PB.increment()
             assert PB.counter == i + 2
 
+
 def test_ProgressFake():
     """Test ProgressFake interface."""
     with libtimer.ProgressFake() as PF:
         PF.increment()
+
 
 def test_ProgressCounter():
     """Test ProgressCounter."""

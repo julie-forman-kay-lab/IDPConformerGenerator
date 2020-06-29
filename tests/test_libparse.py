@@ -3,7 +3,7 @@ from pathlib import Path as Path_
 
 import pytest
 
-from idpconfgen import Path, log
+from idpconfgen import Path
 from idpconfgen.core.exceptions import DSSPParserError
 from idpconfgen.libs import libparse
 
