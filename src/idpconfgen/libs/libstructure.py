@@ -267,6 +267,7 @@ def parse_pdb_to_array(datastr, which='both'):
 
     model_idx = RE_MODEL.search(datastr)
     endmdl_idx = RE_ENDMDL.search(datastr)
+
     if bool(model_idx) + bool(endmdl_idx) == 1:
         # only one is True
         raise PDBFormatError('Found MODEL and not ENDMDL, or vice-versa')
