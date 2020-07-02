@@ -5,6 +5,7 @@
 1MH1_A
 3NZJ_1
 # empty protein only backbone
+1HMJ_A
 6EMW_D
 6EMW_F
 6EMW_K
