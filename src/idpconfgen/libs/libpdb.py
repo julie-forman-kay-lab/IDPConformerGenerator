@@ -9,8 +9,8 @@ from idpconfgen.core.definitions import aa3to1
 from idpconfgen.logger import S
 
 
-RE_MODEL = re.compile('MODEL\s*\d+\s*\n')  # noqa: W605
-RE_ENDMDL = re.compile('ENDMDL\s*\n')  # noqa: W605
+RE_MODEL = re.compile('\nMODEL\s*\d+\s*\n')  # noqa: W605
+RE_ENDMDL = re.compile('\nENDMDL\s*\n')  # noqa: W605
 
 
 # string formats for atom name
