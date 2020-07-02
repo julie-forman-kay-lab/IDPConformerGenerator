@@ -3,3 +3,12 @@
 # because they encode inconsistencies in the PDB format and data
 # which currently we do not know how to treat
 1MH1_A
+3NZJ_1
+# empty protein only backbone
+6EMW_D
+6EMW_F
+6EMW_K
+6EMW_N
+6EMW_U
+# only backbone and with too many residues
+6R83_2A

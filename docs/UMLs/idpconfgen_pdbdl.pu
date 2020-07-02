@@ -28,6 +28,7 @@ to download only missing entries;
 known to be conflictive;
 note right
     1MH1_A
+    total: 8 chains
 end note
 
 #FFD3F2:repeat ://for each chunk of paths//;
@@ -46,7 +47,12 @@ partition #e6ffe6 "filtering **in**" {
     note right
         details later
     end note
-    :keep altLoc `A` or None;
+    :keep altLoc //None//, 'A' or '1';
+    note right
+        altLoc //1// in mmCIFs is converted
+        to 'A' because the former was found
+        to break //dssp// calculations.
+    end note
 }
 
 partition #ffe6e6 "filter out" {
@@ -56,18 +62,25 @@ partition #ffe6e6 "filter out" {
 
 }
 
-partition "probing chains" {
-    :attempt the selected chain;
+partition "chain selection" {
+    :probe UPPER/LOWER case chains:
+
+        * Example: AA, Aa, aA, aa
+        * attempt the selected chain first (highest probability);
     note right
-        However, Dunbrack PISCES culled list
+        Dunbrack PISCES's culled list
         provides all chains in UPPER case, this
-        many times conflicts with mmCIF format.
+        many times conflicts with mmCIF format,
+        forcing the algorithm to try different chains.
     end note
-    while (chain selection) is (empty selection or all //HETATM//)
-        :probe another UPPER/LOWER case combination;
-        :Example: AA, Aa, aA, aa.;
-    endwhile (meaningful selection)
-    :continue;
+    :loop through possible combinations;
+    if (empty selection) then (yes)
+        stop
+    elseif (or all //HETATM// lines) then (yes)
+        stop
+    else
+        :found meaninful selection;
+    endif
 }
 
 partition "additional parsing" {
