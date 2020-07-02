@@ -20,11 +20,12 @@ from idpconfgen.core.exceptions import (
     EmptyFilterError,
     NotBuiltError,
     ParserNotFoundError,
+    PDBFormatError,
     )
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
 from idpconfgen.libs.libparse import group_runs, sample_case, type2string
-from idpconfgen.libs.libpdb import delete_insertions
+from idpconfgen.libs.libpdb import RE_ENDMDL, RE_MODEL, delete_insertions
 from idpconfgen.logger import S
 
 
@@ -264,9 +265,17 @@ def parse_pdb_to_array(datastr, which='both'):
     assert isinstance(datastr, str), \
         f'`datastr` is not str: {type(datastr)} instead'
 
-    _ = datastr[datastr.find('MODEL'):datastr.find('ENDMDL')].split('\n')[1:-1]
-    if _:
-        lines = _
+    model_idx = RE_MODEL.search(datastr)
+    endmdl_idx = RE_ENDMDL.search(datastr)
+    if bool(model_idx) + bool(endmdl_idx) == 1:
+        # only one is True
+        raise PDBFormatError('Found MODEL and not ENDMDL, or vice-versa')
+
+    if model_idx and endmdl_idx:
+        start = model_idx.span()[1]
+        end = endmdl_idx.span()[0] - 1
+        lines = datastr[start: end].split('\n')
+
     else:
         lines = datastr.split('\n')
 
