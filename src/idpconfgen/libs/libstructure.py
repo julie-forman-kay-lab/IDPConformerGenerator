@@ -582,8 +582,9 @@ def save_structure_by_chains(
 
             pdbdata.add_filter_chain(chain_case)
             fout = f'{chaincode}.pdb'
+
             try:
-                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
+                pdb_lines = pdbdata.get_PDB(pdb_filters=_DI)
             except EmptyFilterError as err:
                 err2 = \
                     EmptyFilterError(f'for chain {pdbname}_{chain_case}')
@@ -596,7 +597,13 @@ def save_structure_by_chains(
                 log.debug(errlog)
                 continue
             else:
-                yield fout, pdb_lines
+                if all(line.startswith('HETATM') for line in pdb_lines):
+                    log.debug(
+                        f'Found only HETATM for {chain_case}, '
+                        'continuing with next chain.'
+                        )
+                    continue
+                yield fout, '\n'.join(pdb_lines)
                 break
             finally:
                 pdbdata.pop_last_filter()
