@@ -63,7 +63,7 @@ partition "probing chains" {
         provides all chains in UPPER case, this
         many times conflicts with mmCIF format.
     end note
-    while (chain selection) is (empty selection)
+    while (chain selection) is (empty selection or all //HETATM//)
         :probe another UPPER/LOWER case combination;
         :Example: AA, Aa, aA, aa.;
     endwhile (meaningful selection)
