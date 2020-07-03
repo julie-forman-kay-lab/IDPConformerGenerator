@@ -27,8 +27,8 @@ to download only missing entries;
 :filters out PDBID:CHAIN codes
 known to be conflictive;
 note right
-    1MH1_A
-    total: 8 chains
+    1MH1_A, (...)
+    total: 11 chains
 end note
 
 #FFD3F2:repeat ://for each chunk of paths//;
