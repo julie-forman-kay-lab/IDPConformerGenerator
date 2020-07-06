@@ -1,7 +1,6 @@
 """Handle CIF data."""
 import re
 
-#  from idpconfgen import Path, log
 from idpconfgen.core import exceptions as EXCPTS
 
 
@@ -140,7 +139,7 @@ class CIFParser:
     def altloc(self):
         """The altloc field of the current :attr:`line`."""  # noqa: D401
         altloc = self._auth_label('alt_id')
-        return self._translate(altloc)
+        return self._translate(altloc).replace('1', 'A')
 
     @property
     def resname(self):

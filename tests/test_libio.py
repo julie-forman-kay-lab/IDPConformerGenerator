@@ -65,7 +65,7 @@ def test_concatenate_1():
     )
 def test_extract_from_tar(ext, num):
     """Test extract files from tarfile."""
-    with tcommons.DummyFolder('tar_extracted') as df:
+    with tcommons.TmpFolder('tar_extracted') as df:
         result = libio.extract_from_tar(tcommons.file_tar, output=df, ext=ext)
         assert all(isinstance(i, Path) for i in result)
         suf = f'*{ext}' if ext else '*.*'
@@ -243,7 +243,7 @@ def test_save_pairs_to_disk(func):
         ('pair1.txt', 'some data'),
         ('pair2.txt', b'other data'),
         ])
-    with tcommons.DummyFolder(df):
+    with tcommons.TmpFolder(df):
         func(pairs.items(), df)
         rfiles = [Path(p).name for p in glob.glob(str(Path(df, '*.txt')))]
         assert sorted(pairs.keys()) == sorted(rfiles)
@@ -270,7 +270,7 @@ def test_save_pairs_to_tar(func):
         ('pair1.txt', 'some data'),
         ('pair2.txt', b'other data'),
         ])
-    with tcommons.DummyFile(df):
+    with tcommons.TmpFile(df):
         func(pairs.items(), df)
         with tarfile.open(df, 'r') as tin:
             names = tin.getnames()

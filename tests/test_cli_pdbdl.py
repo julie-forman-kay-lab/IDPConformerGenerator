@@ -1,6 +1,5 @@
 """Test client for PDB Downloader."""
 import os
-import shutil
 
 import pytest
 
@@ -16,7 +15,7 @@ from . import tcommons
     )
 def test_main(ncores):
     """Test main from cli_pdbdownloader."""
-    with tcommons.DummyFolder('downloaded_test') as DF:
+    with tcommons.TmpFolder('downloaded_test') as DF:
         main(
             [tcommons.cull],
             destination=DF,

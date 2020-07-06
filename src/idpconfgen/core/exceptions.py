@@ -119,7 +119,7 @@ class EmptyFilterError(IDPConfGenException):
 class DSSPParserError(IDPConfGenException):
     """Raise when libs.libparse.DSSPParserError needs it."""
 
-    errmsg = 'Error while parsing {}'
+    errmsg = 'Error while parsing: {}'
 
 
 class DSSPSecStructError(IDPConfGenException):
@@ -144,3 +144,9 @@ class NotBuiltError(IDPConfGenException):
     """Raise when attempting to access data of an object before building."""
 
     pass
+
+
+class ReportOnCrashError(IDPConfGenException):
+    """Raised when logger.report_on_crash."""
+
+    errmsg = "Crash reported to {}."""

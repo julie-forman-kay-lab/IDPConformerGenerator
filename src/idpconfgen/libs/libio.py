@@ -123,7 +123,6 @@ def glob_folder(folder, ext):
     """
     ext = f'*{period_suffix(ext)}'
     files = glob.glob(str(Path(folder, ext)))
-    log.debug(f'folder {folder} read {len(files)} files with extension {ext}')
     return list(map(Path, files))
 
 

@@ -25,7 +25,7 @@ from idpconfgen.libs.libmulticore import (
     pool_function_in_chunks,
     )
 from idpconfgen.libs.libparse import mkdssp_w_split
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -88,10 +88,11 @@ ap.add_argument(
         'if needed.'
         ),
     type=Path,
-    default='__sscalc_tmpdir__',
+    default=TMPDIR,
     )
 
 libcli.add_argument_reduced(ap)
+libcli.add_argument_minimum(ap)
 libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
 
@@ -102,7 +103,7 @@ def main(
         chunks=1000,
         destination='sscalc_splitted.tar',
         func=None,  # here just to receive from main cli.py
-        minimum=2,
+        minimum=3,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
@@ -142,11 +143,12 @@ def main(
     if update:
         previous = read_dictionary_from_disk(update)
 
+    # TODO: REFACTOR THIS BLOCK
     log.info(T('reading input paths'))
     try:
         pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
         _istarfile = True
-    except TypeError:
+    except (FileNotFoundError, TypeError):
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
@@ -154,28 +156,36 @@ def main(
     log.info(T('preparing task execution'))
 
     try:
-        execute = partial(
-            pool_function_in_chunks,
-            consume_iterable_in_list,  # function to execute - list wrapper
-            pdbs2operate,              # items to process
-            # args to consume_iterable_in_list
+        consume_func = partial(
+            consume_iterable_in_list,
             mkdssp_w_split,
-            # kwargs to pool functions
-            ncores=ncores,
-            chunks=chunks,
-            # kwargs for mkdssp_w_split
             cmd=cmd,
             reduced=reduced,
             minimum=minimum,
             )
 
+        execute = partial(
+            report_on_crash,
+            consume_func,
+            ROC_exception=Exception,
+            ROC_prefix=_name,
+            )
+
+        # generator
+        execute_pool = pool_function_in_chunks(
+            execute,
+            pdbs2operate,              # items to process
+            ncores=ncores,
+            chunks=chunks,
+            )
         # this implementation is very specific for this case
         # this is why I haven spread it into functions for now
         dssp_data = {}  # stores DSSP data to save at the end
         pdb_data = {}  # temporarily stores data to be writen to the disk
-        for chunk in execute():
+        for chunk in execute_pool:
             for result in chunk:
                 for fname, dsspdict, pdb_split in result:
+                    assert fname not in dssp_data
                     dssp_data[fname] = dsspdict
 
                     # notice the copy, this is needed for the .clear()

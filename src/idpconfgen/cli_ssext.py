@@ -11,8 +11,8 @@ import argparse
 from functools import partial
 
 from idpconfgen import log
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
-from idpconfgen.logger import S, T, init_files
 from idpconfgen.libs.libhigherlevel import extract_secondary_structure
 from idpconfgen.libs.libio import (
     FileReaderIterator,
@@ -24,6 +24,7 @@ from idpconfgen.libs.libmulticore import (
     flat_results_from_chunk,
     pool_function_in_chunks,
     )
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.idpconfgen_ssext'
@@ -126,30 +127,43 @@ def main(
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('read PDB files'))
 
-    execute = partial(
-        # multiprocessing function
-        pool_function_in_chunks,
-        # wrapper around generator
+    # function to be consumed by multiprocessing
+    # this function receives each item of the iterable
+    consume_func = partial(
         consume_iterable_in_list,
-        # items
-        pdbs2operate,
-        # func to operate
         extract_secondary_structure,
-        # multicore kwargs
-        ncores=ncores,
-        chunks=chunks,
-        # func kwargs
         atoms=atoms,
+        minimum=minimum,
         ssdata=ssdata,
         structure=structure,
-        minimum=minimum,
         )
 
-    flat_results_from_chunk(
+    # logger context, special for multiprocessing
+    # replacement for a decorator
+    execute = partial(
+        report_on_crash,
+        consume_func,
+        ROC_exception=IDPConfGenException,
+        ROC_prefix=_name,
+        )
+
+    # multiprocessing execution
+    # uses partial because `flat_results_from_chunk` expects a callable
+    execute_pool = partial(
+        pool_function_in_chunks,
         execute,
+        pdbs2operate,
+        ncores=ncores,
+        chunks=chunks,
+        )
+
+    # flats the yields from results
+    flat_results_from_chunk(
+        execute_pool,
         save_pairs_to_disk,
         destination=destination,
         )
+
     return
 
 

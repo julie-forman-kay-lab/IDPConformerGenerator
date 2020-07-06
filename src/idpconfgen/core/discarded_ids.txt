@@ -1,5 +1,20 @@
 # discarded PDB:CHAIN IDs
 # these ids are not downloaded even upon request
 # because they encode inconsistencies in the PDB format and data
-# which currently we do not know how to treat
+# which currently we do not know how to treat, or we have put idle due
+# to time constraints
+#
+# issues related with insertion codes
 1MH1_A
+1QDM_A
+3NZJ_1
+3QVC_A
+# empty protein, only backbone atoms, can't compute secondary structure with DSSP
+1HMJ_A
+6EMW_D
+6EMW_F
+6EMW_K
+6EMW_N
+6EMW_U
+# only backbone and with too many residues
+6R83_2A

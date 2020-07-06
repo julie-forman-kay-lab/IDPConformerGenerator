@@ -1,51 +1,27 @@
 """Manages operations with logging."""
 import logging
+import traceback
+from inspect import signature
+from pathlib import Path
+from time import time_ns
+
+from idpconfgen import log
+from idpconfgen.core.exceptions import ReportOnCrashError
 
 
-class TitleLog:
-    """
-    Format string to title.
-
-    Example
-    -------
-        >>> TitleLog('error msg: {} {} {}', var1, var2 var3)
-    """
-
-    def __init__(self, msg, *args):
-        self.msg = msg.title()
-        self.args = args
-
-    def __str__(self):
-        """Represent object as string."""
-        return '\n* {} ...'.format(self.msg.format(*self.args))
+def titlelog(msg, *args):
+    """Format a message to a title."""
+    msg = msg.title()
+    return f'\n* {msg.format(*args)} ...'
 
 
-class SubLog:
-    """
-    Format string to bullet point like structure.
-
-    This format performs nicely under the :class:`TitleLog` formatting.
-
-    Example
-    -------
-        >>> SubLog('error msg: {} {} {}', var1, var2 var3)
-    """
-
-    def __init__(self, msg, *args, spacer=' ', indent=4):
-        self.msg = msg
-        self.args = args
-        self.indent = spacer * indent
-
-    def __str__(self):
-        """Represent object as string."""
-        return '{}{}'.format(
-            self.indent,
-            self.msg.format(*self.args),
-            )
+def subline(msg, *args, spacer=' ', indent=4):
+    """Format a line to a sub log line."""
+    return f'{spacer * indent}{msg.format(*args)}'
 
 
-T = TitleLog
-S = SubLog
+T = titlelog
+S = subline
 
 
 def init_files(log, logfilesname):
@@ -78,3 +54,79 @@ def init_files(log, logfilesname):
     errorlog.setLevel(logging.ERROR)
     errorlog.setFormatter(logging.Formatter('%(message)s'))
     log.addHandler(errorlog)
+
+
+def report_on_crash(
+        func,
+        *args,
+        ROC_exception=Exception,
+        ROC_ext='rpr_on_crash',
+        ROC_folder=None,
+        ROC_prefix='ROC',
+        **kwargs,
+        ):
+    """
+    Report to a file upon exception(s).
+
+    If `func` raises `exception`(s), a detailed report of the `func` and
+    passed `args` and `kwargs` and other details are saved to a file.
+    File name is given by:
+        * prefix
+        * hash value of the text to save
+        *`time.time_ns`.
+
+    File saves to the CWD, unless otherwise stated.
+
+    Propagates the `exception`.
+
+    Keyword parameters have `ROC` verbose names to avoid collision with
+    `func`'s `kwargs`.
+
+    Parameters
+    ----------
+    ROC_exception : Exception or tuple of Exceptions
+        The Exception type(s) to consider.
+
+    ROC_ext : str
+        The extension with which save the report file.
+
+    ROC_folder : str or Path,
+        The folder where to save the report.
+        Defaults to the CWD.
+
+    ROC_prefix : str
+        The prefix of the report file.
+    """
+    ROC_folder = ROC_folder or Path.cwd()
+
+    try:
+        return func(*args, **kwargs)
+
+    except ROC_exception as err:
+        sig = signature(func)
+        s = (
+            '#Recording error for exception: {}\n\n'
+            '#function: {}\n\n'
+            '#signature: {}\n\n'
+            '#Args:\n\n{}\n\n'
+            '#Kwargs:\n\n{}\n\n'
+            '#traceback:\n\n{}\n\n'
+            ).format(
+                ROC_exception,
+                str(func),
+                sig,
+                '\n\n'.join(map(str, args)),
+                '\n\n'.join(map(str, kwargs.items())),
+                traceback.format_exc(),
+                )
+
+        fout_path = Path(
+            ROC_folder,
+            f'{ROC_prefix}_{hash(s)}_{time_ns()}.{ROC_ext}',
+            )
+        fout_path.write_text(s)
+
+        log.error(S('saved ERROR REPORT: {}', fout_path))
+
+        roc_error = ReportOnCrashError(fout_path)
+        raise roc_error from err

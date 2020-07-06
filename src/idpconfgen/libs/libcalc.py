@@ -276,18 +276,24 @@ def get_separate_torsions(torsions_array):
     return CA_C, C_N, N_CA
 
 
-def validate_backbone_labels_for_torsion(labels):
+def validate_backbone_labels_for_torsion(labels, minimum=2):
     """
     Validate labels for torsion angle calculation.
 
     Assumes labels are aligned with their corresponding coordinates.
     Yet, coordinates have no scope in this function.
 
+    Excepts only the mininal backbone labels, these are: N, CA, and C.
+
     Parameters
     ----------
     labels : np.array of shape (N,) or alike
+        Where N % 3 equals 0.
+
+    minimum : int
+        The minimum number of residues to consider valid.
     """
-    if len(labels) / 4 < 4:
+    if len(labels) / 3 < minimum:
         return 'Too small segment'
 
     if labels[0] != 'N':

@@ -138,19 +138,19 @@ def test_add_version():
     'func, parsing, expected',
     [
         (libcli.add_argument_chunks, ['-c', '5000'], ['chunks', 5000]),
-        (libcli.add_argument_destination_folder, ['-d', 'myfolder'], ['destination', Path('myfolder')]),
+        (libcli.add_argument_destination_folder, ['-d', 'myfolder'], ['destination', Path('myfolder')]),  # noqa: E501
         (libcli.add_argument_minimum, ['-m', '45'], ['minimum', 45]),
         (libcli.add_argument_ncores, ['-n', '7'], ['ncores', 7]),
         (libcli.add_argument_ncores, ['-n'], ['ncores', os.cpu_count() - 1]),
-        (libcli.add_argument_pdb_files, ['myfolder'], ['pdb_files', ['myfolder']]),
+        (libcli.add_argument_pdb_files, ['myfolder'], ['pdb_files', ['myfolder']]),  # noqa: E501
         (libcli.add_argument_pdb_files, ['my.tar'], ['pdb_files', 'my.tar']),
         (libcli.add_argument_pdbids, ['12AS_A'], ['pdbids', ['12AS_A']]),
         (libcli.add_argument_reduced, ['-rd'], ['reduced', True]),
         (libcli.add_argument_reduced, [], ['reduced', False]),
         (libcli.add_argument_replace, ['--replace'], ['replace', True]),
         (libcli.add_argument_replace, [], ['replace', False]),
-        (libcli.add_argument_record, ['-rn', 'ATOM'], ['record_name', ('ATOM',)]),
-        (libcli.add_argument_source, ['-sc', 'source.txt'], ['source', Path('source.txt')]),
+        (libcli.add_argument_record, ['-rn', 'ATOM'], ['record_name', ('ATOM',)]),  # noqa: E501
+        (libcli.add_argument_source, ['-sc', 'source.txt'], ['source', Path('source.txt')]),  # noqa: E501
         (libcli.add_argument_update, ['-u'], ['update', True]),
         (libcli.add_argument_update, [], ['update', False]),
         (libcli.add_argument_cmd, ['mycmd'], ['cmd', 'mycmd']),
@@ -207,4 +207,3 @@ USAGE:
             '    $ you can also use it like this.\n'
             )
         assert expected == self.usage
-

@@ -3,7 +3,8 @@ from pathlib import Path as Path_
 
 import pytest
 
-from idpconfgen import Path, log
+from idpconfgen import Path
+from idpconfgen.core.exceptions import DSSPParserError
 from idpconfgen.libs import libparse
 
 from . import tcommons
@@ -68,40 +69,40 @@ def test_group_runs_2():
 
 def test_parse_dssp():
     """Parse DSSP from example."""
-    results = [
+    expected = [
         (
-            '  S      T ',
-            'SRMPSPPMPSS',
-            [str(i) for i in (list(range(47, 56)) + [348, 349])],
+            b'  S      T ',
+            b'SRMPSPPMPSS',
+            [str(i).encode() for i in (list(range(47, 56)) + [348, 349])],
             ),
         (
-            '   EEEE ',
-            'AAPRLSFL',
-            [str(i) for i in range(395, 403)],
+            b'   EEEE ',
+            b'AAPRLSFL',
+            [str(i).encode() for i in range(395, 403)],
             ),
         (
-            '    ',
-            'XXXX',
-            [str(i) for i in range(501, 505)],
+            b'    ',
+            b'XXXX',
+            [str(i).encode() for i in range(501, 505)],
             ),
         ]
 
-    with tcommons.example_dssp.open('r') as dssp_data:
+    with tcommons.example_dssp.open('rb') as dssp_data:
         for i, result in enumerate(libparse.parse_dssp(dssp_data.read())):
-            assert result == results[i]
+            assert result == expected[i]
         else:
             assert i == 2
 
 
-def test_parse_dssp_indexError():
+def test_parse_dssp_IndexError():
     """
     Test IndexError.
 
     Obtained in case `dssp` file as not the `#` sperator.
     """
-    with open(Path(tcommons.data_folder, 'wrong.dssp')) as fin:
+    with open(Path(tcommons.data_folder, 'wrong.dssp'), 'rb') as fin:
         data = fin.read()
-        with pytest.raises(IndexError):
+        with pytest.raises(DSSPParserError):
             for _ in libparse.parse_dssp(data):
                 pass
 
@@ -146,7 +147,7 @@ def test_split_pdb_by_dssp(BTE_A_results):
     """Test mkdssp with split."""
     sgen = libparse.split_pdb_by_dssp(
         Path(tcommons.data_folder, '1BTE_A.pdb'),
-        Path(tcommons.data_folder, '1BTE_A.dssp').read_text(),
+        Path(tcommons.data_folder, '1BTE_A.dssp').read_bytes(),
         reduced=True,
         )
 
@@ -188,7 +189,7 @@ def test_split_pdb_by_dssp_minimum():
 
     sgen = libparse.split_pdb_by_dssp(
         Path(tcommons.data_folder, '1BTE_A.pdb'),
-        Path(tcommons.data_folder, '1BTE_A.dssp').read_text(),
+        Path(tcommons.data_folder, '1BTE_A.dssp').read_bytes(),
         reduced=True,
         minimum=40,
         )
