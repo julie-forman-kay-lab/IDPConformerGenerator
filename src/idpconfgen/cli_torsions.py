@@ -85,4 +85,4 @@ def main(
 
 
 if __name__ == '__main__':
-    libcli.maincli()
+    libcli.maincli(ap, main)
