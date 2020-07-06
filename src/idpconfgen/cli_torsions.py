@@ -5,6 +5,7 @@ USAGE:
     $ idpconfgen torsions [PDBS]
 """
 import argparse
+from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -16,7 +17,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = 'idpconfgen_torsion'
@@ -37,6 +38,7 @@ ap = libcli.CustomParser(
 libcli.add_argument_pdb_files(ap)
 libcli.add_argument_db(ap)
 libcli.add_argument_degrees(ap)
+libcli.add_argument_ncores(ap)
 
 
 def main(
@@ -56,15 +58,21 @@ def main(
     pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
 
-    execute = pool_function(
-        starunpack,
-        pdbs,
-        cli_helper_calc_torsions,
-        degrees=degrees,
-        ncores=ncores,
+    consume = partial(starunpack, cli_helper_calc_torsions, degrees=degrees)
+
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
         )
 
-    torsion_result = {Path(pdbid).stem: angles for pdbid, angles in execute}
+    execute_pool = pool_function(execute, pdbs, ncores=ncores)
+
+    torsion_result = {
+        Path(pdbid).stem: angles
+        for pdbid, angles in execute_pool
+        }
 
     pop_difference_with_log(database_dict, torsion_result)
 

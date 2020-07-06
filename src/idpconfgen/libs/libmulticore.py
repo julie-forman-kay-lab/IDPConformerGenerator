@@ -4,9 +4,8 @@ from functools import partial
 from multiprocessing import Pool
 
 from idpconfgen import log
-from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core.exceptions import IDPConfGenException, ReportOnCrashError
 from idpconfgen.libs.libtimer import ProgressWatcher
-
 
 
 def starunpack(func, *args, **kwargs):
@@ -53,14 +52,7 @@ def flat_results_from_chunk(execute, func, *args, **kwargs):
 
 
 # USED OKAY
-def pool_function(
-        func,
-        items,
-        *args,
-        method='imap_unordered',
-        ncores=1,
-        **kwargs,
-        ):
+def pool_function(func, items, method='imap_unordered', ncores=1):
     """
     Multiprocess Pools a function.
 
@@ -68,15 +60,11 @@ def pool_function(
     ----------
     func : callable
         The function to execute along the iterable `items`.
+        If this function expects additional `args and `kwargs`,
+        prepare it previously using `functools.partial`.
 
     items : interable
         Elements to pass to the `func`.
-
-    *args : any
-        Additional positional arguments to pass to `func`.
-        In order to workd, positional arguments should preceed `item`
-        in function signature. Is preferable to use `kwargs` whenever
-        possible.
 
     method : str
         The :class:`Pool` method to execute.
@@ -84,14 +72,10 @@ def pool_function(
 
     ncores : int
         The number of cores to use. Defaults to `1`.
-
-    **kwargs :
-        The named arguments to pass to `func`.
     """
-    f = partial(func, *args, **kwargs)
-
-    with Pool(ncores) as pool, ProgressWatcher(items) as pb:
-        imap = getattr(pool, method)(f, items)
+    with Pool(ncores) as pool, \
+            ProgressWatcher(items, suffix=f'on {ncores} cpus') as pb:
+        imap = getattr(pool, method)(func, items)
         # the use of `while` here is needed, instead of for
         # to allo try/catch options
         while True:
@@ -101,14 +85,17 @@ def pool_function(
             except StopIteration:
                 break
             except IndexError:
-                log.info('IndexError of multiprocessing, ignoring something')
+                log.error('IndexError of multiprocessing, ignoring something')
+            except ReportOnCrashError:
+                # nothing to do, report did it already
+                continue
             except IDPConfGenException as err:
                 log.debug(traceback.format_exc())
                 log.error(err)
 
 
 # USED OKAY
-def pool_function_in_chunks(func, items, *args, chunks=5_000, **kwargs):
+def pool_function_in_chunks(func, items, chunks=5_000, **kwargs):
     """
     Execute ``func`` in ``chunks`` of ``items`` using `Pool`.
 
@@ -118,6 +105,8 @@ def pool_function_in_chunks(func, items, *args, chunks=5_000, **kwargs):
     ----------
     func : callable
         The function to execute over ``items``.
+        If this function expects additional `args and `kwargs`,
+        prepare it previously using `functools.partial`.
 
     items : iterable
         The items to process by the ``funct``.
@@ -138,4 +127,4 @@ def pool_function_in_chunks(func, items, *args, chunks=5_000, **kwargs):
     """
     for i in range(0, len(items), chunks):
         task = items[i: i + chunks]
-        yield list(pool_function(func, task, *args, **kwargs))
+        yield list(pool_function(func, task, **kwargs))

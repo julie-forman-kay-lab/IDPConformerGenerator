@@ -6,7 +6,6 @@ Classes
 Structure
     The main API that represents a protein structure in IDPConfGen.
 """
-import itertools as it
 import traceback
 import warnings
 from collections import defaultdict
@@ -15,13 +14,18 @@ from functools import reduce
 import numpy as np
 
 from idpconfgen import log
-from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
 from idpconfgen.core.definitions import residue_elements as _allowed_elements
+from idpconfgen.core.exceptions import (
+    EmptyFilterError,
+    NotBuiltError,
+    ParserNotFoundError,
+    PDBFormatError,
+    )
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
-from idpconfgen.libs.libparse import group_runs, type2string, sample_case
-from idpconfgen.libs.libpdb import delete_insertions
+from idpconfgen.libs.libparse import group_runs, sample_case, type2string
+from idpconfgen.libs.libpdb import RE_ENDMDL, RE_MODEL, delete_insertions
 from idpconfgen.logger import S
 
 
@@ -96,7 +100,7 @@ class Structure:
                 'Please `.build()` the Structure before attempting to access'
                 'its data'
                 )
-            raise EXCPTS.NotBuiltError(errmsg=errmsg) from err
+            raise NotBuiltError(errmsg=errmsg) from err
 
     @property
     def filters(self):
@@ -193,7 +197,7 @@ class Structure:
             lambda x: ib(x[col_name], x[col_element], minimal=minimal)
             )
 
-    def get_PDB(self, pdb_filters=None):
+    def get_PDB(self, pdb_filters=None, renumber=True):
         """
         Convert Structure to PDB format.
 
@@ -207,15 +211,23 @@ class Structure:
             return f(i)
 
         fs = self.filtered_atoms
-        renumber_atoms(fs)
+
+        # renumber atoms
+        if renumber:
+            try:
+                fs[:, col_serial] = np.arange(1, fs.shape[0] + 1).astype('<U8')
+            except IndexError as err:
+                errmsg = (
+                    'Could not renumber atoms, most likely, because '
+                    'there are no lines in selection.'
+                    )
+                err2 = EmptyFilterError(errmsg)
+                raise err2 from err
 
         pdb_filters = pdb_filters or []
 
         lines = list(reduce(_, pdb_filters, structure_to_pdb(fs)))
 
-        # pdb_filters may disrupt the quality of the PDB file
-        # TODO: use these filters on the data_array level?
-        assert all(len(line) == 80 for line in lines)
         return lines
 
     def write_PDB(self, filename, **kwargs):
@@ -226,7 +238,7 @@ class Structure:
             try:
                 write_PDB(lines, filename)
             except UserWarning:
-                raise EXCPTS.EmptyFilterError(filename)
+                raise EmptyFilterError(filename)
 
 
 def parse_pdb_to_array(datastr, which='both'):
@@ -253,9 +265,18 @@ def parse_pdb_to_array(datastr, which='both'):
     assert isinstance(datastr, str), \
         f'`datastr` is not str: {type(datastr)} instead'
 
-    _ = datastr[datastr.find('MODEL'):datastr.find('ENDMDL')].split('\n')[1:-1]
-    if _:
-        lines = _
+    model_idx = RE_MODEL.search(datastr)
+    endmdl_idx = RE_ENDMDL.search(datastr)
+
+    if bool(model_idx) + bool(endmdl_idx) == 1:
+        # only one is True
+        raise PDBFormatError('Found MODEL and not ENDMDL, or vice-versa')
+
+    if model_idx and endmdl_idx:
+        start = model_idx.span()[1]
+        end = endmdl_idx.span()[0] - 1
+        lines = datastr[start: end].split('\n')
+
     else:
         lines = datastr.split('\n')
 
@@ -381,7 +402,7 @@ def detect_structure_type(datastr):
     for condition, parser in sp:
         if condition(datastr):
             return parser
-    raise EXCPTS.ParserNotFoundError
+    raise ParserNotFoundError
 
 
 def write_PDB(lines, filename):
@@ -404,30 +425,6 @@ def write_PDB(lines, filename):
             fh.write('\n')
     else:
         warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
-
-
-def renumber_atoms(data_array):
-    """
-    Renumber the atoms in structure data array.
-
-    Performs in place.
-
-    Returns
-    -------
-    None
-    """
-    try:
-        data_array[:, col_serial] = \
-            np.arange(1, data_array.shape[0] + 1).astype('<U8')
-    except IndexError as err:
-        log.debug(traceback.format_exc())
-        errmsg = (
-            'Could not renumber atoms because '
-            'there are no lines in selection.'
-            )
-        err2 = EXCPTS.EmptyFilterError(errmsg)
-        log.debug(repr(err2))
-        raise err2 from err
 
 
 def structure_to_pdb(atoms):
@@ -523,7 +520,7 @@ def is_backbone(atom, element, minimal=False):
 def save_structure_by_chains(
         pdb_data,
         pdbname,
-        altlocs=('A', '', ' '),
+        altlocs=('A', '', ' ', '1'),   # CIF: 6uwi chain D has altloc 1
         chains=None,
         record_name=('ATOM', 'HETATM'),
         renumber=True,
@@ -585,15 +582,28 @@ def save_structure_by_chains(
 
             pdbdata.add_filter_chain(chain_case)
             fout = f'{chaincode}.pdb'
+
             try:
-                pdb_lines = '\n'.join(pdbdata.get_PDB(pdb_filters=_DI))
-            except EXCPTS.EmptyFilterError as err:
-                err2 = EXCPTS.EmptyFilterError(f'for chain {chain_case}')
-                log.debug(repr(err2))
-                log.debug('continuing to new chain')
+                pdb_lines = pdbdata.get_PDB(pdb_filters=_DI)
+            except EmptyFilterError as err:
+                err2 = \
+                    EmptyFilterError(f'for chain {pdbname}_{chain_case}')
+                errlog = (
+                    f'{repr(err)}\n'
+                    f'{repr(err2)}\n'
+                    f'{traceback.format_exc()}\n'
+                    'continuing to new chain\n'
+                    )
+                log.debug(errlog)
                 continue
             else:
-                yield fout, pdb_lines
+                if all(line.startswith('HETATM') for line in pdb_lines):
+                    log.debug(
+                        f'Found only HETATM for {chain_case}, '
+                        'continuing with next chain.'
+                        )
+                    continue
+                yield fout, '\n'.join(pdb_lines)
                 break
             finally:
                 pdbdata.pop_last_filter()

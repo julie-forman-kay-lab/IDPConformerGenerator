@@ -6,7 +6,9 @@ from contextlib import suppress
 from idpconfgen import Path
 
 
-class DummyFolder:
+class TmpFolder:
+    """Create temporary folder context."""
+
     def __init__(self, folder):
         self.folder = Path(folder)
 
@@ -19,7 +21,9 @@ class DummyFolder:
             shutil.rmtree(self.folder)
 
 
-class DummyFile:
+class TmpFile:
+    """Create temporary file path context."""
+
     def __init__(self, fpath):
         self.fpath = Path(fpath)
 
@@ -55,6 +59,7 @@ example_dssp = Path(data_folder, 'example.dssp')
 file_tar = Path(data_folder, 'files.tar')
 pdb_example = Path(data_folder, 'pdb_example.pdb')
 pdb_models = Path(data_folder, 'pdb_models.pdb')
+pdb_models2 = Path(data_folder, 'pdb_models2.pdb')
 pdb_models_output = Path(data_folder, 'pdb_models_output.pdb')
 pdb_res_gap = Path(data_folder, 'pdb_residue_gap.pdb')
 pdbs_fasta = Path(data_folder, 'pdbs.fasta')
@@ -89,12 +94,13 @@ cif_example_headers = [
 pdb_saved = Path(data_folder, 'pdb_saved.pdb')
 
 
-
 def random_type():
+    """Return a random builtin type."""
+    # TODO: review why I have not used Hypothesis :-o
     types = [
         1,
         1.0,
-        [1,2],
+        [1, 2],
         {'a': 1},
         None,
         {},

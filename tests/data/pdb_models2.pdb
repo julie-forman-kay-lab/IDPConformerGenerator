@@ -1,3 +1,4 @@
+REMARK some remark line
 MODEL       1    
 ATOM      1  N   ALA A   4      11.751  37.846  29.016  1.00 44.65           N  
 ATOM      2  CA  ALA A   4      12.501  39.048  28.539  1.00 30.68           C  

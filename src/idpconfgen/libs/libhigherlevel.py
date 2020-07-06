@@ -10,8 +10,8 @@ from functools import partial, reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.core.definitions import blocked_ids
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import (
     calc_torsion_angles,
     get_separate_torsions,
@@ -30,7 +30,7 @@ from idpconfgen.libs.libmulticore import (
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
 from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 # USED OKAY!
@@ -99,17 +99,31 @@ def download_pipeline(func, logfilename='.download'):
         something_to_download = len(pdblist_comparison) > 0
         if something_to_download and update:
 
+            # the function to be used in multiprocessing
+            consume_func = partial(consume_iterable_in_list, func)
+
+            # context to perform a dedicated report in case function fails
+            # partial is mandatory because decorators won't pickle
+            # in this way, crashes are reported for files, crashed files
+            # ignored, and the process continues
             execute = partial(
+                report_on_crash,
+                consume_func,
+                ROC_exception=Exception,
+                ROC_prefix='download_pipeline',
+                )
+
+            # convinient partial
+            execute_pool = partial(
                 pool_function_in_chunks,
-                consume_iterable_in_list,
+                execute,
                 list(pdblist_comparison.name_chains_dict.items()),
-                func,
                 ncores=ncores,
                 chunks=chunks,
                 )
 
             flat_results_from_chunk(
-                execute,
+                execute_pool,
                 save_pairs_to_disk,
                 destination=destination,
                 )
@@ -257,7 +271,9 @@ def get_torsions(fdata, degrees=False, decimals=3):
             'Found errors on backbone label consistency: '
             f'{validation_error}\n'
             )
-        err = EXCPTS.IDPConfGenException(errmsg)
+        err = IDPConfGenException(errmsg)
+        # if running through cli_torsions, `err` will be catched and reported
+        # by logger.report_on_crash
         raise err
 
     coords = (data[:, cols_coords].astype(float) * 1000).astype(int)

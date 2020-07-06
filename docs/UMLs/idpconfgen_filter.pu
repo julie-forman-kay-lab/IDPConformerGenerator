@@ -1,0 +1,53 @@
+@startuml
+
+start
+
+:idpconfgen //build//;
+
+partition #LIGHTGREY Examples {
+    #WHITE:$ idpconfgen build pdbdb;
+    }
+
+:parsing pdbdbs to filter DB
+
+|= PHI |= PSI |= OMEGA |= AA residue name  |= DSSP |
+| - | x | x | M | L |
+| x | x | x | D | L |
+| (...) | (...) | (...)  | (...) | (...) |
+| x | - | - | E | L |
+
+;
+
+
+partition "First layer requests" {
+    :unique secondary structure of observed length;
+    note right
+        ~ 0.8 sec
+    end note
+    :unique secondary structure of user defined length;
+    note right
+        fixed length **no overlap**: ~ 0.5 sec
+    end note
+    :unique secondary structure of variable (range) length;
+    note right
+        (?=(L{2}))
+        (?=(L{3}))
+        (?=(L{4}))
+        (?=(L{5}))
+        (?=(L{6}))
+        14.898 secs single core
+    end note
+    :secondary structure combinations: //L+ - H{1,2} - L+//;
+    note right
+        H{1,2} dummy example
+        range [1 to 20]
+        103.777 secs
+    end note
+    }
+
+partition "Second layer request" {
+    :FASTA sequence match - 100% match;
+    :FASTA sequence pattern match - user/analysis specified;
+    }
+
+@enduml

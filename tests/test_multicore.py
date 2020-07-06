@@ -44,15 +44,15 @@ def test_pool_in_chunks():
 
 def test_pool_in_chunks_nested():
     """Test pool in chunk from nested result."""
-    execute = LM.pool_function_in_chunks(
-        LM.consume_iterable_in_list,
+    execute = partial(LM.consume_iterable_in_list, dummy_generator)
+    execute_pool = LM.pool_function_in_chunks(
+        execute,
         range(20),
-        dummy_generator,
         ncores=os.cpu_count(),
         chunks=5,
         )
 
-    for chunk in execute:
+    for chunk in execute_pool:
 
         # chunk of results
         assert len(chunk) == 5
@@ -71,11 +71,11 @@ def test_pool_in_chunks_nested():
 
 def test_pool_in_chunks_flatten():
     """Test pool in chunk from nested result."""
-    execute = partial(
+    execute = partial(LM.consume_iterable_in_list, dummy_generator)
+    execute_pool = partial(
         LM.pool_function_in_chunks,
-        LM.consume_iterable_in_list,
+        execute,
         range(20),
-        dummy_generator,
         ncores=os.cpu_count(),
         chunks=5,
         )
@@ -84,4 +84,4 @@ def test_pool_in_chunks_flatten():
         for result in flat:
             assert isinstance(result, tuple)
 
-    LM.flat_results_from_chunk(execute, assrt)
+    LM.flat_results_from_chunk(execute_pool, assrt)

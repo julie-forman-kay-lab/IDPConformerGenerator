@@ -9,7 +9,8 @@ from itertools import product
 from pathlib import Path as Path_
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import dssp_trans, jsonparameters
+from idpconfgen.core.definitions import dssp_trans_bytes, jsonparameters
+from idpconfgen.core.exceptions import DSSPParserError
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
 
@@ -99,15 +100,16 @@ def mkdssp_w_split(pdb, cmd, **kwargs):
     cmd : str
         The command to execute the external DSSP program.
 
+    Yields
+    ------
+    from `split_pdb_by_dssp`
     """
-    # begin
     pdbfile = pdb.resolve()
     _cmd = [cmd, '-i', str(pdbfile)]
     result = subprocess.run(_cmd, capture_output=True)
-    yield from split_pdb_by_dssp(
-        pdbfile,
-        result.stdout.decode('utf-8'),
-        **kwargs)
+    # if subpress.run fails, the parser will raise an error,
+    # no need to assert result.returncode
+    yield from split_pdb_by_dssp(pdbfile, result.stdout, **kwargs)
 
 
 def split_pdb_by_dssp(pdbfile, dssp_text, minimum=2, reduced=False):
@@ -140,20 +142,22 @@ def split_pdb_by_dssp(pdbfile, dssp_text, minimum=2, reduced=False):
 
         fname = f'{pdbname}_seg{segs}'
 
-        residues_bytes = set(c.encode() for c in residues)
+        residues_set = set(residues)
 
         lines2write = [
             line for line in pdb_bytes
-            if line[atom_resSeq].strip() in residues_bytes
+            if line[atom_resSeq].strip() in residues_set
             ]
 
         if all(line.startswith(b'HETATM') for line in lines2write):
             continue
 
+        # it is much faster to decode three small strings here
+        # than a whole DSSP file at the beginning
         __data = {
-            _ss: dssp,
-            _fasta: fasta,
-            _resids: ','.join(residues),
+            _ss: dssp.decode('utf-8'),
+            _fasta: fasta.decode('utf-8'),
+            _resids: b','.join(residues).decode('utf-8'),
             }
 
         yield fname, __data, b''.join(lines2write)
@@ -190,20 +194,20 @@ def parse_dssp(data, reduced=False):
     JSON doesn't accept bytes
     That is why `data` is expected as str.
     """
-    DT = dssp_trans
+    DT = dssp_trans_bytes
 
-    data_ = data.split('\n')
+    data_ = data.split(b'\n')
 
     # RM means removed empty
     RM1 = (i for i in data_ if i)
 
     # exausts generator until
     for line in RM1:
-        if line.strip().startswith('#'):
+        if line.strip().startswith(b'#'):
             break
     else:
         # if the whole generator is exhausted
-        raise IndexError
+        raise DSSPParserError("File exhausted without finding '#'")
 
     dssp = []
     fasta = []
@@ -211,29 +215,29 @@ def parse_dssp(data, reduced=False):
     _d_append = dssp.append
     _f_append = fasta.append
     _r_append = residues.append
+    bjoin = b''.join
     for line in RM1:
 
-        if line[13:14] != '!':
+        if line[13:14] != b'!':
             _d_append(line[16:17])
             _f_append(line[13:14])
             _r_append(line[6:10].strip())
 
         else:
-            dssp_ = ''.join(dssp).translate(DT) if reduced else ''.join(dssp)
-
-            yield dssp_, ''.join(fasta), residues
+            dssp_ = bjoin(dssp).translate(DT) if reduced else bjoin(dssp)
+            yield dssp_, bjoin(fasta), residues
 
             dssp.clear()
             fasta.clear()
             residues.clear()  # Attention with this clear!
 
     else:
-        dssp_ = ''.join(dssp).translate(DT) if reduced else ''.join(dssp)
-        yield dssp_, ''.join(fasta), residues
+        dssp_ = bjoin(dssp).translate(DT) if reduced else bjoin(dssp)
+        yield dssp_, bjoin(fasta), residues
 
 
 def pop_difference_with_log(dict1, dict2):
-    """"
+    """
     Pop keys in `dict1` that are not present in `dict2`.
 
     Reports pop'ed keys to log INFO.
@@ -254,7 +258,8 @@ def pop_difference_with_log(dict1, dict2):
     diff = d1k.difference(d2k)
     if diff:
         log.info(S(
-            f'The following keys will be removed from the dictionary:\n{diff}\n'
+            'The following keys will be removed from the dictionary: {}\n',
+            diff
             ))
 
         for key in diff:

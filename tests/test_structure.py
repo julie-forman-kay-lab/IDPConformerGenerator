@@ -15,10 +15,11 @@ from idpconfgen.libs import libpdb, libstructure
 from .tcommons import (
     EXPL_A,
     EXPL_B,
-    DummyFile,
+    TmpFile,
     cif_example,
     pdb_example,
     pdb_models,
+    pdb_models2,
     pdb_models_output,
     pdb_res_gap,
     pdb_saved,
@@ -402,18 +403,25 @@ def test_Structure_write(fix_Structure_build):
         )
     fix_Structure_build.add_filter_chain('A')
 
-    with DummyFile('pdb_testing.pdb') as fout:
+    with TmpFile('pdb_testing.pdb') as fout:
         fix_Structure_build.write_PDB(fout)
         result = fout.read_text()
         expected = pdb_saved.read_text()
         assert result == expected
 
 
-def test_Structure_write_pdb_models():
+@pytest.mark.parametrize(
+    'pdbmodels_in',
+    [
+        pdb_models,
+        pdb_models2,
+        ]
+    )
+def test_Structure_write_pdb_models(pdbmodels_in):
     """Test Structure parsig MODELS."""
-    s = libstructure.Structure(pdb_models)
+    s = libstructure.Structure(pdbmodels_in)
     s.build()
-    with DummyFile('pdb_testing.pdb') as fout:
+    with TmpFile('pdb_testing.pdb') as fout:
         s.write_PDB(fout)
         result = fout.read_text()
         expected = pdb_models_output.read_text()

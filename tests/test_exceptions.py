@@ -1,12 +1,13 @@
 """Test custom Exceptions."""
 import inspect
 
-import hypothesis.strategies as st
 import pytest
 from hypothesis import given
+from hypothesis import strategies as st
 
-from idpconfgen.core import has_string_formatters, count_string_formatters
+from idpconfgen.core import count_string_formatters
 from idpconfgen.core import exceptions as EXCPTNS
+from idpconfgen.core import has_string_formatters
 
 from .tcommons import random_type
 
@@ -97,9 +98,7 @@ def forcing_messages(request):
 
 
 def test_forcing_messages(ErrorClass, forcing_messages):
-    """
-    Test all types of exception behave the same way when formattable string.
-    """
+    """Test behaviour against when formattable string."""
     args, expected = forcing_messages[:-1], forcing_messages[-1]
     err = ErrorClass(*args)
     assert str(err) == expected
