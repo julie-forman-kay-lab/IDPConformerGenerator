@@ -15,7 +15,7 @@ USAGE:
 import argparse
 import sys
 
-from idpconfgen import cli_fastaext, cli_fetch
+from idpconfgen import cli_build, cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, log
 from idpconfgen.libs import libcli
@@ -32,6 +32,7 @@ Individual routines for DB creation:
     * {cli_pdbdl._name}
     * {cli_sscalc._name}
     * {cli_torsions._name}
+    * {cli_build._name}
 
 Other useful routines:
 
@@ -59,6 +60,7 @@ subparsers = ap.add_subparsers(
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
+libcli.add_subparser(subparsers, cli_build)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_fastaext)

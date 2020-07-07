@@ -2,7 +2,7 @@
 import functools
 import os
 import sys
-import time
+from time import time
 
 from idpconfgen import log
 from idpconfgen.logger import S
@@ -19,15 +19,32 @@ def record_time(process_name='', *args, **kwargs):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
 
-            start = time.time()
+            start = time()
 
             result = func(*args, **kwargs)
 
-            log.info(S(f'elapsed time :{process_name}: {time.time() - start}'))
+            log.info(S(f'elapsed time :{process_name}: {time() - start}'))
 
             return result
         return wrapper
     return decorator
+
+#
+#def timeme(func):
+#    @wraps(func)
+#    def wrapper(*args, **kwargs):
+#        s = time()
+#        result = func(*args, **kwargs)
+#        log.info(f'elapsed {func.__name__}: {time() - s:.3f} segs')
+#        return result
+#    return wrapper
+
+
+def timeme(func, *args, **kwargs):
+    s = time()
+    result = func(*args, **kwargs)
+    log.info(f'elapsed {func.__name__}: {time() - s:.3f} segs')
+    return result
 
 
 class ProgressWatcher:
