@@ -467,7 +467,7 @@ col_element = 14
 col_model = 15
 
 
-cols_coords = [col_x, col_y, col_z]
+cols_coords = slice(8, 11)
 
 
 # this servers read_pdb_data_to_array mainly

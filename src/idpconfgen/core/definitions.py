@@ -121,3 +121,18 @@ blocked_ids = [
 
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
+
+# Builder Definitions  ###
+# average values of the backbone angles calculated from
+# Dunbrack PISCES
+# cull_d200611/200611/cullpdb_pc90_res1.6_R0.25_d200611_chains8807
+# float values are represented as ratio of integers
+# https://docs.python.org/3/tutorial/floatingpoint.html
+average_N_CA_C = 7816439559578357 / 70368744177664  # +- 2.5068278409848403
+average_CA_C_Np1 = 1026782475409713 / 8796093022208  # +- 1.3123539017613925
+average_CA_C_O = 4237914978594851 / 35184372088832  # +- 1.091512747314927
+average_Np1_C_O = 4319847157608297 / 35184372088832  # +- 1.0303378740537752
+average_Cm1_N_CA = 8543335875083169 / 70368744177664  # +- 1.6638300324154913
+disntace_N_CA = 6576479998126501 / 4503599627370496  # +- 0.013036529567238732
+disntace_CA_C = 3430936279123861 / 2251799813685248  # +- 0.012599655969373144
+disntace_C_Np1 = 5992873469135695 / 4503599627370496  # +- 0.009621596711934686
