@@ -15,6 +15,7 @@ partition #LIGHTGREY Examples {
 | x | x | x | D | L |
 | (...) | (...) | (...)  | (...) | (...) |
 | x | - | - | E | L |
+| NAN | NAN | NAN | pipe | pipe |
 
 ;
 
