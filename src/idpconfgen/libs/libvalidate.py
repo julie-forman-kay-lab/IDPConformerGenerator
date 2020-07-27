@@ -24,6 +24,7 @@ def vdW_clash_common_preparation(
         vdW_elements,
         elements_to_consider,
         residue_numbers,
+        residues_apart,
         vdW_radii='tsai1999',
         ):
     atoms_to_consider = np.isin(vdW_elements, elements_to_consider)
@@ -37,15 +38,14 @@ def vdW_clash_common_preparation(
 
     residue_distances = np.subtract.outer(residue_numbers, residue_numbers)
 
-    return atc_mask, pure_radii_sum, residue_distances
+    return atc_mask, pure_radii_sum, residue_distances >= residues_apart
 
 
 def vdW_clash_calc(
         coords,
         atc_mask,
         pure_radii_sum,
-        residue_distances,
-        residues_apart,
+        distance_apart,
         ):
     #assert coords.size
     #assert atc_mask.size
@@ -59,7 +59,7 @@ def vdW_clash_calc(
 
     rows, cols = np.logical_and(
         np.logical_and(clashes_raw, atc_mask),
-        residue_distances >= residues_apart,
+        distance_apart,
         ).nonzero()
 
     return rows, cols
