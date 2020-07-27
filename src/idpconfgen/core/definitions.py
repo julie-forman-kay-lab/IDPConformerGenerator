@@ -54,6 +54,10 @@ vdW_radii_bondi_1964 = {
 'S': 1.8,
 }
 
+vdW_radii_dict = {
+    'tsai1999': vdW_radii_tsai_1999,
+    'bondi1964': vdW_radii_bondi_1964,
+    }
 
 
 # JSON structure parameter keys

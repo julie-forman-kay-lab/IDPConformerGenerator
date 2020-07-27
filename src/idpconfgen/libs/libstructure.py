@@ -130,6 +130,18 @@ class Structure:
         return set(self.data_array[:, col_chainID])
 
     @property
+    def coords(self):
+        """
+        Coordinates of the filtered atoms.
+
+        As float.
+        """
+        return self.filtered_atoms[:, cols_coords].astype(np.float32)
+
+
+
+
+    @property
     def consecutive_residues(self):
         """Consecutive residue groups from filtered atoms."""
         # the structure.consecutive_residues
