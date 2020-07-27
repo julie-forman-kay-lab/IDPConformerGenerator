@@ -34,6 +34,28 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v: k for k, v in aa3to1.items()}
 
+#
+# https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
+vdW_radii_tsai_1999 = {
+'C': 1.7,
+'N': 1.625,
+'O': 1.480,
+'P': 1.871,
+'S': 1.782,
+}
+
+# Bondi 1964,
+# https://en.wikipedia.org/wiki/Van_der_Waals_radius
+vdW_radii_bondi_1964 = {
+'C': 1.7,
+'N': 1.55,
+'O': 1.52,
+'P': 1.8,
+'S': 1.8,
+}
+
+
+
 # JSON structure parameter keys
 JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')
 jsonparameters = JsonParameters(
