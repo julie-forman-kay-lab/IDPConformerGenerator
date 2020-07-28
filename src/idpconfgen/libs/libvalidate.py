@@ -45,7 +45,7 @@ def vdW_clash_calc(
         coords,
         atc_mask,
         pure_radii_sum,
-        distance_apart,
+        distances_apart,
         ):
     #assert coords.size
     #assert atc_mask.size
@@ -59,8 +59,10 @@ def vdW_clash_calc(
 
     rows, cols = np.logical_and(
         np.logical_and(clashes_raw, atc_mask),
-        distance_apart,
+        distances_apart,
         ).nonzero()
+
+    #print(rows, cols)
 
     return rows, cols
 
@@ -95,11 +97,12 @@ def vdW_clash(
     residues_apart : int
         The minimum number of residues apart to consider for a clash.
     """
-    atc_mask, pure_radii_sum, residue_distances = \
+    atc_mask, pure_radii_sum, distances_apart = \
         vdW_clash_common_preparation(
             vdW_elements,
             elements_to_consider,
             residue_numbers,
+            residues_apart,
             vdW_radii=vdW_radii,
             )
 
@@ -107,7 +110,7 @@ def vdW_clash(
         coords,
         atc_mask,
         pure_radii_sum,
-        residue_distances,
+        distances_apart,
         )
 
     return results
