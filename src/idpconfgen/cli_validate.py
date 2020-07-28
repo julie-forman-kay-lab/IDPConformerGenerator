@@ -19,7 +19,7 @@ from idpconfgen.libs.libcli import CSV2Tuple
 # are they going to be here?
 import numpy as np
 from idpconfgen.libs.libstructure import col_name, col_resSeq
-from idpconfgen.libs.libvalidate import vdW_clash_common_preparation, vdW_clash_calc, vdW_clash
+from idpconfgen.libs.libvalidate import vdW_clash_common_preparation, vdW_clash_calc, vdW_clash, validate_conformer_from_disk
 from idpconfgen.core.definitions import heavy_atoms, vdW_radii_dict
 
 
@@ -41,18 +41,6 @@ ap = libcli.CustomParser(
     )
 
 libcli.add_argument_pdb_files(ap)
-
-ap.add_argument(
-    '-dt',
-    '--different-type',
-    help=(
-        'Whether all conformers are of the same or different type. '
-        'If TRUE, evaluates labels for every conformer separately. '
-        'If FALSE, consider atoms labels equal in all conformers. '
-        'Defaults to FALSE - considers all conformers having the same labels.'
-        ),
-    action='store_true',
-    )
 
 ap.add_argument(
     '-ele',
@@ -94,36 +82,22 @@ def main(
         func=None,
         ncores=1,
         residues_apart=3,
-        different_type=False,
         vdW_radii='tsai1999',
         ):
     """Perform main logic."""
     log.info(T('Validating conformers'))
     init_files(log, LOGFILESNAME)
 
-    print(different_type)
-
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
-    execute_kwargs = {
-        'elements_to_consider': elements_to_consider,
-        'residues_apart': residues_apart,
-        'vdW_radii': vdW_radii,
-        }
-
-    start = time()
-
-    if different_type:
-        print('different')
-        execute = partial(
-            report_on_crash,
-            validate_conformer,
-            ROC_prefix=_name,
-            **execute_kwargs,
-            )
-    else:
-        print('equal')
-        execute = main_same_type(*next(pdbs2operate), **execute_kwargs)
+    execute = partial(
+        report_on_crash,
+        validate_conformer_from_disk,
+        ROC_prefix=_name,
+        elements_to_consider=elements_to_consider,
+        residues_apart=residues_apart,
+        vdW_radii=vdW_radii,
+        )
 
     execute_pool = pool_function(
         partial(starunpack, execute),
@@ -133,124 +107,6 @@ def main(
 
     for _i in execute_pool:
         pass
-
-    print('finished: ', time() - start)
-
-
-
-def main_same_type(
-        name,
-        pdb_data,
-        **preparation_kwargs,
-        ):
-
-    _, atom_elements, res_numbers = get_vdW_needs_from_structure(pdb_data)
-
-    atc_mask, pure_radii_sum, distances_apart = vdW_clash_common_preparation(
-        atom_elements,
-        residue_numbers=res_numbers,
-        **preparation_kwargs,
-        )
-
-#    atc_mask, pure_radii_sum, distances_apart = preparation(
-#        name,
-#        pdb_data,
-#        **preparation_kwargs,
-#        )
-
-    validate_conformer_from_preparation(
-        name,
-        pdb_data,
-        atc_mask=atc_mask,
-        pure_radii_sum=pure_radii_sum,
-        distances_apart=distances_apart,
-        )
-    # done
-
-    execute = partial(
-        report_on_crash,
-        validate_conformer_from_preparation,
-        atc_mask=atc_mask,
-        pure_radii_sum=pure_radii_sum,
-        distances_apart=distances_apart,
-        ROC_prefix=_name,
-        )
-
-    return execute
-
-
-#def preparation(
-#        name,
-#        pdb_data,
-#        elements_to_consider,
-#        residues_apart,
-#        vdW_radii,
-#        ):
-#    """."""
-#    _, atom_elements, res_numbers = get_vdW_needs_from_structure(pdb_data)
-#
-#    return vdW_clash_common_preparation(
-#        atom_elements,
-#        elements_to_consider=elements_to_consider,
-#        residue_numbers=res_numbers,
-#        residues_apart=residues_apart,
-#        vdW_radii=vdW_radii,
-#        )
-
-
-def get_vdW_needs_from_structure(pdb_data):
-    s = Structure(pdb_data)
-    s.build()
-    da = s.data_array
-    atom_names = da[:, col_name]
-    atom_elements = atom_names.astype('<U1')
-    res_numbers = da[:, col_resSeq].astype(np.int)
-    return s, atom_elements, res_numbers
-
-
-def validate_conformer_from_preparation(
-        name,
-        pdb_data,
-        **calc_kwargs,
-        #atc_mask,
-        #pure_radii_sum,
-        #distances_apart,
-        ):
-    # here I don't use kwargs because of the need to use partial
-
-    s = Structure(pdb_data)
-    s.build()
-    coords = s.coords
-
-    return vdW_clash_calc(
-        coords,
-        **calc_kwargs,
-        #atc_mask=atc_mask,
-        #pure_radii_sum=pure_radii_sum,
-        #distances_apart=distances_apart,
-        )
-
-
-def validate_conformer(
-        name,
-        pdb_data,
-        elements_to_consider,
-        residues_apart,
-        vdW_radii,
-        ):
-    """."""
-    s, atom_elements, res_numbers = get_vdW_needs_from_structure(pdb_data)
-
-    coords = s.coords
-
-    vdW_clash(
-        coords,
-        atom_elements,
-        elements_to_consider,
-        res_numbers,
-        residues_apart,
-        vdW_radii=vdW_radii,
-        )
 
 
 if __name__ == '__main__':

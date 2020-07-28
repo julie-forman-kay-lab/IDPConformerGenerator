@@ -16,7 +16,7 @@ import math
 
 
 from idpconfgen.core.definitions import vdW_radii_dict
-from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs.libstructure import Structure, col_name, col_resSeq
 
 
 
@@ -62,8 +62,6 @@ def vdW_clash_calc(
         distances_apart,
         ).nonzero()
 
-    #print(rows, cols)
-
     return rows, cols
 
 
@@ -106,23 +104,36 @@ def vdW_clash(
             vdW_radii=vdW_radii,
             )
 
-    results = vdW_clash_calc(
+    return vdW_clash_calc(
         coords,
         atc_mask,
         pure_radii_sum,
         distances_apart,
         )
 
-    return results
 
+def validate_conformer_from_disk(
+        name,
+        pdb_data,
+        elements_to_consider,
+        residues_apart,
+        vdW_radii,
+        ):
+    """."""
+    s = Structure(pdb_data)
+    s.build()
+    da = s.data_array
+    atom_names = da[:, col_name]
+    atom_elements = atom_names.astype('<U1')
+    res_numbers = da[:, col_resSeq].astype(np.int)
 
+    coords = s.coords
 
-def validate_conformer(name, data):
-    """
-    """
-    structure = Structure(data)
-    structure.build()
-    structure.add_filter_backbone()
-    bbcoords = structure.coords
-    print(bbcoords)
-    return
+    rows, cols = vdW_clash(
+        coords,
+        atom_elements,
+        elements_to_consider,
+        res_numbers,
+        residues_apart,
+        vdW_radii=vdW_radii,
+        )
