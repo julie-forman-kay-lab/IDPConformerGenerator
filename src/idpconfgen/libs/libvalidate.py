@@ -1,5 +1,6 @@
 """
 Tools to validate conformers.
+
 Recognition of this module should be grated to:
     - @AlaaShamandy
     - @joaomcteixeira
@@ -9,15 +10,14 @@ Recognition of this module should be grated to:
 """
 import numpy as np
 from scipy.spatial import distance
-from scipy.spatial import KDTree
-from numpy import array
-import math
-
-
 
 from idpconfgen.core.definitions import vdW_radii_dict
-from idpconfgen.libs.libstructure import Structure, col_name, col_resSeq
-
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    col_resName,
+    col_resSeq,
+    )
 
 
 def vdW_clash_common_preparation(
@@ -27,6 +27,12 @@ def vdW_clash_common_preparation(
         residues_apart,
         vdW_radii='tsai1999',
         ):
+    """
+    Prepare masks for vdW clash calculation.
+
+    .. see-also::
+        vdW_clash_calc
+    """
     atoms_to_consider = np.isin(vdW_elements, elements_to_consider)
     atc_mask = np.logical_and.outer(atoms_to_consider, atoms_to_consider)
     vdW_vector = np.zeros(vdW_elements.size)
@@ -57,12 +63,14 @@ def vdW_clash_calc(
 
     clashes_raw = distances <= pure_radii_sum
 
-    rows, cols = np.logical_and(
+    rows_cols = np.logical_and(
         np.logical_and(clashes_raw, atc_mask),
         distances_apart,
         ).nonzero()
 
-    return rows, cols
+    rows, cols = rows_cols
+
+    return rows, cols, distances[rows_cols], pure_radii_sum[rows_cols]
 
 
 def vdW_clash(
@@ -74,6 +82,8 @@ def vdW_clash(
         vdW_radii='tsai1999',
         ):
     """
+    Calculates vdW clashes from XYZ coordinates and identity masks.
+
     Parameters
     ----------
     coordinates : numpy array, dtype=float, shape (N, 3)
@@ -94,6 +104,10 @@ def vdW_clash(
 
     residues_apart : int
         The minimum number of residues apart to consider for a clash.
+
+    Returns
+    -------
+    What :func:`vdW_clash_calc` returns.
     """
     atc_mask, pure_radii_sum, distances_apart = \
         vdW_clash_common_preparation(
@@ -126,10 +140,9 @@ def validate_conformer_from_disk(
     atom_names = da[:, col_name]
     atom_elements = atom_names.astype('<U1')
     res_numbers = da[:, col_resSeq].astype(np.int)
-
     coords = s.coords
 
-    rows, cols = vdW_clash(
+    rows, cols, distances, threshold = vdW_clash(
         coords,
         atom_elements,
         elements_to_consider,
@@ -137,3 +150,47 @@ def validate_conformer_from_disk(
         residues_apart,
         vdW_radii=vdW_radii,
         )
+
+    report = clash_report(da, rows, cols, distances, threshold)
+
+    # rows.size is the number of clashes
+    return name, rows.size, report
+
+
+def clash_report(data_array, pair1, pair2, distances, thresholds):
+    """
+    Prepare a report of the identified clashes.
+
+    Parameters
+    ----------
+    data_array : Numpy ndarray, shape (N, M)
+        A numpy data_array as given by
+        :attr:`idpconfgen.libs.libstructure.Structure.data_array`.
+
+    pair1, pair2 : ordered iterable of integers
+        The row indexes where to retrieve atom information from `data_array´.
+        pair1 and pair2 must be aligned in order for the report to make sense,
+        that it, the first item of pair1 clashes with the first item of pair2.
+
+    distances, threshold : indexable of length equal to pair1/2 length
+        Contain distances and clash thresholds for the different
+        identified clashes.
+
+    Returns
+    -------
+    str
+        The report.
+    """
+    items = [col_resSeq, col_resName, col_name]
+    report = []
+    for i, (p1, p2) in enumerate(zip(pair1, pair2)):
+        n1, r1, a1 = data_array[p1, items]
+        n2, r2, a2 = data_array[p2, items]
+        report.append(
+            f"{n1:>5} {r1:>3} {a1:>5} - "
+            f"{n2:>5} {r2:>3} {a2:>5} - "
+            f't: {thresholds[i]:.3f} - '
+            f'd: {distances[i]:.3f}'
+            )
+
+    return '\n'.join(report)

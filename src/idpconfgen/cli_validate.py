@@ -8,22 +8,13 @@ import argparse
 from functools import partial
 
 from idpconfgen import log
-from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import FileReaderIterator
-from idpconfgen.libs.libstructure import Structure
-from idpconfgen.libs.libmulticore import pool_function, starunpack
-from idpconfgen.logger import T, init_files, report_on_crash
-from idpconfgen.libs.libcli import CSV2Tuple
-
-
-# are they going to be here?
-import numpy as np
-from idpconfgen.libs.libstructure import col_name, col_resSeq
-from idpconfgen.libs.libvalidate import vdW_clash_common_preparation, vdW_clash_calc, vdW_clash, validate_conformer_from_disk
 from idpconfgen.core.definitions import heavy_atoms, vdW_radii_dict
-
-
-from time import time
+from idpconfgen.libs import libcli
+from idpconfgen.libs.libcli import CSV2Tuple
+from idpconfgen.libs.libio import FileReaderIterator
+from idpconfgen.libs.libmulticore import pool_function, starunpack
+from idpconfgen.libs.libvalidate import validate_conformer_from_disk
+from idpconfgen.logger import T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.validate'
@@ -105,8 +96,33 @@ def main(
         ncores=ncores,
         )
 
-    for _i in execute_pool:
-        pass
+    results = list(execute_pool)
+
+    results.sort(key=lambda x: x[0])
+    max_length = max(len(x[0].stem) for x in results)
+
+    counts = []
+    reports = []
+    for name, clash_number, clash_report in results:
+        counts.append(
+            f'{name}:{" " * (max_length - len(name.stem))} '
+            f'{clash_number}'
+            )
+        reports.append(f'# {name}\n{clash_report}\n')
+
+    with open('validation_report.txt', 'w') as fout:
+        cstring = '\n'.join(counts)
+        rstring = '\n'.join(reports)
+        fout.write(
+            '# Used parameters:\n'
+            f'Elements considered: {elements_to_consider}\n'
+            f'Residue spacing: {residues_apart}\n'
+            f'vdW_radii: {vdW_radii}\n'
+            '\n# Number of vdW clashes per conformer\n'
+            f"{cstring}"
+            '\n\nSpecific clashes per conformer:\n'
+            f"{rstring}"
+            )
 
 
 if __name__ == '__main__':
