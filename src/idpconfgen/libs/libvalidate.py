@@ -24,7 +24,7 @@ def vdW_clash_common_preparation(
         vdW_elements,
         elements_to_consider,
         residue_numbers,
-        residues_apart,
+        residues_apart=2,
         vdW_radii='tsai1999',
         ):
     """
@@ -52,6 +52,7 @@ def vdW_clash_calc(
         atc_mask,
         pure_radii_sum,
         distances_apart,
+        vdW_overlap=0.0,
         ):
     #assert coords.size
     #assert atc_mask.size
@@ -61,7 +62,11 @@ def vdW_clash_calc(
 
     distances = distance.cdist(coords, coords, 'euclidean')
 
-    clashes_raw = distances <= pure_radii_sum
+    #clashes_raw = distances <= pure_radii_sum
+
+    overlap = pure_radii_sum - distances
+
+    clashes_raw = overlap >= vdW_overlap
 
     rows_cols = np.logical_and(
         np.logical_and(clashes_raw, atc_mask),
@@ -70,7 +75,13 @@ def vdW_clash_calc(
 
     rows, cols = rows_cols
 
-    return rows, cols, distances[rows_cols], pure_radii_sum[rows_cols]
+    return (
+        rows,
+        cols,
+        distances[rows_cols],
+        pure_radii_sum[rows_cols],
+        overlap[rows_cols],
+        )
 
 
 def vdW_clash(
@@ -80,6 +91,7 @@ def vdW_clash(
         residue_numbers,
         residues_apart=3,
         vdW_radii='tsai1999',
+        vdW_overlap=0.0,
         ):
     """
     Calculates vdW clashes from XYZ coordinates and identity masks.
@@ -114,7 +126,7 @@ def vdW_clash(
             vdW_elements,
             elements_to_consider,
             residue_numbers,
-            residues_apart,
+            residues_apart=residues_apart,
             vdW_radii=vdW_radii,
             )
 
@@ -123,6 +135,7 @@ def vdW_clash(
         atc_mask,
         pure_radii_sum,
         distances_apart,
+        vdW_overlap=vdW_overlap,
         )
 
 
@@ -130,8 +143,7 @@ def validate_conformer_from_disk(
         name,
         pdb_data,
         elements_to_consider,
-        residues_apart,
-        vdW_radii,
+        **kwargs,
         ):
     """."""
     s = Structure(pdb_data)
@@ -142,22 +154,21 @@ def validate_conformer_from_disk(
     res_numbers = da[:, col_resSeq].astype(np.int)
     coords = s.coords
 
-    rows, cols, distances, threshold = vdW_clash(
+    rows, cols, distances, radii_sum, overlap = vdW_clash(
         coords,
         atom_elements,
         elements_to_consider,
         res_numbers,
-        residues_apart,
-        vdW_radii=vdW_radii,
+        **kwargs,
         )
 
-    report = clash_report(da, rows, cols, distances, threshold)
+    report = clash_report(da, rows, cols, distances, radii_sum, overlap)
 
     # rows.size is the number of clashes
     return name, rows.size, report
 
 
-def clash_report(data_array, pair1, pair2, distances, thresholds):
+def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
     """
     Prepare a report of the identified clashes.
 
@@ -189,8 +200,9 @@ def clash_report(data_array, pair1, pair2, distances, thresholds):
         report.append(
             f"{n1:>5} {r1:>3} {a1:>5} - "
             f"{n2:>5} {r2:>3} {a2:>5} - "
-            f't: {thresholds[i]:.3f} - '
-            f'd: {distances[i]:.3f}'
+            f'r: {radii_sum[i]:.3f} - '
+            f'd: {distances[i]:.3f} - '
+            f'o: {overlap[i]:.3f}'
             )
 
     return '\n'.join(report)

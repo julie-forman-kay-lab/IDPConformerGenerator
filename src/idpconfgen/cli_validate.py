@@ -5,6 +5,7 @@ USAGE:
     $ idpconfgen validator FOLDER
 """
 import argparse
+import sys
 from functools import partial
 
 from idpconfgen import log
@@ -14,7 +15,7 @@ from idpconfgen.libs.libcli import CSV2Tuple
 from idpconfgen.libs.libio import FileReaderIterator
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libvalidate import validate_conformer_from_disk
-from idpconfgen.logger import T, init_files, report_on_crash
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.validate'
@@ -54,6 +55,14 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-vo',
+    '--vdW-overlap',
+    help='VDW overlap in all atoms.',
+    default=0.0,
+    type=float,
+    )
+
+ap.add_argument(
     '-ra',
     '--residues-apart',
     help=(
@@ -69,17 +78,25 @@ libcli.add_argument_ncores(ap)
 
 def main(
         pdb_files,
-        elements_to_consider=('C'),
+        elements_to_consider=('C',),
         func=None,
         ncores=1,
         residues_apart=3,
         vdW_radii='tsai1999',
+        vdW_overlap=0.0,
         ):
     """Perform main logic."""
     log.info(T('Validating conformers'))
     init_files(log, LOGFILESNAME)
 
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
+    if len(pdbs2operate) == 0:
+        log.error(T('invalid input.'))
+        log.error(S(
+            'There are no PDB files in the specified folders. '
+            'Nothing to do...\n'
+            ))
+        sys.exit(2)
 
     execute = partial(
         report_on_crash,
@@ -88,6 +105,7 @@ def main(
         elements_to_consider=elements_to_consider,
         residues_apart=residues_apart,
         vdW_radii=vdW_radii,
+        vdW_overlap=vdW_overlap,
         )
 
     execute_pool = pool_function(
