@@ -71,7 +71,7 @@ def vdW_clash_common_preparation(
 
     vdW_vector = np.zeros(protein_atoms.size)
     for atom, radius in vdW_radii_dict[vdW_radii].items():
-        vdW_vector[protein_atoms == atom] = radius
+        vdW_vector[protein_elements == atom] = radius
 
     pure_radii_sum = np.add.outer(vdW_vector, vdW_vector)
 
