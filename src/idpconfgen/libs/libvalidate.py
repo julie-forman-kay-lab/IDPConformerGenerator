@@ -14,6 +14,7 @@ from scipy.spatial import distance
 from idpconfgen.core.definitions import vdW_radii_dict
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -21,24 +22,56 @@ from idpconfgen.libs.libstructure import (
 
 
 def vdW_clash_common_preparation(
-        vdW_elements,
-        elements_to_consider,
+        protein_atoms,
+        protein_elements,
         residue_numbers,
+        atoms_to_consider=False,
+        elements_to_consider=False,
         residues_apart=2,
         vdW_radii='tsai1999',
         ):
     """
     Prepare masks for vdW clash calculation.
 
+    `atoms_to_consider` and `elements_to_consider` are evaluated with
+    logical AND, that is, only entries that satisfy both are considered.
+
     .. see-also::
         vdW_clash_calc
-    """
-    atoms_to_consider = np.isin(vdW_elements, elements_to_consider)
-    atc_mask = np.logical_and.outer(atoms_to_consider, atoms_to_consider)
-    vdW_vector = np.zeros(vdW_elements.size)
 
+    Parameters
+    ----------
+    protein_atoms : np.array, of shape (N,), dtype string
+        A sequence of the protein atom names.
+
+    protein_elements : np.array, of shape (N,), dytpe compatible with '<U2'
+        A sequence of the protein atom elements aligned with `protein_atoms`.
+
+    residue_numbers : np.array of shape (N,), dtype=np.int
+
+    atoms_to_consider : sequence, optional
+        A tuple of the atom names to consider in the calculation.
+        Defaults to FALSE, considers all atoms.
+
+    elements_to_consider : sequence, optional
+        A tuple of the element types to consider in the calculation.
+        Defaults to FALSE, considers all elements.
+    """
+    # uses all options if values evaluate to FALSE
+    atoms_to_consider = atoms_to_consider or protein_atoms
+    elements_to_consider = elements_to_consider or protein_elements
+
+    atoms_to_analyze = np.logical_and(
+        np.isin(protein_elements, elements_to_consider),
+        np.isin(protein_atoms, atoms_to_consider),
+        )
+
+    # computes only pairs of atoms where both atoms are in atoms_to_consider
+    atc_mask = np.logical_and.outer(atoms_to_analyze, atoms_to_analyze)
+
+    vdW_vector = np.zeros(protein_atoms.size)
     for atom, radius in vdW_radii_dict[vdW_radii].items():
-        vdW_vector[vdW_elements == atom] = radius
+        vdW_vector[protein_atoms == atom] = radius
 
     pure_radii_sum = np.add.outer(vdW_vector, vdW_vector)
 
@@ -54,18 +87,33 @@ def vdW_clash_calc(
         distances_apart,
         vdW_overlap=0.0,
         ):
-    #assert coords.size
-    #assert atc_mask.size
-    #assert pure_radii_sum.size
-    #assert residue_distances.size
-    #assert isinstance(residues_apart, int)
+    """
+    Calculate van der Waals clashes.
 
+    Parameters
+    ----------
+    coords : np.array, dtype=np.float
+        The protein XYZ coordinates.
+
+    atc_mask : np.array, dtype=np.bool, shape (N, N)
+        A boolean masks to filter only the atoms relevant to report.
+
+    pure_radii_sum : np.array, dtype=float, shape (N, N)
+        An all-to-all sum of the vdW radii. In other words, the threeshold
+        after which a clash is considered to exist, before applying
+        `vdW_overlap` allowance.
+
+    distances_apart : np.array, dtype=int, shape (N, N)
+        An all-to-all atom-to-atom residue to residue disntace matrix.
+
+    vdW_overlap : float
+        The vdW overlap tolerance to apply.
+    """
     distances = distance.cdist(coords, coords, 'euclidean')
 
-    #clashes_raw = distances <= pure_radii_sum
-
+    # computes clahses based on overlap, so we can apply a overlap
+    # threshold
     overlap = pure_radii_sum - distances
-
     clashes_raw = overlap >= vdW_overlap
 
     rows_cols = np.logical_and(
@@ -86,7 +134,9 @@ def vdW_clash_calc(
 
 def vdW_clash(
         coords,
-        vdW_elements,
+        protein_atoms,
+        protein_elements,
+        atoms_to_consider,
         elements_to_consider,
         residue_numbers,
         residues_apart=3,
@@ -94,7 +144,7 @@ def vdW_clash(
         vdW_overlap=0.0,
         ):
     """
-    Calculates vdW clashes from XYZ coordinates and identity masks.
+    Calculate vdW clashes from XYZ coordinates and identity masks.
 
     Parameters
     ----------
@@ -123,9 +173,11 @@ def vdW_clash(
     """
     atc_mask, pure_radii_sum, distances_apart = \
         vdW_clash_common_preparation(
-            vdW_elements,
-            elements_to_consider,
+            protein_atoms,
+            protein_elements,
             residue_numbers,
+            atoms_to_consider=atoms_to_consider,
+            elements_to_consider=elements_to_consider,
             residues_apart=residues_apart,
             vdW_radii=vdW_radii,
             )
@@ -142,6 +194,7 @@ def vdW_clash(
 def validate_conformer_from_disk(
         name,
         pdb_data,
+        atoms_to_consider,
         elements_to_consider,
         **kwargs,
         ):
@@ -150,13 +203,27 @@ def validate_conformer_from_disk(
     s.build()
     da = s.data_array
     atom_names = da[:, col_name]
-    atom_elements = atom_names.astype('<U1')
+    atom_elements_pure = da[:, col_element]
+    atom_elements_from_names = atom_names.astype('<U1')
+
+    # elements_dont_exist = np.logical_not(atom_elements_pure.astype(np.bool))
+    # ValueError: invalid literal for int() with base 10:
+    # really?
+    elements_dont_exist = np.array([not bool(i) for i in atom_elements_pure])
+
+    best_observation_ele = np.zeros(atom_elements_pure.shape, dtype='<U2')
+    best_observation_ele[:] = atom_elements_pure[:]
+    best_observation_ele[elements_dont_exist] = \
+        atom_elements_from_names[elements_dont_exist]
+
     res_numbers = da[:, col_resSeq].astype(np.int)
     coords = s.coords
 
     rows, cols, distances, radii_sum, overlap = vdW_clash(
         coords,
-        atom_elements,
+        atom_names,  # protein atoms
+        best_observation_ele,  # protein elements
+        atoms_to_consider,
         elements_to_consider,
         res_numbers,
         **kwargs,

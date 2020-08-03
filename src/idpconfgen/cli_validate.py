@@ -35,14 +35,27 @@ ap = libcli.CustomParser(
 libcli.add_argument_pdb_files(ap)
 
 ap.add_argument(
+    '-atm',
+    '--atoms-to-consider',
+    help=(
+        'Which atoms to consider in the validation process. '
+        f'Defaults to heavy atoms: {heavy_atoms!r}.'
+        ),
+    nargs='+',
+    default=None,
+    #action=CSV2Tuple,
+    )
+
+ap.add_argument(
     '-ele',
     '--elements-to-consider',
     help=(
         'Which elements to consider in the validation process. '
         f'Defaults to heavy atoms: {heavy_atoms!r}.'
         ),
+    nargs='+',
     default=tuple(heavy_atoms),
-    action=CSV2Tuple,
+    #action=CSV2Tuple,
     )
 
 ap.add_argument(
@@ -78,7 +91,8 @@ libcli.add_argument_ncores(ap)
 
 def main(
         pdb_files,
-        elements_to_consider=('C',),
+        atoms_to_consider=None,
+        elements_to_consider=None,
         func=None,
         ncores=1,
         residues_apart=3,
@@ -102,6 +116,7 @@ def main(
         report_on_crash,
         validate_conformer_from_disk,
         ROC_prefix=_name,
+        atoms_to_consider=atoms_to_consider,
         elements_to_consider=elements_to_consider,
         residues_apart=residues_apart,
         vdW_radii=vdW_radii,
