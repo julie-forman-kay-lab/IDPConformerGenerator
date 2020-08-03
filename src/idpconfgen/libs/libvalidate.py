@@ -11,13 +11,19 @@ Recognition of this module should be grated to:
 import numpy as np
 from scipy.spatial import distance
 
-from idpconfgen.core.definitions import vdW_radii_dict
+from idpconfgen.core.definitions import (
+    distance_CA_C,
+    distance_C_Np1,
+    distance_N_CA,
+    vdW_radii_dict,
+    )
 from idpconfgen.libs.libstructure import (
     Structure,
     col_element,
     col_name,
     col_resName,
     col_resSeq,
+    cols_coords,
     )
 
 
@@ -235,6 +241,72 @@ def validate_conformer_from_disk(
     return name, rows.size, report
 
 
+def bb_bond_len_calc(coords, tolerance=0.01):
+    """."""
+
+    expected_bond_length = np.tile(
+        [
+            distance_N_CA,
+            distance_CA_C,
+            distance_C_Np1
+            ],
+        coords.shape[0] // 3
+        )
+
+    #bond_distances = distance.cdist(coords, coords, 'euclidean')
+
+
+    bond_distances = coords[:-1] - coords[1:]
+
+    bond_distances = np.sqrt(
+        np.float_power(coords[:-1, 0] - coords[1:, 0], 2) +
+        np.float_power(coords[:-1, 1] - coords[1:, 1], 2) +
+        np.float_power(coords[:-1, 2] - coords[1:, 2], 2)
+        )
+
+    #difference = np.abs(bond_distances - expected_bond_length[:-1])
+
+    # true when bond length is too different
+    invalid = np.invert(np.isclose(
+        bond_distances,
+        expected_bond_length[:-1],
+        atol=tolerance,
+        ))
+
+    return invalid, bond_distances, expected_bond_length[:-1]
+
+
+def validate_bb_bonds_len_from_disk(
+        name,
+        pdb_data,
+        tolerance=0.1,
+        ):
+    """."""
+
+    s = Structure(pdb_data)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+    fa = s.filtered_atoms
+
+    invalid, bond_distances, expected_bond_length = \
+        bb_bond_len_calc(s.coords, tolerance)
+
+    res_nums = fa[:-1, col_resSeq]
+    res_names = fa[:-1, col_resName]
+    res_atoms = fa[:-1, col_name]
+
+    report = bond_len_report(
+        bond_distances,
+        expected_bond_length,
+        invalid,
+        res_nums,
+        res_names,
+        res_atoms,
+        )
+
+    return name, np.sum(invalid), report
+
+
 def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
     """
     Prepare a report of the identified clashes.
@@ -273,3 +345,29 @@ def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
             )
 
     return '\n'.join(report)
+
+
+def bond_len_report(
+        bond_distances,
+        expected_bond_length,
+        invalid_bool,
+        res_nums,
+        res_names,
+        res_atoms,
+        ):
+    """."""
+    BD = bond_distances[invalid_bool]
+    EB = expected_bond_length[invalid_bool]
+    DIFF = np.abs(BD - EB)
+    RNU = res_nums[invalid_bool]
+    RNA = res_names[invalid_bool]
+    RAT = res_atoms[invalid_bool]
+
+    rows = []
+    AR = rows.append
+
+    for s, r, a, bd, eb, d in zip(RNU, RNA, RAT, BD, EB, DIFF):
+        resid = f'{s}{r}{a}'
+        AR(f'{resid:<10} - f: {bd:.3f} e: {eb:.3f} - {d:.3f}')
+
+    return '\n'.join(rows)
