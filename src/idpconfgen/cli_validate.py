@@ -8,6 +8,8 @@ import argparse
 import sys
 from functools import partial
 
+import numpy as np
+
 from idpconfgen import log
 from idpconfgen.core.definitions import heavy_atoms, vdW_radii_dict
 from idpconfgen.libs import libcli
@@ -17,11 +19,16 @@ from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libvalidate import (
     validate_bb_bonds_len_from_disk,
     validate_conformer_from_disk,
+    bb_bond_length,
     )
+from idpconfgen.libs.libstructure import Structure, col_resSeq, col_name, col_resName
+from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
+
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.validate'
+VALIDATION_PROTOCOLS = ('vdw', 'bbl', 'bbd')
 
 _name = 'validate'
 _help = 'Validate IDP conformers according to criteria.'
@@ -46,7 +53,6 @@ ap.add_argument(
         ),
     nargs='+',
     default=None,
-    #action=CSV2Tuple,
     )
 
 ap.add_argument(
@@ -58,7 +64,6 @@ ap.add_argument(
         ),
     nargs='+',
     default=tuple(heavy_atoms),
-    #action=CSV2Tuple,
     )
 
 ap.add_argument(
@@ -97,6 +102,18 @@ ap.add_argument(
     default=0.01,
     )
 
+ap.add_argument(
+    '-v',
+    '--validations',
+    help=(
+        'Which validations to perform. Input as a list. '
+        f'Available options are: {VALIDATION_PROTOCOLS}.'
+        ),
+    nargs='+',
+    default=VALIDATION_PROTOCOLS,
+    )
+
+
 libcli.add_argument_ncores(ap)
 
 
@@ -110,26 +127,106 @@ def main(
         vdW_radii='tsai1999',
         vdW_overlap=0.0,
         bond_tolerance=0.01,
+        validations=VALIDATION_PROTOCOLS,
         ):
     """Perform main logic."""
     log.info(T('Validating conformers'))
     init_files(log, LOGFILESNAME)
 
-    validate_vdW_clashes(
-        pdb_files,
-        atoms_to_consider,
-        elements_to_consider,
-        residues_apart,
-        vdW_radii,
-        vdW_overlap,
-        ncores,
+    if 'vdw' in validations:
+        validate_vdW_clashes(
+            pdb_files,
+            atoms_to_consider,
+            elements_to_consider,
+            residues_apart,
+            vdW_radii,
+            vdW_overlap,
+            ncores,
+            )
+
+    if 'bbl' in validations:
+        validate_bond_lengths(
+            pdb_files,
+            bond_tolerance,
+            ncores,
+            )
+
+    if 'bbd' in validations:
+        bb_bond_length_distribution(
+            pdb_files,
+            ncores,
+            )
+
+
+def bb_bond_length_distribution(pdb_files, ncores):
+    """."""
+
+    pdbs2operate = FileReaderIterator(pdb_files, ext='*.pdb')
+
+    name, pdb_data = next(pdbs2operate)
+    s = Structure(pdb_data)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+    fa = s.filtered_atoms
+    number_of_bb_atoms = fa.shape[0]
+
+    # ddata from distribution data
+    # the number of bonds is the number of atoms -1
+    ddata = np.zeros(
+        (len(pdbs2operate), number_of_bb_atoms - 1),
+        dtype=np.float32,
         )
 
-    validate_bond_lengths(
-        pdb_files,
-        bond_tolerance,
-        ncores,
+    ddata[0, :] = calculate_sequential_bond_distances(s.coords)
+
+    labels = np.array([
+        f'{s}{r}{a}'
+        for r, s, a in fa[:-1, [col_resSeq, col_resName, col_name]]
+        ])
+
+    print(labels.shape)
+
+    del s
+
+    execute = partial(report_on_crash, bb_bond_length)
+    execute_pool = pool_function(
+        partial(starunpack, execute),
+        pdbs2operate,
+        ncores=ncores,
         )
+
+    for i, lengths in enumerate(execute_pool, start=1):
+        ddata[i, :] = lengths
+
+    mean = np.mean(ddata, axis=0)
+    std = np.std(ddata, axis=0)
+    median = np.median(ddata, axis=0)
+    var = np.var(ddata, axis=0)
+
+    results = np.stack([mean, std, median, var], axis=-1)
+
+    table = np.append(labels[:, np.newaxis], results.astype('|S7'), axis=1)
+
+    print(table.shape)
+
+    np.savetxt(
+        'validate_bb_bond_distribution.txt',
+        table,
+        fmt='%s',# + ['%.3f'] * 4,
+        delimiter='\t',
+        comments='#',
+        header=(
+            f' Backbone bond lengths distributions for conformers in:\n'
+            f' {pdb_files}\n'
+            f' analyzed a total of {ddata.shape[0]} conformers\n'
+            f' with {ddata.shape[1]} bonds.\n'
+            f' mean, std, median, variance'
+            ),
+        )
+
+    return
+
+
 
 
 def validate_bond_lengths(

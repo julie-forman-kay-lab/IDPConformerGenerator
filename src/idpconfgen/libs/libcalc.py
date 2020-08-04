@@ -276,6 +276,16 @@ def get_separate_torsions(torsions_array):
     return CA_C, C_N, N_CA
 
 
+def calculate_sequential_bond_distances(coords):
+    """Calculate distances from a sequence of XYZ coordinates."""
+    return np.sqrt(
+        np.float_power(coords[:-1, 0] - coords[1:, 0], 2) +
+        np.float_power(coords[:-1, 1] - coords[1:, 1], 2) +
+        np.float_power(coords[:-1, 2] - coords[1:, 2], 2)
+        )
+
+
+
 def validate_backbone_labels_for_torsion(labels, minimum=2):
     """
     Validate labels for torsion angle calculation.

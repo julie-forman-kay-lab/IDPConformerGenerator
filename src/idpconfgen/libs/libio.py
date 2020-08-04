@@ -15,6 +15,10 @@ from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 
 
+# TODO:
+# consider reducing the lengths of the FileIterators as progression
+#  along the generation happens
+
 # Dispachers are at the bottom
 
 

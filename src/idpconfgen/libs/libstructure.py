@@ -77,6 +77,9 @@ class Structure:
         self.clear_filters()
         assert isinstance(self.filters, list)
 
+    def __len__(self):
+        return self.data_array.shape[0]
+
     def build(self):
         """
         Read structure raw data in :attr:`rawdata`.

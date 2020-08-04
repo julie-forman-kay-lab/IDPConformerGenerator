@@ -25,6 +25,7 @@ from idpconfgen.libs.libstructure import (
     col_resSeq,
     cols_coords,
     )
+from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
 
 
 def vdW_clash_common_preparation(
@@ -253,18 +254,7 @@ def bb_bond_len_calc(coords, tolerance=0.01):
         coords.shape[0] // 3
         )
 
-    #bond_distances = distance.cdist(coords, coords, 'euclidean')
-
-
-    bond_distances = coords[:-1] - coords[1:]
-
-    bond_distances = np.sqrt(
-        np.float_power(coords[:-1, 0] - coords[1:, 0], 2) +
-        np.float_power(coords[:-1, 1] - coords[1:, 1], 2) +
-        np.float_power(coords[:-1, 2] - coords[1:, 2], 2)
-        )
-
-    #difference = np.abs(bond_distances - expected_bond_length[:-1])
+    bond_distances = calculate_sequential_bond_distances(coords)
 
     # true when bond length is too different
     invalid = np.invert(np.isclose(
@@ -305,6 +295,15 @@ def validate_bb_bonds_len_from_disk(
         )
 
     return name, np.sum(invalid), report
+
+
+
+def bb_bond_length(name, pdb_data):
+    """."""
+    s = Structure(pdb_data)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+    return calculate_sequential_bond_distances(s.coords)
 
 
 def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
