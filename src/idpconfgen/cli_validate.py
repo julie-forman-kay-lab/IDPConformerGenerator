@@ -7,6 +7,7 @@ USAGE:
 import argparse
 import sys
 from functools import partial
+from pathlib import Path
 
 import numpy as np
 
@@ -237,8 +238,57 @@ def bb_bond_length_distribution(pdb_files, ncores):
     var = np.var(ddata, axis=0)
 
     results = np.stack([mean, std, median, var], axis=-1)
-
     table = np.append(labels[:, np.newaxis], results.astype('|S7'), axis=1)
+
+    # results for bond types
+    #N_CA_conformer_means = mean[::3]
+    #N_CA_mean = np.mean(N_CA_conformer_means)
+    #N_CA_std = np.std(N_CA_conformer_means)
+    #N_CA_median = np.median(N_CA_conformer_means)
+    #N_CA_variance = np.var(N_CA_conformer_means)
+
+    #CA_C_conformer_means = mean[1::3]
+    #CA_C_mean = np.mean(CA_C_conformer_means)
+    #CA_C_std = np.std(CA_C_conformer_means)
+    #CA_C_median = np.median(CA_C_conformer_means)
+    #CA_C_variance = np.var(CA_C_conformer_means)
+
+    #C_N_conformer_means = mean[2::3]
+    #C_N_mean = np.mean(C_N_conformer_means)
+    #C_N_std = np.std(C_N_conformer_means)
+    #C_N_median = np.median(C_N_conformer_means)
+    #C_N_variance = np.var(C_N_conformer_means)
+
+    #bond_type_report = (
+    #    f' N  - CA: {N_CA_mean:.3f}\t{N_CA_std:.3f}\t{N_CA_median:.3f}\t{N_CA_variance:.3f}\n'
+    #    f' CA - C : {CA_C_mean:.3f}\t{CA_C_std:.3f}\t{CA_C_median:.3f}\t{CA_C_variance:.3f}\n'
+    #    f' C  - N : {C_N_mean:.3f}\t{C_N_std:.3f}\t{C_N_median:.3f}\t{C_N_variance:.3f}\n'
+    #    )
+
+    # results for bond types
+    N_CA_conformer_means = ddata[:, ::3]
+    N_CA_mean = np.mean(N_CA_conformer_means)
+    N_CA_std = np.std(N_CA_conformer_means)
+    N_CA_median = np.median(N_CA_conformer_means)
+    N_CA_variance = np.var(N_CA_conformer_means)
+
+    CA_C_conformer_means = ddata[:, 1::3]
+    CA_C_mean = np.mean(CA_C_conformer_means)
+    CA_C_std = np.std(CA_C_conformer_means)
+    CA_C_median = np.median(CA_C_conformer_means)
+    CA_C_variance = np.var(CA_C_conformer_means)
+
+    C_N_conformer_means = ddata[:, 2::3]
+    C_N_mean = np.mean(C_N_conformer_means)
+    C_N_std = np.std(C_N_conformer_means)
+    C_N_median = np.median(C_N_conformer_means)
+    C_N_variance = np.var(C_N_conformer_means)
+
+    bond_type_report = (
+        f' N  - CA: {N_CA_mean:.5f}\t{N_CA_std:.5f}\t{N_CA_median:.5f}\t{N_CA_variance:.5f}\n'
+        f' CA - C : {CA_C_mean:.5f}\t{CA_C_std:.5f}\t{CA_C_median:.5f}\t{CA_C_variance:.5f}\n'
+        f' C  - N : {C_N_mean:.5f}\t{C_N_std:.5f}\t{C_N_median:.5f}\t{C_N_variance:.5f}\n'
+        )
 
     np.savetxt(
         'validate_bb_bond_distribution.txt',
@@ -248,9 +298,11 @@ def bb_bond_length_distribution(pdb_files, ncores):
         comments='#',
         header=(
             f' Backbone bond lengths distributions for conformers in:\n'
-            f' {p.resolve() for p in pdb_files}\n'
+            f' {[Path(p).resolve() for p in pdb_files]}\n'
             f' analyzed a total of {ddata.shape[0]} conformers\n'
             f' with {ddata.shape[1]} bonds.\n'
+            f' Results for bond type:\n'
+            f'{bond_type_report}\n'
             f' mean, std, median, variance'
             ),
         )
