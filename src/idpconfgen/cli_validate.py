@@ -12,7 +12,11 @@ from pathlib import Path
 import numpy as np
 
 from idpconfgen import log
-from idpconfgen.core.definitions import heavy_atoms, vdW_radii_dict
+from idpconfgen.core.definitions import (
+    heavy_atoms, vdW_radii_dict, aa1to3,
+    distance_N_CA, distance_CA_C, distance_C_Np1,
+    distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std
+    )
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcli import CSV2Tuple
 from idpconfgen.libs.libio import FileReaderIterator
@@ -24,6 +28,7 @@ from idpconfgen.libs.libvalidate import (
     )
 from idpconfgen.libs.libstructure import Structure, col_resSeq, col_name, col_resName
 from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
+from idpconfgen.libs.libplot import plot_distribution, plot_distribution_list
 
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -182,6 +187,13 @@ def bb_bond_length_distribution(pdb_files, ncores):
     CA_mask = fa[:, col_name] == 'CA'
     C_mask = fa[:, col_name] == 'C'
 
+    # residue types
+    residue_masks =  {}
+    for residue in aa1to3.values():
+        mask_ = fa[:, col_resName] == residue
+        if np.any(mask_):
+            residue_masks[residue] = mask_
+
     # preparing labels
     # 5 is 3 from 3-letter aa code and 2 from 'CA' label length
     max_len = len(str(np.sum(N_mask))) + 5
@@ -198,7 +210,6 @@ def bb_bond_length_distribution(pdb_files, ncores):
         fa[:, [col_resSeq, col_resName, col_name]][C_mask],
         fmt=fmt_res,
         )
-
 
     C_N_labels = generate_residue_labels(
         fa[:, [col_resSeq, col_resName, col_name]][C_mask][:-1],
@@ -306,6 +317,64 @@ def bb_bond_length_distribution(pdb_files, ncores):
             f' mean, std, median, variance'
             ),
         )
+
+    plot_distribution_list(
+        [ddata[:, i::3] for i in range(3)],
+        title=['N - CA bond', 'CA - C bond', 'C - N bond'],
+        subplots=3,
+        labels=[labels[i::3] for i in range(3)],
+        vert=False,
+        figname='bb_bond_dist.pdf',
+        ylabel='Bond',
+        xlabel='bond length ($\AA$)',
+        #usermedians=median[::3],
+        usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
+        userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        )
+
+    res_N = []
+    res_CA = []
+    res_C = []
+    for residue, mask in residue_masks.items():
+        res_N.append(ddata[:, mask[:-1]][:, ::3].ravel())
+        res_CA.append(ddata[:, mask[:-1]][:, 1::3].ravel())
+        res_C.append(ddata[:, mask[:-1]][:, 2::3].ravel())
+
+    res_labels = list(residue_masks.keys())
+    res_type_dist = [res_N, res_CA, res_C]
+
+    plot_distribution_list(
+        res_type_dist,
+        title=['N - CA bond', 'CA - C bond', 'C - N bond'],
+        subplots=3,
+        labels=[res_labels] * 3,
+        vert=False,
+        figname='bb_bond_restype_dist.pdf',
+        ylabel='Bond',
+        xlabel='bond length ($\AA$)',
+        usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
+        userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        #usermedians=median[::3],
+        )
+
+
+#    plot_distribution(
+#        CA_C_conformer_means,
+#        title='CA - C bond',
+#        labels=labels[1::3],
+#        vert=False,
+#        figname='CA_N_bond_dist.pdf',
+#        #usermedians=median[1::3],
+#        )
+#
+#    plot_distribution(
+#        C_N_conformer_means,
+#        title='C - N bond',
+#        labels=labels[2::3],
+#        vert=False,
+#        figname='C_N_bond_dist.pdf',
+#        #usermedians=median[2::3],
+#        )
 
     return
 
