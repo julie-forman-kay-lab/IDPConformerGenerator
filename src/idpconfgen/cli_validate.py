@@ -19,7 +19,7 @@ from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libvalidate import (
     validate_bb_bonds_len_from_disk,
     validate_conformer_from_disk,
-    bb_bond_length,
+    bb_bond_length_dist,
     )
 from idpconfgen.libs.libstructure import Structure, col_resSeq, col_name, col_resName
 from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
@@ -160,7 +160,6 @@ def main(
 
 def bb_bond_length_distribution(pdb_files, ncores):
     """."""
-
     pdbs2operate = FileReaderIterator(pdb_files, ext='*.pdb')
 
     name, pdb_data = next(pdbs2operate)
@@ -168,34 +167,68 @@ def bb_bond_length_distribution(pdb_files, ncores):
     s.build()
     s.add_filter_backbone(minimal=True)
     fa = s.filtered_atoms
-    number_of_bb_atoms = fa.shape[0]
+    # the number of bonds is the number of atoms -1
+    number_of_bb_atoms = fa.shape[0] - 1
 
     # ddata from distribution data
-    # the number of bonds is the number of atoms -1
     ddata = np.zeros(
-        (len(pdbs2operate), number_of_bb_atoms - 1),
+        (len(pdbs2operate), number_of_bb_atoms),
         dtype=np.float32,
         )
 
-    ddata[0, :] = calculate_sequential_bond_distances(s.coords)
+    # masks
+    N_mask = fa[:, col_name] == 'N'
+    CA_mask = fa[:, col_name] == 'CA'
+    C_mask = fa[:, col_name] == 'C'
 
-    labels = np.array([
-        f'{s}{r}{a}'
-        for r, s, a in fa[:-1, [col_resSeq, col_resName, col_name]]
-        ])
+    # preparing labels
+    # 5 is 3 from 3-letter aa code and 2 from 'CA' label length
+    max_len = len(str(np.sum(N_mask))) + 5
+    fmt_res = '{:<' + str(max_len) + '}'
 
-    print(labels.shape)
+    N_CA_labels = generate_residue_labels(
+        fa[:, [col_resSeq, col_resName, col_name]][N_mask],
+        fa[:, [col_resSeq, col_resName, col_name]][CA_mask],
+        fmt=fmt_res,
+        )
 
+    CA_C_labels = generate_residue_labels(
+        fa[:, [col_resSeq, col_resName, col_name]][CA_mask],
+        fa[:, [col_resSeq, col_resName, col_name]][C_mask],
+        fmt=fmt_res,
+        )
+
+
+    C_N_labels = generate_residue_labels(
+        fa[:, [col_resSeq, col_resName, col_name]][C_mask][:-1],
+        fa[:, [col_resSeq, col_resName, col_name]][N_mask][1:],
+        fmt=fmt_res,
+        )
+
+    max_label_len = max(len(i) for i in N_CA_labels)
+
+    labels = np.zeros(number_of_bb_atoms, dtype=f'<U{max_label_len}')
+    labels[0::3] = N_CA_labels
+    labels[1::3] = CA_C_labels
+    labels[2::3] = C_N_labels
+
+    del pdbs2operate
     del s
 
-    execute = partial(report_on_crash, bb_bond_length)
+    pdbs2operate = FileReaderIterator(pdb_files, ext='*.pdb')
+
+    execute = partial(
+        report_on_crash,
+        bb_bond_length_dist,
+        ROC_prefix=f'{_name}_bb_dist',
+        )
     execute_pool = pool_function(
         partial(starunpack, execute),
         pdbs2operate,
         ncores=ncores,
         )
 
-    for i, lengths in enumerate(execute_pool, start=1):
+    for i, lengths in enumerate(execute_pool, start=0):
         ddata[i, :] = lengths
 
     mean = np.mean(ddata, axis=0)
@@ -207,17 +240,15 @@ def bb_bond_length_distribution(pdb_files, ncores):
 
     table = np.append(labels[:, np.newaxis], results.astype('|S7'), axis=1)
 
-    print(table.shape)
-
     np.savetxt(
         'validate_bb_bond_distribution.txt',
         table,
-        fmt='%s',# + ['%.3f'] * 4,
+        fmt='%s',
         delimiter='\t',
         comments='#',
         header=(
             f' Backbone bond lengths distributions for conformers in:\n'
-            f' {pdb_files}\n'
+            f' {p.resolve() for p in pdb_files}\n'
             f' analyzed a total of {ddata.shape[0]} conformers\n'
             f' with {ddata.shape[1]} bonds.\n'
             f' mean, std, median, variance'
@@ -227,6 +258,27 @@ def bb_bond_length_distribution(pdb_files, ncores):
     return
 
 
+def generate_residue_labels(labels1, labels2, fmt='{:<15}'):
+    """."""
+    empty_join = ''.join
+    labels = []
+    LA = labels.append
+    for R1, R2 in zip(labels1, labels2):
+        r1l = fmt.format(empty_join(R1))
+        r2l = fmt.format(empty_join(R2))
+        LA(f'{r1l} - {r2l}')
+
+    return labels
+
+
+    #return [
+    #    f'{s1}{r1}{a1} - {s2}{r2}{a2}'
+    #    for (s1, r1, a1), (s2, r2, a2) in zip(
+    #        labels1, labels2)
+    #        #data_array[:, [col_resSeq, col_resName, col_name]][mask1],
+    #        #data_array[:, [col_resSeq, col_resName, col_name]][mask2],
+    #        #)
+    #    ]
 
 
 def validate_bond_lengths(
@@ -240,8 +292,7 @@ def validate_bond_lengths(
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
     execute = partial(
-        report_on_crash,
-        validate_bb_bonds_len_from_disk,
+        report_on_crash, validate_bb_bonds_len_from_disk,
         ROC_prefix=_name,
         tolerance=bond_tolerance,
         )

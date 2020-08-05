@@ -306,6 +306,29 @@ def bb_bond_length(name, pdb_data):
     return calculate_sequential_bond_distances(s.coords)
 
 
+def bb_bond_length_dist(name, pdb_data):
+    """."""
+    s = Structure(pdb_data)
+    s.build()
+    coords = s.coords
+
+    N_coords = coords[s.data_array[:, col_name] == 'N']
+    CA_coords = coords[s.data_array[:, col_name] == 'CA']
+    C_coords = coords[s.data_array[:, col_name] == 'C']
+
+    N_num = N_coords.shape[0]
+    CA_num = CA_coords.shape[0]
+    C_num = C_coords.shape[0]
+    num_backbone_atoms = sum([N_num, CA_num, C_num])
+
+    minimal_backbone = np.zeros((num_backbone_atoms, 3), dtype=np.float32)
+    minimal_backbone[0:-2:3] = N_coords
+    minimal_backbone[1:-1:3] = CA_coords
+    minimal_backbone[2::3] = C_coords
+
+    return calculate_sequential_bond_distances(minimal_backbone)
+
+
 def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
     """
     Prepare a report of the identified clashes.
