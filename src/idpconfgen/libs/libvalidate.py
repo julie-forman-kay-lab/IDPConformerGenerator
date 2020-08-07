@@ -28,7 +28,7 @@ from idpconfgen.libs.libstructure import (
 from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
 
 
-def vdW_clash_common_preparation(
+def vdw_clash_by_threshold_common_preparation(
         protein_atoms,
         protein_elements,
         residue_numbers,
@@ -44,7 +44,7 @@ def vdW_clash_common_preparation(
     logical AND, that is, only entries that satisfy both are considered.
 
     .. see-also::
-        vdW_clash_calc
+        vdw_clash_by_threshold_calc
 
     Parameters
     ----------
@@ -87,7 +87,7 @@ def vdW_clash_common_preparation(
     return atc_mask, pure_radii_sum, residue_distances >= residues_apart
 
 
-def vdW_clash_calc(
+def vdw_clash_by_threshold_calc(
         coords,
         atc_mask,
         pure_radii_sum,
@@ -139,16 +139,18 @@ def vdW_clash_calc(
         )
 
 
-def vdW_clash(
+def vdw_clash_by_threshold(
         coords,
         protein_atoms,
         protein_elements,
         atoms_to_consider,
         elements_to_consider,
         residue_numbers,
-        residues_apart=3,
+        residues_apart=2,
         vdW_radii='tsai1999',
         vdW_overlap=0.0,
+        # 07/ago/2020, I have decided not to use **kwargs here
+        # even if that requires a duplication of parameters in this function
         ):
     """
     Calculate vdW clashes from XYZ coordinates and identity masks.
@@ -158,28 +160,46 @@ def vdW_clash(
     coordinates : numpy array, dtype=float, shape (N, 3)
         The atom XYZ coordinates.
 
-    #distances : numpy array, dtype=float, shape (N, N)
-        #All-to-all distance array. The diagonal of this array is 0.
+    protein_atoms : numpy array, dtype=str, shape (N,)
+        The protein atom names.
 
-    vdW_elements : numpy array, dtype='<U1', shape (N,)
-        The corresponding element character of the different atoms.
+    protein_elements : numpy array, dtype=str, shape(N,)
+        The protein atom elements.
+
+    atoms_to_consider : list-like
+        The atoms in `protein_atoms` to consider in the vdW clash
+        analysis.
 
     elements_to_consider : list-like
-        The elements in `vdW_elements` to consider in the vdW clash
+        The elements in `protein_elements` to consider in the vdW clash
         analysis.
 
     residue_number : numpy array, dtype=int, shape (N,)
         The residue number corresponding to each atom.
 
-    residues_apart : int
+    residues_apart : int, optional
         The minimum number of residues apart to consider for a clash.
+        Defaults to 2.
+
+    vdW_radii : str, optional
+        The VDW radii set to consider. Defaults to 'tsai1999'.
+
+
+    vdW_overlap : float, optional
+        An overlap allowance in Angstroms.
+        Defaults to 0.0, any distance less than vdW+vdW is considered
+        a clash.
 
     Returns
     -------
-    What :func:`vdW_clash_calc` returns.
+    Same :func:`vdw_clash_by_threshold_calc` returns.
     """
+    # The VDW clash analysis is separated in two steps,
+    # 1) the preparation of the data and masks
+    # 2) the actual clash calculation
+
     atc_mask, pure_radii_sum, distances_apart = \
-        vdW_clash_common_preparation(
+        vdw_clash_by_threshold_common_preparation(
             protein_atoms,
             protein_elements,
             residue_numbers,
@@ -189,7 +209,7 @@ def vdW_clash(
             vdW_radii=vdW_radii,
             )
 
-    return vdW_clash_calc(
+    return vdw_clash_by_threshold_calc(
         coords,
         atc_mask,
         pure_radii_sum,
@@ -198,14 +218,21 @@ def vdW_clash(
         )
 
 
-def validate_conformer_from_disk(
+def evaluate_vdw_clash_by_threshold_from_disk(
         name,
         pdb_data,
         atoms_to_consider,
         elements_to_consider,
         **kwargs,
         ):
-    """."""
+    """
+    Evaluate clashes in a structure.
+
+    Created to evaluate conformers from disk.
+
+    .. see-also::
+        validate_vdw_clashes
+    """
     s = Structure(pdb_data)
     s.build()
     da = s.data_array
@@ -214,10 +241,12 @@ def validate_conformer_from_disk(
     atom_elements_from_names = atom_names.astype('<U1')
 
     # elements_dont_exist = np.logical_not(atom_elements_pure.astype(np.bool))
+    #
     # ValueError: invalid literal for int() with base 10:
-    # really?
+    # really? okay, lets do a list comprehension...
     elements_dont_exist = np.array([not bool(i) for i in atom_elements_pure])
 
+    # considers PDBs that lab element information
     best_observation_ele = np.zeros(atom_elements_pure.shape, dtype='<U2')
     best_observation_ele[:] = atom_elements_pure[:]
     best_observation_ele[elements_dont_exist] = \
@@ -226,12 +255,12 @@ def validate_conformer_from_disk(
     res_numbers = da[:, col_resSeq].astype(np.int)
     coords = s.coords
 
-    rows, cols, distances, radii_sum, overlap = vdW_clash(
+    rows, cols, distances, radii_sum, overlap = vdw_clash_by_threshold(
         coords,
         atom_names,  # protein atoms
         best_observation_ele,  # protein elements
-        atoms_to_consider,
-        elements_to_consider,
+        atoms_to_consider,  # atoms to consider in the validation
+        elements_to_consider,  # elements to consider in the validation
         res_numbers,
         **kwargs,
         )
@@ -277,9 +306,10 @@ def validate_bb_bonds_len_from_disk(
     s.build()
     s.add_filter_backbone(minimal=True)
     fa = s.filtered_atoms
+    coords = s.sorted_minimal_backbone_coords
 
     invalid, bond_distances, expected_bond_length = \
-        bb_bond_len_calc(s.coords, tolerance)
+        bb_bond_len_calc(coords, tolerance)
 
     res_nums = fa[:-1, col_resSeq]
     res_names = fa[:-1, col_resName]
@@ -296,37 +326,21 @@ def validate_bb_bonds_len_from_disk(
 
     return name, np.sum(invalid), report
 
+#
+#def bb_bond_length(name, pdb_data):
+#    """."""
+#    s = Structure(pdb_data)
+#    s.build()
+#    s.add_filter_backbone(minimal=True)
+#    return calculate_sequential_bond_distances(s.coords)
+#
 
-
-def bb_bond_length(name, pdb_data):
+def eval_bb_bond_length_distribution(name, pdb_data):
     """."""
     s = Structure(pdb_data)
     s.build()
-    s.add_filter_backbone(minimal=True)
-    return calculate_sequential_bond_distances(s.coords)
-
-
-def bb_bond_length_dist(name, pdb_data):
-    """."""
-    s = Structure(pdb_data)
-    s.build()
-    coords = s.coords
-
-    N_coords = coords[s.data_array[:, col_name] == 'N']
-    CA_coords = coords[s.data_array[:, col_name] == 'CA']
-    C_coords = coords[s.data_array[:, col_name] == 'C']
-
-    N_num = N_coords.shape[0]
-    CA_num = CA_coords.shape[0]
-    C_num = C_coords.shape[0]
-    num_backbone_atoms = sum([N_num, CA_num, C_num])
-
-    minimal_backbone = np.zeros((num_backbone_atoms, 3), dtype=np.float32)
-    minimal_backbone[0:-2:3] = N_coords
-    minimal_backbone[1:-1:3] = CA_coords
-    minimal_backbone[2::3] = C_coords
-
-    return calculate_sequential_bond_distances(minimal_backbone)
+    coords = s.sorted_minimal_backbone_coords
+    return calculate_sequential_bond_distances(coords)
 
 
 def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):

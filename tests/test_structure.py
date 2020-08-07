@@ -491,3 +491,40 @@ def test_save_chain_does_not_exist():
     result = [i for i in execute]
     assert len(result) == 0
 # end
+
+
+def test_generate_labels_1(fix_Structure_build):
+    """Test generate labels function."""
+    s = fix_Structure_build
+    label_cols = [libstructure.col_resSeq, libstructure.col_resName, libstructure.col_name]
+    labels = s.data_array[:3, label_cols]
+    results = list(libstructure.concatenate_residue_labels(labels))
+    expected = [
+        '4ALAN',
+        '4ALACA',
+        '4ALAC',
+        ]
+
+    assert results == expected
+
+
+def test_generate_labels_2(fix_Structure_build):
+    """Test generate labels function."""
+    s = fix_Structure_build
+    label_cols = [libstructure.col_resSeq, libstructure.col_resName, libstructure.col_name]
+    labels = s.data_array[:3, label_cols]
+    labels1 = s.data_array[-3:, label_cols]
+    results = libstructure.generate_residue_labels(
+        labels,
+        labels1,
+        delimiter=',',
+        )
+
+    expected = [
+        '4ALAN,431HOHO     ',
+        '4ALACA,432HOHO    ',
+        '4ALAC,433HOHO     ',
+        ]
+
+    assert results == expected
+

@@ -23,10 +23,16 @@ from idpconfgen.libs.libio import FileReaderIterator
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libvalidate import (
     validate_bb_bonds_len_from_disk,
-    validate_conformer_from_disk,
-    bb_bond_length_dist,
+    evaluate_vdw_clash_by_threshold_from_disk,
+    eval_bb_bond_length_distribution,
     )
-from idpconfgen.libs.libstructure import Structure, col_resSeq, col_name, col_resName
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_resSeq,
+    col_name,
+    col_resName,
+    generate_residue_labels,
+    )
 from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
 from idpconfgen.libs.libplot import plot_distribution, plot_distribution_list
 
@@ -41,6 +47,7 @@ _help = 'Validate IDP conformers according to criteria.'
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
+# CLI parameters receive parameters for all the validation tests.
 ap = libcli.CustomParser(
     prog=_prog,
     description=libcli.detailed.format(_des),
@@ -54,19 +61,21 @@ ap.add_argument(
     '-atm',
     '--atoms-to-consider',
     help=(
-        'Which atoms to consider in the validation process. '
-        f'Defaults to heavy atoms: {heavy_atoms!r}.'
+        'Which atoms to consider in the VDW clash validation process. '
+        f'Defaults to heavy atoms: {heavy_atoms!r}. '
+        'Works for --validations vdw.'
         ),
     nargs='+',
-    default=None,
+    default=tuple(heavy_atoms),
     )
 
 ap.add_argument(
     '-ele',
     '--elements-to-consider',
     help=(
-        'Which elements to consider in the validation process. '
+        'Which elements to consider in the VDW validation process. '
         f'Defaults to heavy atoms: {heavy_atoms!r}.'
+        'Works for --validations vdw.'
         ),
     nargs='+',
     default=tuple(heavy_atoms),
@@ -75,7 +84,10 @@ ap.add_argument(
 ap.add_argument(
     '-vdw',
     '--vdW-radii',
-    help='The van der Waals radii set.',
+    help=(
+        'The van der Waals radii set. '
+        'Works for --validations vdw.'
+        ),
     choices=list(vdW_radii_dict.keys()),
     default='tsai1999',
     type=str,
@@ -84,7 +96,10 @@ ap.add_argument(
 ap.add_argument(
     '-vo',
     '--vdW-overlap',
-    help='VDW overlap in all atoms.',
+    help=(
+        'VDW overlap in all atoms. '
+        'Works for --validations vdw.'
+        ),
     default=0.0,
     type=float,
     )
@@ -93,17 +108,21 @@ ap.add_argument(
     '-ra',
     '--residues-apart',
     help=(
-        'How many residues apart to evaluate for clashes. '
-        'Defaults to 3.'
+        'How many residues apart to start evaluating for VDW clashes. '
+        'Defaults to 2. '
+        'Works for --validations vdw.'
         ),
-    default=3,
+    default=2,
     type=int,
     )
 
 ap.add_argument(
     '-bt',
     '--bond-tolerance',
-    help='Bond tolerance in angstroms.',
+    help=(
+        'Bond tolerance in angstroms. Defaults to 0.01. '
+        'Works for --validations bbl'
+        ),
     type=float,
     default=0.01,
     )
@@ -119,28 +138,40 @@ ap.add_argument(
     default=VALIDATION_PROTOCOLS,
     )
 
-
 libcli.add_argument_ncores(ap)
 
 
 def main(
         pdb_files,
         atoms_to_consider=None,
+        bond_tolerance=0.01,
         elements_to_consider=None,
         func=None,
         ncores=1,
         residues_apart=3,
-        vdW_radii='tsai1999',
-        vdW_overlap=0.0,
-        bond_tolerance=0.01,
         validations=VALIDATION_PROTOCOLS,
+        vdW_overlap=0.0,
+        vdW_radii='tsai1999',
         ):
-    """Perform main logic."""
+    """Validate conformers according to the criteria implemented."""
     log.info(T('Validating conformers'))
     init_files(log, LOGFILESNAME)
 
-    if 'vdw' in validations:
-        validate_vdW_clashes(
+    # confirms there are PDBs in the input
+    pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
+    if len(pdbs2operate) == 0:
+        log.error(T('invalid input.'))
+        log.error(S(
+            'There are no PDB files in the specified folders. '
+            'Nothing to do...\n'
+            ))
+        sys.exit(2)
+    del pdbs2operate
+
+    # preparares available validation tests
+    available_validations = {
+        'vdw': partial(
+            validate_vdw_clashes,
             pdb_files,
             atoms_to_consider,
             elements_to_consider,
@@ -148,24 +179,25 @@ def main(
             vdW_radii,
             vdW_overlap,
             ncores,
-            )
+            ),
 
-    if 'bbl' in validations:
-        validate_bond_lengths(
+        'bbl': partial(
+            validate_backbone_bond_lengths,
             pdb_files,
             bond_tolerance,
             ncores,
-            )
+            ),
 
-    if 'bbd' in validations:
-        bb_bond_length_distribution(
-            pdb_files,
-            ncores,
-            )
+        'bbd': partial(eval_bb_bond_length_distribution, pdb_files, ncores),
+        }
+
+    # executes requested validations
+    for validation in validations:
+        available_validations[validation]()
 
 
-def bb_bond_length_distribution(pdb_files, ncores):
-    """."""
+def eval_bb_bond_length_distribution(pdb_files, ncores):
+    """Evaluate backbone bond length distribution."""
     pdbs2operate = FileReaderIterator(pdb_files, ext='*.pdb')
 
     name, pdb_data = next(pdbs2operate)
@@ -191,6 +223,7 @@ def bb_bond_length_distribution(pdb_files, ncores):
     residue_masks =  {}
     for residue in aa1to3.values():
         mask_ = fa[:, col_resName] == residue
+        # consider only residues that exist in the protein
         if np.any(mask_):
             residue_masks[residue] = mask_
 
@@ -231,7 +264,7 @@ def bb_bond_length_distribution(pdb_files, ncores):
 
     execute = partial(
         report_on_crash,
-        bb_bond_length_dist,
+        eval_bb_bond_length_distribution,
         ROC_prefix=f'{_name}_bb_dist',
         )
     execute_pool = pool_function(
@@ -250,31 +283,6 @@ def bb_bond_length_distribution(pdb_files, ncores):
 
     results = np.stack([mean, std, median, var], axis=-1)
     table = np.append(labels[:, np.newaxis], results.astype('|S7'), axis=1)
-
-    # results for bond types
-    #N_CA_conformer_means = mean[::3]
-    #N_CA_mean = np.mean(N_CA_conformer_means)
-    #N_CA_std = np.std(N_CA_conformer_means)
-    #N_CA_median = np.median(N_CA_conformer_means)
-    #N_CA_variance = np.var(N_CA_conformer_means)
-
-    #CA_C_conformer_means = mean[1::3]
-    #CA_C_mean = np.mean(CA_C_conformer_means)
-    #CA_C_std = np.std(CA_C_conformer_means)
-    #CA_C_median = np.median(CA_C_conformer_means)
-    #CA_C_variance = np.var(CA_C_conformer_means)
-
-    #C_N_conformer_means = mean[2::3]
-    #C_N_mean = np.mean(C_N_conformer_means)
-    #C_N_std = np.std(C_N_conformer_means)
-    #C_N_median = np.median(C_N_conformer_means)
-    #C_N_variance = np.var(C_N_conformer_means)
-
-    #bond_type_report = (
-    #    f' N  - CA: {N_CA_mean:.3f}\t{N_CA_std:.3f}\t{N_CA_median:.3f}\t{N_CA_variance:.3f}\n'
-    #    f' CA - C : {CA_C_mean:.3f}\t{CA_C_std:.3f}\t{CA_C_median:.3f}\t{CA_C_variance:.3f}\n'
-    #    f' C  - N : {C_N_mean:.3f}\t{C_N_std:.3f}\t{C_N_median:.3f}\t{C_N_variance:.3f}\n'
-    #    )
 
     # results for bond types
     N_CA_conformer_means = ddata[:, ::3]
@@ -327,7 +335,6 @@ def bb_bond_length_distribution(pdb_files, ncores):
         figname='bb_bond_dist.pdf',
         ylabel='Bond',
         xlabel='bond length ($\AA$)',
-        #usermedians=median[::3],
         usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
         userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
         )
@@ -354,66 +361,31 @@ def bb_bond_length_distribution(pdb_files, ncores):
         xlabel='bond length ($\AA$)',
         usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
         userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
-        #usermedians=median[::3],
         )
-
-
-#    plot_distribution(
-#        CA_C_conformer_means,
-#        title='CA - C bond',
-#        labels=labels[1::3],
-#        vert=False,
-#        figname='CA_N_bond_dist.pdf',
-#        #usermedians=median[1::3],
-#        )
-#
-#    plot_distribution(
-#        C_N_conformer_means,
-#        title='C - N bond',
-#        labels=labels[2::3],
-#        vert=False,
-#        figname='C_N_bond_dist.pdf',
-#        #usermedians=median[2::3],
-#        )
 
     return
 
 
-def generate_residue_labels(labels1, labels2, fmt='{:<15}'):
-    """."""
-    empty_join = ''.join
-    labels = []
-    LA = labels.append
-    for R1, R2 in zip(labels1, labels2):
-        r1l = fmt.format(empty_join(R1))
-        r2l = fmt.format(empty_join(R2))
-        LA(f'{r1l} - {r2l}')
-
-    return labels
 
 
-    #return [
-    #    f'{s1}{r1}{a1} - {s2}{r2}{a2}'
-    #    for (s1, r1, a1), (s2, r2, a2) in zip(
-    #        labels1, labels2)
-    #        #data_array[:, [col_resSeq, col_resName, col_name]][mask1],
-    #        #data_array[:, [col_resSeq, col_resName, col_name]][mask2],
-    #        #)
-    #    ]
-
-
-def validate_bond_lengths(
+def validate_backbone_bond_lengths(
         pdb_files,
         bond_tolerance,
         ncores,
+        report_file_name='validation_report_bb_bond_length.txt',
         ):
-    """."""
-    log.info(T('validation for bond lengths'))
+    """
+    Validate backbone bond lengths.
+
+    Acceptable bond lengths are according to definitions in IDPConfGen.
+    """
+    log.info(T('validating backbone bond lengths'))
 
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
     execute = partial(
-        report_on_crash, validate_bb_bonds_len_from_disk,
+        report_on_crash,
+        validate_bb_bonds_len_from_disk,
         ROC_prefix=_name,
         tolerance=bond_tolerance,
         )
@@ -426,11 +398,11 @@ def validate_bond_lengths(
 
     results = list(execute_pool)
 
-    counts, reports = generate_general_validate_report(results)
+    counts, reports = generate_general_validation_report(results)
+    cstring = '\n'.join(counts)
+    rstring = '\n'.join(reports)
 
-    with open('validation_report_bb_bond_length.txt', 'w') as fout:
-        cstring = '\n'.join(counts)
-        rstring = '\n'.join(reports)
+    with open(report_file_name, 'w') as fout:
         fout.write(
             '# Used parameters:\n'
             f'tolerance (angstroms): {bond_tolerance}\n'
@@ -443,7 +415,7 @@ def validate_bond_lengths(
     return
 
 
-def validate_vdW_clashes(
+def validate_vdw_clashes(
         pdb_files,
         atoms_to_consider,
         elements_to_consider,
@@ -451,25 +423,22 @@ def validate_vdW_clashes(
         vdW_radii,
         vdW_overlap,
         ncores,
+        report_file_name='validation_report_vdW_clashes.txt',
         ):
-    """."""
+    """
+    Validate conformers based on VDW clashes considering a threshold.
+
+    At the current implementation is this function is a helper of the
+    the `cli_validate`, therefore all parameters are mandatory.
+    """
     log.info(T('validation for van der waals clashes'))
 
     pdbs2operate = FileReaderIterator(pdb_files, ext='.pdb')
 
-    # consider placing this at argparse level?
-    if len(pdbs2operate) == 0:
-        log.error(T('invalid input.'))
-        log.error(S(
-            'There are no PDB files in the specified folders. '
-            'Nothing to do...\n'
-            ))
-        sys.exit(2)
-
     execute = partial(
         report_on_crash,
-        validate_conformer_from_disk,
-        ROC_prefix=_name,
+        evaluate_vdW_clashes_from_disk,
+        ROC_prefix=f'{_name}_vdw_clash_threshold',
         atoms_to_consider=atoms_to_consider,
         elements_to_consider=elements_to_consider,
         residues_apart=residues_apart,
@@ -478,6 +447,7 @@ def validate_vdW_clashes(
         )
 
     execute_pool = pool_function(
+        # starunpack is needed because FileReaderIterator
         partial(starunpack, execute),
         pdbs2operate,
         ncores=ncores,
@@ -485,11 +455,11 @@ def validate_vdW_clashes(
 
     results = list(execute_pool)
 
-    counts, reports = generate_general_validate_report(results)
+    counts, reports = generate_general_validation_report(results)
+    cstring = '\n'.join(counts)
+    rstring = '\n'.join(reports)
 
-    with open('validation_report_vdW_clashes.txt', 'w') as fout:
-        cstring = '\n'.join(counts)
-        rstring = '\n'.join(reports)
+    with open(report_file_name, 'w') as fout:
         fout.write(
             '# Used parameters:\n'
             f'Atoms considered: {atoms_to_consider}\n'
@@ -502,9 +472,23 @@ def validate_vdW_clashes(
             f"{rstring}"
             )
 
+    return
 
-def generate_general_validate_report(results):
-    """."""
+
+def generate_general_validation_report(results):
+    """
+    Generate a per conformer validation report.
+
+    Firstly, conformers are listed followed by the number of errors
+        identified for each.
+
+    Secondly, specific errors are listed for each conformer.
+
+    Returns
+    -------
+    tuple of lists
+        Each list contains the strings for each report type.
+    """
     results.sort(key=lambda x: x[0])
     max_length = max(len(x[0].stem) for x in results)
 

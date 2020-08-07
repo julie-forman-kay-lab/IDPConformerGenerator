@@ -187,6 +187,40 @@ class Structure:
         """
         return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
 
+    @property
+    def sorted_minimal_backbone_coords(self, filtered=False):
+        """
+        Generate a copy of the backbone coords sorted.
+
+        Sorting according N, CA, C.
+
+        This method was created because some PDBs may not have the
+        backbone atoms sorted properly.
+
+        Parameters
+        ----------
+        filtered : bool, optional
+            Whether consider current filters or raw data.
+        """
+        atoms = self.filtered_atoms if filtered else self.data_array
+
+        N_coords = coords[atoms[:, col_name] == 'N']
+        CA_coords = coords[atoms[:, col_name] == 'CA']
+        C_coords = coords[atoms[:, col_name] == 'C']
+
+        N_num = N_coords.shape[0]
+        CA_num = CA_coords.shape[0]
+        C_num = C_coords.shape[0]
+        num_backbone_atoms = sum([N_num, CA_num, C_num])
+        assert num_backbone_atoms / 3 == N_num
+
+        minimal_backbone = np.zeros((num_backbone_atoms, 3), dtype=np.float32)
+        minimal_backbone[0:-2:3] = N_coords
+        minimal_backbone[1:-1:3] = CA_coords
+        minimal_backbone[2::3] = C_coords
+
+        return minimal_backbone
+
     def pop_last_filter(self):
         """Pop last filter."""
         self._filters.pop()
@@ -342,6 +376,45 @@ def gen_empty_structure_data_array(number_of_atoms):
         (number_of_atoms, len(libpdb.atom_slicers)),
         dtype='<U8',
         )
+
+
+def generate_residue_labels(*residue_labels, fmt=None, delimiter=' - '):
+    """
+    Generate residue labels column.
+
+    Concatenate labels in `residue_labels` using
+        `concatenate_residue_labels`.
+
+    Parameters
+    ----------
+    fmt : str, optional
+        The string formatter by default we consider backbone atoms
+        of a protein with less than 1000 residues.
+        Defaults to `None`, uses '{:<8}', 8 or multiple of 8 according
+        to length of residue_labels.
+    """
+    if not fmt:
+        # 11 because 8 + len(' - ')
+        fmt = '{:<' + str(len(residue_labels) * (8 + len(delimiter))) + '}'
+
+    concat = (concatenate_residue_labels(l) for l in residue_labels)
+    return [fmt.format(delimiter.join(clabels)) for clabels in zip(*concat)]
+
+
+def concatenate_residue_labels(labels):
+    """
+    Concatenate residue labels.
+
+    This function is a generator.
+
+    Parameters
+    ----------
+    labels : numpy array of shape (N, M)
+        Where N is the number of rows, and M the number of columns
+        with the labels to be concatenated.
+    """
+    empty_join = ''.join
+    return (empty_join(res_label) for res_label in labels)
 
 
 def populate_structure_array_from_pdb(record_lines, data_array):
