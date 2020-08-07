@@ -33,7 +33,7 @@ from idpconfgen.libs.libstructure import (
     col_resName,
     generate_residue_labels,
     )
-from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
+from idpconfgen.libs.libcalc import calculate_sequential_bond_distances, calc_MSMV
 from idpconfgen.libs.libplot import plot_distribution, plot_distribution_list
 
 from idpconfgen.logger import S, T, init_files, report_on_crash
@@ -205,6 +205,7 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
     s.build()
     s.add_filter_backbone(minimal=True)
     fa = s.filtered_atoms
+
     # the number of bonds is the number of atoms -1
     number_of_bb_atoms = fa.shape[0] - 1
 
@@ -214,11 +215,6 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
         dtype=np.float32,
         )
 
-    # masks
-    N_mask = fa[:, col_name] == 'N'
-    CA_mask = fa[:, col_name] == 'CA'
-    C_mask = fa[:, col_name] == 'C'
-
     # residue types
     residue_masks =  {}
     for residue in aa1to3.values():
@@ -227,35 +223,7 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
         if np.any(mask_):
             residue_masks[residue] = mask_
 
-    # preparing labels
-    # 5 is 3 from 3-letter aa code and 2 from 'CA' label length
-    max_len = len(str(np.sum(N_mask))) + 5
-    fmt_res = '{:<' + str(max_len) + '}'
-
-    N_CA_labels = generate_residue_labels(
-        fa[:, [col_resSeq, col_resName, col_name]][N_mask],
-        fa[:, [col_resSeq, col_resName, col_name]][CA_mask],
-        fmt=fmt_res,
-        )
-
-    CA_C_labels = generate_residue_labels(
-        fa[:, [col_resSeq, col_resName, col_name]][CA_mask],
-        fa[:, [col_resSeq, col_resName, col_name]][C_mask],
-        fmt=fmt_res,
-        )
-
-    C_N_labels = generate_residue_labels(
-        fa[:, [col_resSeq, col_resName, col_name]][C_mask][:-1],
-        fa[:, [col_resSeq, col_resName, col_name]][N_mask][1:],
-        fmt=fmt_res,
-        )
-
-    max_label_len = max(len(i) for i in N_CA_labels)
-
-    labels = np.zeros(number_of_bb_atoms, dtype=f'<U{max_label_len}')
-    labels[0::3] = N_CA_labels
-    labels[1::3] = CA_C_labels
-    labels[2::3] = C_N_labels
+    labels = generate_backbone_pairs_labels(fa)
 
     del pdbs2operate
     del s
@@ -267,6 +235,7 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
         eval_bb_bond_length_distribution,
         ROC_prefix=f'{_name}_bb_dist',
         )
+
     execute_pool = pool_function(
         partial(starunpack, execute),
         pdbs2operate,
@@ -285,28 +254,21 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
     table = np.append(labels[:, np.newaxis], results.astype('|S7'), axis=1)
 
     # results for bond types
-    N_CA_conformer_means = ddata[:, ::3]
-    N_CA_mean = np.mean(N_CA_conformer_means)
-    N_CA_std = np.std(N_CA_conformer_means)
-    N_CA_median = np.median(N_CA_conformer_means)
-    N_CA_variance = np.var(N_CA_conformer_means)
+    N_CA_vals = calc_MSMV(data[:, ::3])
+    CA_C_vals = calc_MSMV(data[:, 1::3])
+    C_N_vals = calc_MSMV(data[:, 2::3])
 
-    CA_C_conformer_means = ddata[:, 1::3]
-    CA_C_mean = np.mean(CA_C_conformer_means)
-    CA_C_std = np.std(CA_C_conformer_means)
-    CA_C_median = np.median(CA_C_conformer_means)
-    CA_C_variance = np.var(CA_C_conformer_means)
-
-    C_N_conformer_means = ddata[:, 2::3]
-    C_N_mean = np.mean(C_N_conformer_means)
-    C_N_std = np.std(C_N_conformer_means)
-    C_N_median = np.median(C_N_conformer_means)
-    C_N_variance = np.var(C_N_conformer_means)
+    # float format
+    ffmt = '{:.5f}'
+    FF = fmt.format
+    NCAs = '\t'.join(FF(_) for _ in N_CA_vals)
+    CACs = '\t'.join(FF(_) for _ in CA_C_vals)
+    CNs = '\t'.join(FF(_) for _ in C_N_vals)
 
     bond_type_report = (
-        f' N  - CA: {N_CA_mean:.5f}\t{N_CA_std:.5f}\t{N_CA_median:.5f}\t{N_CA_variance:.5f}\n'
-        f' CA - C : {CA_C_mean:.5f}\t{CA_C_std:.5f}\t{CA_C_median:.5f}\t{CA_C_variance:.5f}\n'
-        f' C  - N : {C_N_mean:.5f}\t{C_N_std:.5f}\t{C_N_median:.5f}\t{C_N_variance:.5f}\n'
+        f' N  - CA: {NCAs}\n'
+        f' CA - C : {CACs}\n'
+        f' C  - N : {CNs}\n'
         )
 
     np.savetxt(
@@ -326,17 +288,23 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
             ),
         )
 
+    # prepares data for plotting
+
+    plt_kwargs = {
+        'title': ['N - CA bond', 'CA - C bond', 'C - N bond'],
+        'subplots': 3,
+        'xlabel': r'bond length ($\AA$)',
+        'ylabel': 'Bond',
+        'vert': False,
+        'usermean': [distance_N_CA, distance_CA_C, distance_C_Np1],
+        'userstd': [distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        }
+
     plot_distribution_list(
         [ddata[:, i::3] for i in range(3)],
-        title=['N - CA bond', 'CA - C bond', 'C - N bond'],
-        subplots=3,
         labels=[labels[i::3] for i in range(3)],
-        vert=False,
         figname='bb_bond_dist.pdf',
-        ylabel='Bond',
-        xlabel='bond length ($\AA$)',
-        usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
-        userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        **plt_kwargs,
         )
 
     res_N = []
@@ -353,19 +321,12 @@ def eval_bb_bond_length_distribution(pdb_files, ncores):
     plot_distribution_list(
         res_type_dist,
         title=['N - CA bond', 'CA - C bond', 'C - N bond'],
-        subplots=3,
         labels=[res_labels] * 3,
-        vert=False,
         figname='bb_bond_restype_dist.pdf',
-        ylabel='Bond',
-        xlabel='bond length ($\AA$)',
-        usermean=[distance_N_CA, distance_CA_C, distance_C_Np1],
-        userstd=[distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        **plt_kwargs,
         )
 
     return
-
-
 
 
 def validate_backbone_bond_lengths(
@@ -437,7 +398,7 @@ def validate_vdw_clashes(
 
     execute = partial(
         report_on_crash,
-        evaluate_vdW_clashes_from_disk,
+        evaluate_vdw_clash_by_threshold_from_disk,
         ROC_prefix=f'{_name}_vdw_clash_threshold',
         atoms_to_consider=atoms_to_consider,
         elements_to_consider=elements_to_consider,

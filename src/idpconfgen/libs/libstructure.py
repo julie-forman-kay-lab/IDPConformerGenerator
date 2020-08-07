@@ -142,8 +142,6 @@ class Structure:
         return self.filtered_atoms[:, cols_coords].astype(np.float32)
 
 
-
-
     @property
     def consecutive_residues(self):
         """Consecutive residue groups from filtered atoms."""
@@ -203,6 +201,7 @@ class Structure:
             Whether consider current filters or raw data.
         """
         atoms = self.filtered_atoms if filtered else self.data_array
+        coords = atoms[:, cols_coords]
 
         N_coords = coords[atoms[:, col_name] == 'N']
         CA_coords = coords[atoms[:, col_name] == 'CA']
@@ -397,8 +396,70 @@ def generate_residue_labels(*residue_labels, fmt=None, delimiter=' - '):
         # 11 because 8 + len(' - ')
         fmt = '{:<' + str(len(residue_labels) * (8 + len(delimiter))) + '}'
 
-    concat = (concatenate_residue_labels(l) for l in residue_labels)
+    concat = (
+        concatenate_residue_labels(label_tuple)
+        for label_tuple in residue_labels
+        )
     return [fmt.format(delimiter.join(clabels)) for clabels in zip(*concat)]
+
+
+def generate_backbone_pairs_labels(da):
+    """
+    Generate backbone atom pairs labels.
+
+    Used to create columns in report summaries.
+
+    Parameters
+    ----------
+    da : Structure.data_array - like
+
+    Returns
+    -------
+    Numpy Array of dtype str, shape (N,)
+        Where N is the number of minimal backbone atoms.
+
+    """
+    # masks from minimal backbone atoms
+    N_mask = da[:, col_name] == 'N'
+    CA_mask = da[:, col_name] == 'CA'
+    C_mask = da[:, col_name] == 'C'
+
+    # prepares labels column format
+    # number of digit of the highest residue
+    # 5 is 3 from 3-letter aa code and 2 from 'CA' label length
+    max_len = len(str(np.sum(N_mask))) + 5
+    fmt_res = '{:<' + str(max_len) + '}'
+
+    # Generate label pairs
+    N_CA_labels = generate_residue_labels(
+        da[:, cols_labels][N_mask],
+        da[:, cols_labels][CA_mask],
+        fmt=fmt_res,
+        )
+
+    CA_C_labels = generate_residue_labels(
+        da[:, cols_labels][CA_mask],
+        da[:, cols_labels][C_mask],
+        fmt=fmt_res,
+        )
+
+    C_N_labels = generate_residue_labels(
+        da[:, cols_labels][C_mask][:-1],
+        da[:, cols_labels][N_mask][1:],
+        fmt=fmt_res,
+        )
+
+    # prepares the labels array
+    # max_label_len to use the exact needed memory size
+    number_of_bb_atoms = \
+        sum(len(i) for i in [N_CA_labels, CA_C_labels, C_N_labels])
+    max_label_len = max(len(i) for i in N_CA_labels)
+    labels = np.zeros(number_of_bb_atoms, dtype=f'<U{max_label_len}')
+    labels[0::3] = N_CA_labels
+    labels[1::3] = CA_C_labels
+    labels[2::3] = C_N_labels
+
+    return labels
 
 
 def concatenate_residue_labels(labels):
@@ -556,6 +617,7 @@ col_model = 15
 
 
 cols_coords = [col_x, col_y, col_z]
+cols_labels = [col_resSeq, col_resName, col_name]
 
 
 # this servers read_pdb_data_to_array mainly

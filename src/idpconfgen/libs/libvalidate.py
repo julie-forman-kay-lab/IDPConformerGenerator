@@ -302,14 +302,17 @@ def validate_bb_bonds_len_from_disk(
         ):
     """."""
 
+    # read structure
     s = Structure(pdb_data)
     s.build()
     s.add_filter_backbone(minimal=True)
     fa = s.filtered_atoms
-    coords = s.sorted_minimal_backbone_coords
+    coords = s.sorted_minimal_backbone_coords(filtered=False)
 
     invalid, bond_distances, expected_bond_length = \
         bb_bond_len_calc(coords, tolerance)
+
+    labels = generate_backbone_pairs_labels(fa)
 
     res_nums = fa[:-1, col_resSeq]
     res_names = fa[:-1, col_resName]
@@ -319,12 +322,14 @@ def validate_bb_bonds_len_from_disk(
         bond_distances,
         expected_bond_length,
         invalid,
-        res_nums,
-        res_names,
-        res_atoms,
+        labels,
+        #res_nums,
+        #res_names,
+        #res_atoms,
         )
 
     return name, np.sum(invalid), report
+
 
 #
 #def bb_bond_length(name, pdb_data):
@@ -387,23 +392,23 @@ def bond_len_report(
         bond_distances,
         expected_bond_length,
         invalid_bool,
-        res_nums,
-        res_names,
-        res_atoms,
+        labels,
+        #res_nums,
+        #res_names,
+        #res_atoms,
         ):
     """."""
     BD = bond_distances[invalid_bool]
     EB = expected_bond_length[invalid_bool]
     DIFF = np.abs(BD - EB)
-    RNU = res_nums[invalid_bool]
-    RNA = res_names[invalid_bool]
-    RAT = res_atoms[invalid_bool]
+    LABELS = labels[invalid_bool]
+    #RNU = res_nums[invalid_bool]
+    #RNA = res_names[invalid_bool]
+    #RAT = res_atoms[invalid_bool]
 
-    rows = []
-    AR = rows.append
-
-    for s, r, a, bd, eb, d in zip(RNU, RNA, RAT, BD, EB, DIFF):
-        resid = f'{s}{r}{a}'
-        AR(f'{resid:<10} - f: {bd:.3f} e: {eb:.3f} - {d:.3f}')
+    rows = (
+        f'{l} - f: {bd:.3f} e: {eb:.3f} - {d:.3f}'
+        for bd, eb, d, l in zip(BD, EB, DIFF, LABELS)
+        )
 
     return '\n'.join(rows)
