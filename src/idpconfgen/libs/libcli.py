@@ -40,6 +40,14 @@ class ArgsToTuple(argparse.Action):
         setattr(namespace, self.dest, tuple(values))
 
 
+class CSV2Tuple(argparse.Action):
+    """Convert list of arguments in tuple."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Call it."""
+        setattr(namespace, self.dest, tuple(values.split(',')))
+
+
 def CheckExt(extensions):
     """Check extension for arguments in argument parser."""
     class Act(argparse.Action):

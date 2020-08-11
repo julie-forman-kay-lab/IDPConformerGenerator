@@ -306,3 +306,8 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
         return 'There are atoms other than N, C and CA.'
 
     return ''
+
+
+def calc_MSMV(data):
+    """Calculate Mean, STD, Median, and Variance."""
+    return np.mean(data), np.std(data), np.median(data), np.var(data)
