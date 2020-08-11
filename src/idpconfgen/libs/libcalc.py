@@ -1,5 +1,6 @@
 """Mathemical calculations."""
 import math
+from math import sin, cos, pi
 
 import numpy as np
 
@@ -311,3 +312,96 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 def calc_MSMV(data):
     """Calculate Mean, STD, Median, and Variance."""
     return np.mean(data), np.std(data), np.median(data), np.var(data)
+
+
+def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
+    """Hamiltonian Multiplication."""
+    return (
+            a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2,
+            a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2,
+            a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2,
+            a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2,
+    )
+
+
+def make_coord_Q(
+        v1,
+        v2,
+        v3,
+        distance,
+        bend,
+        torsion,
+        norm=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        sin=sin,
+        cos=cos,
+        pi=pi,
+        ):
+    """
+    Make a new coords from 3 vectors using Quaternions.
+
+    Angles must be given in radians. For a matter of performance,
+    angles will not be converted to radians if given in degrees.
+
+    Parameters
+    ----------
+    v1, v2, v3 : np.ndarray, shape (3,), dtype=np.float
+        The vectors that define the three points required to place
+        the new coordinate according to bend and torsion angles.
+
+    distance : float
+        The distance between `v3` and the new coordinate.
+
+    bend : float
+        The angle (radians) between v2-v3 and v3-new vectors.
+
+    torsion : float
+        The torsion angle (radians) around v2-v3 which will place
+        the new coordinate correctly.
+
+    Returns
+    -------
+    np.ndarray of shape (3,), dtype=np.float32
+    """
+    # transfer vectors to origin
+    o1 = v1 - v2
+    o2 = v3 - v2
+
+    ocross = np.cross(o1, o2)
+    u_ocross = ocross / norm(ocross)
+
+    # creates quaterion to rotate on the bend angle
+    bend_angle = (pi - bend) / 2
+    b2, b3, b4 = sin(bend_angle) * u_ocross
+    b1 = cos(bend_angle)
+
+    # rotates a copy of o2 according to bend angle
+    uo2 = o2  / norm(o2)
+    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    n1, n2, n3, n4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    # rotates according to torsion angle
+    torsion_angle = torsion / 2
+    t2, t3, t4 = sin(torsion_angle) * uo2
+    t1 = cos(torsion_angle)
+
+    f1, f2, f3, f4 = QM(
+        *QM(t1, t2, t3, t4, 0, n2, n3, n4),
+        t1, -t2, -t3, -t4,
+        )
+
+    # the new rotated vector is unitary
+    # extends to the correct lenth
+    fov_size = np.array((f2 * distance, f3 * distance, f4 * distance))
+    # the above implementation is faster than
+    # np.array([f2, f3, f4]) * distance - 1.8 us
+    # against 857 ns, given by %%timeit jupyter notebook
+
+    # transfers the new coord created in origin
+    # to the correct space position
+    # performing this sum at the moment of fov_size is not faster
+    # than doing it separately here
+    return fov_size + v3
