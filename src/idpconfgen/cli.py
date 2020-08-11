@@ -17,7 +17,7 @@ import sys
 
 from idpconfgen import cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
-from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, log
+from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_validate, log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
@@ -38,6 +38,7 @@ Other useful routines:
     * {cli_fetch._name}
     * {cli_ssext._name}
     * {cli_fastaext._name}
+    * {cli_validate._name}
 """
 
 ap = libcli.CustomParser(
@@ -64,6 +65,7 @@ libcli.add_subparser(subparsers, cli_torsions)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_ssext)
+libcli.add_subparser(subparsers, cli_validate)
 
 
 def load_args():
