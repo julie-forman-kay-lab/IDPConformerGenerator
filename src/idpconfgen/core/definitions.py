@@ -34,6 +34,37 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v: k for k, v in aa3to1.items()}
 
+# heavy atoms
+heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
+
+#
+# https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
+vdW_radii_tsai_1999 = {
+'C': 1.7,
+'H': 1.0,
+'N': 1.625,
+'O': 1.480,
+'P': 1.871,
+'S': 1.782,
+}
+
+# Bondi 1964,
+# https://en.wikipedia.org/wiki/Van_der_Waals_radius
+vdW_radii_bondi_1964 = {
+'C': 1.7,
+'H': 1.09,
+'N': 1.55,
+'O': 1.52,
+'P': 1.8,
+'S': 1.8,
+}
+
+vdW_radii_dict = {
+    'tsai1999': vdW_radii_tsai_1999,
+    'bondi1964': vdW_radii_bondi_1964,
+    }
+
+
 # JSON structure parameter keys
 JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')
 jsonparameters = JsonParameters(
@@ -133,6 +164,11 @@ average_CA_C_Np1 = 1026782475409713 / 8796093022208  # +- 1.3123539017613925
 average_CA_C_O = 4237914978594851 / 35184372088832  # +- 1.091512747314927
 average_Np1_C_O = 4319847157608297 / 35184372088832  # +- 1.0303378740537752
 average_Cm1_N_CA = 8543335875083169 / 70368744177664  # +- 1.6638300324154913
-disntace_N_CA = 6576479998126501 / 4503599627370496  # +- 0.013036529567238732
-disntace_CA_C = 3430936279123861 / 2251799813685248  # +- 0.012599655969373144
-disntace_C_Np1 = 5992873469135695 / 4503599627370496  # +- 0.009621596711934686
+
+distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
+distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599
+distance_C_Np1 = 2996436734567847 / 2251799813685248  # 1.33068 +- 0.009621
+
+distance_N_CA_std = 0.013036529567238726
+distance_CA_C_std = 0.012599655969373144
+distance_C_Np1_std = 0.009621596711934686
