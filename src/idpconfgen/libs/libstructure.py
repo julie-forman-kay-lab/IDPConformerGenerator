@@ -185,41 +185,6 @@ class Structure:
         """
         return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
 
-    @property
-    def sorted_minimal_backbone_coords(self, filtered=False):
-        """
-        Generate a copy of the backbone coords sorted.
-
-        Sorting according N, CA, C.
-
-        This method was created because some PDBs may not have the
-        backbone atoms sorted properly.
-
-        Parameters
-        ----------
-        filtered : bool, optional
-            Whether consider current filters or raw data.
-        """
-        atoms = self.filtered_atoms if filtered else self.data_array
-        coords = atoms[:, cols_coords]
-
-        N_coords = coords[atoms[:, col_name] == 'N']
-        CA_coords = coords[atoms[:, col_name] == 'CA']
-        C_coords = coords[atoms[:, col_name] == 'C']
-
-        N_num = N_coords.shape[0]
-        CA_num = CA_coords.shape[0]
-        C_num = C_coords.shape[0]
-        num_backbone_atoms = sum([N_num, CA_num, C_num])
-        assert num_backbone_atoms / 3 == N_num
-
-        minimal_backbone = np.zeros((num_backbone_atoms, 3), dtype=np.float32)
-        minimal_backbone[0:-2:3] = N_coords
-        minimal_backbone[1:-1:3] = CA_coords
-        minimal_backbone[2::3] = C_coords
-
-        return minimal_backbone
-
     def pop_last_filter(self):
         """Pop last filter."""
         self._filters.pop()
@@ -277,6 +242,40 @@ class Structure:
         lines = list(reduce(_, pdb_filters, structure_to_pdb(fs)))
 
         return lines
+
+    def get_sorted_minimal_backbone_coords(self, filtered=False):
+        """
+        Generate a copy of the backbone coords sorted.
+
+        Sorting according N, CA, C.
+
+        This method was created because some PDBs may not have the
+        backbone atoms sorted properly.
+
+        Parameters
+        ----------
+        filtered : bool, optional
+            Whether consider current filters or raw data.
+        """
+        atoms = self.filtered_atoms if filtered else self.data_array
+        coords = atoms[:, cols_coords]
+
+        N_coords = coords[atoms[:, col_name] == 'N']
+        CA_coords = coords[atoms[:, col_name] == 'CA']
+        C_coords = coords[atoms[:, col_name] == 'C']
+
+        N_num = N_coords.shape[0]
+        CA_num = CA_coords.shape[0]
+        C_num = C_coords.shape[0]
+        num_backbone_atoms = sum([N_num, CA_num, C_num])
+        assert num_backbone_atoms / 3 == N_num
+
+        minimal_backbone = np.zeros((num_backbone_atoms, 3), dtype=np.float32)
+        minimal_backbone[0:-2:3] = N_coords
+        minimal_backbone[1:-1:3] = CA_coords
+        minimal_backbone[2::3] = C_coords
+
+        return minimal_backbone
 
     def write_PDB(self, filename, **kwargs):
         """Write Structure to PDB file."""
@@ -451,8 +450,8 @@ def generate_backbone_pairs_labels(da):
 
     # prepares the labels array
     # max_label_len to use the exact needed memory size
-    number_of_bb_atoms = \
-        sum(len(i) for i in [N_CA_labels, CA_C_labels, C_N_labels])
+    _ = [N_CA_labels, CA_C_labels, C_N_labels]
+    number_of_bb_atoms = sum(len(i) for i in _)
     max_label_len = max(len(i) for i in N_CA_labels)
     labels = np.zeros(number_of_bb_atoms, dtype=f'<U{max_label_len}')
     labels[0::3] = N_CA_labels

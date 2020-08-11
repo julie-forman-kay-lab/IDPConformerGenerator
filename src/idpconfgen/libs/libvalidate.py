@@ -11,6 +11,7 @@ Recognition of this module should be grated to:
 import numpy as np
 from scipy.spatial import distance
 
+from idpconfgen import Path
 from idpconfgen.core.definitions import (
     distance_CA_C,
     distance_C_Np1,
@@ -21,11 +22,10 @@ from idpconfgen.libs.libstructure import (
     Structure,
     col_element,
     col_name,
-    col_resName,
     col_resSeq,
     cols_coords,
+    generate_backbone_pairs_labels,
     )
-from idpconfgen.libs.libcalc import calculate_sequential_bond_distances
 
 
 def vdw_clash_by_threshold_common_preparation(
@@ -39,6 +39,10 @@ def vdw_clash_by_threshold_common_preparation(
         ):
     """
     Prepare masks for vdW clash calculation.
+
+    Masks are prepared considering all-to-all distances will be computed
+    using scipy.distance.cdist, so a (N, 3) array originates a (N, N)
+    distance result.
 
     `atoms_to_consider` and `elements_to_consider` are evaluated with
     logical AND, that is, only entries that satisfy both are considered.
@@ -95,26 +99,42 @@ def vdw_clash_by_threshold_calc(
         vdW_overlap=0.0,
         ):
     """
-    Calculate van der Waals clashes.
+    Calculate van der Waals clashes from a pure sphere overlap.
+
+    Other masks used as parameters will be applied to the result of:
+
+    scipy.distance.cdist(coords, coords, 'euclidean')
 
     Parameters
     ----------
-    coords : np.array, dtype=np.float
+    coords : np.array, dtype=np.float, shape (N, 3)
         The protein XYZ coordinates.
 
     atc_mask : np.array, dtype=np.bool, shape (N, N)
         A boolean masks to filter only the atoms relevant to report.
+        Usually this mask is prepared beforehand and can contain different
+        considerations, such as residues apart and especific atom types.
+        If `coords` contain only the coordinates desired to compute,
+        then `atc_mask` should contain only TRUE entries.
 
     pure_radii_sum : np.array, dtype=float, shape (N, N)
         An all-to-all sum of the vdW radii. In other words, the threeshold
-        after which a clash is considered to exist, before applying
-        `vdW_overlap` allowance.
+        after which a clash is considered to exist for each atom pair,
+        before applying `vdW_overlap` allowance.
 
     distances_apart : np.array, dtype=int, shape (N, N)
-        An all-to-all atom-to-atom residue to residue disntace matrix.
+        An all-to-all atom-to-atom residue to residue distance matrix.
 
     vdW_overlap : float
         The vdW overlap tolerance to apply.
+
+    Returns
+    -------
+    tuple
+        rows, cols : of cdist applied to `coords` where clashes where found.
+        distances found for those clashes
+        computed distance threshold
+        overlap, computed overlap distance between threshold and distance
     """
     distances = distance.cdist(coords, coords, 'euclidean')
 
@@ -265,15 +285,39 @@ def evaluate_vdw_clash_by_threshold_from_disk(
         **kwargs,
         )
 
-    report = clash_report(da, rows, cols, distances, radii_sum, overlap)
+    report = report_vdw_clash(da, rows, cols, distances, radii_sum, overlap)
 
     # rows.size is the number of clashes
     return name, rows.size, report
 
 
-def bb_bond_len_calc(coords, tolerance=0.01):
-    """."""
+def validate_bb_bond_len(coords, tolerance=0.01):
+    """
+    Validate backbone bond lengths of `coords`.
 
+    Considers `coords` are already sorted to (N, CA, C) per residue.
+    Considers only (N, CA, C) atoms are present in `coords`.
+    Evalutes against N-CA, CA-C and C-Np1 distances used in IDPConfGen.
+
+    Parameters
+    ----------
+    tolerance : float
+        A tolerance in the same units as `coords`.
+        Conflicts under the tolerance are consider valid.
+
+    Returns
+    -------
+    np.array, dtype=bool, shape (N-1,)
+        True if bond length is invalid.
+        False if bond length is valid.
+
+
+    np.array, dtype=np.float, shape (N-1,)
+        The computed bond distances.
+
+    np.array, dtype=np.float, shape (N-1,)
+        The expected bond lengths
+    """
     expected_bond_length = np.tile(
         [
             distance_N_CA,
@@ -283,7 +327,10 @@ def bb_bond_len_calc(coords, tolerance=0.01):
         coords.shape[0] // 3
         )
 
-    bond_distances = calculate_sequential_bond_distances(coords)
+    # https://stackoverflow.com/questions/1401712
+    # bond_distances = np.linalg.norm(coords[:-1] - coords[1:], axis=1)
+    _coords = coords[:-1] - coords[1:]
+    bond_distances = np.sqrt(np.einsum("ij,ij->i", _coords, _coords))
 
     # true when bond length is too different
     invalid = np.invert(np.isclose(
@@ -296,59 +343,46 @@ def bb_bond_len_calc(coords, tolerance=0.01):
 
 
 def validate_bb_bonds_len_from_disk(
-        name,
-        pdb_data,
+        name=None,
+        pdb_data=None,
         tolerance=0.1,
         ):
-    """."""
-
+    """
+    Validate backbone bond lengths of a structure stored in disk.
+    """
     # read structure
-    s = Structure(pdb_data)
+    pdb = Path(name) if name else pdb_data
+    s = Structure(pdb)
     s.build()
     s.add_filter_backbone(minimal=True)
     fa = s.filtered_atoms
-    coords = s.sorted_minimal_backbone_coords(filtered=False)
+    coords = s.get_sorted_minimal_backbone_coords(filtered=False)
 
     invalid, bond_distances, expected_bond_length = \
-        bb_bond_len_calc(coords, tolerance)
+        validate_bb_bond_len(coords, tolerance)
 
     labels = generate_backbone_pairs_labels(fa)
 
-    res_nums = fa[:-1, col_resSeq]
-    res_names = fa[:-1, col_resName]
-    res_atoms = fa[:-1, col_name]
-
-    report = bond_len_report(
+    report = report_sequential_bon_len(
         bond_distances,
         expected_bond_length,
         invalid,
         labels,
-        #res_nums,
-        #res_names,
-        #res_atoms,
         )
 
     return name, np.sum(invalid), report
 
 
-#
-#def bb_bond_length(name, pdb_data):
-#    """."""
-#    s = Structure(pdb_data)
-#    s.build()
-#    s.add_filter_backbone(minimal=True)
-#    return calculate_sequential_bond_distances(s.coords)
-#
-
 def eval_bb_bond_length_distribution(name, pdb_data):
     """."""
     s = Structure(pdb_data)
     s.build()
-    coords = s.sorted_minimal_backbone_coords
-    return calculate_sequential_bond_distances(coords)
+    coords = s.get_sorted_minimal_backbone_coords()
+    _coords = coords[:-1] - coords[1:]
+    return np.sqrt(np.einsum('ij,ij->i', _coords, _coords))
 
 
-def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
+def report_vdw_clash(data_array, pair1, pair2, distances, radii_sum, overlap):
     """
     Prepare a report of the identified clashes.
 
@@ -372,11 +406,10 @@ def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
     str
         The report.
     """
-    items = [col_resSeq, col_resName, col_name]
     report = []
     for i, (p1, p2) in enumerate(zip(pair1, pair2)):
-        n1, r1, a1 = data_array[p1, items]
-        n2, r2, a2 = data_array[p2, items]
+        n1, r1, a1 = data_array[p1, cols_coords]
+        n2, r2, a2 = data_array[p2, cols_coords]
         report.append(
             f"{n1:>5} {r1:>3} {a1:>5} - "
             f"{n2:>5} {r2:>3} {a2:>5} - "
@@ -388,23 +421,23 @@ def clash_report(data_array, pair1, pair2, distances, radii_sum, overlap):
     return '\n'.join(report)
 
 
-def bond_len_report(
+def report_sequential_bon_len(
         bond_distances,
         expected_bond_length,
         invalid_bool,
         labels,
-        #res_nums,
-        #res_names,
-        #res_atoms,
         ):
-    """."""
+    """
+    Generate a report from bond distances of sequential bonds.
+
+    Returns
+    -------
+    string
+    """
     BD = bond_distances[invalid_bool]
     EB = expected_bond_length[invalid_bool]
     DIFF = np.abs(BD - EB)
     LABELS = labels[invalid_bool]
-    #RNU = res_nums[invalid_bool]
-    #RNA = res_names[invalid_bool]
-    #RAT = res_atoms[invalid_bool]
 
     rows = (
         f'{l} - f: {bd:.3f} e: {eb:.3f} - {d:.3f}'

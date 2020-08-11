@@ -41,6 +41,7 @@ heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 # https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
 vdW_radii_tsai_1999 = {
 'C': 1.7,
+'H': 1.0,
 'N': 1.625,
 'O': 1.480,
 'P': 1.871,
@@ -51,6 +52,7 @@ vdW_radii_tsai_1999 = {
 # https://en.wikipedia.org/wiki/Van_der_Waals_radius
 vdW_radii_bondi_1964 = {
 'C': 1.7,
+'H': 1.09,
 'N': 1.55,
 'O': 1.52,
 'P': 1.8,
