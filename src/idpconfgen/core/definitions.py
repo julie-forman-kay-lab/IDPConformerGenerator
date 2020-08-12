@@ -34,6 +34,33 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v: k for k, v in aa3to1.items()}
 
+# amino-acids atom labels
+# from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
+# PDB column
+# Taken from PDB entry 6I1B REVDAT 15-OCT-92.
+atom_labels = {
+    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', 'HB1', 'HB2', 'HB3'),
+    'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),
+    'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),
+    'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),
+    'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),
+    'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),
+    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD2', 'CE1', 'ND1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1'),
+    'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),
+    'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD','2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),
+    'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),
+    'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CE', 'SD', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),
+    'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND2', 'OD1', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),
+    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'H2', 'H1', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),
+    'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE2', 'OE1', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),
+    'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CZ', 'NE', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),
+    'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),
+    'T': ('N', 'CA', 'C', 'O', 'CB', 'CG2', 'OG1', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),
+    'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),
+    'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'NE1', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),
+    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'),
+    }
+
 # heavy atoms
 heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 
