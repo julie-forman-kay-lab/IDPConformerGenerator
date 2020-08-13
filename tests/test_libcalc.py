@@ -134,6 +134,28 @@ def test_validate_backbone_labels_for_torsions(labels, expected):
     [
         (np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1]]), np.array([90], dtype=float)),  # noqa: E501
         (np.array([[1, 0, 0], [0, 0, 0], [0, 0, 1], [0, 1, 1], [1, 1, 1]]), np.array([90, -90], dtype=float)),  # noqa: E501
+        (
+            np.array((
+                (1, 0, 0.000),
+                (0, 0, 0.000),
+                (0, 1, 0.000),
+                (-1, 1, 0.000),
+                (-1, 1, 1),
+                (0, 1, 1),
+                (0, 0, 0)
+                )),
+            np.array([-180, 90, -0, -45], dtype=float),
+            ),
+        (
+            np.array((
+                (1, 0, 0.000),
+                (0, 0, 0.000),
+                (0, 1, 0.000),
+                (-1, 1, 0.000),
+                (-1, 1, 1),
+                )),
+            np.array([-180, 90], dtype=float),
+            ),
         ]
     )
 def test_calculate_torsions(coords, expected):
