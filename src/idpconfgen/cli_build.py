@@ -30,8 +30,12 @@ from idpconfgen.core.definitions import (
     average_CA_C_Np1,
     average_Cm1_N_CA,
     average_CA_C_O,
+    average_Np1_C_O,
+    atom_labels,
+    aa1to3,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
 
 
 _name = 'build'
@@ -68,6 +72,7 @@ def main(input_seq, database, func=None):
 
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
+    print(angles[pdbs['12AS_A_seg0']][:10])
 
     # esta parte tengo que ponerla de parametro externo
     regex = re.compile(r'(?=(L{6}))')
@@ -80,9 +85,9 @@ def main(input_seq, database, func=None):
 
     # prepares data based on the input sequence
     len_conf = len(input_seq)  # number of residues
-    atom_labels = generate_atom_labels(input_seq)  # considers sidechain all-atoms
+    atom_labels = np.array(generate_atom_labels(input_seq))  # considers sidechain all-atoms
     num_atoms = len(atom_labels)
-    residue_numbers = generate_residue_numbers(atom_labels)
+    residue_numbers = np.array(generate_residue_numbers(atom_labels))
     coords = np.zeros((num_atoms, 3), dtype=np.float32)
 
     # creates masks
@@ -124,45 +129,50 @@ def main(input_seq, database, func=None):
     # and needs to adjust with the += assignment inside the loop
     last_O = 0  # carbonyl atoms
     while True:
-        agls = angles[RC(loops_6), :].ravel()[1:-2]
+        #agls = angles[RC(loops_6), :].ravel()[1:-2]
+        agls = angles[pdbs['12AS_A_seg0'], :].ravel()[1:-2]
         i0 = i
         try:
             for torsion in agls:
+                bond_l = next(bond_lens)
+                bond_b = next(bond_bend)
+                print(bond_l, torsion, bond_b)
                 bb[i, :] = make_coord_Q(
                     bb[i - 3, :],
                     bb[i - 2, :],
                     bb[i - 1, :],
-                    next(bond_lens),
-                    next(bond_bend),
+                    bond_l, #next(bond_lens),
+                    bond_b, #next(bond_bend),  # radians!
                     torsion,
                     )
                 i += 1
 
-            else:
-                # when backbone completes,
-                # adds carbonyl oxygen atoms
-                for k in range(i0, i, 3):
-                    bb_o[last_O, :] = make_coord_Q(
-                        bb[k - 2, :],
-                        bb[k - 1, :],
-                        bb[k, :],
-                        distance_N_CA,  # to change
-                        average_CA_C_O,
-                        0,
-                        )
-                    last_O += 1
+            #else:
+            #    # when backbone completes,
+            #    # adds carbonyl oxygen atoms
+            #    for k in range(i0, i, 3):
+            #        bb_o[last_O, :] = make_coord_Q(
+            #            bb[k - 2, :],
+            #            bb[k - 1, :],
+            #            bb[k, :],
+            #            distance_N_CA,  # to change
+            #            average_CA_C_O,
+            #            0,
+            #            )
+            #        last_O += 1
         except IndexError:
             # i-1, to discard the last carboxyl
-            for k in range(i0, i-1, 3):
-                bb_o[last_O, :] = make_coord_Q(
-                    bb[k - 2, :],
-                    bb[k - 1, :],
-                    bb[k, :],
-                    distance_N_CA,  # to change
-                    average_CA_C_O,
-                    0,
-                    )
-                last_O += 1
+            #for k in range(i0, i-1, 3):
+            #    bb_o[last_O, :] = make_coord_Q(
+            #        bb[k - 2, :],
+            #        bb[k - 1, :],
+            #        bb[k, :],
+            #        distance_N_CA,  # to change
+            #        #average_CA_C_O,
+            #        average_Np1_C_O,
+            #        0,
+            #        )
+            #    last_O += 1
             break
 
 
@@ -172,21 +182,86 @@ def main(input_seq, database, func=None):
 # carboxylo final
 # correct distance C_O
 # correct bend angle CA_C_O
+# get values of average as radians
 
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_o
-    print(coords)
 
-def generate_atom_labels(input_seq):
-    return ('N', 'CA', 'C', 'O') * len(input_seq)
+    relevant = bb_mask #np.isin(atom_labels, ('N', 'CA', 'C', 'O'))
+
+    save_conformer_to_disk(
+        input_seq,
+        atom_labels[relevant],
+        residue_numbers[relevant],
+        coords[relevant],
+        )
 
 
-def generate_residue_numbers(atom_labels):
-    return [
-        number
-        for number, atom_label in enumerate(atom_labels, start=1)
-        if atom_label == 'N'
-        ]
+def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
+    lines = []
+    LA = lines.append
+    resi = -1
+    for i in range(len(atom_labels)):
+        if atom_labels[i] == 'N':
+            resi += 1
+        ele = atom_labels[i].lstrip('123')[0]
+        LA(atom_line_formatter.format(
+            'ATOM',
+            i,
+            format_atom_name(atom_labels[i], ele),
+            '',
+            aa1to3[input_seq[resi]],
+            'A',
+            residues[i],
+            '',
+            coords[i, 0],
+            coords[i, 1],
+            coords[i, 2],
+            0.0,
+            0.0,
+            '',
+            ele,
+            '',
+            )
+        )
+
+    with open('conformer.pdb', 'w') as fout:
+        fout.write('\n'.join(lines))
+
+
+
+
+
+def generate_atom_labels(input_seq, AL=atom_labels):
+    """."""
+    labels = []
+
+    LE = labels.extend
+    for residue in input_seq:
+        LE(AL[residue])
+
+    return labels
+
+
+def generate_residue_numbers(atom_labels, start=1):
+    """
+    Create a list of residue numbers based on atom labels.
+
+    Considers `N` to be the first atom of the residue.
+    If this is not the case, the output can be meaningless.
+    """
+    if atom_labels[0] == 'N':
+        start -= 1  # to compensate the +=1 implementation in the for loop
+
+    residues = []
+    RA = residues.append
+
+    for al in atom_labels:
+        if al == 'N':
+            start += 1
+        RA(start)
+
+    return residues
 
 
 #class Conformer:

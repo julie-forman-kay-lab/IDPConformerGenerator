@@ -38,7 +38,7 @@ def aligndb(db):
 
         pdbs[pdb] = current
         # +1 because resseq will be concatenated with '|'
-        # can't avoid +1 becase of the need to set the next starting integer
+        # can't avoid +1 because of the need to set the next starting integer
         current += len_segment + 1
         PHIE(_PHITMP)
         PSIE(_PSITMP)
