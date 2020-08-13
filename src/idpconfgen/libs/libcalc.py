@@ -161,7 +161,14 @@ def make_coord_from_angles(theta, phi, distance):
         ])
 
 
-def calc_torsion_angles(coords):
+def calc_torsion_angles(
+        coords,
+        ARCTAN2=np.arctan2,
+        CROSS=np.cross,
+        DIAGONAL=np.diagonal,
+        MATMUL=np.matmul,
+        NORM=np.linalg.norm,
+        ):
     """
     Calculate torsion angles from sequential coordinates.
 
@@ -219,40 +226,40 @@ def calc_torsion_angles(coords):
     assert coords.shape[0] > 3
     assert coords.shape[1] == 3
 
+    crds = coords.T
+
     # Yes, I always write explicit array indices! :-)
-    q_vecs = coords[1:, :] - coords[:-1, :]
-    cross = np.cross(q_vecs[:-1, :], q_vecs[1:, :])
-    #print(cross.shape)
-    #NORMS = np.linalg.norm(cross, axis=1)
-    #print(NORMS.shape)
-    unitary = (cross.T / np.linalg.norm(cross, axis=1)).T
-    #print(unitary)
+    q_vecs = crds[:, 1:] - crds[:, :-1]
+    cross = CROSS(q_vecs[:, :-1], q_vecs[:, 1:], axis=0)
+    unitary = cross / NORM(cross, axis=0)
 
     # components
     # u0 comes handy to define because it fits u1
-    u0 = unitary[:-1, :]
+    u0 = unitary[:, :-1]
 
     # u1 is the unitary cross products of the second plane
     # that is the unitary q2xq3, obviously applied to the whole chain
-    u1 = unitary[1:, :]
+    u1 = unitary[:, 1:]
 
     # u3 is the unitary of the bonds that have a torsion representation,
     # those are all but the first and the last
-    u3 = (q_vecs[1:-1].T / np.linalg.norm(q_vecs[1:-1], axis=1)).T
+    u3 = q_vecs[:, 1:-1] / NORM(q_vecs[:, 1:-1], axis=0)
 
     # u2
     # there is no need to further select dimensions for u2, those have
     # been already sliced in u1 and u3.
-    u2 = np.cross(u3, u1)
+    u2 = CROSS(u3, u1, axis=0)
 
     # calculating cos and sin of the torsion angle
     # here we need to use the .T and np.diagonal trick to achieve
     # broadcasting along the whole coords chain
-    cos_theta = np.diagonal(np.dot(u0, u1.T))
-    sin_theta = np.diagonal(np.dot(u0, u2.T))
+    # np.matmul is preferred to np.dot in this case
+    # https://numpy.org/doc/stable/reference/generated/numpy.matmul.html
+    cos_theta = DIAGONAL(MATMUL(u0.T, u1))
+    sin_theta = DIAGONAL(MATMUL(u0.T, u2))
 
     # torsion angles
-    return -np.arctan2(sin_theta, cos_theta)
+    return -ARCTAN2(sin_theta, cos_theta)
 
 
 def get_separate_torsions(torsions_array):
