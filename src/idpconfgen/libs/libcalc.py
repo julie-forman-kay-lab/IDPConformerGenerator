@@ -222,7 +222,11 @@ def calc_torsion_angles(coords):
     # Yes, I always write explicit array indices! :-)
     q_vecs = coords[1:, :] - coords[:-1, :]
     cross = np.cross(q_vecs[:-1, :], q_vecs[1:, :])
-    unitary = cross / np.linalg.norm(cross)
+    #print(cross.shape)
+    #NORMS = np.linalg.norm(cross, axis=1)
+    #print(NORMS.shape)
+    unitary = (cross.T / np.linalg.norm(cross, axis=1)).T
+    #print(unitary)
 
     # components
     # u0 comes handy to define because it fits u1
@@ -234,7 +238,7 @@ def calc_torsion_angles(coords):
 
     # u3 is the unitary of the bonds that have a torsion representation,
     # those are all but the first and the last
-    u3 = q_vecs[1:-1] / np.linalg.norm(q_vecs[1:-1])
+    u3 = (q_vecs[1:-1].T / np.linalg.norm(q_vecs[1:-1], axis=1)).T
 
     # u2
     # there is no need to further select dimensions for u2, those have
