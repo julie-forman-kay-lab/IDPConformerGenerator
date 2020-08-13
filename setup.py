@@ -64,7 +64,7 @@ setup(
     python_requires='==3.8.*',
     install_requires=[
         'matplotlib>=3',
-        'numpy>=1.7',
+        'numpy>=1.19',
         # 'click',
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
         ],
