@@ -3,6 +3,8 @@ import re
 
 import numpy as np
 
+from idpconfgen.core.exceptions import IDPConfGenException
+
 
 def aligndb(db, NAN=np.nan):
     """Aligns IDPConfGen DB."""
@@ -53,18 +55,71 @@ def aligndb(db, NAN=np.nan):
     return pdbs, _angles, _dssp, _resseq
 
 
+# # regex to compute
+# forward with overlap
+# forward no overlap
 
-def index_single_regex_overlap(sequence, regex, start_offset=1):
+
+def regex_search(sequence, regex):
+    """Search for regex in sequence)."""
+    overlap_r = re.compile('\(\?\=\(.+\)')
+    rex = re.compile(regex)
+
+    if overlap_r.findall(regex):
+        slices = regex_forward_with_overlap(sequence, rex)
+
+    else:
+        # do without overlap
+        slices = regex_forward_no_overlap(sequence, rex)
+
+    return slices
+
+
+
+def regex_forward_no_overlap(sequence, regex):
+    """
+    Searches for regex forward without overlap.
+
+    Examples:
+
+        r'L'
+        r'L{2}'
+        r'L{1,3}'
+
+    In the first example, returns all indexes of single char L without
+        overlap.
+
+    On the second example, returns all indexes of entire 'LL' sequences
+        without overlap. So, 'LLL' returns only slice(0, 2).
+
+    3) returns all sequences with 'LLL' without overlap, if a terminal 'LL'
+        is found, returns that. Same for 'L' if found at the end.
+
+    Using expressions such as r'(?=(L))' give not correct results.
+    """
+    # m.span() is used for regexes without overlap
+    # using m.start(1) would not work here.
+    # See regex_forward_with_overlap
+    result = [slice(*m.span()) for m in regex.finditer(sequence)]
+    if not result:
+        raise IDPConfGenException(f'No matches found for: {regex.pattern}')
+    else:
+        return result
+
+
+def regex_forward_with_overlap(sequence, regex):
     """
     Returns the indexes of re.finditer.
 
-    Offset accounts for the difference betwee the explored sequence
-    and the target data where to use the produced slice.
+    Accepts only regex expressions with overlap, for example:
 
-    For example, to use on torsion angles table,
-    the stop slice found in the 
+        r'(?=(L{3}))'
     """
-    return [
-        slice(m.start(1) + start_offset, m.end(1))
-        for m in regex.finditer(sequence)
-        ]
+    result = [slice(m.start(1), m.end(1)) for m in regex.finditer(sequence)]
+    if not result:  # no match found
+        # I decided to raise an error here because of the functionality of
+        # IDPConfGen. It can lead to hidden bugs and errors if a regex without
+        # matches is given, at least for now
+        raise IDPConfGenException()#errmsg=f'No matches found for: {regex.pattern}')
+    else:
+        return result

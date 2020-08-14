@@ -20,7 +20,7 @@ from idpconfgen.libs.libcalc import make_coord_Q
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libfilter import (
     aligndb,
-    index_single_regex_overlap,
+    regex_search,
     )
 from idpconfgen.libs.libtimer import timeme
 from idpconfgen.core.definitions import (
@@ -63,7 +63,12 @@ ap.add_argument(
     )
 
 
-def main(input_seq, database, func=None):
+def main(
+        input_seq,
+        database,
+        func=None,
+        regex_string=r'(?=(L{2}))',
+        ):
     """."""
 
     db = read_dictionary_from_disk(database)
@@ -73,13 +78,13 @@ def main(input_seq, database, func=None):
 
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
-    ANGLES = pdbs[list(pdbs.keys())[0]]
+    #ANGLES = pdbs[list(pdbs.keys())[0]]
 
     # esta parte tengo que ponerla de parametro externo
-    regex = re.compile(r'(?=(L{6}))')
-    timed = partial(timeme, index_single_regex_overlap)
-    loops_6 = timed(dssp, regex)
-    _log = f'Found {len(loops_6)} indexes for loops of 6'
+    timed = partial(timeme, regex_search)
+    slices = timed(dssp, regex_string)
+    _log = f'Found {len(slices)} indexes for {regex_string}'
+    print(slices)
     log.info(_log)
 
     # building
