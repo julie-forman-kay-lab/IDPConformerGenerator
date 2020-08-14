@@ -188,18 +188,23 @@ def extract_secondary_structure(
         The secondary structure character to separate.
         Multiple can be given in the form of a list.
     """
+    # caused problems in the past
+    assert atoms != ['all']
+    assert structure != ['all']
+
     pdbname = Path(pdbid[0]).stem
     pdbdata = pdbid[1].split(b'\n')
+
+    # gets PDB computed data from dictionary
     try:
         pdbdd = ssdata[pdbname]
     except KeyError:
         pdbdd = ssdata[f'{pdbname}.pdb']
 
-    ss_identified = set(pdbdd['dssp'])
     if structure == 'all':
-        ss_to_isolate = ss_identified
+        ss_to_isolate = set(pdbdd['dssp'])
     else:
-        ss_to_isolate = set(s for s in ss_identified if s in structure)
+        ss_to_isolate = set(structure)
 
     # general lines filters
     line_filters = []
@@ -214,7 +219,7 @@ def extract_secondary_structure(
 
     dssp_slices = group_by(pdbdd['dssp'])
     # DR stands for dssp residues
-    DR = [c.encode() for c in pdbdd['resids'].split(',')]
+    DR = [c for c in pdbdd['resids'].encode().split(b',')]
 
     for ss in ss_to_isolate:
 
