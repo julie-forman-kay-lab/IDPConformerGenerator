@@ -40,6 +40,18 @@ class ArgsToTuple(argparse.Action):
         setattr(namespace, self.dest, tuple(values))
 
 
+class AllParam(argparse.Action):
+    """Convert list of arguments in tuple."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Call it."""
+        if values == ['all']:
+            setattr(namespace, self.dest, 'all')
+
+        else:
+            setattr(namespace, self.dest, values)
+
+
 class CSV2Tuple(argparse.Action):
     """Convert list of arguments in tuple."""
 

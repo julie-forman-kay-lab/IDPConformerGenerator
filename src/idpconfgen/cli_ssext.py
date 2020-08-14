@@ -58,6 +58,7 @@ ap.add_argument(
         'A subfolder is created for each secondary structure type'
         ),
     default='all',
+    action=libcli.AllParam,
     nargs='+',
     )
 
@@ -70,6 +71,7 @@ ap.add_argument(
         ),
     default='all',  # ('N', 'CA', 'C'),
     nargs='+',
+    action=libcli.AllParam,
     )
 libcli.add_argument_minimum(ap)
 libcli.add_argument_ncores(ap)
