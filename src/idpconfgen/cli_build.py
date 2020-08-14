@@ -10,6 +10,7 @@ import re
 import random
 from functools import partial
 from itertools import cycle
+from math import pi
 
 import numpy as np
 
@@ -72,7 +73,8 @@ def main(input_seq, database, func=None):
 
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
-    print(angles[pdbs['12AS_A_seg0']][:10])
+    ANGLES = pdbs[list(pdbs.keys())[0]]
+    #print(angles[pdbs['12AS_A_seg0']][:10])
 
     # esta parte tengo que ponerla de parametro externo
     regex = re.compile(r'(?=(L{6}))')
@@ -95,8 +97,8 @@ def main(input_seq, database, func=None):
     carbonyl_mask = np.isin(atom_labels, ('O',))
 
     # creates views
-    bb = np.zeros((np.sum(bb_mask), 3), dtype=np.float32)
-    bb_o = np.zeros((np.sum(carbonyl_mask), 3), dtype=np.float32)
+    bb = np.zeros((np.sum(bb_mask), 3), dtype=np.float64)
+    bb_o = np.zeros((np.sum(carbonyl_mask), 3), dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
@@ -115,13 +117,15 @@ def main(input_seq, database, func=None):
         bb[0, :],
         bb[1, :],
         distance_CA_C,
-        average_N_CA_C,
+        pi - average_N_CA_C,
         0,  # null torsion angle
         )
 
     # prepares cycles for building process
-    bond_lens = cycle([distance_C_Np1, distance_N_CA, distance_CA_C])
-    bond_bend = cycle([average_CA_C_Np1, average_Cm1_N_CA, average_N_CA_C])
+    #bond_lens = cycle([distance_C_Np1, distance_N_CA, distance_CA_C])
+    bond_lens = cycle([1.4096543793847391, 1.4591385878894008, 1.5249730242787116])
+    #bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
+    bond_bend = cycle([pi - 2.0263767811505957, pi - 2.1234205127842865, pi - 1.9446364708791568])
 
     RC = random.choice
     ALL = np.all
@@ -130,13 +134,13 @@ def main(input_seq, database, func=None):
     last_O = 0  # carbonyl atoms
     while True:
         #agls = angles[RC(loops_6), :].ravel()[1:-2]
-        agls = angles[pdbs['12AS_A_seg0'], :].ravel()[1:-2]
+        agls = angles[ANGLES, :].ravel()[1:-2]
         i0 = i
         try:
             for torsion in agls:
                 bond_l = next(bond_lens)
                 bond_b = next(bond_bend)
-                print(bond_l, torsion, bond_b)
+                #print(bond_l, torsion, bond_b)
                 bb[i, :] = make_coord_Q(
                     bb[i - 3, :],
                     bb[i - 2, :],
@@ -144,6 +148,7 @@ def main(input_seq, database, func=None):
                     bond_l, #next(bond_lens),
                     bond_b, #next(bond_bend),  # radians!
                     torsion,
+
                     )
                 i += 1
 
@@ -214,9 +219,9 @@ def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
             'A',
             residues[i],
             '',
-            coords[i, 0],
-            coords[i, 1],
-            coords[i, 2],
+            np.round(coords[i, 0], decimals=3),
+            np.round(coords[i, 1], decimals=3),
+            np.round(coords[i, 2], decimals=3),
             0.0,
             0.0,
             '',

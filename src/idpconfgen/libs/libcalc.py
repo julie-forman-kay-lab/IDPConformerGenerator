@@ -378,11 +378,12 @@ def make_coord_Q(
     o1 = v1 - v2
     o2 = v3 - v2
 
-    ocross = np.cross(o1, o2)
+    ocross = np.cross(o2, o1)  #changed
     u_ocross = ocross / norm(ocross)
 
     # creates quaterion to rotate on the bend angle
-    bend_angle = (pi - bend) / 2
+    #bend_angle = (pi - bend) / 2
+    bend_angle = bend / 2
     b2, b3, b4 = sin(bend_angle) * u_ocross
     b1 = cos(bend_angle)
 
