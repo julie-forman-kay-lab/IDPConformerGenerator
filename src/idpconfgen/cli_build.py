@@ -74,7 +74,6 @@ def main(input_seq, database, func=None):
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
     ANGLES = pdbs[list(pdbs.keys())[0]]
-    #print(angles[pdbs['12AS_A_seg0']][:10])
 
     # esta parte tengo que ponerla de parametro externo
     regex = re.compile(r'(?=(L{6}))')
@@ -122,10 +121,8 @@ def main(input_seq, database, func=None):
         )
 
     # prepares cycles for building process
-    #bond_lens = cycle([distance_C_Np1, distance_N_CA, distance_CA_C])
-    bond_lens = cycle([1.4096543793847391, 1.4591385878894008, 1.5249730242787116])
-    #bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
-    bond_bend = cycle([pi - 2.0263767811505957, pi - 2.1234205127842865, pi - 1.9446364708791568])
+    bond_lens = cycle([distance_C_Np1, distance_N_CA, distance_CA_C])
+    bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
 
     RC = random.choice
     ALL = np.all
@@ -138,15 +135,12 @@ def main(input_seq, database, func=None):
         i0 = i
         try:
             for torsion in agls:
-                bond_l = next(bond_lens)
-                bond_b = next(bond_bend)
-                #print(bond_l, torsion, bond_b)
                 bb[i, :] = make_coord_Q(
                     bb[i - 3, :],
                     bb[i - 2, :],
                     bb[i - 1, :],
-                    bond_l, #next(bond_lens),
-                    bond_b, #next(bond_bend),  # radians!
+                    next(bond_lens),
+                    next(bond_bend),
                     torsion,
 
                     )
@@ -187,7 +181,6 @@ def main(input_seq, database, func=None):
 # carboxylo final
 # correct distance C_O
 # correct bend angle CA_C_O
-# get values of average as radians
 
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_o
@@ -234,9 +227,6 @@ def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
         fout.write('\n'.join(lines))
 
 
-
-
-
 def generate_atom_labels(input_seq, AL=atom_labels):
     """."""
     labels = []
@@ -267,47 +257,6 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
-
-
-#class Conformer:
-#    def __init__(self, input_seq):
-#        len_conf = len(input_seq)
-#        num_atoms = get_num_atoms(input_seq)
-#
-#        atom_labels = get_atom_labels(input_seq)
-#        residue_numbers = get_residue_numbers(input_seq)
-#
-#        bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
-#        bb_o_mask = np.isin(atom_labels, ('O',))
-#
-#        coords = np.zeros((num_atoms, 3), dtype=np.float32)
-#        bb = coords[bb_mask]
-#        bb_o = coords[bb_o_mask]
-#        bb[1, :] = (distance_N_CA, 0.0, 0.0)
-#        bb[2, :] = make_coord_Q(
-#            np.array((0.0, distance_N_CA, 0.0)),
-#            bb[0, :],
-#            bb[1, :],
-#            distance_CA_C,
-#            average_N_CA_C,
-#            0,
-#            )
-#
-#    def is_complete(self):
-#        return np.all(bb)
-
-
-
-
-
-    #from time import time
-    #start = time()
-    #for i in range(500_000):
-    #    agl = random.choice(loops_6)
-    #    agls = angles[agl, :]
-    #print(time() - start)
-
-    #return
 
 
 def build(input_seq):
