@@ -396,6 +396,12 @@ def test_regex_forward_no_overlap(seq, regex, expected_slices):
             [range(1, 4)],
             ['L'],
             ),
+        (
+            r'(?=(L{1,6}E{1,10}L{1,6}))',
+            20,
+            [range(1, 7), range(1, 11), range(1, 7)],
+            ['L', 'E', 'L'],
+            ),
         ]
     )
 def test_make_range(in1, max_range, expected_ranges, expected_chars):
@@ -546,6 +552,11 @@ REGEX_SEARCH_w_RANGE = [
             slice(10, 11),
             slice(3, 5),
             ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'K{1,2}',
+        [],
         ),
     ]
 

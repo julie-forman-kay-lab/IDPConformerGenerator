@@ -10,7 +10,9 @@ from idpconfgen.libs.libmulticore import pool_function
 
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
-REGEX_RANGE = re.compile(r'(\{\d\,\d\}|\{\d\}|\{\d\,\}|\{\,\d\})')
+REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
+# a more general version of the above is: r'\{\d*\,*\d*\}' but this would
+# accept also r'{}' which is not desired
 REGEX_RANGE_CHAR = re.compile(r'\w\{')
 
 
@@ -209,7 +211,7 @@ def make_ranges(
     # ensures
     assert isinstance(ranges, list)
     assert isinstance(chars, list)
-    assert len(ranges) == len(chars)
+    assert len(ranges) == len(chars), (len(ranges), len(chars))
     return ranges, chars
 
 
