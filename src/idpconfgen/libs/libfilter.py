@@ -5,6 +5,7 @@ from functools import partial
 
 import numpy as np
 
+from idpconfgen import log
 from idpconfgen.libs.libmulticore import pool_function
 
 
@@ -22,6 +23,7 @@ def aligndb(db, NAN=np.nan):
     OMGE = omg.extend
     DA = dssp.append
     RA = resseq.append
+    spacer = 1  # algorithm definition
 
     current = 0
     for pdb, data in db.items():
@@ -31,16 +33,21 @@ def aligndb(db, NAN=np.nan):
         _PSITMP = data['psi'] + [NAN, NAN]
         _OMGTMP = data['omega'] + [NAN, NAN]
 
-        l_PHITMP = len(_PHITMP)
-        if sum([l_PHITMP, len(_PSITMP), len(_OMGTMP)]) / 3 != l_PHITMP:
-            print(f'lengths of angles are not the same, ignoring... {pdb}')
-            continue
-
         # +1 because NAN are added as spacers
-        len_segment_w_spacer = len_segment + 1
-        if len_segment_w_spacer != l_PHITMP:
-            print(f"Seq length and angles don't match, ignoring... {pdb}")
-            print(f'>>> {len_segment} {l_PHITMP} {pdb}')
+        len_segment_w_spacer = len_segment + spacer
+
+        correct_lengths = [
+            len_segment_w_spacer,
+            len(data['dssp']) + spacer,
+            len(_PHITMP),
+            len(_PSITMP),
+            len(_OMGTMP),
+            ]
+        if sum(correct_lengths) / len(correct_lengths) != len_segment_w_spacer:
+            log.error(
+                'number of residues, SS chars and angles does not match, '
+                f'ignoring... {pdb}'
+                )
             continue
 
         pdbs[pdb] = slice(current, current + len_segment)
@@ -93,7 +100,7 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE):
     return result
 
 
-def regex_has_overlap(regex_string, overlap_fmt=REGEX_OVERLAP):
+def regex_has_overlap(regex_string, overlap_rex=REGEX_OVERLAP):
     """
     Find if a `regex_string` defines overlap.
 
@@ -109,7 +116,7 @@ def regex_has_overlap(regex_string, overlap_fmt=REGEX_OVERLAP):
     -------
     bool
     """
-    return bool(overlap_fmt.findall(regex_string))
+    return bool(overlap_rex.findall(regex_string))
 
 
 def regex_range(sequence, regex_string, ncores=1):
@@ -123,11 +130,15 @@ def regex_range(sequence, regex_string, ncores=1):
     if regex_has_overlap(regex_string):
         pre, suf, func = r'(?=(', r'))', regex_forward_with_overlap
     else:
-        pre, suf = '', '', regex_forward_no_overlap
+        pre, suf, func = '', '', regex_forward_no_overlap
 
     # creates all possible regex combinations without ranges
     # from the rangex identified in the original regex_string
-    regex_combinations = make_regex_combinations(regex_string, pre=pre, suf=suf)
+    regex_combinations = make_regex_combinations_from_ranges(
+        regex_string,
+        pre=pre,
+        suf=suf,
+        )
 
     exec_pool = pool_function(
         partial(func, sequence),
@@ -142,13 +153,67 @@ def regex_range(sequence, regex_string, ncores=1):
     return slices
 
 
-def make_regex_combinations_from_ranges(regex_string, pre='', suf=''):
+def make_regex_combinations_from_ranges(regex_string, **kwargs):
     """."""
     ranges, chars = make_ranges(regex_string)
-    return make_regex_combinations(ranges, chars, pre=pre, suf=suf)
+    return make_regex_combinations(ranges, chars, **kwargs)
 
 
-def make_regex_combinations(ranges, chars, pre='', suf=''):
+def make_ranges(
+        regex_string,
+        rang_rex=REGEX_RANGE,
+        char_rex=REGEX_RANGE_CHAR,
+        max_range=30,
+        ):
+    """
+    Define a set of ranges and characters from `regex_string`.
+
+    Examples
+    --------
+        >>> make_range('L{1}H{1,2}')
+        [range(1, 2), range(1, 3)], ['L', 'H']
+
+        >>> make_range('L{1,}H{,2}')
+        [range(1, None), range(1, 3)], ['L', 'H']
+    """
+    # requires
+    assert isinstance(regex_string, str)
+
+    # examples of i according to `prev`
+    # 'L{', 'H{'
+    chars = [i[:-1] for i in char_rex.findall(regex_string)]
+
+    # yes, I tried to write this in a list comprehension, but these are
+    # 3 for loops. I thought is just more readable to make it explicit
+    rangs = (i.strip('{}') for i in rang_rex.findall(regex_string))
+    ranges = []
+    for trange in rangs:
+        # examples of trange:
+        # '1', '1,', '1,2', ',2'
+        # to make ranges compatible with regex, start should be equal to 1
+        # and because regex ranges are inclusive, 1 must be added to stop
+        ts = trange.split(',')
+
+        # 'or 1' covers {,3} cases, that yield ['', '3']
+        start = int(ts[0] or 1)
+
+        try:
+            # 'or max_range' covers {3,} cases, that yield ['3', '']
+            end = int(ts[1] or max_range)
+        except IndexError:
+            # covers {1} no-range situations
+            end = start
+
+        ranges.append(range(start, end + 1))
+
+    # ensures
+    assert isinstance(ranges, list)
+    assert isinstance(chars, list)
+    assert len(ranges) == len(chars)
+    return ranges, chars
+
+
+def make_regex_combinations(ranges, chars, pre=None, suf=None):
     """
     Make combinations of regexes from `ranges` and `chars`.
 
@@ -168,43 +233,13 @@ def make_regex_combinations(ranges, chars, pre='', suf=''):
     pre, suf : str
         Strings to add as prefix and suffix of the generates ranges.
     """
+    pre = pre or ''
+    suf = suf or ''
     regex_combinations = []
     for range_tuple in it.product(*ranges):
-        c_regex = (c + str(ii) + '}' for ii, c in zip(range_tuple, chars))
+        c_regex = (c + '{' + str(ii) + '}' for ii, c in zip(range_tuple, chars))
         regex_combinations.append(f"{pre}{''.join(c_regex)}{suf}")
     return regex_combinations
-
-
-def make_ranges(
-        regex_string,
-        rang_rex=REGEX_RANGE,
-        char_rex=REGEX_RANGE_CHAR,
-        ):
-    """."""
-    # requires
-    assert isinstance(regex_string, str)
-
-    # examples of i according to `prev`
-    # 'L{', 'H{'
-    chars = [i[:-1] for i in char_rex.findall(regex_string)]
-
-    # yes, I tried to write this in a list comprehension, but these are
-    # 3 for loops. I thought is just more readable to make it explicit
-    rangs = (i.strip('{}') for i in rang_rex.findall(regex_string))
-    ranges = []
-    for trange in rangs:
-        # examples of trange:
-        # '1', '1,', '1,2', ',2'
-        # to make ranges compatible with regex, start should be equal to 1
-        # and because regex ranges are inclusive, 1 must be added to stop
-        values = [int(i) if i else 1 for i in trange.split(',')]
-        ranges.append(range(values[0], values[-1] + 1))
-
-    # ensures
-    assert isinstance(ranges, list)
-    assert isinstance(chars, list)
-    assert len(ranges) == range(chars)
-    return ranges, chars
 
 
 def regex_forward_no_overlap(sequence, regex):

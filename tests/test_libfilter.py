@@ -5,7 +5,15 @@ import numpy as np
 import pytest
 
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libfilter import aligndb, regex_forward_with_overlap
+from idpconfgen.libs.libfilter import (
+    aligndb,
+    regex_forward_with_overlap,
+    regex_forward_no_overlap,
+    regex_has_overlap,
+    make_ranges,
+    regex_search,
+    make_regex_combinations,
+    )
 
 @pytest.mark.parametrize(
     'in1,out',
@@ -153,6 +161,111 @@ def test_aligndb(in1, out):
     assert fasta == out[3]
 
 
+
+@pytest.mark.parametrize(
+    'in1, out',
+    [
+        (
+            {
+                "pdb1": {
+                    "dssp": "LLLLLL",
+                    "fasta": "MMMMMM",
+                    "omega": [2, 2, 2, 2, 2],
+                    "psi": [1, 1, 1, 1, 1],
+                    "phi": [3, 3, 3, 3, 3],
+                    "resids": "1,2,3,4,5,6",
+                    },
+                "pdb2": {
+                    "dssp": "HHHHHH",
+                    "fasta": "AAAAA",
+                    "omega": [5, 5, 5, 5, 5],
+                    "psi": [4, 4, 4, 4, 4],
+                    "phi": [6, 6, 6, 6, 6],
+                    "resids": "7,8,9,10,11,12",
+                    },
+                },
+            (
+                {
+                    "pdb1": slice(0, 6, None),
+                    },
+                np.array([
+                    [np.nan, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    ]),
+                "LLLLLL",
+                "MMMMMM",
+                ),
+            ),
+        ]
+    )
+def test_aligndb_continue_1(in1, out):
+    """Test ignores when angles are different"""
+    assert isinstance(in1, dict)
+    pdbs, angles, dssp, fasta = aligndb(in1)
+    assert pdbs == out[0]
+    assert angles.shape == out[1].shape
+    assert np.array_equal(angles, out[1], equal_nan=True)
+    assert dssp == out[2]
+    assert fasta == out[3]
+
+
+@pytest.mark.parametrize(
+    'in1, out',
+    [
+        (
+            {
+                "pdb1": {
+                    "dssp": "LLLLLL",
+                    "fasta": "MMMMMM",
+                    "omega": [2, 2, 2, 2, 2],
+                    "psi": [1, 1, 1, 1, 1],
+                    "phi": [3, 3, 3, 3, 3],
+                    "resids": "1,2,3,4,5,6",
+                    },
+                "pdb2": {
+                    "dssp": "HHHHH",
+                    "fasta": "AAAAAA",
+                    "omega": [5, 5, 5, 5, 5],
+                    "psi": [4, 4, 4, 4, 4],
+                    "phi": [6, 6, 6, 6, 6],
+                    "resids": "7,8,9,10,11,12",
+                    },
+                },
+            (
+                {
+                    "pdb1": slice(0, 6, None),
+                    },
+                np.array([
+                    [np.nan, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, 1, 2],
+                    [3, np.nan, np.nan],
+                    [np.nan, np.nan, np.nan],
+                    ]),
+                "LLLLLL",
+                "MMMMMM",
+                ),
+            ),
+        ]
+    )
+def test_aligndb_continue_2(in1, out):
+    """Test ignores when angles are different"""
+    assert isinstance(in1, dict)
+    pdbs, angles, dssp, fasta = aligndb(in1)
+    assert pdbs == out[0]
+    assert angles.shape == out[1].shape
+    assert np.array_equal(angles, out[1], equal_nan=True)
+    assert dssp == out[2]
+    assert fasta == out[3]
+
+
 @pytest.mark.parametrize(
     'seq, regex, expected_slices',
     [
@@ -190,6 +303,7 @@ def test_regex_forward_with_overlap(seq, regex, expected_slices):
     """."""
     result = regex_forward_with_overlap(seq, re.compile(regex))
 
+    assert len(result) == len(expected_slices)
     # the line bellow does not report on which slice is wrong
     # assert all(r == e for r, e in zip(result, expected_slices))
     # verbose for loop does report properly :-)
@@ -197,7 +311,243 @@ def test_regex_forward_with_overlap(seq, regex, expected_slices):
         assert r == e, (r, e)
 
 
-def test_regex_forward_with_overlap_error():
-    """Test error raises when no match is found."""
-    with pytest.raises(IDPConfGenException):
-        regex_forward_with_overlap('HHH', re.compile(r'(?=(L))'))
+@pytest.mark.parametrize(
+    'seq, regex, expected_slices',
+    [
+        # ################## FIST Example
+        # L between 1 and 3 length.
+        (
+            "LLLLLLLLHHLL",
+            r"L{3}",
+            [
+                slice(0, 3, None),
+                slice(3, 6, None),
+                ],
+            ),
+        # ################## SECOND Example
+        # L of length 1
+        (
+            "HHHLLHHH",
+            r"H",
+            [
+                slice(0, 1),
+                slice(1, 2),
+                slice(2, 3),
+                slice(5, 6),
+                slice(6, 7),
+                slice(7, 8),
+                ],
+            ),
+        # ################## THIRD Example
+        # L of length 1
+        (
+            "HHHLLHHH",
+            r"H{2}",
+            [
+                slice(0, 2),
+                slice(5, 7),
+                ],
+            ),
+        # ################## FORTH Example
+        # L of length 1
+        (
+            "HHHLLHHH",
+            r"H{2}L{2}H{1,2}",
+            [
+                slice(1, 7),
+                ],
+            ),
+        ],
+    )
+def test_regex_forward_no_overlap(seq, regex, expected_slices):
+    """."""
+    result = regex_forward_no_overlap(seq, re.compile(regex))
+
+    assert len(result) == len(expected_slices)
+    # the line bellow does not report on which slice is wrong
+    # assert all(r == e for r, e in zip(result, expected_slices))
+    # verbose for loop does report properly :-)
+    for r, e in zip(result, expected_slices):
+        assert r == e, (r, e)
+
+
+@pytest.mark.parametrize(
+    'in1,max_range,expected_ranges,expected_chars',
+    [
+        (
+            'L{1}H{2}',
+            20,
+            [range(1, 2), range(2, 3)],
+            ['L', 'H'],
+            ),
+        (
+            'L{1,}L{8,9}H{5,}',
+            20,
+            [range(1, 21), range(8, 10), range(5, 21)],
+            ['L', 'L', 'H'],
+            ),
+        (
+            'L{,3}',
+            10,
+            [range(1, 4)],
+            ['L'],
+            ),
+        ]
+    )
+def test_make_range(in1, max_range, expected_ranges, expected_chars):
+    """."""
+    ranges, chars = make_ranges(in1, max_range=max_range)
+
+    assert len(ranges) == len(expected_ranges)
+
+    for i, j in zip(ranges, expected_ranges):
+        assert i == j
+
+    assert len(chars) == len(expected_chars)
+
+    for i, j in zip(chars, expected_chars):
+        assert i == j
+
+
+@pytest.mark.parametrize(
+    'in_ranges, in_chars, in_pre, in_suf, expected',
+    [
+        (
+            [range(4, 8)],
+            'X',
+            None,
+            None,
+            ['X{4}', 'X{5}', 'X{6}', 'X{7}'],
+            ),
+        (
+            [range(1, 2), range(5, 9)],
+            ['L', 'E'],
+            r'(?=(',
+            r'))',
+            [
+                '(?=(L{1}E{5}))',
+                '(?=(L{1}E{6}))',
+                '(?=(L{1}E{7}))',
+                '(?=(L{1}E{8}))',
+                ],
+            ),
+        ]
+    )
+def test_make_regex_combinations(
+        in_ranges,
+        in_chars,
+        in_pre,
+        in_suf,
+        expected,
+        ):
+    """."""
+    result = make_regex_combinations(in_ranges, in_chars, in_pre, in_suf)
+    assert len(result) == len(expected)
+    for i, j in zip(result, expected):
+        assert i == j, (i, j)
+
+
+@pytest.mark.parametrize(
+    'in1, expected',
+    [
+        ('L{4,5}', False),
+        ('(?=(L{4,5}))', True),
+        ],
+    )
+def test_regex_has_overlap(in1, expected):
+    """Test has overlap."""
+    result = regex_has_overlap(in1)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'sequence, regex_string, expected',
+    [
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'L{3}',
+            [
+                slice(0, 3),
+                slice(5, 8),
+                slice(11, 14),
+                slice(16, 19),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'L{1}H{2}',
+            [slice(2, 5)],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'L{1,3}H{1,2}L{1,3}',
+            [
+                slice(2, 6),
+                slice(2, 7),
+                slice(2, 8),
+                slice(1, 6),
+                slice(1, 7),
+                slice(1, 8),
+                slice(0, 6),
+                slice(0, 7),
+                slice(0, 8),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'L{1}E{2}L{2,3}',
+            [
+                slice(13, 18),
+                slice(13, 19),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            '(?=(L{1}E{2}L{2,3}))',
+            [
+                slice(13, 18),
+                slice(13, 19),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            '(?=(L{2}))',
+            [
+                slice(0, 2),
+                slice(1, 3),
+                slice(5, 7),
+                slice(6, 8),
+                slice(11, 13),
+                slice(12, 14),
+                slice(16, 18),
+                slice(17, 19),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'L{2}',
+            [
+                slice(0, 2),
+                slice(5, 7),
+                slice(11, 13),
+                slice(16, 18),
+                ],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'H{1,2}',
+            [
+                slice(3, 4),
+                slice(4, 5),
+                slice(10, 11),
+                slice(3, 5),
+                ],
+            ),
+        ]
+    )
+def test_regex_search(sequence, regex_string, expected):
+    """."""
+    result = regex_search(sequence, regex_string)
+    assert len(result) == len(expected)
+    for i, j in zip(result, expected):
+        assert i == j, (i, j)
