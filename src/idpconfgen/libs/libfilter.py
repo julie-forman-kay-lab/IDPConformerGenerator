@@ -74,7 +74,7 @@ def aligndb(db, NAN=np.nan):
 # forward no overlap
 
 
-def regex_search(sequence, regex_string, rex_range=REGEX_RANGE):
+def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
     """
     Search for regex in sequence.
 
@@ -86,7 +86,7 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE):
     # range is defined by default by: L{1}, L{1,5} situations
     # the following functions ensures searchs goes both directions
     if rex_range.findall(regex_string):
-        result = regex_range(sequence, regex_string)
+        result = regex_range(sequence, regex_string, **kwargs)
 
     else:
         overlap = regex_has_overlap(regex_string)
@@ -98,25 +98,6 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE):
     assert isinstance(result, list)
     assert all(isinstance(S, slice) for S in result)  # heavy and slow!!
     return result
-
-
-def regex_has_overlap(regex_string, overlap_rex=REGEX_OVERLAP):
-    """
-    Find if a `regex_string` defines overlap.
-
-    Parameters
-    ----------
-    regex_string : str
-        The regex string.
-
-    overlap_fmt : str
-        The regex to find overlap in regex_string.
-
-    Returns
-    -------
-    bool
-    """
-    return bool(overlap_rex.findall(regex_string))
 
 
 def regex_range(sequence, regex_string, ncores=1):
@@ -151,6 +132,25 @@ def regex_range(sequence, regex_string, ncores=1):
         slices.extend(result)
 
     return slices
+
+
+def regex_has_overlap(regex_string, overlap_rex=REGEX_OVERLAP):
+    """
+    Find if a `regex_string` defines overlap.
+
+    Parameters
+    ----------
+    regex_string : str
+        The regex string.
+
+    overlap_fmt : str
+        The regex to find overlap in regex_string.
+
+    Returns
+    -------
+    bool
+    """
+    return bool(overlap_rex.findall(regex_string))
 
 
 def make_regex_combinations_from_ranges(regex_string, **kwargs):

@@ -4,16 +4,17 @@ import re
 import numpy as np
 import pytest
 
-from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libfilter import (
     aligndb,
-    regex_forward_with_overlap,
-    regex_forward_no_overlap,
-    regex_has_overlap,
     make_ranges,
-    regex_search,
     make_regex_combinations,
+    regex_forward_no_overlap,
+    regex_forward_with_overlap,
+    regex_has_overlap,
+    regex_range,
+    regex_search,
     )
+
 
 @pytest.mark.parametrize(
     'in1,out',
@@ -161,7 +162,6 @@ def test_aligndb(in1, out):
     assert fasta == out[3]
 
 
-
 @pytest.mark.parametrize(
     'in1, out',
     [
@@ -204,7 +204,7 @@ def test_aligndb(in1, out):
         ]
     )
 def test_aligndb_continue_1(in1, out):
-    """Test ignores when angles are different"""
+    """Test ignores when number of angles doesn't match seq length."""
     assert isinstance(in1, dict)
     pdbs, angles, dssp, fasta = aligndb(in1)
     assert pdbs == out[0]
@@ -256,7 +256,11 @@ def test_aligndb_continue_1(in1, out):
         ]
     )
 def test_aligndb_continue_2(in1, out):
-    """Test ignores when angles are different"""
+    """
+    Test ignores when sizes differ.
+
+    In other words, number of angles, residues or DSSP are different.
+    """
     assert isinstance(in1, dict)
     pdbs, angles, dssp, fasta = aligndb(in1)
     assert pdbs == out[0]
@@ -460,58 +464,114 @@ def test_regex_has_overlap(in1, expected):
     assert result == expected
 
 
+# this list will be used in test_regex_search and test_regex_range
+# ORDER MATHERS!
+REGEX_SEARCH_w_RANGE = [
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'L{3}',
+        [
+            slice(0, 3),
+            slice(5, 8),
+            slice(11, 14),
+            slice(16, 19),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'L{1}H{2}',
+        [slice(2, 5)],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'L{1,3}H{1,2}L{1,3}',
+        [
+            slice(2, 6),
+            slice(2, 7),
+            slice(2, 8),
+            slice(1, 6),
+            slice(1, 7),
+            slice(1, 8),
+            slice(0, 6),
+            slice(0, 7),
+            slice(0, 8),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'L{1}E{2}L{2,3}',
+        [
+            slice(13, 18),
+            slice(13, 19),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        '(?=(L{1}E{2}L{2,3}))',
+        [
+            slice(13, 18),
+            slice(13, 19),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        '(?=(L{2}))',
+        [
+            slice(0, 2),
+            slice(1, 3),
+            slice(5, 7),
+            slice(6, 8),
+            slice(11, 13),
+            slice(12, 14),
+            slice(16, 18),
+            slice(17, 19),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'L{2}',
+        [
+            slice(0, 2),
+            slice(5, 7),
+            slice(11, 13),
+            slice(16, 18),
+            ],
+        ),
+    (
+        'LLLHHLLLE|HLLLEELLL',
+        'H{1,2}',
+        [
+            slice(3, 4),
+            slice(4, 5),
+            slice(10, 11),
+            slice(3, 5),
+            ],
+        ),
+    ]
+
+
 @pytest.mark.parametrize(
     'sequence, regex_string, expected',
-    [
+    # ORDER MATHERS!
+    REGEX_SEARCH_w_RANGE + [
         (
             'LLLHHLLLE|HLLLEELLL',
-            'L{3}',
+            'LHHL',
+            [slice(2, 6)],
+            ),
+        (
+            'LLLHHLLLE|HLLLEELLL',
+            'LL',
             [
-                slice(0, 3),
-                slice(5, 8),
-                slice(11, 14),
-                slice(16, 19),
+                slice(0, 2),
+                slice(5, 7),
+                slice(11, 13),
+                slice(16, 18),
                 ],
             ),
         (
             'LLLHHLLLE|HLLLEELLL',
-            'L{1}H{2}',
-            [slice(2, 5)],
-            ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            'L{1,3}H{1,2}L{1,3}',
-            [
-                slice(2, 6),
-                slice(2, 7),
-                slice(2, 8),
-                slice(1, 6),
-                slice(1, 7),
-                slice(1, 8),
-                slice(0, 6),
-                slice(0, 7),
-                slice(0, 8),
-                ],
-            ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            'L{1}E{2}L{2,3}',
-            [
-                slice(13, 18),
-                slice(13, 19),
-                ],
-            ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            '(?=(L{1}E{2}L{2,3}))',
-            [
-                slice(13, 18),
-                slice(13, 19),
-                ],
-            ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            '(?=(L{2}))',
+            '(?=(LL))',
             [
                 slice(0, 2),
                 slice(1, 3),
@@ -523,31 +583,28 @@ def test_regex_has_overlap(in1, expected):
                 slice(17, 19),
                 ],
             ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            'L{2}',
-            [
-                slice(0, 2),
-                slice(5, 7),
-                slice(11, 13),
-                slice(16, 18),
-                ],
-            ),
-        (
-            'LLLHHLLLE|HLLLEELLL',
-            'H{1,2}',
-            [
-                slice(3, 4),
-                slice(4, 5),
-                slice(10, 11),
-                slice(3, 5),
-                ],
-            ),
         ]
     )
 def test_regex_search(sequence, regex_string, expected):
-    """."""
-    result = regex_search(sequence, regex_string)
+    """
+    Test regex_search in single core.
+
+    Single core is important because results are ordered.
+    """
+    result = regex_search(sequence, regex_string, ncores=1)
     assert len(result) == len(expected)
     for i, j in zip(result, expected):
         assert i == j, (i, j)
+
+
+@pytest.mark.parametrize(
+    'sequence, regex_string, expected',
+    REGEX_SEARCH_w_RANGE,
+    )
+def test_regex_ranges(sequence, regex_string, expected):
+    """Test regex_ranges function in multicore."""
+    result = regex_range(sequence, regex_string, ncores=None)
+    assert len(result) == len(expected)
+    # here because is multicore the results are note sorted in order
+    for i in result:
+        assert i in expected, i
