@@ -186,18 +186,21 @@ def main(
                     )
                 bbi += 1
 
-            else:
-                # when backbone completes,
-                # adds carbonyl oxygen atoms
-                for k in range(bbi0, bbi, 3):
-                    bb_CO[COi, :] = make_coord_Q_CO(
-                        bb[k - 2, :],
-                        bb[k - 1, :],
-                        bb[k, :],
-                        distance_C_O,  # to change
-                        average_CA_C_O,
-                        )
-                    COi += 1
+            # when backbone completes,
+            # adds carbonyl oxygen atoms
+            # after this loop all COs are added for the portion of BB
+            # added previously
+            for k in range(bbi0, bbi, 3):
+                bb_CO[COi, :] = make_coord_Q_CO(
+                    bb[k - 2, :],
+                    bb[k - 1, :],
+                    bb[k, :],
+                    distance_C_O,  # to change
+                    average_CA_C_O,
+                    )
+                COi += 1
+
+            # add sidechains here.....
 
             coords[bb_mask] = bb
             coords[carbonyl_mask] = bb_CO
@@ -213,11 +216,16 @@ def main(
             # has clash
             if is_valid:
                 continue
+
             else:  # not valid
-                bb[bbi0:bbi, :] = 0.0
-                bb_CO[COi0:COi, :] = 0.0
+                # reset coordinates to the original value
+                bb[bbi0:bbi, :] = 1.0
+                bb_CO[COi0:COi, :] = 1.0
                 bbi = bbi0
                 COi = COi0
+                # coords needs to be reset because size of protein
+                # chunjs may not be equal
+                coords[:, :] = 1.0
 
 
         except IndexError as err:
