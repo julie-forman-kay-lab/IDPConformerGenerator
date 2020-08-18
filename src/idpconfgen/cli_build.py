@@ -54,43 +54,68 @@ ap = libcli.CustomParser(
 # https://stackoverflow.com/questions/24180527
 
 ap.add_argument(
-    'database',
+    '-db',
+    '--database',
     help='The IDPConfGen database.',
+    required=True,
     )
 
 ap.add_argument(
-    'input_seq',
+    '-seq',
+    '--input_seq',
+    help='The Conformer residue sequence.',
+    required=True
     )
+
+ap.add_argument(
+    '-n',
+    '--nconfs',
+    help='Number of conformers to build',
+    default=1,
+    )
+
+ap.add_argument(
+    '-dr',
+    '--dssp-regexes',
+    help='Regexes used to search in DSSP',
+    default='(?=(L{2,6}))',
+    nargs='+',
+    )
+
 
 
 def main(
         input_seq,
         database,
         func=None,
-        regex_string=r'(?=(L{2}))',
+        dssp_regexes=r'(?=(L{2,6}))',
+        nconfs=1,
         ):
     """."""
-
     db = read_dictionary_from_disk(database)
     ldb = len(db)
-    _log = f'Read DB with {ldb} entries'
-    log.info(_log)
+    log.info(f'Read DB with {ldb} entries')
 
+    # reads and aligns IDPConfGen data base
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
-    #ANGLES = pdbs[list(pdbs.keys())[0]]
 
-    # esta parte tengo que ponerla de parametro externo
+    # seachs for slices in secondary structure
     timed = partial(timeme, regex_search)
-    slices = timed(dssp, regex_string)
-    _log = f'Found {len(slices)} indexes for {regex_string}'
-    print(slices)
-    log.info(_log)
+    slices = []
+    if isinstance(dssp_regexes, str):
+        dssp_regexes = [dssp_regexes]
+
+    for dssp_regex_string in dssp_regexes:
+        slices.extend(timed(dssp, dssp_regex_string))
+
+    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
+
 
     # building
 
     # prepares data based on the input sequence
-    len_conf = len(input_seq)  # number of residues
+    #len_conf = len(input_seq)  # number of residues
     atom_labels = np.array(generate_atom_labels(input_seq))  # considers sidechain all-atoms
     num_atoms = len(atom_labels)
     residue_numbers = np.array(generate_residue_numbers(atom_labels))
@@ -130,13 +155,12 @@ def main(
     bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
 
     RC = random.choice
-    ALL = np.all
     i = 3  # starts at 2 because the first 3 atoms are already placed
     # and needs to adjust with the += assignment inside the loop
     last_O = 0  # carbonyl atoms
     while True:
         #agls = angles[RC(loops_6), :].ravel()[1:-2]
-        agls = angles[ANGLES, :].ravel()[1:-2]
+        agls = angles[RC(slices), :].ravel()[1:-2]
         i0 = i
         try:
             for torsion in agls:
@@ -262,10 +286,6 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
-
-
-def build(input_seq):
-    return
 
 
 
