@@ -37,6 +37,7 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
+from idpconfgen.libs.libvalidate import vdw_clash_by_threshold
 
 
 _name = 'build'
@@ -158,9 +159,16 @@ def main(
     i = 3  # starts at 2 because the first 3 atoms are already placed
     # and needs to adjust with the += assignment inside the loop
     last_O = 0  # carbonyl atoms
+
+    # run this loop until a specific BREAK is triggered
     while True:
-        #agls = angles[RC(loops_6), :].ravel()[1:-2]
+
+        # the slice [1:-2] removes the first phi and the last psi and omega
+        # from the group of angles. These angles are not needed because the
+        # implementation always follows the order: psi-omega-phi(...)
         agls = angles[RC(slices), :].ravel()[1:-2]
+
+        # index at the start of the current cycle
         i0 = i
         try:
             for torsion in agls:
@@ -171,7 +179,6 @@ def main(
                     next(bond_lens),
                     next(bond_bend),
                     torsion,
-
                     )
                 i += 1
 
@@ -188,6 +195,24 @@ def main(
             #            0,
             #            )
             #        last_O += 1
+
+            rows, *_ = vdw_clash_by_threshold(
+                bb[:i, :],
+                atom_labels[bb_mask][:i],
+                atom_labels[bb_mask][:i].astype('<U1'),
+                False,
+                False,
+                residue_numbers[bb_mask][:i],
+                residues_apart=3,
+                )
+
+            # has clash
+            if np.any(rows):
+                print('found clash', i, rows)
+                bb[i0:i, :] = 0.0
+                i = i0
+                print('reset', i)
+
         except IndexError:
             # i-1, to discard the last carboxyl
             #for k in range(i0, i-1, 3):
@@ -249,8 +274,7 @@ def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
             '',
             ele,
             '',
-            )
-        )
+            ))
 
     with open('conformer.pdb', 'w') as fout:
         fout.write('\n'.join(lines))
