@@ -162,7 +162,7 @@ def main(
     bbi = 3  # starts at 2 because the first 3 atoms are already placed
     # and needs to adjust with the += assignment inside the loop
     COi = 0  # carbonyl atoms
-
+    backbone_done = False
     # run this loop until a specific BREAK is triggered
     while True:
 
@@ -185,69 +185,74 @@ def main(
                     torsion,
                     )
                 bbi += 1
+        except IndexError:
+            # here bbi is the last index + 1
+            backbone_done = True
 
-            # when backbone completes,
-            # adds carbonyl oxygen atoms
-            # after this loop all COs are added for the portion of BB
-            # added previously
-            for k in range(bbi0, bbi, 3):
-                bb_CO[COi, :] = make_coord_Q_CO(
-                    bb[k - 2, :],
-                    bb[k - 1, :],
-                    bb[k, :],
-                    distance_C_O,  # to change
-                    average_CA_C_O,
-                    )
-                COi += 1
-
-            # add sidechains here.....
-
-            coords[bb_mask] = bb
-            coords[carbonyl_mask] = bb_CO
-            is_valid = validate_conformer_for_builder(
-                coords,
-                atom_labels,
-                residue_numbers,
-                bb_mask,
-                carbonyl_mask,
-                #bbi,
+        # this else performs if the for loop concludes properly
+        #else:
+        # when backbone completes,
+        # adds carbonyl oxygen atoms
+        # after this loop all COs are added for the portion of BB
+        # added previously
+        for k in range(bbi0, bbi, 3):
+            bb_CO[COi, :] = make_coord_Q_CO(
+                bb[k - 2, :],
+                bb[k - 1, :],
+                bb[k, :],
+                distance_C_O,  # to change
+                average_CA_C_O,
                 )
+            COi += 1
 
-            # has clash
-            if is_valid:
-                continue
+        if backbone_done:
+            # add COO
+            pass
 
-            else:  # not valid
-                # reset coordinates to the original value
-                bb[bbi0:bbi, :] = 1.0
-                bb_CO[COi0:COi, :] = 1.0
-                bbi = bbi0
-                COi = COi0
-                # coords needs to be reset because size of protein
-                # chunjs may not be equal
-                coords[:, :] = 1.0
+        # add sidechains here.....
 
+        # validate conformer current state
+        coords[bb_mask] = bb
+        coords[carbonyl_mask] = bb_CO
+        energy = validate_conformer_for_builder(
+            coords,
+            atom_labels,
+            residue_numbers,
+            bb_mask,
+            carbonyl_mask,
+            #bbi,
+            )
 
-        except IndexError as err:
-            # i-1, to discard the last carboxyl
-            for k in range(bbi0, bbi-1, 3):
-                bb_CO[COi, :] = make_coord_Q_CO(
-                    bb[k - 2, :],
-                    bb[k - 1, :],
-                    bb[k, :],
-                    distance_C_O,
-                    average_CA_C_O,
-                    )
-                COi += 1
+        if energy > 0:  # not valid
+            # reset coordinates to the original value
+            # before the last chunk added
+            bb[bbi0:bbi, :] = 1.0
+            bb_CO[COi0:COi, :] = 1.0
+            # do the same for sidechains
+            # ...
+            # reset also indexes
+            bbi = bbi0
+            COi = COi0
+            # coords needs to be reset because size of protein next
+            # chunks may not be equal
+            coords[:, :] = 1.0
+
+            backbone_done = False
+            continue
+
+        if backbone_done:
+            # this point guarantees all protein atoms are built
             break
+    # END of while loop
 
 
-# TODO:
-# clashes
-# sidechains
-# carboxylo final
-# correct distance C_O
-# correct bend angle CA_C_O
+
+    # TODO:
+    # clashes
+    # sidechains
+    # carboxylo final
+    # correct distance C_O
+    # correct bend angle CA_C_O
 
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_CO

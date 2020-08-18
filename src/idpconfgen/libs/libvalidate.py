@@ -479,4 +479,7 @@ def validate_conformer_for_builder(
         not np.any(rows),
         ))
 
-    return not np.any(rows) #is_valid
+    if np.any(rows): # not valid
+        return 1  # simulates positive energy
+    else:
+        return -1  # simulates negative energy
