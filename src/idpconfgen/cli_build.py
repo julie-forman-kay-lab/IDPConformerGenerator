@@ -126,9 +126,11 @@ def main(
     # creates masks
     bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
     carbonyl_mask = np.isin(atom_labels, ('O',))
+    OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
     # replces the last TRUE value by false because that is a carboxyl
     # and nota carbonyl
-    carbonyl_mask[np.argwhere(carbonyl_mask)[-1][0]] = False
+    OXT1_index = np.argwhere(carbonyl_mask)[-1][0]
+    carbonyl_mask[OXT1_index] = False
 
     # creates views
     bb = np.ones((np.sum(bb_mask), 3), dtype=np.float64)
@@ -206,7 +208,21 @@ def main(
             COi += 1
 
         if backbone_done:
-            # add COO
+            coords[OXT_index] = make_coord_Q_CO(
+                bb[-2, :],
+                bb[-1, :],
+                np.array((bb[-2, 2], bb[-2, 1], bb[-2, 0])),
+                1.25,
+                0.5235987755982988
+                )
+
+            coords[OXT1_index] = make_coord_Q_CO(
+                bb[-2, :],
+                bb[-1, :],
+                np.array((-bb[-2, 2], bb[-2, 1], bb[-2, 0])),
+                1.25,
+                -0.5235987755982988
+                )
             pass
 
         # add sidechains here.....
@@ -257,7 +273,9 @@ def main(
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_CO
 
-    relevant = np.logical_or(bb_mask, carbonyl_mask) 
+    sums = np.sum(coords, axis=1)
+    relevant = np.logical_not(np.isclose(sums, 3))
+    #relevant = np.logical_or(bb_mask, carbonyl_mask) 
 
     save_conformer_to_disk(
         input_seq,
