@@ -445,3 +445,31 @@ def report_sequential_bon_len(
         )
 
     return '\n'.join(rows)
+
+
+def validate_conformer_for_builder(
+        coords,
+        atom_labels,
+        residue_numbers,
+        bb_mask,
+        carbonyl_mask,
+        bbi,
+        ):
+    """."""
+    bb = coords[bb_mask, :]
+
+    rows, *_ = vdw_clash_by_threshold(
+        bb[:bbi, :],
+        atom_labels[bb_mask][:bbi],
+        atom_labels[bb_mask][:bbi].astype('<U1'),
+        False,
+        False,
+        residue_numbers[bb_mask][:bbi],
+        residues_apart=3,
+        )
+
+    is_valid = all((
+        not np.any(rows),
+        ))
+
+    return not np.any(rows) #is_valid

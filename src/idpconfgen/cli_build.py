@@ -27,6 +27,7 @@ from idpconfgen.core.definitions import (
     distance_N_CA,
     distance_CA_C,
     distance_C_Np1,
+    distance_C_O,
     average_N_CA_C,
     average_CA_C_Np1,
     average_Cm1_N_CA,
@@ -37,7 +38,7 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
-from idpconfgen.libs.libvalidate import vdw_clash_by_threshold
+from idpconfgen.libs.libvalidate import validate_conformer_for_builder
 
 
 _name = 'build'
@@ -128,7 +129,7 @@ def main(
 
     # creates views
     bb = np.zeros((np.sum(bb_mask), 3), dtype=np.float64)
-    bb_o = np.zeros((np.sum(carbonyl_mask), 3), dtype=np.float64)
+    bb_CO = np.zeros((np.sum(carbonyl_mask), 3), dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
@@ -156,9 +157,9 @@ def main(
     bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
 
     RC = random.choice
-    i = 3  # starts at 2 because the first 3 atoms are already placed
+    bbi = 3  # starts at 2 because the first 3 atoms are already placed
     # and needs to adjust with the += assignment inside the loop
-    last_O = 0  # carbonyl atoms
+    COi = 0  # carbonyl atoms
 
     # run this loop until a specific BREAK is triggered
     while True:
@@ -169,63 +170,68 @@ def main(
         agls = angles[RC(slices), :].ravel()[1:-2]
 
         # index at the start of the current cycle
-        i0 = i
+        bbi0 = bbi
+        COi0 = COi
         try:
             for torsion in agls:
-                bb[i, :] = make_coord_Q(
-                    bb[i - 3, :],
-                    bb[i - 2, :],
-                    bb[i - 1, :],
+                bb[bbi, :] = make_coord_Q(
+                    bb[bbi - 3, :],
+                    bb[bbi - 2, :],
+                    bb[bbi - 1, :],
                     next(bond_lens),
                     next(bond_bend),
                     torsion,
                     )
-                i += 1
+                bbi += 1
 
             #else:
             #    # when backbone completes,
             #    # adds carbonyl oxygen atoms
-            #    for k in range(i0, i, 3):
-            #        bb_o[last_O, :] = make_coord_Q(
+            #    for k in range(bbi0, bbi, 3):
+            #        bb_CO[COi, :] = make_coord_Q(
             #            bb[k - 2, :],
             #            bb[k - 1, :],
             #            bb[k, :],
-            #            distance_N_CA,  # to change
+            #            distance_C_O,  # to change
             #            average_CA_C_O,
             #            0,
             #            )
-            #        last_O += 1
+            #        COi += 1
 
-            rows, *_ = vdw_clash_by_threshold(
-                bb[:i, :],
-                atom_labels[bb_mask][:i],
-                atom_labels[bb_mask][:i].astype('<U1'),
-                False,
-                False,
-                residue_numbers[bb_mask][:i],
-                residues_apart=3,
+            coords[bb_mask] = bb
+            # coords[carbonyl_mask] = bb_CO
+            is_valid = validate_conformer_for_builder(
+                coords,
+                atom_labels,
+                residue_numbers,
+                bb_mask,
+                carbonyl_mask,
+                bbi,
                 )
 
             # has clash
-            if np.any(rows):
-                print('found clash', i, rows)
-                bb[i0:i, :] = 0.0
-                i = i0
-                print('reset', i)
+            if is_valid:
+                continue
+            else:  # not valid
+                bb[bbi0:bbi, :] = 0.0
+                #bb_CO[COi0:COi, :] = 0.0
+                bbi = bbi0
+                #COi = COi0
+
 
         except IndexError:
-            # i-1, to discard the last carboxyl
-            #for k in range(i0, i-1, 3):
-            #    bb_o[last_O, :] = make_coord_Q(
+            ## i-1, to discard the last carboxyl
+            #for k in range(bbi0, bbi-1, 3):
+            #    bb_CO[COi, :] = make_coord_Q(
             #        bb[k - 2, :],
             #        bb[k - 1, :],
             #        bb[k, :],
-            #        distance_N_CA,  # to change
+            #        distance_C_O,  # to change
             #        #average_CA_C_O,
             #        average_Np1_C_O,
             #        0,
             #        )
-            #    last_O += 1
+            #    COi += 1
             break
 
 
@@ -237,7 +243,7 @@ def main(
 # correct bend angle CA_C_O
 
     coords[bb_mask] = bb
-    coords[carbonyl_mask] = bb_o
+    coords[carbonyl_mask] = bb_CO
 
     relevant = bb_mask #np.isin(atom_labels, ('N', 'CA', 'C', 'O'))
 
