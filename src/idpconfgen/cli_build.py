@@ -16,7 +16,7 @@ import numpy as np
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libcalc import make_coord_Q
+from idpconfgen.libs.libcalc import make_coord_Q, make_coord_Q_CO
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libfilter import (
     aligndb,
@@ -121,23 +121,25 @@ def main(
     atom_labels = np.array(generate_atom_labels(input_seq))  # considers sidechain all-atoms
     num_atoms = len(atom_labels)
     residue_numbers = np.array(generate_residue_numbers(atom_labels))
-    coords = np.zeros((num_atoms, 3), dtype=np.float32)
+    coords = np.ones((num_atoms, 3), dtype=np.float32)
 
     # creates masks
     bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
     carbonyl_mask = np.isin(atom_labels, ('O',))
+    # replces the last TRUE value by false because that is a carboxyl
+    # and nota carbonyl
+    carbonyl_mask[np.argwhere(carbonyl_mask)[-1][0]] = False
 
     # creates views
-    bb = np.zeros((np.sum(bb_mask), 3), dtype=np.float64)
-    bb_CO = np.zeros((np.sum(carbonyl_mask), 3), dtype=np.float64)
+    bb = np.ones((np.sum(bb_mask), 3), dtype=np.float64)
+    bb_CO = np.ones((np.sum(carbonyl_mask), 3), dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
     # definitions of IDPConfGen
 
-    # first atom (N-terminal) is at 0, 0, 0 - no need to add it because
-    # coords was created with np.zeros :-)
-
+    # first atom (N-terminal) is at 0, 0, 0
+    bb[0, :] = 0.0
     # second atom (CA of the firs residue) is at the x-axis
     bb[1, :] = (distance_N_CA, 0.0, 0.0)
 
@@ -184,29 +186,28 @@ def main(
                     )
                 bbi += 1
 
-            #else:
-            #    # when backbone completes,
-            #    # adds carbonyl oxygen atoms
-            #    for k in range(bbi0, bbi, 3):
-            #        bb_CO[COi, :] = make_coord_Q(
-            #            bb[k - 2, :],
-            #            bb[k - 1, :],
-            #            bb[k, :],
-            #            distance_C_O,  # to change
-            #            average_CA_C_O,
-            #            0,
-            #            )
-            #        COi += 1
+            else:
+                # when backbone completes,
+                # adds carbonyl oxygen atoms
+                for k in range(bbi0, bbi, 3):
+                    bb_CO[COi, :] = make_coord_Q_CO(
+                        bb[k - 2, :],
+                        bb[k - 1, :],
+                        bb[k, :],
+                        distance_C_O,  # to change
+                        average_CA_C_O,
+                        )
+                    COi += 1
 
             coords[bb_mask] = bb
-            # coords[carbonyl_mask] = bb_CO
+            coords[carbonyl_mask] = bb_CO
             is_valid = validate_conformer_for_builder(
                 coords,
                 atom_labels,
                 residue_numbers,
                 bb_mask,
                 carbonyl_mask,
-                bbi,
+                #bbi,
                 )
 
             # has clash
@@ -214,24 +215,22 @@ def main(
                 continue
             else:  # not valid
                 bb[bbi0:bbi, :] = 0.0
-                #bb_CO[COi0:COi, :] = 0.0
+                bb_CO[COi0:COi, :] = 0.0
                 bbi = bbi0
-                #COi = COi0
+                COi = COi0
 
 
-        except IndexError:
-            ## i-1, to discard the last carboxyl
-            #for k in range(bbi0, bbi-1, 3):
-            #    bb_CO[COi, :] = make_coord_Q(
-            #        bb[k - 2, :],
-            #        bb[k - 1, :],
-            #        bb[k, :],
-            #        distance_C_O,  # to change
-            #        #average_CA_C_O,
-            #        average_Np1_C_O,
-            #        0,
-            #        )
-            #    COi += 1
+        except IndexError as err:
+            # i-1, to discard the last carboxyl
+            for k in range(bbi0, bbi-1, 3):
+                bb_CO[COi, :] = make_coord_Q_CO(
+                    bb[k - 2, :],
+                    bb[k - 1, :],
+                    bb[k, :],
+                    distance_C_O,
+                    average_CA_C_O,
+                    )
+                COi += 1
             break
 
 
@@ -245,7 +244,7 @@ def main(
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_CO
 
-    relevant = bb_mask #np.isin(atom_labels, ('N', 'CA', 'C', 'O'))
+    relevant = np.logical_or(bb_mask, carbonyl_mask) 
 
     save_conformer_to_disk(
         input_seq,
@@ -293,7 +292,7 @@ def generate_atom_labels(input_seq, AL=atom_labels):
     LE = labels.extend
     for residue in input_seq:
         LE(AL[residue])
-
+    labels.append('OXT')
     return labels
 
 

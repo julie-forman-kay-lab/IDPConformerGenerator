@@ -453,18 +453,25 @@ def validate_conformer_for_builder(
         residue_numbers,
         bb_mask,
         carbonyl_mask,
-        bbi,
+        #bbi,
         ):
     """."""
-    bb = coords[bb_mask, :]
+
+    sums = np.sum(coords, axis=1)
+    assert sums.shape == (coords.shape[0], )
+
+    coords_in_use = np.logical_not(np.isclose(sums, 3))
+    assert coords_in_use.shape == sums.shape
+    assert coords_in_use.dtype == bool
+    assert coords_in_use.size == coords.shape[0]
 
     rows, *_ = vdw_clash_by_threshold(
-        bb[:bbi, :],
-        atom_labels[bb_mask][:bbi],
-        atom_labels[bb_mask][:bbi].astype('<U1'),
+        coords[coords_in_use, :],
+        atom_labels[coords_in_use],
+        atom_labels[coords_in_use].astype('<U1'),
         False,
         False,
-        residue_numbers[bb_mask][:bbi],
+        residue_numbers[coords_in_use],
         residues_apart=3,
         )
 

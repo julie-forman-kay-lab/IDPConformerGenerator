@@ -342,11 +342,12 @@ def make_coord_Q(
         distance,
         bend,
         torsion,
-        norm=np.linalg.norm,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
         QM=hamiltonian_multiplication_Q,
-        sin=sin,
-        cos=cos,
-        pi=pi,
+        SIN=sin,
+        COS=cos,
         ):
     """
     Make a new coords from 3 vectors using Quaternions.
@@ -378,17 +379,17 @@ def make_coord_Q(
     o1 = v1 - v2
     o2 = v3 - v2
 
-    ocross = np.cross(o2, o1)  #changed
-    u_ocross = ocross / norm(ocross)
+    ocross = CROSS(o2, o1)  #changed
+    u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
     #bend_angle = (pi - bend) / 2
     bend_angle = bend / 2
-    b2, b3, b4 = sin(bend_angle) * u_ocross
-    b1 = cos(bend_angle)
+    b2, b3, b4 = SIN(bend_angle) * u_ocross
+    b1 = COS(bend_angle)
 
     # rotates a copy of o2 according to bend angle
-    uo2 = o2  / norm(o2)
+    uo2 = o2  / NORM(o2)
     p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
         *QM(b1, b2, b3, b4, 0, p2, p3, p4),
@@ -397,8 +398,8 @@ def make_coord_Q(
 
     # rotates according to torsion angle
     torsion_angle = torsion / 2
-    t2, t3, t4 = sin(torsion_angle) * uo2
-    t1 = cos(torsion_angle)
+    t2, t3, t4 = SIN(torsion_angle) * uo2
+    t1 = COS(torsion_angle)
 
     f1, f2, f3, f4 = QM(
         *QM(t1, t2, t3, t4, 0, n2, n3, n4),
@@ -407,7 +408,7 @@ def make_coord_Q(
 
     # the new rotated vector is unitary
     # extends to the correct lenth
-    fov_size = np.array((f2 * distance, f3 * distance, f4 * distance))
+    fov_size = ARRAY((f2 * distance, f3 * distance, f4 * distance))
     # the above implementation is faster than
     # np.array([f2, f3, f4]) * distance - 1.8 us
     # against 857 ns, given by %%timeit jupyter notebook
@@ -417,3 +418,39 @@ def make_coord_Q(
     # performing this sum at the moment of fov_size is not faster
     # than doing it separately here
     return fov_size + v3
+
+
+def make_coord_Q_CO(
+        v1,
+        v2,
+        v3,
+        distance,
+        bend,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        SIN=sin,
+        COS=cos,
+        ):
+    o1 = v1 - v2
+    o2 = v3 - v2
+
+    ocross = CROSS(o1, o2)  #changed
+    u_ocross = ocross / NORM(ocross)
+
+    # creates quaterion to rotate on the bend angle
+    #bend_angle = (pi - bend) / 2
+    bend_angle = bend / 2
+    b2, b3, b4 = SIN(bend_angle) * u_ocross
+    b1 = COS(bend_angle)
+
+    # rotates a copy of o2 according to bend angle
+    uo2 = o2 / NORM(o2)
+    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    n1, n2, n3, n4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + v2
