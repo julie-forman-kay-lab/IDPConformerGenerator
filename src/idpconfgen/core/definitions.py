@@ -195,7 +195,11 @@ average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.02903931225921431
 bend_CA_C_OXT = 2 * pi / 3
 
 # pi corrected angles needed for the building algorithm
+build_bend_CA_C_Np1 = (pi - average_CA_C_Np1) / 2
+build_bend_Cm1_N_CA = (pi - average_Cm1_N_CA) / 2
+build_bend_N_CA_C = (pi - average_N_CA_C) / 2
 build_bend_CA_C_OXT = (pi - bend_CA_C_OXT) / 2
+build_bend_CA_C_O = average_CA_C_O / 2  # this angle does not require `pi -`
 
 distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
 distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599

@@ -7,7 +7,7 @@ USAGE:
 """
 import argparse
 import re
-import random
+from random import choice as RC
 from functools import partial
 from itertools import cycle
 from math import pi
@@ -24,16 +24,14 @@ from idpconfgen.libs.libfilter import (
     )
 from idpconfgen.libs.libtimer import timeme
 from idpconfgen.core.definitions import (
-    bend_CA_C_OXT,
+    build_bend_CA_C_Np1,
+    build_bend_Cm1_N_CA,
+    build_bend_N_CA_C,
+    build_bend_CA_C_O,
     distance_N_CA,
     distance_CA_C,
     distance_C_Np1,
     distance_C_O,
-    average_N_CA_C,
-    average_CA_C_Np1,
-    average_Cm1_N_CA,
-    average_CA_C_O,
-    average_Np1_C_O,
     atom_labels,
     aa1to3,
     )
@@ -153,15 +151,18 @@ def main(
         bb[0, :],
         bb[1, :],
         distance_CA_C,
-        pi - average_N_CA_C,
+        build_bend_N_CA_C,
         0,  # null torsion angle
         )
 
     # prepares cycles for building process
-    bond_lens = cycle([distance_C_Np1, distance_N_CA, distance_CA_C])
-    bond_bend = cycle([pi - average_CA_C_Np1, pi - average_Cm1_N_CA, pi - average_N_CA_C])
+    bond_lens = cycle((distance_C_Np1, distance_N_CA, distance_CA_C))
+    bond_bend = cycle((
+        build_bend_CA_C_Np1,
+        build_bend_Cm1_N_CA,
+        build_bend_N_CA_C,
+        ))
 
-    RC = random.choice
     bbi = 3  # starts at 2 because the first 3 atoms are already placed
     # and needs to adjust with the += assignment inside the loop
     COi = 0  # carbonyl atoms
@@ -203,14 +204,14 @@ def main(
                 bb[k - 2, :],
                 bb[k - 1, :],
                 bb[k, :],
-                distance_C_O,  # to change
-                average_CA_C_O,
                 )
             COi += 1
 
         if backbone_done:  # make terminal carboxyl coordinates
-            coords[[OXT_index, OXT1_index]] = \
-                make_coord_Q_COO(bb[-2, :], bb[-1, :])
+            coords[[OXT_index, OXT1_index]] = make_coord_Q_COO(
+                bb[-2, :],
+                bb[-1, :],
+                )
 
         # add sidechains here.....
 
@@ -223,7 +224,6 @@ def main(
             residue_numbers,
             bb_mask,
             carbonyl_mask,
-            #bbi,
             )
 
         if energy > 0:  # not valid
@@ -251,11 +251,7 @@ def main(
 
 
     # TODO:
-    # clashes
     # sidechains
-    # carboxylo final
-    # correct distance C_O
-    # correct bend angle CA_C_O
 
     coords[bb_mask] = bb
     coords[carbonyl_mask] = bb_CO

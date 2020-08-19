@@ -4,7 +4,12 @@ from math import sin, cos, pi
 
 import numpy as np
 
-from idpconfgen.core.definitions import distance_C_OXT, build_bend_CA_C_OXT
+from idpconfgen.core.definitions import (
+    build_bend_CA_C_O,
+    build_bend_CA_C_OXT,
+    distance_C_O,
+    distance_C_OXT,
+    )
 
 
 AXIS_111 = np.array([
@@ -367,11 +372,16 @@ def make_coord_Q(
         The distance between `v3` and the new coordinate.
 
     bend : float
-        The angle (radians) between v2-v3 and v3-new vectors.
+        The angle in radians for the bend angle between the three atoms.
+        The actual `bend` value input in this function must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
 
     torsion : float
         The torsion angle (radians) around v2-v3 which will place
         the new coordinate correctly.
+        Contrarily to the `bend` angle, do not compute any additional
+        calcualtions and just provide the torsion angle value as is.
 
     Returns
     -------
@@ -385,12 +395,10 @@ def make_coord_Q(
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
-    #bend_angle = (pi - bend) / 2
-    bend_angle = bend / 2
-    b2, b3, b4 = SIN(bend_angle) * u_ocross
-    b1 = COS(bend_angle)
+    b2, b3, b4 = SIN(bend) * u_ocross
+    b1 = COS(bend)
 
-    # rotates a copy of o2 according to bend angle
+    # rotates the unitary of o2 according to bend angle
     uo2 = o2  / NORM(o2)
     p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
@@ -398,7 +406,7 @@ def make_coord_Q(
         b1, -b2, -b3, -b4,
         )
 
-    # rotates according to torsion angle
+    # rotates the previous result according to torsion angle
     torsion_angle = torsion / 2
     t2, t3, t4 = SIN(torsion_angle) * uo2
     t1 = COS(torsion_angle)
@@ -411,9 +419,9 @@ def make_coord_Q(
     # the new rotated vector is unitary
     # extends to the correct lenth
     fov_size = ARRAY((f2 * distance, f3 * distance, f4 * distance))
-    # the above implementation is faster than
-    # np.array([f2, f3, f4]) * distance - 1.8 us
-    # against 857 ns, given by %%timeit jupyter notebook
+    # the above implementation takes 857 ns, and is faster than
+    # np.array([f2, f3, f4]) * distance which takes 1.8 us
+    # given by %%timeit jupyter notebook
 
     # transfers the new coord created in origin
     # to the correct space position
@@ -423,11 +431,11 @@ def make_coord_Q(
 
 
 def make_coord_Q_CO(
-        v1,
-        v2,
-        v3,
-        distance,
-        bend,
+        CA_coords,
+        C_coords,
+        N_coords,
+        distance=distance_C_O,
+        bend=build_bend_CA_C_O,
         ARRAY=np.array,
         CROSS=np.cross,
         NORM=np.linalg.norm,
@@ -435,18 +443,43 @@ def make_coord_Q_CO(
         SIN=sin,
         COS=cos,
         ):
-    o1 = v1 - v2
-    o2 = v3 - v2
+    """
+    Create carbonyl (C=O) coordinate for protein backbone.
 
-    ocross = CROSS(o1, o2)  #changed
+    Uses rotation by quaternions logic.
+
+    Parameters
+    ----------
+    CA_coords, C_coods, N_coords : np.ndarray, shape (3,), dtype=np.float
+        The XYZ coordinates for the CA, C and N atoms surrounding the
+        C=O bond, respectively.
+
+    distance : float, optional
+        The distance of the C-O bond pair.
+        Defaults to ~1.234.
+
+    bend : float, optional
+        The angle in radians for the CA-C-O.
+        Defaults to ~2.1428 radians (~122.777 degress).
+        If `bend` is given, consider the actual `bend` value must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
+
+    Returns
+    -------
+    np.ndarray of shape (3,), dtype=np.float32
+    """
+    o1 = CA_coords - C_coords
+    o2 = N_coords - C_coords
+
+    ocross = CROSS(o1, o2)
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
-    bend_angle = bend / 2
-    b2, b3, b4 = SIN(bend_angle) * u_ocross
-    b1 = COS(bend_angle)
+    b2, b3, b4 = SIN(bend) * u_ocross
+    b1 = COS(bend)
 
-    # rotates a copy of o2 according to bend angle
+    # rotates a the unitary of o2 according to bend angle
     uo2 = o2 / NORM(o2)
     p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
@@ -454,7 +487,8 @@ def make_coord_Q_CO(
         b1, -b2, -b3, -b4,
         )
 
-    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + v2
+    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_coords
+
 
 def make_coord_Q_COO(
         CA_term,
@@ -469,7 +503,7 @@ def make_coord_Q_COO(
         COS=cos,
         ):
     """
-    Creates the C-terminal carboxyl coordinates.
+    Create the C-terminal carboxyl coordinates.
 
     Uses a strategy based on Quaternion rotations.
 
@@ -493,6 +527,11 @@ def make_coord_Q_COO(
         If `bend` is given, consider the actual `bend` value must be
         `(pi - bend) / 2`, this calculation must be computed outside
         this function for perfomance reasons.
+
+    Returns
+    -------
+    tuple of length 2
+        np.ndarray of shape (3,), dtype=np.float32
     """
     o1 = C_term - CA_term
     # creates an inmaginary coordinate perpendicular to o1 and origin
@@ -531,7 +570,7 @@ def make_coord_Q_COO(
         )
 
     # creates the final coordinate arrays
-    O = ARRAY((m2 * distance, m3 * distance, m4 * distance)) + C_term
-    OXT = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
+    O_coords = ARRAY((m2 * distance, m3 * distance, m4 * distance)) + C_term
+    OXT_coords = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
 
-    return O, OXT
+    return O_coords, OXT_coords
