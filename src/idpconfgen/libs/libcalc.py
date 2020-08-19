@@ -1,6 +1,7 @@
 """Mathemical calculations."""
 import math
 from math import sin, cos, pi
+from numba import njit
 
 import numpy as np
 
@@ -332,6 +333,7 @@ def calc_MSMV(data):
     return np.mean(data), np.std(data), np.median(data), np.var(data)
 
 
+@njit
 def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
     """Hamiltonian Multiplication."""
     return (
@@ -342,6 +344,7 @@ def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
     )
 
 
+@njit
 def make_coord_Q(
         v1,
         v2,
@@ -430,6 +433,7 @@ def make_coord_Q(
     return fov_size + v3
 
 
+@njit
 def make_coord_Q_CO(
         CA_coords,
         C_coords,
@@ -490,6 +494,7 @@ def make_coord_Q_CO(
     return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_coords
 
 
+@njit
 def make_coord_Q_COO(
         CA_term,
         C_term,
