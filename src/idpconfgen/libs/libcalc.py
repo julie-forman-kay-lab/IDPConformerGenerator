@@ -4,6 +4,8 @@ from math import sin, cos, pi
 
 import numpy as np
 
+from idpconfgen.core.definitions import distance_C_OXT, build_bend_CA_C_OXT
+
 
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],
@@ -440,7 +442,6 @@ def make_coord_Q_CO(
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
-    #bend_angle = (pi - bend) / 2
     bend_angle = bend / 2
     b2, b3, b4 = SIN(bend_angle) * u_ocross
     b1 = COS(bend_angle)
@@ -454,3 +455,83 @@ def make_coord_Q_CO(
         )
 
     return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + v2
+
+def make_coord_Q_COO(
+        CA_term,
+        C_term,
+        distance=distance_C_OXT,
+        bend=build_bend_CA_C_OXT,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        SIN=sin,
+        COS=cos,
+        ):
+    """
+    Creates the C-terminal carboxyl coordinates.
+
+    Uses a strategy based on Quaternion rotations.
+
+    Parameters
+    ----------
+    CA_term : np.ndarray, shape (3,), dtype=np.float
+        The coordinates of the terminal CA atom.
+
+    C_term : np.ndarray, shape (3,), dtype=np.float
+        The coordinates of the terminal C atom.
+
+    distance : float, optional
+        The distance of the C-O and C-OXT bond lengths.
+        The distance is considered the same for both atom pairs.
+        Defaults to 1.27.
+
+    bend : float, optional
+        The angle in radians for the CA-C-O and CA-C-OXT bonds.
+        The angle between both cases is considered the same.
+        Defaults to 2 * pi / 3 (120º).
+        If `bend` is given, consider the actual `bend` value must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
+    """
+    o1 = C_term - CA_term
+    # creates an inmaginary coordinate perpendicular to o1 and origin
+    o2 = o1[::-1]
+
+    # creates the cross vector that will be used to rotate the new coordinates
+    ocross2 = CROSS(o1, o2)
+    u_ocross2 = ocross2 / NORM(ocross2)
+
+    # creates quaterions to rotate O and OXT on the bend angle
+    # O and OXT have the same rotation angle along the same axis but
+    # with opposite angle signs
+    minus_bend = -bend
+    b2, b3, b4 = SIN(minus_bend) * u_ocross2
+    b1 = COS(minus_bend)
+
+    c2, c3, c4 = SIN(bend) * u_ocross2
+    c1 = COS(bend)
+
+    # creates a unitary CA-C vector in the origin
+    # the unitary vector is created to allow proper distance placement
+    # in the final step
+    # p1 is not need because it is 0 according to Quaternion math
+    p2, p3, p4 = o1 / NORM(o1)
+
+    # rotates the above copy for O and OXT
+    # the rotation creates generates new coordinates
+    m1, m2, m3, m4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    n1, n2, n3, n4 = QM(
+        *QM(c1, c2, c3, c4, 0, p2, p3, p4),
+        c1, -c2, -c3, -c4,
+        )
+
+    # creates the final coordinate arrays
+    O = ARRAY((m2 * distance, m3 * distance, m4 * distance)) + C_term
+    OXT = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
+
+    return O, OXT

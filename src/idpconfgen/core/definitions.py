@@ -2,6 +2,7 @@
 from argparse import Namespace
 from collections import namedtuple
 from itertools import chain
+from math import pi
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
 
@@ -191,11 +192,16 @@ average_CA_C_Np1 = 4587708133805365 / 2251799813685248  # +- 0.02290489653713049
 average_Np1_C_O = 4733796466948169 / 2251799813685248  # +- 0.019050491268134375
 average_CA_C_O = 4825315589323725 / 2251799813685248  # +- 0.017982788310237034
 average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.029039312259214314
+bend_CA_C_OXT = 2 * pi / 3
+
+# pi corrected angles needed for the building algorithm
+build_bend_CA_C_OXT = (pi - bend_CA_C_OXT) / 2
 
 distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
 distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599
 distance_C_Np1 = 2996436734567847 / 2251799813685248  # 1.33068 +- 0.009621
 distance_C_O = 5556993099130213 / 4503599627370496  # 1.234 +- 0.0121
+distance_C_OXT = 1.27
 
 distance_N_CA_std = 0.013036529567238726
 distance_CA_C_std = 0.012599655969373144

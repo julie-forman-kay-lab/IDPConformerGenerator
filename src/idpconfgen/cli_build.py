@@ -16,7 +16,7 @@ import numpy as np
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libcalc import make_coord_Q, make_coord_Q_CO
+from idpconfgen.libs.libcalc import make_coord_Q, make_coord_Q_CO, make_coord_Q_COO
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libfilter import (
     aligndb,
@@ -24,6 +24,7 @@ from idpconfgen.libs.libfilter import (
     )
 from idpconfgen.libs.libtimer import timeme
 from idpconfgen.core.definitions import (
+    bend_CA_C_OXT,
     distance_N_CA,
     distance_CA_C,
     distance_C_Np1,
@@ -207,23 +208,9 @@ def main(
                 )
             COi += 1
 
-        if backbone_done:
-            coords[OXT_index] = make_coord_Q_CO(
-                bb[-2, :],
-                bb[-1, :],
-                np.array((bb[-2, 2], bb[-2, 1], bb[-2, 0])),
-                1.25,
-                0.5235987755982988
-                )
-
-            coords[OXT1_index] = make_coord_Q_CO(
-                bb[-2, :],
-                bb[-1, :],
-                np.array((-bb[-2, 2], bb[-2, 1], bb[-2, 0])),
-                1.25,
-                -0.5235987755982988
-                )
-            pass
+        if backbone_done:  # make terminal carboxyl coordinates
+            coords[[OXT_index, OXT1_index]] = \
+                make_coord_Q_COO(bb[-2, :], bb[-1, :])
 
         # add sidechains here.....
 
