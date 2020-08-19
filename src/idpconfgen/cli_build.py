@@ -7,6 +7,7 @@ USAGE:
 """
 import argparse
 import re
+import sys
 from random import choice as RC
 from functools import partial
 from itertools import cycle
@@ -164,9 +165,18 @@ def main(
         ))
 
     bbi = 3  # starts at 2 because the first 3 atoms are already placed
+    bbi0_register = [bbi]
+    bbi0_R_APPEND = bbi0_register.append
+    bbi0_R_POP = bbi0_register.pop
+
     # and needs to adjust with the += assignment inside the loop
     COi = 0  # carbonyl atoms
+    COi0_register = [COi]
+    COi0_R_APPEND = COi0_register.append
+    COi0_R_POP = COi0_register.pop
+
     backbone_done = False
+    number_of_trials = 0
     # run this loop until a specific BREAK is triggered
     while True:
 
@@ -229,19 +239,44 @@ def main(
         if energy > 0:  # not valid
             # reset coordinates to the original value
             # before the last chunk added
-            bb[bbi0:bbi, :] = 1.0
-            bb_CO[COi0:COi, :] = 1.0
+
+            # reset the same chunk maximum 5 times,
+            # after that reset also the chunk before
+            if number_of_trials > 5:
+                bbi0_R_POP()
+                COi0_R_POP()
+                number_of_trials = 0
+
+            try:
+                _bbi0 = bbi0_register[-1]
+                _COi0 = COi0_register[-1]
+            except IndexError:
+                # if this point is reached,
+                # we erased until the beginning of the conformer
+                # discard conformer, something went really wrong
+                sys.exit('total error')  # change this to a functional error
+
+            bb[_bbi0:bbi, :] = 1.0
+            bb_CO[_COi0:COi, :] = 1.0
+
             # do the same for sidechains
             # ...
+
             # reset also indexes
-            bbi = bbi0
-            COi = COi0
+            bbi = _bbi0
+            COi = _COi0
+
             # coords needs to be reset because size of protein next
             # chunks may not be equal
             coords[:, :] = 1.0
 
             backbone_done = False
+            number_of_trials += 1
             continue
+
+        number_of_trials = 0
+        bbi0_R_APPEND(bbi)
+        COi0_R_APPEND(COi)
 
         if backbone_done:
             # this point guarantees all protein atoms are built
