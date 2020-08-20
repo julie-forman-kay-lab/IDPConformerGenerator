@@ -23,7 +23,7 @@ from idpconfgen.libs.libfilter import (
     aligndb,
     regex_search,
     )
-from idpconfgen.libs.libtimer import timeme, ProgressWatcher
+from idpconfgen.libs.libtimer import timeme, ProgressCounter
 from idpconfgen.core.definitions import (
     build_bend_CA_C_Np1,
     build_bend_Cm1_N_CA,
@@ -39,6 +39,7 @@ from idpconfgen.core.definitions import (
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
 from idpconfgen.libs.libvalidate import validate_conformer_for_builder
+from idpconfgen.libs.libmulticore import pool_function
 
 
 _name = 'build'
@@ -85,6 +86,7 @@ ap.add_argument(
     nargs='+',
     )
 
+libcli.add_argument_ncores(ap)
 
 
 def main(
@@ -94,7 +96,42 @@ def main(
         dssp_regexes=r'(?=(L{2,6}))',
         nconfs=1,
         conformer_name='conformer',
-        conf_n=1,
+        ncores=1,
+        ):
+    """."""
+    core_chunks = nconfs // ncores
+    remaining_chunks = nconfs % ncores
+
+    execute = partial(
+        main_exec,
+        input_seq=input_seq,
+        database=database,
+        dssp_regexes=dssp_regexes,
+        nconfs=core_chunks,
+        conformer_name=conformer_name,
+        )
+
+    from time import time
+    start = time()
+    from multiprocessing import Pool
+    with Pool(ncores) as pool:
+        imap = pool.imap(execute, range(ncores))
+        for i in imap:
+            pass
+
+
+    execute(core_chunks * ncores, nconfs=remaining_chunks)
+    print(time() - start)
+
+
+def main_exec(
+        execution_run,
+        input_seq,
+        database,
+        func=None,
+        dssp_regexes=r'(?=(L{2,6}))',
+        nconfs=1,
+        conformer_name='conformer',
         ROUND=np.round,
         ):
     """."""
@@ -186,13 +223,11 @@ def main(
         ))
 
 
-    pw = ProgressWatcher(nconfs)
-    pw.__enter__()
 
-    from time import time
-    start = time()
     # STARTS BUILDING
-    for conf_n in range(nconfs):
+    start_conf = nconfs * execution_run
+    end_conf = start_conf + nconfs
+    for conf_n in range(start_conf, end_conf):
 
         coords[:, :] = 1.0#np.nan
         bb[:, :] = 1.0#np.nan
@@ -331,12 +366,11 @@ def main(
             ROUND(coords[relevant], decimals=3),
             )
 
-        pw.increment()
-        #with open(f'{conformer_name}_{conf_n}.pdb', 'w') as fout:
-        #    fout.write(pdb_string)
+        ##fname = f'{conformer_name}_{conf_n}.pdb'
+        ##with open(fname, 'w') as fout:
+        ##    fout.write(pdb_string)
+            #print(f'saved: {fname}')
 
-    pw.__exit__()
-    print(time() - start)
     return
 
 
