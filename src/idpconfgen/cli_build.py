@@ -164,7 +164,6 @@ def main_exec(
     atom_labels = np.array(generate_atom_labels(input_seq))  # considers sidechain all-atoms
     num_atoms = len(atom_labels)
     residue_numbers = np.array(generate_residue_numbers(atom_labels))
-    coords = np.ones((num_atoms, 3), dtype=np.float32)
 
     # creates masks
     bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
@@ -175,30 +174,36 @@ def main_exec(
     OXT1_index = np.argwhere(carbonyl_mask)[-1][0]
     carbonyl_mask[OXT1_index] = False
 
-    # creates views
-    bb = np.ones((np.sum(bb_mask), 3), dtype=np.float64)
-    bb_CO = np.ones((np.sum(carbonyl_mask), 3), dtype=np.float64)
+    # create coordinates and views
+    coords = np.full((num_atoms, 3), np.nan, dtype=np.float32)
+    bb = np.full((np.sum(bb_mask), 3), np.nan, dtype=np.float64)
+    bb_CO = np.full((np.sum(carbonyl_mask), 3), np.nan, dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
     # definitions of IDPConfGen
-
     # first atom (N-terminal) is at 0, 0, 0
-    bb[0, :] = 0.0
     # second atom (CA of the firs residue) is at the x-axis
-    bb[1, :] = (distance_N_CA, 0.0, 0.0)
+    n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
+    n_terminal_CA_coord = np.array((distance_N_CA, 0.0, 0.0))
 
     # third atom (C of the first residue) needs to be computed according
     # to the bond length parameters and bend angle.
-    bb[2, :] = make_coord_Q(
+    n_terminal_C_coord = MAKE_COORD_Q_LOCAL(
         np.array((0.0, distance_N_CA, 0.0)),  # dummy coordinate used only here
-        bb[0, :],
-        bb[1, :],
+        n_terminal_N_coord,
+        n_terminal_CA_coord,
         distance_CA_C,
         build_bend_N_CA_C,
         0,  # null torsion angle
         )
-    seed_coords = np.ndarray.copy(bb[:3, :])
+
+    seed_coords = np.array((
+        n_terminal_N_coord,
+        n_terminal_CA_coord,
+        n_terminal_C_coord,
+        ))
+    assert seed_coords.shape == (3, 3)
 
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
@@ -223,10 +228,13 @@ def main_exec(
     end_conf = start_conf + nconfs
     for conf_n in range(start_conf, end_conf):
 
-        coords[:, :] = 1.0#np.nan
-        bb[:, :] = 1.0#np.nan
+        # in the first run of the loop this is unnecessary, but is better of
+        # just do it once than flag it the whole time
+        coords[:, :] = np.nan
+        bb[:, :] = np.nan
+        bb_CO[:, :] = np.nan
+
         bb[:3, :] = seed_coords
-        bb_CO[:, :] = 1.0#np.nan
         # SIDECHAINS HERE
 
         bbi = 3  # starts at 2 because the first 3 atoms are already placed
@@ -289,6 +297,7 @@ def main_exec(
             # validate conformer current state
             coords[bb_mask] = bb
             coords[carbonyl_mask] = bb_CO
+
             energy = VALIDATE_CONF_LOCAL(
                 coords,
                 atom_labels,
@@ -317,8 +326,9 @@ def main_exec(
                     # discard conformer, something went really wrong
                     sys.exit('total error')  # change this to a functional error
 
-                bb[_bbi0:bbi, :] = 1.0
-                bb_CO[_COi0:COi, :] = 1.0
+                # clean previously built protein chunk
+                bb[_bbi0:bbi, :] = np.nan
+                bb_CO[_COi0:COi, :] = np.nan
 
                 # do the same for sidechains
                 # ...
@@ -329,7 +339,7 @@ def main_exec(
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
-                coords[:, :] = 1.0
+                coords[:, :] = np.nan
 
                 backbone_done = False
                 number_of_trials += 1
@@ -344,12 +354,7 @@ def main_exec(
                 break
         # END of while loop
 
-        coords[bb_mask] = bb
-        coords[carbonyl_mask] = bb_CO
-
-        sums = np.sum(coords, axis=1)
-        relevant = np.logical_not(np.isclose(sums, 3))
-        #relevant = np.logical_or(bb_mask, carbonyl_mask)
+        relevant = np.logical_not(np.isnan(coords[:, 0]))
 
         pdb_string = gen_PDB_from_conformer(
             input_seq,
@@ -358,9 +363,9 @@ def main_exec(
             ROUND(coords[relevant], decimals=3),
             )
 
-        ##fname = f'{conformer_name}_{conf_n}.pdb'
-        ##with open(fname, 'w') as fout:
-        ##    fout.write(pdb_string)
+        fname = f'{conformer_name}_{conf_n}.pdb'
+        with open(fname, 'w') as fout:
+            fout.write(pdb_string)
             #print(f'saved: {fname}')
 
     return

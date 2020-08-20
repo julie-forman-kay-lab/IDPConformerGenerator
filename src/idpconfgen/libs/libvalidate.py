@@ -453,17 +453,15 @@ def validate_conformer_for_builder(
         residue_numbers,
         bb_mask,
         carbonyl_mask,
-        #bbi,
+        LOGICAL_NOT=np.logical_not,
+        ISNAN=np.isnan,
         ):
     """."""
 
-    sums = np.sum(coords, axis=1)
-    assert sums.shape == (coords.shape[0], )
-
-    coords_in_use = np.logical_not(np.isclose(sums, 3))
-    assert coords_in_use.shape == sums.shape
-    assert coords_in_use.dtype == bool
-    assert coords_in_use.size == coords.shape[0]
+    # no need to compute isnan in whole coordinates because coordinates
+    # either are all nan or are all numbers
+    coords_in_use = LOGICAL_NOT(ISNAN(coords[:, 0]))
+    assert coords_in_use.shape == (coords.shape[0], )
 
     rows, *_ = vdw_clash_by_threshold(
         coords[coords_in_use, :],
