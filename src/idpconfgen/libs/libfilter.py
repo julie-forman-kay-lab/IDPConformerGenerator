@@ -16,8 +16,10 @@ REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 REGEX_RANGE_CHAR = re.compile(r'\w\{')
 
 
-def aligndb(db, NAN=np.nan):
+def aligndb(db):#, NAN=np.nan):
     """Aligns IDPConfGen DB."""
+    assert isinstance(db, dict)
+    NAN = np.nan
     phi, psi, omg, dssp, resseq = [], [], [], [], []
     pdbs = {}
     PSIE = psi.extend
@@ -32,9 +34,9 @@ def aligndb(db, NAN=np.nan):
 
         fasta_truncated = data['fasta'][1:-1]
         dssp_truncated = data['dssp'][1:-1]
-        phi_truncated = data['phi'][1:]
-        psi_truncated = data['psi'][:-1]
-        omg_truncated = data['omega'][:-1]
+        phi_truncated = data['phi'][:-1]
+        psi_truncated = data['psi'][1:]
+        omg_truncated = data['omega'][1:]
 
 
 
