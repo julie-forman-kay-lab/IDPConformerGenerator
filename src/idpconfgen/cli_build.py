@@ -258,9 +258,7 @@ def main_exec(
             # the slice [1:-2] removes the first phi and the last psi and omega
             # from the group of angles. These angles are not needed because the
             # implementation always follows the order: psi-omega-phi(...)
-            rc_slices = RC(slices)
-            agls = angles[rc_slices, :].ravel()#[1:-2]
-            print(agls, dssp[rc_slices])
+            agls = angles[RC(slices), :].ravel()#[1:-2]
 
             # index at the start of the current cycle
             try:
