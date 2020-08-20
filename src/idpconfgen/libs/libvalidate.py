@@ -470,7 +470,7 @@ def validate_conformer_for_builder(
         False,
         False,
         residue_numbers[coords_in_use],
-        residues_apart=3,
+        residues_apart=2,
         )
 
     is_valid = all((

@@ -30,17 +30,25 @@ def aligndb(db, NAN=np.nan):
     current = 0
     for pdb, data in db.items():
 
-        len_segment = len(data['fasta'])
-        _PHITMP = [NAN] + data['phi'] + [NAN]
-        _PSITMP = data['psi'] + [NAN, NAN]
-        _OMGTMP = data['omega'] + [NAN, NAN]
+        fasta_truncated = data['fasta'][1:-1]
+        dssp_truncated = data['dssp'][1:-1]
+        phi_truncated = data['phi'][1:]
+        psi_truncated = data['psi'][:-1]
+        omg_truncated = data['omega'][:-1]
+
+
+
+        len_segment = len(fasta_truncated)
+        _PHITMP = phi_truncated + [NAN]
+        _PSITMP = psi_truncated + [NAN]
+        _OMGTMP = omg_truncated + [NAN]
 
         # +1 because NAN are added as spacers
         len_segment_w_spacer = len_segment + spacer
 
         correct_lengths = [
             len_segment_w_spacer,
-            len(data['dssp']) + spacer,
+            len(dssp_truncated) + spacer,
             len(_PHITMP),
             len(_PSITMP),
             len(_OMGTMP),
@@ -61,8 +69,8 @@ def aligndb(db, NAN=np.nan):
         PSIE(_PSITMP)
         OMGE(_OMGTMP)
 
-        DA(data['dssp'])
-        RA(data['fasta'])
+        DA(dssp_truncated)
+        RA(fasta_truncated)
 
     _resseq = '|'.join(resseq)
     _dssp = '|'.join(dssp)
