@@ -8,10 +8,10 @@ USAGE:
 import argparse
 import re
 import sys
-from random import choice as RC
 from functools import partial
 from itertools import cycle
-from math import pi
+from multiprocessing import Pool
+from random import choice as RC
 
 import numpy as np
 
@@ -28,17 +28,15 @@ from idpconfgen.core.definitions import (
     build_bend_CA_C_Np1,
     build_bend_Cm1_N_CA,
     build_bend_N_CA_C,
-    build_bend_CA_C_O,
     distance_N_CA,
     distance_CA_C,
     distance_C_Np1,
-    distance_C_O,
     atom_labels,
     aa1to3,
     )
-from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
+from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libvalidate import validate_conformer_for_builder
+from idpconfgen.libs.libmulticore import pool_function
 
 
 _name = 'build'
@@ -70,10 +68,11 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-n',
+    '-nc',
     '--nconfs',
     help='Number of conformers to build',
     default=1,
+    type=int,
     )
 
 ap.add_argument(
@@ -84,6 +83,7 @@ ap.add_argument(
     nargs='+',
     )
 
+libcli.add_argument_ncores(ap)
 
 
 def main(
@@ -92,8 +92,51 @@ def main(
         func=None,
         dssp_regexes=r'(?=(L{2,6}))',
         nconfs=1,
+        conformer_name='conformer',
+        ncores=1,
         ):
     """."""
+    core_chunks = nconfs // ncores
+    remaining_chunks = nconfs % ncores
+
+    execute = partial(
+        main_exec,
+        input_seq=input_seq,  # string
+        database=database,  # path string
+        dssp_regexes=dssp_regexes,  # list of strings
+        nconfs=core_chunks,  # int
+        conformer_name=conformer_name, # string
+        )
+
+    from time import time
+    start = time()
+    with Pool(ncores) as pool:
+        imap = pool.imap(execute, range(ncores))
+        for _ in imap:
+            pass
+
+    if remaining_chunks:
+        execute(core_chunks * ncores, nconfs=remaining_chunks)
+    print(time() - start)
+
+
+def main_exec(
+        execution_run,
+        input_seq,
+        database,
+        dssp_regexes=r'(?=(L{2,6}))',
+        nconfs=1,
+        conformer_name='conformer',
+        ROUND=np.round,
+        ):
+    """."""
+    # bring global to local scope
+    MAKE_COORD_Q_LOCAL = make_coord_Q
+    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
+    MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
+    VALIDATE_CONF_LOCAL = validate_conformer_for_builder
+
+
     db = read_dictionary_from_disk(database)
     ldb = len(db)
     log.info(f'Read DB with {ldb} entries')
@@ -155,6 +198,15 @@ def main(
         build_bend_N_CA_C,
         0,  # null torsion angle
         )
+    seed_coords = np.ndarray.copy(bb[:3, :])
+
+    bbi0_register = []
+    bbi0_R_APPEND = bbi0_register.append
+    bbi0_R_POP = bbi0_register.pop
+
+    COi0_register = []
+    COi0_R_APPEND = COi0_register.append
+    COi0_R_POP = COi0_register.pop
 
     # prepares cycles for building process
     bond_lens = cycle((distance_C_Np1, distance_N_CA, distance_CA_C))
@@ -164,165 +216,198 @@ def main(
         build_bend_N_CA_C,
         ))
 
-    bbi = 3  # starts at 2 because the first 3 atoms are already placed
-    bbi0_register = [bbi]
-    bbi0_R_APPEND = bbi0_register.append
-    bbi0_R_POP = bbi0_register.pop
+    # STARTS BUILDING
+    start_conf = nconfs * execution_run
+    end_conf = start_conf + nconfs
+    for conf_n in range(start_conf, end_conf):
 
-    # and needs to adjust with the += assignment inside the loop
-    COi = 0  # carbonyl atoms
-    COi0_register = [COi]
-    COi0_R_APPEND = COi0_register.append
-    COi0_R_POP = COi0_register.pop
+        coords[:, :] = 1.0#np.nan
+        bb[:, :] = 1.0#np.nan
+        bb[:3, :] = seed_coords
+        bb_CO[:, :] = 1.0#np.nan
+        # SIDECHAINS HERE
 
-    backbone_done = False
-    number_of_trials = 0
-    # run this loop until a specific BREAK is triggered
-    while True:
-
-        # the slice [1:-2] removes the first phi and the last psi and omega
-        # from the group of angles. These angles are not needed because the
-        # implementation always follows the order: psi-omega-phi(...)
-        agls = angles[RC(slices), :].ravel()[1:-2]
-
-        # index at the start of the current cycle
-        bbi0 = bbi
-        COi0 = COi
-        try:
-            for torsion in agls:
-                bb[bbi, :] = make_coord_Q(
-                    bb[bbi - 3, :],
-                    bb[bbi - 2, :],
-                    bb[bbi - 1, :],
-                    next(bond_lens),
-                    next(bond_bend),
-                    torsion,
-                    )
-                bbi += 1
-        except IndexError:
-            # here bbi is the last index + 1
-            backbone_done = True
-
-        # this else performs if the for loop concludes properly
-        #else:
-        # when backbone completes,
-        # adds carbonyl oxygen atoms
-        # after this loop all COs are added for the portion of BB
-        # added previously
-        for k in range(bbi0, bbi, 3):
-            bb_CO[COi, :] = make_coord_Q_CO(
-                bb[k - 2, :],
-                bb[k - 1, :],
-                bb[k, :],
-                )
-            COi += 1
-
-        if backbone_done:  # make terminal carboxyl coordinates
-            coords[[OXT_index, OXT1_index]] = make_coord_Q_COO(
-                bb[-2, :],
-                bb[-1, :],
-                )
-
-        # add sidechains here.....
-
-        # validate conformer current state
-        coords[bb_mask] = bb
-        coords[carbonyl_mask] = bb_CO
-        energy = validate_conformer_for_builder(
-            coords,
-            atom_labels,
-            residue_numbers,
-            bb_mask,
-            carbonyl_mask,
-            )
-
-        if energy > 0:  # not valid
-            # reset coordinates to the original value
-            # before the last chunk added
-
-            # reset the same chunk maximum 5 times,
-            # after that reset also the chunk before
-            if number_of_trials > 5:
-                bbi0_R_POP()
-                COi0_R_POP()
-                number_of_trials = 0
-
-            try:
-                _bbi0 = bbi0_register[-1]
-                _COi0 = COi0_register[-1]
-            except IndexError:
-                # if this point is reached,
-                # we erased until the beginning of the conformer
-                # discard conformer, something went really wrong
-                sys.exit('total error')  # change this to a functional error
-
-            bb[_bbi0:bbi, :] = 1.0
-            bb_CO[_COi0:COi, :] = 1.0
-
-            # do the same for sidechains
-            # ...
-
-            # reset also indexes
-            bbi = _bbi0
-            COi = _COi0
-
-            # coords needs to be reset because size of protein next
-            # chunks may not be equal
-            coords[:, :] = 1.0
-
-            backbone_done = False
-            number_of_trials += 1
-            continue
-
-        number_of_trials = 0
+        bbi = 3  # starts at 2 because the first 3 atoms are already placed
+        bbi0_register.clear()
         bbi0_R_APPEND(bbi)
+
+        # and needs to adjust with the += assignment inside the loop
+        COi = 0  # carbonyl atoms
+        COi0_register.clear()
         COi0_R_APPEND(COi)
 
-        if backbone_done:
-            # this point guarantees all protein atoms are built
-            break
-    # END of while loop
+        backbone_done = False
+        number_of_trials = 0
+        # run this loop until a specific BREAK is triggered
+        while True:
+
+            # the slice [1:-2] removes the first phi and the last psi and omega
+            # from the group of angles. These angles are not needed because the
+            # implementation always follows the order: psi-omega-phi(...)
+            agls = angles[RC(slices), :].ravel()[1:-2]
+
+            # index at the start of the current cycle
+            bbi0 = bbi
+            COi0 = COi
+            try:
+                for torsion in agls:
+                    bb[bbi, :] = MAKE_COORD_Q_LOCAL(
+                        bb[bbi - 3, :],
+                        bb[bbi - 2, :],
+                        bb[bbi - 1, :],
+                        next(bond_lens),
+                        next(bond_bend),
+                        torsion,
+                        )
+                    bbi += 1
+            except IndexError:
+                # here bbi is the last index + 1
+                backbone_done = True
+
+            # this else performs if the for loop concludes properly
+            #else:
+            # when backbone completes,
+            # adds carbonyl oxygen atoms
+            # after this loop all COs are added for the portion of BB
+            # added previously
+            for k in range(bbi0, bbi, 3):
+                bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+                    bb[k - 2, :],
+                    bb[k - 1, :],
+                    bb[k, :],
+                    )
+                COi += 1
+
+            if backbone_done:  # make terminal carboxyl coordinates
+                coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
+                    bb[-2, :],
+                    bb[-1, :],
+                    )
+
+            # add sidechains here.....
+
+            # validate conformer current state
+            coords[bb_mask] = bb
+            coords[carbonyl_mask] = bb_CO
+            energy = VALIDATE_CONF_LOCAL(
+                coords,
+                atom_labels,
+                residue_numbers,
+                bb_mask,
+                carbonyl_mask,
+                )
+
+            if energy > 0:  # not valid
+                # reset coordinates to the original value
+                # before the last chunk added
+
+                # reset the same chunk maximum 5 times,
+                # after that reset also the chunk before
+                if number_of_trials > 5:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    number_of_trials = 0
+
+                try:
+                    _bbi0 = bbi0_register[-1]
+                    _COi0 = COi0_register[-1]
+                except IndexError:
+                    # if this point is reached,
+                    # we erased until the beginning of the conformer
+                    # discard conformer, something went really wrong
+                    sys.exit('total error')  # change this to a functional error
+
+                bb[_bbi0:bbi, :] = 1.0
+                bb_CO[_COi0:COi, :] = 1.0
+
+                # do the same for sidechains
+                # ...
+
+                # reset also indexes
+                bbi = _bbi0
+                COi = _COi0
+
+                # coords needs to be reset because size of protein next
+                # chunks may not be equal
+                coords[:, :] = 1.0
+
+                backbone_done = False
+                number_of_trials += 1
+                continue
+
+            number_of_trials = 0
+            bbi0_R_APPEND(bbi)
+            COi0_R_APPEND(COi)
+
+            if backbone_done:
+                # this point guarantees all protein atoms are built
+                break
+        # END of while loop
+
+        coords[bb_mask] = bb
+        coords[carbonyl_mask] = bb_CO
+
+        sums = np.sum(coords, axis=1)
+        relevant = np.logical_not(np.isclose(sums, 3))
+        #relevant = np.logical_or(bb_mask, carbonyl_mask)
+
+        pdb_string = gen_PDB_from_conformer(
+            input_seq,
+            atom_labels[relevant],
+            residue_numbers[relevant],
+            ROUND(coords[relevant], decimals=3),
+            )
+
+        ##fname = f'{conformer_name}_{conf_n}.pdb'
+        ##with open(fname, 'w') as fout:
+        ##    fout.write(pdb_string)
+            #print(f'saved: {fname}')
+
+    return
 
 
-
-    # TODO:
-    # sidechains
-
-    coords[bb_mask] = bb
-    coords[carbonyl_mask] = bb_CO
-
-    sums = np.sum(coords, axis=1)
-    relevant = np.logical_not(np.isclose(sums, 3))
-    #relevant = np.logical_or(bb_mask, carbonyl_mask) 
-
-    save_conformer_to_disk(
+def gen_PDB_from_conformer(
         input_seq,
-        atom_labels[relevant],
-        residue_numbers[relevant],
-        coords[relevant],
-        )
-
-
-def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
+        atom_labels,
+        residues,
+        coords,
+        ALF=atom_line_formatter,
+        AA1TO3=aa1to3,
+        ROUND=np.round,
+        ):
+    """."""
     lines = []
-    LA = lines.append
+    LINES_APPEND = lines.append
+    ALF_FORMAT = ALF.format
     resi = -1
+    ATOM_LABEL_FMT = ' {: <3}'.format
+    pdb_text = ''
+
     for i in range(len(atom_labels)):
+
         if atom_labels[i] == 'N':
             resi += 1
-        ele = atom_labels[i].lstrip('123')[0]
-        LA(atom_line_formatter.format(
+            current_residue = input_seq[resi]
+            current_resnum = residues[i]
+
+        atm = atom_labels[i].strip()
+        ele = atm.lstrip('123')[0]
+
+        if len(atm) < 4:
+            atm = ATOM_LABEL_FMT(atm)
+
+        LINES_APPEND(ALF_FORMAT(
             'ATOM',
             i,
-            format_atom_name(atom_labels[i], ele),
+            atm,
             '',
-            aa1to3[input_seq[resi]],
+            AA1TO3[current_residue],
             'A',
-            residues[i],
+            current_resnum,
             '',
-            np.round(coords[i, 0], decimals=3),
-            np.round(coords[i, 1], decimals=3),
-            np.round(coords[i, 2], decimals=3),
+            coords[i, 0],
+            coords[i, 1],
+            coords[i, 2],
             0.0,
             0.0,
             '',
@@ -330,18 +415,19 @@ def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
             '',
             ))
 
-    with open('conformer.pdb', 'w') as fout:
-        fout.write('\n'.join(lines))
+    return '\n'.join(lines)
 
 
 def generate_atom_labels(input_seq, AL=atom_labels):
     """."""
     labels = []
-
     LE = labels.extend
+
     for residue in input_seq:
         LE(AL[residue])
+
     labels.append('OXT')
+
     return labels
 
 
@@ -364,7 +450,6 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
-
 
 
 if __name__ == "__main__":
