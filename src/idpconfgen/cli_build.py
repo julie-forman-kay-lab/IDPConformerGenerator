@@ -8,10 +8,10 @@ USAGE:
 import argparse
 import re
 import sys
-from random import choice as RC
 from functools import partial
 from itertools import cycle
-from math import pi
+from multiprocessing import Pool
+from random import choice as RC
 
 import numpy as np
 
@@ -23,21 +23,18 @@ from idpconfgen.libs.libfilter import (
     aligndb,
     regex_search,
     )
-from idpconfgen.libs.libtimer import timeme, ProgressCounter
+from idpconfgen.libs.libtimer import timeme
 from idpconfgen.core.definitions import (
     build_bend_CA_C_Np1,
     build_bend_Cm1_N_CA,
     build_bend_N_CA_C,
-    build_bend_CA_C_O,
     distance_N_CA,
     distance_CA_C,
     distance_C_Np1,
-    distance_C_O,
     atom_labels,
     aa1to3,
     )
-from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libpdb import atom_line_formatter, format_atom_name
+from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libvalidate import validate_conformer_for_builder
 from idpconfgen.libs.libmulticore import pool_function
 
@@ -104,23 +101,22 @@ def main(
 
     execute = partial(
         main_exec,
-        input_seq=input_seq,
-        database=database,
-        dssp_regexes=dssp_regexes,
-        nconfs=core_chunks,
-        conformer_name=conformer_name,
+        input_seq=input_seq,  # string
+        database=database,  # path string
+        dssp_regexes=dssp_regexes,  # list of strings
+        nconfs=core_chunks,  # int
+        conformer_name=conformer_name, # string
         )
 
     from time import time
     start = time()
-    from multiprocessing import Pool
     with Pool(ncores) as pool:
         imap = pool.imap(execute, range(ncores))
-        for i in imap:
+        for _ in imap:
             pass
 
-
-    execute(core_chunks * ncores, nconfs=remaining_chunks)
+    if remaining_chunks:
+        execute(core_chunks * ncores, nconfs=remaining_chunks)
     print(time() - start)
 
 
@@ -128,14 +124,13 @@ def main_exec(
         execution_run,
         input_seq,
         database,
-        func=None,
         dssp_regexes=r'(?=(L{2,6}))',
         nconfs=1,
         conformer_name='conformer',
         ROUND=np.round,
         ):
     """."""
-    # bring global to local
+    # bring global to local scope
     MAKE_COORD_Q_LOCAL = make_coord_Q
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
@@ -205,7 +200,6 @@ def main_exec(
         )
     seed_coords = np.ndarray.copy(bb[:3, :])
 
-
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
     bbi0_R_POP = bbi0_register.pop
@@ -221,8 +215,6 @@ def main_exec(
         build_bend_Cm1_N_CA,
         build_bend_N_CA_C,
         ))
-
-
 
     # STARTS BUILDING
     start_conf = nconfs * execution_run
@@ -357,7 +349,7 @@ def main_exec(
 
         sums = np.sum(coords, axis=1)
         relevant = np.logical_not(np.isclose(sums, 3))
-        #relevant = np.logical_or(bb_mask, carbonyl_mask) 
+        #relevant = np.logical_or(bb_mask, carbonyl_mask)
 
         pdb_string = gen_PDB_from_conformer(
             input_seq,
@@ -373,16 +365,6 @@ def main_exec(
 
     return
 
-
-    #save_conformer_to_disk(
-    #    input_seq,
-    #    atom_labels[relevant],
-    #    residue_numbers[relevant],
-    #    coords[relevant],
-    #    )
-
-
-#def save_conformer_to_disk(input_seq, atom_labels, residues, coords):
 
 def gen_PDB_from_conformer(
         input_seq,
@@ -417,7 +399,6 @@ def gen_PDB_from_conformer(
         LINES_APPEND(ALF_FORMAT(
             'ATOM',
             i,
-            #format_atom_name(atom_labels[i], ele),
             atm,
             '',
             AA1TO3[current_residue],
@@ -469,7 +450,6 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
-
 
 
 if __name__ == "__main__":
