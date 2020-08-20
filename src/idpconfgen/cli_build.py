@@ -203,10 +203,12 @@ def main_exec(
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
     bbi0_R_POP = bbi0_register.pop
+    bbi0_R_CLEAR = bbi0_register.clear
 
     COi0_register = []
     COi0_R_APPEND = COi0_register.append
     COi0_R_POP = COi0_register.pop
+    COi0_R_CLEAR = COi0_register.clear
 
     # prepares cycles for building process
     bond_lens = cycle((distance_C_Np1, distance_N_CA, distance_CA_C))
@@ -228,12 +230,12 @@ def main_exec(
         # SIDECHAINS HERE
 
         bbi = 3  # starts at 2 because the first 3 atoms are already placed
-        bbi0_register.clear()
+        bbi0_R_CLEAR()
         bbi0_R_APPEND(bbi)
 
         # and needs to adjust with the += assignment inside the loop
         COi = 0  # carbonyl atoms
-        COi0_register.clear()
+        COi0_R_CLEAR()
         COi0_R_APPEND(COi)
 
         backbone_done = False
@@ -247,8 +249,6 @@ def main_exec(
             agls = angles[RC(slices), :].ravel()[1:-2]
 
             # index at the start of the current cycle
-            bbi0 = bbi
-            COi0 = COi
             try:
                 for torsion in agls:
                     bb[bbi, :] = MAKE_COORD_Q_LOCAL(
@@ -270,7 +270,7 @@ def main_exec(
             # adds carbonyl oxygen atoms
             # after this loop all COs are added for the portion of BB
             # added previously
-            for k in range(bbi0, bbi, 3):
+            for k in range(bbi0_register[-1], bbi, 3):
                 bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb[k - 2, :],
                     bb[k - 1, :],
