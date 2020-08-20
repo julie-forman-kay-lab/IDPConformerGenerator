@@ -135,6 +135,7 @@ def main_exec(
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     VALIDATE_CONF_LOCAL = validate_conformer_for_builder
+    NAN = np.nan
 
 
     db = read_dictionary_from_disk(database)
@@ -175,12 +176,10 @@ def main_exec(
     carbonyl_mask[OXT1_index] = False
 
     # create coordinates and views
-    coords = np.full((num_atoms, 3), np.nan, dtype=np.float32)
-    bb = np.full((np.sum(bb_mask) + 1, 3), np.nan, dtype=np.float64)
+    coords = np.full((num_atoms, 3), NAN, dtype=np.float32)
+    bb = np.full((np.sum(bb_mask) + 1, 3), NAN, dtype=np.float64)
     bb_real = bb[1:, :]  # without the dummy
-    print(bb.shape)
-    print(bb_real.shape)
-    bb_CO = np.full((np.sum(carbonyl_mask), 3), np.nan, dtype=np.float64)
+    bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
@@ -191,23 +190,11 @@ def main_exec(
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
     n_terminal_CA_coord = np.array((distance_N_CA, 0.0, 0.0))
 
-    # third atom (C of the first residue) needs to be computed according
-    # to the bond length parameters and bend angle.
-    #n_terminal_C_coord = MAKE_COORD_Q_LOCAL(
-    #    ,  # dummy coordinate used only here
-    #    n_terminal_N_coord,
-    #    n_terminal_CA_coord,
-    #    distance_CA_C,
-    #    build_bend_N_CA_C,
-    #    0,  # null torsion angle
-    #    )
-
     seed_coords = np.array((
         dummy_CA_m1_coord,
         n_terminal_N_coord,
         n_terminal_CA_coord,
         ))
-    #assert seed_coords.shape == (3, 3)
 
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
@@ -219,24 +206,25 @@ def main_exec(
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
 
-    # prepares cycles for building process
-    bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
-    bond_bend = cycle((
-        build_bend_N_CA_C,
-        build_bend_CA_C_Np1,
-        build_bend_Cm1_N_CA,
-        ))
 
     # STARTS BUILDING
     start_conf = nconfs * execution_run
     end_conf = start_conf + nconfs
     for conf_n in range(start_conf, end_conf):
 
+        # prepares cycles for building process
+        bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+        bond_bend = cycle((
+            build_bend_N_CA_C,
+            build_bend_CA_C_Np1,
+            build_bend_Cm1_N_CA,
+            ))
+
         # in the first run of the loop this is unnecessary, but is better of
         # just do it once than flag it the whole time
-        coords[:, :] = np.nan
-        bb[:, :] = np.nan
-        bb_CO[:, :] = np.nan
+        coords[:, :] = NAN
+        bb[:, :] = NAN
+        bb_CO[:, :] = NAN
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
         # SIDECHAINS HERE
@@ -358,6 +346,15 @@ def main_exec(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 coords[:, :] = np.nan
+
+                # review!!!!!!!!
+                # prepares cycles for building process
+                bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+                bond_bend = cycle((
+                    build_bend_N_CA_C,
+                    build_bend_CA_C_Np1,
+                    build_bend_Cm1_N_CA,
+                    ))
 
                 backbone_done = False
                 number_of_trials += 1
