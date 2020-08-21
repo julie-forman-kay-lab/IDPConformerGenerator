@@ -16,8 +16,9 @@ REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 REGEX_RANGE_CHAR = re.compile(r'\w\{')
 
 
-def aligndb(db, NAN=np.nan):
+def aligndb(db):
     """Aligns IDPConfGen DB."""
+    NAN = np.nan
     phi, psi, omg, dssp, resseq = [], [], [], [], []
     pdbs = {}
     PSIE = psi.extend
@@ -25,44 +26,49 @@ def aligndb(db, NAN=np.nan):
     OMGE = omg.extend
     DA = dssp.append
     RA = resseq.append
+    # +1 because NAN are added as spacers
     spacer = 1  # algorithm definition
 
     current = 0
     for pdb, data in db.items():
 
-        len_segment = len(data['fasta'])
-        _PHITMP = [NAN] + data['phi'] + [NAN]
-        _PSITMP = data['psi'] + [NAN, NAN]
-        _OMGTMP = data['omega'] + [NAN, NAN]
+        fasta_truncated = data['fasta'][1:-1]
+        dssp_truncated = data['dssp'][1:-1]
+        phi_truncated = data['phi'][:-1]
+        psi_truncated = data['psi'][1:]
+        omg_truncated = data['omega'][1:]
 
-        # +1 because NAN are added as spacers
-        len_segment_w_spacer = len_segment + spacer
+        len_segment = len(fasta_truncated)
 
-        correct_lengths = [
-            len_segment_w_spacer,
-            len(data['dssp']) + spacer,
-            len(_PHITMP),
-            len(_PSITMP),
-            len(_OMGTMP),
+        lists_to_compare = [
+            dssp_truncated,
+            phi_truncated,
+            psi_truncated,
+            omg_truncated,
             ]
-        if sum(correct_lengths) / len(correct_lengths) != len_segment_w_spacer:
+
+        if any(len(i) != len_segment for i in lists_to_compare):
             log.error(
                 'number of residues, SS chars and angles does not match, '
                 f'ignoring... {pdb}'
                 )
             continue
 
+        phi_truncated.append(NAN)
+        psi_truncated.append(NAN)
+        omg_truncated.append(NAN)
+
         pdbs[pdb] = slice(current, current + len_segment)
         # +1 because resseq will be concatenated with '|'
         # can't avoid +1 because of the need to set the next starting integer
-        current += len_segment_w_spacer
+        current += len_segment + spacer
 
-        PHIE(_PHITMP)
-        PSIE(_PSITMP)
-        OMGE(_OMGTMP)
+        PHIE(phi_truncated)
+        PSIE(psi_truncated)
+        OMGE(omg_truncated)
 
-        DA(data['dssp'])
-        RA(data['fasta'])
+        DA(dssp_truncated)
+        RA(fasta_truncated)
 
     _resseq = '|'.join(resseq)
     _dssp = '|'.join(dssp)

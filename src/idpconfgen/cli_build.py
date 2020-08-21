@@ -135,6 +135,7 @@ def main_exec(
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     VALIDATE_CONF_LOCAL = validate_conformer_for_builder
+    NAN = np.nan
 
 
     db = read_dictionary_from_disk(database)
@@ -175,35 +176,25 @@ def main_exec(
     carbonyl_mask[OXT1_index] = False
 
     # create coordinates and views
-    coords = np.full((num_atoms, 3), np.nan, dtype=np.float32)
-    bb = np.full((np.sum(bb_mask), 3), np.nan, dtype=np.float64)
-    bb_CO = np.full((np.sum(carbonyl_mask), 3), np.nan, dtype=np.float64)
+    coords = np.full((num_atoms, 3), NAN, dtype=np.float32)
+    bb = np.full((np.sum(bb_mask) + 1, 3), NAN, dtype=np.float64)
+    bb_real = bb[1:, :]  # without the dummy
+    bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
 
     # places seed coordinates
     # coordinates are created always from the parameters in the core
     # definitions of IDPConfGen
     # first atom (N-terminal) is at 0, 0, 0
     # second atom (CA of the firs residue) is at the x-axis
+    dummy_CA_m1_coord = np.array((0.0, distance_N_CA, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
     n_terminal_CA_coord = np.array((distance_N_CA, 0.0, 0.0))
 
-    # third atom (C of the first residue) needs to be computed according
-    # to the bond length parameters and bend angle.
-    n_terminal_C_coord = MAKE_COORD_Q_LOCAL(
-        np.array((0.0, distance_N_CA, 0.0)),  # dummy coordinate used only here
-        n_terminal_N_coord,
-        n_terminal_CA_coord,
-        distance_CA_C,
-        build_bend_N_CA_C,
-        0,  # null torsion angle
-        )
-
     seed_coords = np.array((
+        dummy_CA_m1_coord,
         n_terminal_N_coord,
         n_terminal_CA_coord,
-        n_terminal_C_coord,
         ))
-    assert seed_coords.shape == (3, 3)
 
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
@@ -215,29 +206,30 @@ def main_exec(
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
 
-    # prepares cycles for building process
-    bond_lens = cycle((distance_C_Np1, distance_N_CA, distance_CA_C))
-    bond_bend = cycle((
-        build_bend_CA_C_Np1,
-        build_bend_Cm1_N_CA,
-        build_bend_N_CA_C,
-        ))
 
     # STARTS BUILDING
     start_conf = nconfs * execution_run
     end_conf = start_conf + nconfs
     for conf_n in range(start_conf, end_conf):
 
+        # prepares cycles for building process
+        bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+        bond_bend = cycle((
+            build_bend_N_CA_C,
+            build_bend_CA_C_Np1,
+            build_bend_Cm1_N_CA,
+            ))
+
         # in the first run of the loop this is unnecessary, but is better of
         # just do it once than flag it the whole time
-        coords[:, :] = np.nan
-        bb[:, :] = np.nan
-        bb_CO[:, :] = np.nan
+        coords[:, :] = NAN
+        bb[:, :] = NAN
+        bb_CO[:, :] = NAN
 
-        bb[:3, :] = seed_coords
+        bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
         # SIDECHAINS HERE
 
-        bbi = 3  # starts at 2 because the first 3 atoms are already placed
+        bbi = 2  # starts at 2 because the first 3 atoms are already placed
         bbi0_R_CLEAR()
         bbi0_R_APPEND(bbi)
 
@@ -254,15 +246,15 @@ def main_exec(
             # the slice [1:-2] removes the first phi and the last psi and omega
             # from the group of angles. These angles are not needed because the
             # implementation always follows the order: psi-omega-phi(...)
-            agls = angles[RC(slices), :].ravel()[1:-2]
+            agls = angles[RC(slices), :].ravel()#[1:-2]
 
             # index at the start of the current cycle
             try:
                 for torsion in agls:
-                    bb[bbi, :] = MAKE_COORD_Q_LOCAL(
-                        bb[bbi - 3, :],
+                    bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                         bb[bbi - 2, :],
                         bb[bbi - 1, :],
+                        bb[bbi, :],
                         next(bond_lens),
                         next(bond_bend),
                         torsion,
@@ -272,30 +264,44 @@ def main_exec(
                 # here bbi is the last index + 1
                 backbone_done = True
 
+                for k in range(bbi0_register[-1], bbi - 1, 3):
+                    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+                        bb_real[k - 1, :],
+                        bb_real[k, :],
+                        bb_real[k + 1, :],
+                        )
+                    COi += 1
+
+                coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
+                    bb[-2, :],
+                    bb[-1, :],
+                    )
+
             # this else performs if the for loop concludes properly
             #else:
             # when backbone completes,
             # adds carbonyl oxygen atoms
             # after this loop all COs are added for the portion of BB
             # added previously
-            for k in range(bbi0_register[-1], bbi, 3):
-                bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb[k - 2, :],
-                    bb[k - 1, :],
-                    bb[k, :],
-                    )
-                COi += 1
+            else:
+                for k in range(bbi0_register[-1], bbi, 3):
+                    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+                        bb_real[k - 1, :],
+                        bb_real[k, :],
+                        bb_real[k + 1, :],
+                        )
+                    COi += 1
 
-            if backbone_done:  # make terminal carboxyl coordinates
-                coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
-                    bb[-2, :],
-                    bb[-1, :],
-                    )
+            #if backbone_done:  # make terminal carboxyl coordinates
+            #    coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
+            #        bb[-2, :],
+            #        bb[-1, :],
+            #        )
 
             # add sidechains here.....
 
             # validate conformer current state
-            coords[bb_mask] = bb
+            coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
 
             energy = VALIDATE_CONF_LOCAL(
@@ -327,7 +333,7 @@ def main_exec(
                     sys.exit('total error')  # change this to a functional error
 
                 # clean previously built protein chunk
-                bb[_bbi0:bbi, :] = np.nan
+                bb_real[_bbi0:bbi, :] = np.nan
                 bb_CO[_COi0:COi, :] = np.nan
 
                 # do the same for sidechains
@@ -340,6 +346,15 @@ def main_exec(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 coords[:, :] = np.nan
+
+                # review!!!!!!!!
+                # prepares cycles for building process
+                bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+                bond_bend = cycle((
+                    build_bend_N_CA_C,
+                    build_bend_CA_C_Np1,
+                    build_bend_Cm1_N_CA,
+                    ))
 
                 backbone_done = False
                 number_of_trials += 1
