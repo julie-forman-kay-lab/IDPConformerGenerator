@@ -14,15 +14,19 @@ import numpy as np
 from idpconfgen import log
 from idpconfgen.core.definitions import (
     aa1to3,
-    distance_C_Np1,
-    distance_C_Np1_std,
-    distance_CA_C,
-    distance_CA_C_std,
-    distance_N_CA,
-    distance_N_CA_std,
     heavy_atoms,
     vdW_radii_dict,
     )
+
+from idpconfgen.core.build_definitions import (
+    average_distance_C_Np1,
+    std_distance_C_Np1,
+    average_distance_CA_C,
+    std_distance_CA_C,
+    average_distance_N_CA,
+    std_distance_N_CA,
+    )
+
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import calc_MSMV
 from idpconfgen.libs.libio import FileReaderIterator
@@ -348,8 +352,8 @@ def eval_bb_bond_length_distribution_cli(pdb_files, ncores):
         'xlabel': r'bond length ($\AA$)',
         'ylabel': 'Bond',
         'vert': False,
-        'usermean': [distance_N_CA, distance_CA_C, distance_C_Np1],
-        'userstd': [distance_N_CA_std, distance_CA_C_std, distance_C_Np1_std],
+        'usermean': [average_distance_N_CA, average_distance_CA_C, average_distance_C_Np1],
+        'userstd': [std_distance_N_CA, std_distance_CA_C, std_distance_C_Np1],
         }
 
     plot_distribution_list(

@@ -35,33 +35,6 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v: k for k, v in aa3to1.items()}
 
-# amino-acids atom labels
-# from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
-# PDB column
-# Taken from PDB entry 6I1B REVDAT 15-OCT-92.
-atom_labels = {
-    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', 'HB1', 'HB2', 'HB3'),
-    'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),
-    'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),
-    'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),
-    'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),
-    'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),
-    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD2', 'CE1', 'ND1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1'),
-    'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),
-    'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD','2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),
-    'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),
-    'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CE', 'SD', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),
-    'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND2', 'OD1', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'H2', 'H1', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),
-    'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE2', 'OE1', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),
-    'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CZ', 'NE', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),
-    'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),
-    'T': ('N', 'CA', 'C', 'O', 'CB', 'CG2', 'OG1', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),
-    'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),
-    'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'NE1', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'),
-    }
-
 # heavy atoms
 heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 
@@ -187,26 +160,26 @@ minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 # cull_d200611/200611/cullpdb_pc90_res1.6_R0.25_d200611_chains8807
 # float values are represented as ratio of integers
 # https://docs.python.org/3/tutorial/floatingpoint.html
-average_N_CA_C = 8731046790257777 / 4503599627370496  # +- 0.04375239960584633
-average_CA_C_Np1 = 4587708133805365 / 2251799813685248  # +- 0.022904896537130497
-average_Np1_C_O = 4733796466948169 / 2251799813685248  # +- 0.019050491268134375
-average_CA_C_O = 4825315589323725 / 2251799813685248  # +- 0.017982788310237034
-average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.029039312259214314
-bend_CA_C_OXT = 2 * pi / 3
-
-# pi corrected angles needed for the building algorithm
-build_bend_CA_C_Np1 = (pi - average_CA_C_Np1) / 2
-build_bend_Cm1_N_CA = (pi - average_Cm1_N_CA) / 2
-build_bend_N_CA_C = (pi - average_N_CA_C) / 2
-build_bend_CA_C_OXT = (pi - bend_CA_C_OXT) / 2
-build_bend_CA_C_O = average_CA_C_O / 2  # this angle does not require `pi -`
-
-distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
-distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599
-distance_C_Np1 = 2996436734567847 / 2251799813685248  # 1.33068 +- 0.009621
-distance_C_O = 5556993099130213 / 4503599627370496  # 1.234 +- 0.0121
-distance_C_OXT = 1.27
-
-distance_N_CA_std = 0.013036529567238726
-distance_CA_C_std = 0.012599655969373144
-distance_C_Np1_std = 0.009621596711934686
+#average_N_CA_C = 8731046790257777 / 4503599627370496  # +- 0.04375239960584633
+#average_CA_C_Np1 = 4587708133805365 / 2251799813685248  # +- 0.022904896537130497
+#average_Np1_C_O = 4733796466948169 / 2251799813685248  # +- 0.019050491268134375
+#average_CA_C_O = 4825315589323725 / 2251799813685248  # +- 0.017982788310237034
+#average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.029039312259214314
+#bend_CA_C_OXT = 2 * pi / 3
+#
+## pi corrected angles needed for the building algorithm
+#build_bend_CA_C_Np1 = (pi - average_CA_C_Np1) / 2
+#build_bend_Cm1_N_CA = (pi - average_Cm1_N_CA) / 2
+#build_bend_N_CA_C = (pi - average_N_CA_C) / 2
+#build_bend_CA_C_OXT = (pi - bend_CA_C_OXT) / 2
+#build_bend_CA_C_O = average_CA_C_O / 2  # this angle does not require `pi -`
+#
+#distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
+#distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599
+#distance_C_Np1 = 2996436734567847 / 2251799813685248  # 1.33068 +- 0.009621
+#distance_C_O = 5556993099130213 / 4503599627370496  # 1.234 +- 0.0121
+#distance_C_OXT = 1.27
+#
+#distance_N_CA_std = 0.013036529567238726
+#distance_CA_C_std = 0.012599655969373144
+#distance_C_Np1_std = 0.009621596711934686

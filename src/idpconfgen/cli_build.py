@@ -24,16 +24,17 @@ from idpconfgen.libs.libfilter import (
     regex_search,
     )
 from idpconfgen.libs.libtimer import timeme
-from idpconfgen.core.definitions import (
-    build_bend_CA_C_Np1,
-    build_bend_Cm1_N_CA,
-    build_bend_N_CA_C,
-    distance_N_CA,
-    distance_CA_C,
-    distance_C_Np1,
+from idpconfgen.core.build_definitions import (
+    build_bend_angles_CA_C_Np1,
+    build_bend_angles_Cm1_N_CA,
+    build_bend_angles_N_CA_C,
+    distances_N_CA,
+    distances_CA_C,
+    distances_C_Np1,
     atom_labels,
-    aa1to3,
     )
+
+from idpconfgen.core.definitions import aa1to3
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libvalidate import validate_conformer_for_builder
 from idpconfgen.libs.libmulticore import pool_function
@@ -99,8 +100,9 @@ def main(
     core_chunks = nconfs // ncores
     remaining_chunks = nconfs % ncores
 
-    execute = partial(
-        main_exec,
+    #execute = partial(
+    main_exec(
+        0,
         input_seq=input_seq,  # string
         database=database,  # path string
         dssp_regexes=dssp_regexes,  # list of strings
@@ -108,16 +110,16 @@ def main(
         conformer_name=conformer_name, # string
         )
 
-    from time import time
-    start = time()
-    with Pool(ncores) as pool:
-        imap = pool.imap(execute, range(ncores))
-        for _ in imap:
-            pass
+    #from time import time
+    #start = time()
+    #with Pool(ncores) as pool:
+    #    imap = pool.imap(execute, range(ncores))
+    #    for _ in imap:
+    #        pass
 
-    if remaining_chunks:
-        execute(core_chunks * ncores, nconfs=remaining_chunks)
-    print(time() - start)
+    #if remaining_chunks:
+    #    execute(core_chunks * ncores, nconfs=remaining_chunks)
+    #print(time() - start)
 
 
 def main_exec(
@@ -147,13 +149,14 @@ def main_exec(
     pdbs, angles, dssp, resseq = timed(db)
 
     # seachs for slices in secondary structure
-    timed = partial(timeme, regex_search)
-    slices = []
-    if isinstance(dssp_regexes, str):
-        dssp_regexes = [dssp_regexes]
+    #timed = partial(timeme, regex_search)
+    #slices = []
+    #if isinstance(dssp_regexes, str):
+    #    dssp_regexes = [dssp_regexes]
 
-    for dssp_regex_string in dssp_regexes:
-        slices.extend(timed(dssp, dssp_regex_string))
+    #for dssp_regex_string in dssp_regexes:
+    #    slices.extend(timed(dssp, dssp_regex_string))
+    slices = [pdbs[list(pdbs.keys())[0]]]
 
     log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
 
@@ -186,9 +189,9 @@ def main_exec(
     # definitions of IDPConfGen
     # first atom (N-terminal) is at 0, 0, 0
     # second atom (CA of the firs residue) is at the x-axis
-    dummy_CA_m1_coord = np.array((0.0, distance_N_CA, 0.0))
+    dummy_CA_m1_coord = np.array((0.0, 1.0, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-    n_terminal_CA_coord = np.array((distance_N_CA, 0.0, 0.0))
+    n_terminal_CA_coord = np.array((distances_N_CA[input_seq[0]], 0.0, 0.0))
 
     seed_coords = np.array((
         dummy_CA_m1_coord,
@@ -213,11 +216,11 @@ def main_exec(
     for conf_n in range(start_conf, end_conf):
 
         # prepares cycles for building process
-        bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+        bond_lens = cycle((distances_CA_C, distances_C_Np1, distances_N_CA))
         bond_bend = cycle((
-            build_bend_N_CA_C,
-            build_bend_CA_C_Np1,
-            build_bend_Cm1_N_CA,
+            build_bend_angles_N_CA_C,
+            build_bend_angles_CA_C_Np1,
+            build_bend_angles_Cm1_N_CA,
             ))
 
         # in the first run of the loop this is unnecessary, but is better of
@@ -251,12 +254,17 @@ def main_exec(
             # index at the start of the current cycle
             try:
                 for torsion in agls:
+                    # bbi -2 makes the match
+                    current_residue = input_seq[(bbi - 2) // 3]
+                    bbend_a = next(bond_lens)[current_residue]
+                    print(current_residue, bbend_a)
+
                     bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                         bb[bbi - 2, :],
                         bb[bbi - 1, :],
                         bb[bbi, :],
-                        next(bond_lens),
-                        next(bond_bend),
+                        bbend_a,
+                        next(bond_bend)[current_residue],
                         torsion,
                         )
                     bbi += 1
@@ -312,7 +320,7 @@ def main_exec(
                 carbonyl_mask,
                 )
 
-            if energy > 0:  # not valid
+            if False:#energy > 0:  # not valid
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -349,11 +357,11 @@ def main_exec(
 
                 # review!!!!!!!!
                 # prepares cycles for building process
-                bond_lens = cycle((distance_CA_C, distance_C_Np1, distance_N_CA))
+                bond_lens = cycle((distances_CA_C, distances_C_Np1, distances_N_CA))
                 bond_bend = cycle((
-                    build_bend_N_CA_C,
-                    build_bend_CA_C_Np1,
-                    build_bend_Cm1_N_CA,
+                    build_bend_angles_N_CA_C,
+                    build_bend_angles_CA_C_Np1,
+                    build_bend_angles_Cm1_N_CA,
                     ))
 
                 backbone_done = False

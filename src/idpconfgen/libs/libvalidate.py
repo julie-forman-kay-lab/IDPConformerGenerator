@@ -12,12 +12,12 @@ import numpy as np
 from scipy.spatial import distance
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import (
-    distance_CA_C,
-    distance_C_Np1,
-    distance_N_CA,
-    vdW_radii_dict,
+from idpconfgen.core.build_definitions import (
+    average_distance_CA_C,
+    average_distance_C_Np1,
+    average_distance_N_CA,
     )
+from idpconfgen.core.definitions import vdW_radii_dict
 from idpconfgen.libs.libstructure import (
     Structure,
     col_element,
@@ -320,9 +320,9 @@ def validate_bb_bond_len(coords, tolerance=0.01):
     """
     expected_bond_length = np.tile(
         [
-            distance_N_CA,
-            distance_CA_C,
-            distance_C_Np1
+            average_distance_N_CA,
+            average_distance_CA_C,
+            average_distance_C_Np1
             ],
         coords.shape[0] // 3
         )

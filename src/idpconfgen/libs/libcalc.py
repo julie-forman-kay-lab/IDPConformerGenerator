@@ -5,7 +5,7 @@ from numba import njit
 
 import numpy as np
 
-from idpconfgen.core.definitions import (
+from idpconfgen.core.build_definitions import (
     build_bend_CA_C_O,
     build_bend_CA_C_OXT,
     distance_C_O,
