@@ -1,15 +1,15 @@
 """
-Builds.
+Builds conformers from a database of torsion angles and secondary structure
+information. Database is as created by `idpconfgen torsions` CLI.
 
 USAGE:
-    $ idpconfgen build DB
+    $ idpconfgen build -db torsions.json -seq MMMMMMM...
 
 """
 import argparse
-import sys
 from functools import partial
 from itertools import cycle
-from multiprocessing import Pool, Manager
+from multiprocessing import Pool
 from random import choice
 from time import time
 
@@ -116,16 +116,13 @@ def main(
         # at the end
         remaining_chunks = nconfs % ncores
 
-    _slices, ANGLES = read_db_to_slices(database, dssp_regexes)
+    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
     SLICES.extend(_slices)
 
     # prepars execution function
     execute = partial(
         main_exec,
         input_seq=input_seq,  # string
-        #slices=slices_multi,
-        #database=database,  # path string
-        #dssp_regexes=dssp_regexes,  # list of strings
         nconfs=core_chunks,  # int
         conformer_name=conformer_name,  # string
         )
@@ -142,7 +139,8 @@ def main(
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
 
 
-def read_db_to_slices(database, dssp_regexes):
+def read_db_to_slices(database, dssp_regexes, ncores=1):
+    """Create database base of slice and angles."""
     # reads db dictionary from disk
     db = read_dictionary_from_disk(database)
     log.info(f'Read DB with {len(db)} entries')
@@ -152,23 +150,21 @@ def read_db_to_slices(database, dssp_regexes):
     pdbs, angles, dssp, resseq = timed(db)
 
     # searchs for slices in secondary structure, according to user requests
-    timed = partial(timeme, regex_search)
+    timed = partial(timeme, regex_search, ncores=ncores)
     dssp_regexes = \
         [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
     slices = []
     for dssp_regex_string in dssp_regexes:
         slices.extend(timed(dssp, dssp_regex_string))
     log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
+
     return slices, angles
 
 
 def main_exec(
         execution_run,
         input_seq,
-        #slices,
-        #database,
         conformer_name='conformer',
-        #dssp_regexes=r'(?=(L{2,6}))',
         nconfs=1,
         ):
     """Prepare data base and builds conformers."""
@@ -236,12 +232,21 @@ def main_exec(
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
 
+    broke_on_start_attempt = False
+    start_attempts = 0
+    max_start_attempts = 5  # maximum attempts to start a conformer
+    # because we are building from a experimental database there can be
+    # some angle combinations that fail on our validation process from start
+    # if this happens more than `max_start_attemps` the production is canceled.
+
     # STARTS BUILDING
     # aligns the indexes so that conformers can be named properly in
     # multicore operations
     start_conf = nconfs * execution_run
     end_conf = start_conf + nconfs
-    for conf_n in range(start_conf, end_conf):
+    conf_n = start_conf
+    #for conf_n in range(start_conf, end_conf):
+    while conf_n < end_conf:
 
         # prepares cycles for building process
         # cycles need to be regenerated every conformer because the first
@@ -372,7 +377,8 @@ def main_exec(
                     # if this point is reached,
                     # we erased until the beginning of the conformer
                     # discard conformer, something went really wrong
-                    sys.exit('total error')  # change this to a functional error
+                    broke_on_start_attempt = True
+                    break  # whilte loop
 
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
@@ -420,6 +426,18 @@ def main_exec(
                 break  # while loop
         # END of while loop
 
+        if broke_on_start_attempt:
+            start_attempts += 1
+            if start_attempts > max_start_attempts:
+                log.error(
+                    'Reached maximum amount of starts. Canceling... '
+                    f'{end_conf - conf_n} of {end_conf - start_conf} '
+                    'conformers were not built.'
+                    )
+                return
+            broke_on_max_attempts = False
+            continue
+
         # until sidechains are implemented this is needed
         relevant = np.logical_not(np.isnan(coords[:, 0]))
 
@@ -433,6 +451,8 @@ def main_exec(
         fname = f'{conformer_name}_{conf_n}.pdb'
         with open(fname, 'w') as fout:
             fout.write(pdb_string)
+
+        conf_n += 1
 
     return
 
