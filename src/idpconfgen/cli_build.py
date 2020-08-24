@@ -9,7 +9,7 @@ import argparse
 import sys
 from functools import partial
 from itertools import cycle
-from multiprocessing import Pool
+from multiprocessing import Pool, Manager
 from random import choice
 from time import time
 
@@ -86,6 +86,10 @@ ap.add_argument(
 libcli.add_argument_ncores(ap)
 
 
+SLICES = []
+ANGLES = None
+
+
 def main(
         input_seq,
         database,
@@ -100,18 +104,28 @@ def main(
 
     Distributes over processors.
     """
+    global ANGLES
     # Calculates how many conformers are built per core
-    core_chunks = nconfs // ncores
-    # in case nconfs is not multiple of ncores, builds the remaining confs
-    # at the end
-    remaining_chunks = nconfs % ncores
+    if nconfs < ncores:
+        ncores = 1
+        core_chunks = nconfs
+        remaining_chunks = 0
+    else:
+        core_chunks = nconfs // ncores
+        # in case nconfs is not multiple of ncores, builds the remaining confs
+        # at the end
+        remaining_chunks = nconfs % ncores
+
+    _slices, ANGLES = read_db_to_slices(database, dssp_regexes)
+    SLICES.extend(_slices)
 
     # prepars execution function
     execute = partial(
         main_exec,
         input_seq=input_seq,  # string
-        database=database,  # path string
-        dssp_regexes=dssp_regexes,  # list of strings
+        #slices=slices_multi,
+        #database=database,  # path string
+        #dssp_regexes=dssp_regexes,  # list of strings
         nconfs=core_chunks,  # int
         conformer_name=conformer_name,  # string
         )
@@ -128,24 +142,7 @@ def main(
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
 
 
-def main_exec(
-        execution_run,
-        input_seq,
-        database,
-        conformer_name='conformer',
-        dssp_regexes=r'(?=(L{2,6}))',
-        nconfs=1,
-        ROUND=np.round,
-        ):
-    """Prepare data base and builds conformers."""
-    # bring global to local scope
-    MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
-    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
-    MAKE_COORD_Q_LOCAL = make_coord_Q
-    NAN = np.nan
-    RC = choice
-    VALIDATE_CONF_LOCAL = validate_conformer_for_builder
-
+def read_db_to_slices(database, dssp_regexes):
     # reads db dictionary from disk
     db = read_dictionary_from_disk(database)
     log.info(f'Read DB with {len(db)} entries')
@@ -162,6 +159,29 @@ def main_exec(
     for dssp_regex_string in dssp_regexes:
         slices.extend(timed(dssp, dssp_regex_string))
     log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
+    return slices, angles
+
+
+def main_exec(
+        execution_run,
+        input_seq,
+        #slices,
+        #database,
+        conformer_name='conformer',
+        #dssp_regexes=r'(?=(L{2,6}))',
+        nconfs=1,
+        ):
+    """Prepare data base and builds conformers."""
+    # bring global to local scope
+    MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
+    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
+    MAKE_COORD_Q_LOCAL = make_coord_Q
+    NAN = np.nan
+    RC = choice
+    ROUND = np.round
+    VALIDATE_CONF_LOCAL = validate_conformer_for_builder
+    angles = ANGLES
+    slices = SLICES
 
     # Start building process
 

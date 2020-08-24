@@ -13,7 +13,24 @@ from idpconfgen.libs.libfilter import (
     regex_has_overlap,
     regex_range,
     regex_search,
+    REGEX_RANGE,
     )
+
+
+@pytest.mark.parametrize(
+    'regex,expected',
+    [
+        ('(?=(L{2,6}))', True),
+        ('(?=(L{,6}))', True),
+        ('(?=(L{6,}))', True),
+        ('(?=(L{6}))', True),
+        ('(?=(LLLH))', False),
+        ]
+    )
+def test_REX_RANGE_regex(regex, expected):
+    """Test global variable regex range."""
+    result = REGEX_RANGE.findall(regex)
+    assert bool(result) == expected
 
 
 @pytest.mark.parametrize(

@@ -10,9 +10,11 @@ from idpconfgen.libs.libmulticore import pool_function
 
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
+# read comments bellow
 REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 # a more general version of the above is: r'\{\d*\,*\d*\}' but this would
 # accept also r'{}' which is not desired
+# also we consider \{\d+\} for simplicity of the algorithm
 REGEX_RANGE_CHAR = re.compile(r'\w\{')
 
 
@@ -90,6 +92,8 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
     ------
     list of slices
     """
+    assert isinstance(sequence, str)
+    assert isinstance(regex_string, str)
     # if a range exists in regex_string
     # range is defined by default by: L{1}, L{1,5} situations
     # the following functions ensures searchs goes both directions
