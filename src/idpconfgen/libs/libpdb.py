@@ -84,7 +84,7 @@ def delete_insertions(lines):
         yield line
 
 
-def format_atom_name(atom, element):
+def format_atom_name(atom, element, AFD=_atom_format_dict):
     """
     Format PDB Record line Atom name.
 
@@ -108,7 +108,6 @@ def format_atom_name(atom, element):
     atm = atom.strip()
     len_atm = len(atm)
     len_ele = len(element.strip())
-    AFD = _atom_format_dict
 
     try:
         return AFD[len_ele][len_atm].format(atm)

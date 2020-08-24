@@ -1,7 +1,16 @@
 """Mathemical calculations."""
 import math
+from math import sin, cos, pi
+from numba import njit
 
 import numpy as np
+
+from idpconfgen.core.build_definitions import (
+    build_bend_CA_C_O,
+    build_bend_CA_C_OXT,
+    distance_C_O,
+    distance_C_OXT,
+    )
 
 
 AXIS_111 = np.array([
@@ -322,3 +331,251 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 def calc_MSMV(data):
     """Calculate Mean, STD, Median, and Variance."""
     return np.mean(data), np.std(data), np.median(data), np.var(data)
+
+
+@njit
+def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
+    """Hamiltonian Multiplication."""
+    return (
+            a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2,
+            a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2,
+            a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2,
+            a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2,
+    )
+
+
+@njit
+def make_coord_Q(
+        v1,
+        v2,
+        v3,
+        distance,
+        bend,
+        torsion,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        SIN=sin,
+        COS=cos,
+        ):
+    """
+    Make a new coords from 3 vectors using Quaternions.
+
+    Angles must be given in radians. For a matter of performance,
+    angles will not be converted to radians if given in degrees.
+
+    Parameters
+    ----------
+    v1, v2, v3 : np.ndarray, shape (3,), dtype=np.float
+        The vectors that define the three points required to place
+        the new coordinate according to bend and torsion angles.
+
+    distance : float
+        The distance between `v3` and the new coordinate.
+
+    bend : float
+        The angle in radians for the bend angle between the three atoms.
+        The actual `bend` value input in this function must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
+
+    torsion : float
+        The torsion angle (radians) around v2-v3 which will place
+        the new coordinate correctly.
+        Contrarily to the `bend` angle, do not compute any additional
+        calcualtions and just provide the torsion angle value as is.
+
+    Returns
+    -------
+    np.ndarray of shape (3,), dtype=np.float32
+    """
+    # transfer vectors to origin
+    o1 = v1 - v2
+    o2 = v3 - v2
+
+    ocross = CROSS(o2, o1)  #changed
+    u_ocross = ocross / NORM(ocross)
+
+    # creates quaterion to rotate on the bend angle
+    b2, b3, b4 = SIN(bend) * u_ocross
+    b1 = COS(bend)
+
+    # rotates the unitary of o2 according to bend angle
+    uo2 = o2  / NORM(o2)
+    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    n1, n2, n3, n4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    # rotates the previous result according to torsion angle
+    torsion_angle = torsion / 2
+    t2, t3, t4 = SIN(torsion_angle) * uo2
+    t1 = COS(torsion_angle)
+
+    f1, f2, f3, f4 = QM(
+        *QM(t1, t2, t3, t4, 0, n2, n3, n4),
+        t1, -t2, -t3, -t4,
+        )
+
+    # the new rotated vector is unitary
+    # extends to the correct lenth
+    fov_size = ARRAY((f2 * distance, f3 * distance, f4 * distance))
+    # the above implementation takes 857 ns, and is faster than
+    # np.array([f2, f3, f4]) * distance which takes 1.8 us
+    # given by %%timeit jupyter notebook
+
+    # transfers the new coord created in origin
+    # to the correct space position
+    # performing this sum at the moment of fov_size is not faster
+    # than doing it separately here
+    return fov_size + v3
+
+
+@njit
+def make_coord_Q_CO(
+        CA_coords,
+        C_coords,
+        N_coords,
+        distance=distance_C_O,
+        bend=build_bend_CA_C_O,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        SIN=sin,
+        COS=cos,
+        ):
+    """
+    Create carbonyl (C=O) coordinate for protein backbone.
+
+    Uses rotation by quaternions logic.
+
+    Parameters
+    ----------
+    CA_coords, C_coods, N_coords : np.ndarray, shape (3,), dtype=np.float
+        The XYZ coordinates for the CA, C and N atoms surrounding the
+        C=O bond, respectively.
+
+    distance : float, optional
+        The distance of the C-O bond pair.
+        Defaults to ~1.234.
+
+    bend : float, optional
+        The angle in radians for the CA-C-O.
+        Defaults to ~2.1428 radians (~122.777 degress).
+        If `bend` is given, consider the actual `bend` value must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
+
+    Returns
+    -------
+    np.ndarray of shape (3,), dtype=np.float32
+    """
+    o1 = CA_coords - C_coords
+    o2 = N_coords - C_coords
+
+    ocross = CROSS(o1, o2)
+    u_ocross = ocross / NORM(ocross)
+
+    # creates quaterion to rotate on the bend angle
+    b2, b3, b4 = SIN(bend) * u_ocross
+    b1 = COS(bend)
+
+    # rotates a the unitary of o2 according to bend angle
+    uo2 = o2 / NORM(o2)
+    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    n1, n2, n3, n4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_coords
+
+
+@njit
+def make_coord_Q_COO(
+        CA_term,
+        C_term,
+        distance=distance_C_OXT,
+        bend=build_bend_CA_C_OXT,
+        ARRAY=np.array,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        QM=hamiltonian_multiplication_Q,
+        SIN=sin,
+        COS=cos,
+        ):
+    """
+    Create the C-terminal carboxyl coordinates.
+
+    Uses a strategy based on Quaternion rotations.
+
+    Parameters
+    ----------
+    CA_term : np.ndarray, shape (3,), dtype=np.float
+        The coordinates of the terminal CA atom.
+
+    C_term : np.ndarray, shape (3,), dtype=np.float
+        The coordinates of the terminal C atom.
+
+    distance : float, optional
+        The distance of the C-O and C-OXT bond lengths.
+        The distance is considered the same for both atom pairs.
+        Defaults to 1.27.
+
+    bend : float, optional
+        The angle in radians for the CA-C-O and CA-C-OXT bonds.
+        The angle between both cases is considered the same.
+        Defaults to 2 * pi / 3 (120º).
+        If `bend` is given, consider the actual `bend` value must be
+        `(pi - bend) / 2`, this calculation must be computed outside
+        this function for perfomance reasons.
+
+    Returns
+    -------
+    tuple of length 2
+        np.ndarray of shape (3,), dtype=np.float32
+    """
+    o1 = C_term - CA_term
+    # creates an inmaginary coordinate perpendicular to o1 and origin
+    o2 = o1[::-1]
+
+    # creates the cross vector that will be used to rotate the new coordinates
+    ocross2 = CROSS(o1, o2)
+    u_ocross2 = ocross2 / NORM(ocross2)
+
+    # creates quaterions to rotate O and OXT on the bend angle
+    # O and OXT have the same rotation angle along the same axis but
+    # with opposite angle signs
+    minus_bend = -bend
+    b2, b3, b4 = SIN(minus_bend) * u_ocross2
+    b1 = COS(minus_bend)
+
+    c2, c3, c4 = SIN(bend) * u_ocross2
+    c1 = COS(bend)
+
+    # creates a unitary CA-C vector in the origin
+    # the unitary vector is created to allow proper distance placement
+    # in the final step
+    # p1 is not need because it is 0 according to Quaternion math
+    p2, p3, p4 = o1 / NORM(o1)
+
+    # rotates the above copy for O and OXT
+    # the rotation creates generates new coordinates
+    m1, m2, m3, m4 = QM(
+        *QM(b1, b2, b3, b4, 0, p2, p3, p4),
+        b1, -b2, -b3, -b4,
+        )
+
+    n1, n2, n3, n4 = QM(
+        *QM(c1, c2, c3, c4, 0, p2, p3, p4),
+        c1, -c2, -c3, -c4,
+        )
+
+    # creates the final coordinate arrays
+    O_coords = ARRAY((m2 * distance, m3 * distance, m4 * distance)) + C_term
+    OXT_coords = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
+
+    return O_coords, OXT_coords

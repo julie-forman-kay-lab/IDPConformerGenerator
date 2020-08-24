@@ -615,6 +615,7 @@ col_element = 14
 col_model = 15
 
 
+cols_coords_slice = slice(8, 11)
 cols_coords = [col_x, col_y, col_z]
 cols_labels = [col_resSeq, col_resName, col_name]
 

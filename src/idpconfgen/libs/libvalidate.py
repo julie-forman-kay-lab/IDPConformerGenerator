@@ -12,12 +12,12 @@ import numpy as np
 from scipy.spatial import distance
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import (
-    distance_CA_C,
-    distance_C_Np1,
-    distance_N_CA,
-    vdW_radii_dict,
+from idpconfgen.core.build_definitions import (
+    average_distance_CA_C,
+    average_distance_C_Np1,
+    average_distance_N_CA,
     )
+from idpconfgen.core.definitions import vdW_radii_dict
 from idpconfgen.libs.libstructure import (
     Structure,
     col_element,
@@ -320,9 +320,9 @@ def validate_bb_bond_len(coords, tolerance=0.01):
     """
     expected_bond_length = np.tile(
         [
-            distance_N_CA,
-            distance_CA_C,
-            distance_C_Np1
+            average_distance_N_CA,
+            average_distance_CA_C,
+            average_distance_C_Np1
             ],
         coords.shape[0] // 3
         )
@@ -445,3 +445,39 @@ def report_sequential_bon_len(
         )
 
     return '\n'.join(rows)
+
+
+def validate_conformer_for_builder(
+        coords,
+        atom_labels,
+        residue_numbers,
+        bb_mask,
+        carbonyl_mask,
+        LOGICAL_NOT=np.logical_not,
+        ISNAN=np.isnan,
+        ):
+    """."""
+
+    # no need to compute isnan in whole coordinates because coordinates
+    # either are all nan or are all numbers
+    coords_in_use = LOGICAL_NOT(ISNAN(coords[:, 0]))
+    assert coords_in_use.shape == (coords.shape[0], )
+
+    rows, *_ = vdw_clash_by_threshold(
+        coords[coords_in_use, :],
+        atom_labels[coords_in_use],
+        atom_labels[coords_in_use].astype('<U1'),
+        False,
+        False,
+        residue_numbers[coords_in_use],
+        residues_apart=2,
+        )
+
+    is_valid = all((
+        not np.any(rows),
+        ))
+
+    if np.any(rows): # not valid
+        return 1  # simulates positive energy
+    else:
+        return -1  # simulates negative energy

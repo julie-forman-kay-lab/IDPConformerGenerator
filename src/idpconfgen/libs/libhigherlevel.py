@@ -281,13 +281,13 @@ def get_torsions(fdata, degrees=False, decimals=3):
         # by logger.report_on_crash
         raise err
 
-    coords = (data[:, cols_coords].astype(float) * 1000).astype(int)
+    coords = (data[:, cols_coords].astype(np.float64) * 1000).astype(int)
     torsions = calc_torsion_angles(coords)
 
     if degrees:
         torsions = np.degrees(torsions)
 
-    return torsions.round(decimals=decimals)
+    return torsions#.round(decimals=decimals)
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):
