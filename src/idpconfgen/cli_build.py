@@ -10,7 +10,7 @@ import argparse
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool
-from random import choice
+from random import choice as randchoice, randint
 from time import time
 
 import numpy as np
@@ -26,6 +26,7 @@ from idpconfgen.core.build_definitions import (
     distances_N_CA,
     )
 from idpconfgen.core.definitions import aa1to3
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
     make_coord_Q,
@@ -165,19 +166,89 @@ def main_exec(
         execution_run,
         input_seq,
         conformer_name='conformer',
+        generative_function=None,
         nconfs=1,
         ):
-    """Prepare data base and builds conformers."""
+    """
+    Builds conformers.
+
+    *Note*: `execution_run` is a positional parameter in order to maintain
+    operability with the multiprocessing operations in `main`, sorry for
+    that :-)
+
+    Parameters
+    ----------
+    execution_run : int
+        A zero or positive integer. `execution_run` will number the
+        conformers accordingly to the CPU job number which generates
+        them.
+
+        `execution_run` dictate the numbering suffix of the PDBs saved
+        to disk.
+
+        If a single CPU is being used, just use 0 for convenience.
+
+    input_seq : str
+        The FASTA sequence of the protein being built. This parameter
+        needs to be accurate and is extremely important to create an
+        appropriate data structure able to contain all conformer's
+        atoms.
+        Example: "MAGERDDAPL".
+
+    conformer_name : str, optional
+        The prefix name of the PDB file saved to disk.
+        Defaults to 'conformer'.
+
+    generative_function : callable, optional
+        The generative function used by the builder to retrieve torsion
+        angles during the building process.
+
+        The builder expects this function to receive two parameters:
+            - `nres`, the residue chunk size to get angles from
+            - `cres`, the next residue being built. For example,
+                with cres=10, the builder will expect a minimum of three
+                torsion angles (phi, psi, omega) for residue 10.
+
+        Depending on the nature of the `generative function` the two
+        pameters may be ignored by the function itself (use **kwargs
+        for that purpose).
+
+        If `None` provided, the builder will use the internal `SLIDES`
+        and `ANGLES` variables and will assume the `cli_build.main` was
+        executed priorly, or that ANGLES and SLICES were populated
+        properly.
+
+    nconfs : int
+        The number of conformers to build.
+    """
     # bring global to local scope
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
-    RC = choice
+    RC = randchoice
+    RINT = randint
     ROUND = np.round
     VALIDATE_CONF_LOCAL = validate_conformer_for_builder
     angles = ANGLES
     slices = SLICES
+
+
+    # prepares generative function
+    if generative_function is None:
+        # nres and cres are ignored in the lambda function
+        # and are used for compatibility purposes
+        generative_function = lambda nres, cres: angles[RC(slices), :].ravel()
+    else:
+        try:
+            generative_function(cres=0, nres=5)
+        except Exception as err:  # this is generic Exception on purpose
+            errmsg = (
+                'The `generative_function` provided is not compatible with '
+                'the building process. Please read `main_exec` docstring '
+                'for more details.'
+                )
+            raise IDPConfGenException(errmsg) from err
 
     # Start building process
 
@@ -250,7 +321,7 @@ def main_exec(
 
         # prepares cycles for building process
         # cycles need to be regenerated every conformer because the first
-        # atom build is a CA and the last atom built is the C, which breaks
+        # atom build is a C and the last atom built is the CA, which breaks
         # periodicity
         # all these are dictionaries
         bond_lens = cycle((
@@ -289,7 +360,7 @@ def main_exec(
 
             # following aligndb function, `angls` will always be cyclic with:
             # phi - psi - omega - phi - psi - omega - (...)
-            agls = angles[RC(slices), :].ravel()
+            agls = generative_function(nres=RINT(1, 6), cres=bbi - 2 // 3)
 
             # index at the start of the current cycle
             try:
