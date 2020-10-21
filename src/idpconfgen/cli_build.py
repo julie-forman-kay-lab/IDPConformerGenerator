@@ -1,5 +1,7 @@
 """
-Builds conformers from a database of torsion angles and secondary structure
+Builds IDP conformers.
+
+Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
 USAGE:
@@ -10,7 +12,8 @@ import argparse
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool
-from random import choice as randchoice, randint
+from random import choice as randchoice
+from random import randint
 from time import time
 
 import numpy as np
@@ -170,7 +173,7 @@ def main_exec(
         nconfs=1,
         ):
     """
-    Builds conformers.
+    Build conformers.
 
     *Note*: `execution_run` is a positional parameter in order to maintain
     operability with the multiprocessing operations in `main`, sorry for
@@ -311,7 +314,7 @@ def main_exec(
     start_conf = nconfs * execution_run
     end_conf = start_conf + nconfs
     conf_n = start_conf
-    #for conf_n in range(start_conf, end_conf):
+    # for conf_n in range(start_conf, end_conf):
     while conf_n < end_conf:
 
         # prepares cycles for building process
@@ -511,7 +514,7 @@ def main_exec(
                     'conformers were not built.'
                     )
                 return
-            broke_on_max_attempts = False
+            broke_on_start_attempt = False
             continue
 
         # until sidechains are implemented this is needed
