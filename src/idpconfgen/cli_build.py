@@ -233,15 +233,10 @@ def main_exec(
     angles = ANGLES
     slices = SLICES
 
-
-    # prepares generative function
-    if generative_function is None:
-        # nres and cres are ignored in the lambda function
-        # and are used for compatibility purposes
-        generative_function = lambda nres, cres: angles[RC(slices), :].ravel()
-    else:
+    # tests generative function complies with implementation requirements
+    if generative_function:
         try:
-            generative_function(cres=0, nres=5)
+            generative_function(nres=1, cres=0)
         except Exception as err:  # this is generic Exception on purpose
             errmsg = (
                 'The `generative_function` provided is not compatible with '
@@ -358,9 +353,19 @@ def main_exec(
         # run this loop until a specific BREAK is triggered
         while True:
 
-            # following aligndb function, `angls` will always be cyclic with:
-            # phi - psi - omega - phi - psi - omega - (...)
-            agls = generative_function(nres=RINT(1, 6), cres=bbi - 2 // 3)
+            # I decided to use an if-statement here instead of polymorph
+            # the else clause to a `generative_function` variable because
+            # the resulting overhead from the extra function call and
+            # **kwargs handling was greater then the if-statement processing
+            # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html
+            if generative_function:
+                agls = generative_function(nres=RINT(1, 6), cres=bbi - 2 // 3)
+
+            else:
+                # following `aligndb` function,
+                # `angls` will always be cyclic with:
+                # phi - psi - omega - phi - psi - omega - (...)
+                agls = angles[RC(slices), :].ravel()
 
             # index at the start of the current cycle
             try:
