@@ -141,6 +141,11 @@ class Structure:
         """
         return self.filtered_atoms[:, cols_coords].astype(np.float32)
 
+    @coords.setter
+    def coords(self, coords):
+        self.data_array[:, cols_coords] = \
+            np.round(coords, decimals=3).astype('<U8')
+
 
     @property
     def consecutive_residues(self):
