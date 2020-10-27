@@ -27,6 +27,7 @@ from idpconfgen.core.build_definitions import (
     distances_C_Np1,
     distances_CA_C,
     distances_N_CA,
+    sidechain_templates,
     )
 from idpconfgen.core.definitions import aa1to3
 from idpconfgen.core.exceptions import IDPConfGenException
@@ -267,6 +268,8 @@ def main_exec(
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
+
+
     # +1 because of the dummy coordinate required to start building.
     # see later
     bb = np.full((np.sum(bb_mask) + 1, 3), NAN, dtype=np.float64)
@@ -300,6 +303,11 @@ def main_exec(
     COi0_R_APPEND = COi0_register.append
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
+
+    res_R = []  # residue number register
+    res_R_APPEND = res_R.append
+    res_R_POP = res_R.pop
+    res_R_CLEAR = res_R.clear
 
     broke_on_start_attempt = False
     start_attempts = 0
@@ -351,6 +359,11 @@ def main_exec(
         COi0_R_CLEAR()
         COi0_R_APPEND(COi)
 
+        # residue integer number
+        current_res_number = 0
+        res_R_CLEAR()
+        res_R_APPEND(current_res_number)
+
         backbone_done = False
         number_of_trials = 0
         # run this loop until a specific BREAK is triggered
@@ -377,7 +390,8 @@ def main_exec(
                     # being placed is a C, it is placed using the PHI angle of a
                     # residue. And PHI is the first angle of that residue angle
                     # set.
-                    current_residue = input_seq[(bbi - 2) // 3]
+                    current_res_number = (bbi - 2) // 3
+                    current_residue = input_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
                     # is displaced by 1 unit from bb. So 2 in bb_read is the
@@ -426,9 +440,32 @@ def main_exec(
 
             # IMPLEMENT SIDE CHAIN CONSTRUCTION HERE
 
+            #chunk_first_residue = bbi0_register[-1] - 2 // 3
+            #_crn = current_res_number + 1
+            #_resnums = list(range(chunk_first_residue, _crn))
+
+            #for bb_atom_idx in range(bbi0_register[-1] - 2, bbi - 2, 3):
+            for res_i in range(res_R[-1], current_res_number):
+                sscoords = place_sidechain_template(
+                    bb[res_i * 3, res_i * 3 + 3],  # from N to C
+                    sidechain_templates[aa1to3[input_seq[res_i]]][1],
+                    )
+                ss[res_i][1] = sscoords
+
+            # -1 subtration is because bbi stores CA at these positions, and
+            # we need N and C
+            #place_sidechain_template(
+            #    bb[bbi0_register[-1] - 1:bbi - 1],
+            #    coords[np.isin(residue_numbers, _resnums)],
+            #    input_seq[chunk_first_residue, _crn],
+            #    )
+
+
             # validate conformer current state
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
+            for _smask, _sidecoords in ss[res_R[-1]: current_res_number]:
+                coords[_smask] = _sidecoords
 
             energy = VALIDATE_CONF_LOCAL(
                 coords,
@@ -447,17 +484,21 @@ def main_exec(
                 if number_of_trials > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
+                    res_R_POP()
                     number_of_trials = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
+                    # there is no need to clean res_R because it is managed
+                    # by indexes of list rather than copying non nan values
+                    # as for bbi0 and COi0
                 except IndexError:
                     # if this point is reached,
                     # we erased until the beginning of the conformer
                     # discard conformer, something went really wrong
                     broke_on_start_attempt = True
-                    break  # whilte loop
+                    break  # while loop
 
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
@@ -469,6 +510,7 @@ def main_exec(
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
+                current_res_number = res_R[-1]
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
@@ -499,6 +541,8 @@ def main_exec(
             number_of_trials = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
+            # the residue where the build process stopped
+            res_R_APPEND(current_res_number)
 
             if backbone_done:
                 # this point guarantees all protein atoms are built

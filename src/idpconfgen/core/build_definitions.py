@@ -215,7 +215,7 @@ def _get_structure_coords(path_):
     return s.coords
 
 
-sidechain_coordinates = {
+sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
     for pdb in Path('sidechain_templates').glob('*.pdb')
     }
