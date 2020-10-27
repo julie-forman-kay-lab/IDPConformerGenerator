@@ -265,12 +265,23 @@ def main_exec(
     OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
     # replces the last TRUE value by false because that is a carboxyl
     # and not a carbonyl
+    # Example explaining the implementation:
+    # >>> f = np.array([False, True, True, True, False, False])
+    # >>> f
+    # array([False,  True,  True,  True, False, False])
+    # >>> np.argwhere(f)
+    # array([[1],
+    #        [2],
+    #        [3]])
+    # >>> np.argwhere(f)[-1]
+    # array([3])
+    # >>> np.argwhere(f)[-1][0]
+    # 3
     OXT1_index = np.argwhere(carbonyl_mask)[-1][0]
     carbonyl_mask[OXT1_index] = False
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
-
 
     # +1 because of the dummy coordinate required to start building.
     # see later
@@ -303,12 +314,17 @@ def main_exec(
 
     # this is a list but could be a dictionary because key are indexes
     ss = [
-        (
-            residue_numbers[residue_numbers==_resnum],
+        [
+            residue_numbers==_resnum,
             np.full((_natoms, 3), NAN, dtype=np.float64),
-            )
+            ]
         for _resnum, _natoms in sorted(Counter(residue_numbers).items())
         ]
+    # the last residue will contain an extra atom OXT, which needs to be
+    # removed
+    _OXT1_index = np.argwhere(ss[-1][0])[-1][0]
+    ss[-1][0][_OXT1_index] = False
+    ss[-1][1] = np.full((ss[-1][1].shape[0] - 1, 3), NAN, dtype=np.float64)
 
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
@@ -463,12 +479,13 @@ def main_exec(
             #_resnums = list(range(chunk_first_residue, _crn))
 
             #for bb_atom_idx in range(bbi0_register[-1] - 2, bbi - 2, 3):
-            for res_i in range(res_R[-1], current_res_number):
+            for res_i in range(res_R[-1], current_res_number + backbone_done):
                 sscoords = place_sidechain_template(
-                    bb[res_i * 3, res_i * 3 + 3],  # from N to C
-                    sidechain_templates[aa1to3[input_seq[res_i]]][1],
+                    bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
+                    sidechain_templates[aa1to3[input_seq[res_i]]],
                     )
-                ss[res_i][1] = sscoords
+                print(sscoords)
+                ss[res_i][1][:, :]  = sscoords
 
             # -1 subtration is because bbi stores CA at these positions, and
             # we need N and C
@@ -480,20 +497,20 @@ def main_exec(
 
 
             # validate conformer current state
-            for _smask, _sidecoords in ss[res_R[-1]: current_res_number]:
+            for _smask, _sidecoords in ss[res_R[-1]: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
 
-            energy = VALIDATE_CONF_LOCAL(
-                coords,
-                atom_labels,
-                residue_numbers,
-                bb_mask,
-                carbonyl_mask,
-                )
+            #energy = VALIDATE_CONF_LOCAL(
+            #    coords,
+            #    atom_labels,
+            #    residue_numbers,
+            #    bb_mask,
+            #    carbonyl_mask,
+            #    )
 
-            if energy > 0:  # not valid
+            if False:#energy > 0:  # not valid
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -578,13 +595,14 @@ def main_exec(
             continue
 
         # until sidechains are implemented this is needed
-        relevant = np.logical_not(np.isnan(coords[:, 0]))
+        #relevant = np.logical_not(np.isnan(coords[:, 0]))
 
         pdb_string = gen_PDB_from_conformer(
             input_seq,
-            atom_labels[relevant],
-            residue_numbers[relevant],
-            ROUND(coords[relevant], decimals=3),
+            atom_labels,#,[relevant],
+            residue_numbers,#[relevant],
+            #ROUND(coords[relevant], decimals=3),
+            ROUND(coords, decimals=3),
             )
 
         fname = f'{conformer_name}_{conf_n}.pdb'

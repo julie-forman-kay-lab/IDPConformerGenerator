@@ -5,6 +5,7 @@ from statistics import fmean, stdev
 
 from idpconfgen.libs.libstructure import Structure
 
+_filepath = Path(__file__).resolve().parent  # folder
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
@@ -17,7 +18,7 @@ atom_labels = {
     'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),  # noqa: E501
     'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),  # noqa: E501
     'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),  # noqa: E501
-    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD2', 'CE1', 'ND1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1'),  # noqa: E501
+    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
     'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),  # noqa: E501
     'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),  # noqa: E501
     'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
@@ -217,5 +218,7 @@ def _get_structure_coords(path_):
 
 sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
-    for pdb in Path('sidechain_templates').glob('*.pdb')
+    for pdb in _filepath.joinpath('sidechain_templates').glob('*.pdb')
     }
+
+print(sidechain_templates['MET'])

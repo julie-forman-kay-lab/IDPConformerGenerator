@@ -10,6 +10,7 @@ from idpconfgen.core.build_definitions import (
     build_bend_CA_C_OXT,
     distance_C_O,
     distance_C_OXT,
+    sidechain_templates,
     )
 
 
@@ -333,15 +334,144 @@ def calc_MSMV(data):
     return np.mean(data), np.std(data), np.median(data), np.var(data)
 
 
+#@njit
+#def xxhamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
+#    """Hamiltonian Multiplication."""
+#    return (
+#            (a1 * a2.T) - (b1 * b2.T) - (c1 * c2.T) - (d1 * d2.T),
+#            (a1 * b2.T) + (b1 * a2.T) + (c1 * d2.T) - (d1 * c2.T),
+#            (a1 * c2.T) - (b1 * d2.T) + (c1 * a2.T) + (d1 * b2.T),
+#            (a1 * d2.T) + (b1 * c2.T) - (c1 * b2.T) + (d1 * a2.T),
+#    )
+
 @njit
 def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
     """Hamiltonian Multiplication."""
     return (
-            a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2,
-            a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2,
-            a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2,
-            a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2,
+            (a1 * a2) - (b1 * b2) - (c1 * c2) - (d1 * d2),
+            (a1 * b2) + (b1 * a2) + (c1 * d2) - (d1 * c2),
+            (a1 * c2) - (b1 * d2) + (c1 * a2) + (d1 * b2),
+            (a1 * d2) + (b1 * c2) - (c1 * b2) + (d1 * a2),
     )
+
+
+def place_sidechain_template(
+        bb_cnf,
+        ss_template,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        ):
+    """
+    Place sidechain templates on backbone.
+
+    Parameters
+    ----------
+    bb_cnf : numpy nd.array, shape (3, 3), dtype=float64
+        The backbone coords in the form of: N-CA-C
+
+    ss_template : numpy nd.array, shape (M, 3), dtype=float64
+        The sidechain all-atom template.
+
+    Returns
+    -------
+    nd.array, shape (M-4, 3), dtype=float64
+        The side chain coords.
+        Backbone coords are NOT returned.
+    """
+    # places bb with CA at 0,0,0
+    bbtmp = bb_cnf[:, :] - bb_cnf[1, :]
+    N_CA = bbtmp[0, :]
+
+    # the template ss is expected to have CA already in the 0,0,0
+    N_CA_ = ss_template[0, :]
+
+    # rotation vector
+    rv = CROSS(N_CA_, N_CA)
+    rvu = rv / NORM(rv)
+
+    # angle between N-CAs
+    N_CA_N = angle_between(N_CA, N_CA_)
+
+    rot1 = Q_rotate(ss_template, rvu, N_CA_N)
+
+    # starts the second rotation
+    cross_cnf = CROSS(bbtmp[0, :], bbtmp[2, :])
+    cross_ss = CROSS(rot1[0, :], rot1[2, :])
+
+    # angle between bb planes
+    angle = angle_between(cross_ss, cross_cnf)
+
+    # plane rotation vector
+    rv = CROSS(cross_ss, cross_cnf)
+    rvu = rv / NORM(rv)
+
+    rot2 = Q_rotate(rot1, rvu, angle)
+
+    return rot2 + bb_cnf[1, :]
+
+
+def Q_rotate(
+        coords,
+        rot_vec,
+        angle_rad,
+        ARRAY=np.array,
+        HMQ=hamiltonian_multiplication_Q,
+        ):
+    """
+    Rotate coordinates by radians along an axis.
+
+    Rotates using quaternion operations.
+
+    Parameters
+    ----------
+    coords : nd.array (N, 3), dtype=np.float64
+        The coordinates to ratote.
+
+    rot_vec : (,3)
+        A 3D space vector around which to rotate coords.
+
+    angle_rad : float
+        The angle in radians to rotate the coords.
+
+    Returns
+    -------
+    nd.array shape (N, 3), dtype=np.float64
+        The rotated coordinates
+    """
+    assert coords.shape[1] == 3
+
+    b2, b3, b4 = sin(angle_rad / 2) * rot_vec
+    b1 = cos(angle_rad / 2)
+
+    c1, c2, c3, c4 = HMQ(
+        b1, b2, b3, b4,
+        0, coords[:, 0], coords[:, 1], coords[:, 2],
+        )
+
+    _, d2, d3, d4 = HMQ(
+        c1, c2, c3, c4,
+        b1, -b2, -b3, -b4,
+        )
+
+    rotated = ARRAY([d2, d3, d4]).T
+
+    assert rotated.shape[1] == 3
+    return rotated
+
+
+def angle_between(
+        v1,
+        v2,
+        ARCCOS=np.arccos,
+        CLIP=np.clip,
+        DOT=np.dot,
+        NORM=np.linalg.norm,
+        ):
+    """Calculate the angle between two vectors."""
+    v1_u = v1 / NORM(v1)
+    v2_u = v2 / NORM (v2)
+    return ARCCOS(CLIP(DOT(v1_u, v2_u), -1.0, 1.0))
+
 
 
 @njit
