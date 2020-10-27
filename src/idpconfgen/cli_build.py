@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+from collections import Counter
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool
@@ -36,6 +37,7 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q,
     make_coord_Q_CO,
     make_coord_Q_COO,
+    place_sidechain_template,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
@@ -294,6 +296,20 @@ def main_exec(
         n_terminal_CA_coord,
         ))
 
+    # side chain templates and masks
+    # create a lits of tuples, where index 0 is a boolean mask placing
+    # the side chain in coords, and index 1 is an array of the sidechain atoms
+    # excluded the 4 atoms of the backbone
+
+    # this is a list but could be a dictionary because key are indexes
+    ss = [
+        (
+            residue_numbers[residue_numbers==_resnum],
+            np.full((_natoms, 3), NAN, dtype=np.float64),
+            )
+        for _resnum, _natoms in sorted(Counter(residue_numbers).items())
+        ]
+
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
     bbi0_R_POP = bbi0_register.pop
@@ -346,6 +362,8 @@ def main_exec(
         coords[:, :] = NAN
         bb[:, :] = NAN
         bb_CO[:, :] = NAN
+        for _mask, _coords in ss:
+            _coords[:, :] = NAN
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
@@ -462,10 +480,10 @@ def main_exec(
 
 
             # validate conformer current state
-            coords[bb_mask] = bb_real  # do not consider the initial dummy atom
-            coords[carbonyl_mask] = bb_CO
             for _smask, _sidecoords in ss[res_R[-1]: current_res_number]:
                 coords[_smask] = _sidecoords
+            coords[bb_mask] = bb_real  # do not consider the initial dummy atom
+            coords[carbonyl_mask] = bb_CO
 
             energy = VALIDATE_CONF_LOCAL(
                 coords,
@@ -490,9 +508,7 @@ def main_exec(
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
-                    # there is no need to clean res_R because it is managed
-                    # by indexes of list rather than copying non nan values
-                    # as for bbi0 and COi0
+                    _resi0 = res_R[-1]
                 except IndexError:
                     # if this point is reached,
                     # we erased until the beginning of the conformer
@@ -510,7 +526,7 @@ def main_exec(
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
-                current_res_number = res_R[-1]
+                current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
