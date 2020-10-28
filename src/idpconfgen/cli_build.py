@@ -25,6 +25,8 @@ from idpconfgen.core.build_definitions import (
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
     build_bend_angles_N_CA_C,
+    build_bend_H_N_C,
+    distance_H_N,
     distances_C_Np1,
     distances_CA_C,
     distances_N_CA,
@@ -231,6 +233,8 @@ def main_exec(
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
+    BUILD_BEND_H_N_C = build_bend_H_N_C
+    DISTANCE_NH = distance_H_N
     NAN = np.nan
     RC = randchoice
     RINT = randint
@@ -262,6 +266,7 @@ def main_exec(
     # creates masks
     bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
     carbonyl_mask = atom_labels == 'O'
+    NHydrogen_mask = atom_labels == 'H'
     OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
     # replces the last TRUE value by false because that is a carboxyl
     # and not a carbonyl
@@ -289,6 +294,7 @@ def main_exec(
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
     bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
+    bb_NH = np.full((np.sum(NHydrogen_mask), 3), NAN, dtype=np.float64)
 
     # creates seed coordinates:
     # 1st) a dummy atom at the y-axis to build the first atom
@@ -336,6 +342,11 @@ def main_exec(
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
 
+    NHi0_register = []
+    NHi0_R_APPEND = NHi0_register.append
+    NHi0_R_POP = NHi0_register.pop
+    NHi0_R_CLEAR = NHi0_register.clear
+
     res_R = []  # residue number register
     res_R_APPEND = res_R.append
     res_R_POP = res_R.pop
@@ -378,6 +389,7 @@ def main_exec(
         coords[:, :] = NAN
         bb[:, :] = NAN
         bb_CO[:, :] = NAN
+        bb_NH[:, :] = NAN
         for _mask, _coords in ss:
             _coords[:, :] = NAN
 
@@ -392,6 +404,10 @@ def main_exec(
         COi = 0  # carbonyl atoms
         COi0_R_CLEAR()
         COi0_R_APPEND(COi)
+
+        NHi = 1  # 0 is the N-terminal, should be handled separately
+        NHi0_R_CLEAR()
+        NHi0_R_APPEND(NHi)
 
         # residue integer number
         current_res_number = 0
@@ -472,11 +488,18 @@ def main_exec(
                     )
                 COi += 1
 
-            # IMPLEMENT SIDE CHAIN CONSTRUCTION HERE
+            # Adds N-H Hydrogens
+            for k in range(bbi0_register[-1] + 1, bbi, 3):
+                bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
+                    bb_real[k - 1, :],
+                    bb_real[k, :],
+                    bb_real[k + 1, :],
+                    distance=DISTANCE_NH,
+                    bend=BUILD_BEND_H_N_C,
+                    )
+                NHi += 1
 
-            #chunk_first_residue = bbi0_register[-1] - 2 // 3
-            #_crn = current_res_number + 1
-            #_resnums = list(range(chunk_first_residue, _crn))
+            # IMPLEMENT SIDE CHAIN CONSTRUCTION HERE
 
             #for bb_atom_idx in range(bbi0_register[-1] - 2, bbi - 2, 3):
             for res_i in range(res_R[-1], current_res_number + backbone_done):
@@ -484,23 +507,13 @@ def main_exec(
                     bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
                     sidechain_templates[aa1to3[input_seq[res_i]]],
                     )
-                print(sscoords)
                 ss[res_i][1][:, :]  = sscoords
 
-            # -1 subtration is because bbi stores CA at these positions, and
-            # we need N and C
-            #place_sidechain_template(
-            #    bb[bbi0_register[-1] - 1:bbi - 1],
-            #    coords[np.isin(residue_numbers, _resnums)],
-            #    input_seq[chunk_first_residue, _crn],
-            #    )
-
-
-            # validate conformer current state
             for _smask, _sidecoords in ss[res_R[-1]: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
+            coords[NHydrogen_mask] = bb_NH
 
             #energy = VALIDATE_CONF_LOCAL(
             #    coords,
@@ -519,12 +532,14 @@ def main_exec(
                 if number_of_trials > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
+                    NHi0_R_POP()
                     res_R_POP()
                     number_of_trials = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
+                    _NHi0 = NHi0_register[-1]
                     _resi0 = res_R[-1]
                 except IndexError:
                     # if this point is reached,
@@ -536,6 +551,7 @@ def main_exec(
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
                 bb_CO[_COi0:COi, :] = NAN
+                bb_NH[_NHi0:NHi, :] = NAN
 
                 # do the same for sidechains
                 # ...
@@ -543,6 +559,7 @@ def main_exec(
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
+                NHi = _NHi0
                 current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
@@ -574,6 +591,7 @@ def main_exec(
             number_of_trials = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
+            NHi0_R_APPEND(NHi)
             # the residue where the build process stopped
             res_R_APPEND(current_res_number)
 
@@ -595,14 +613,14 @@ def main_exec(
             continue
 
         # until sidechains are implemented this is needed
-        #relevant = np.logical_not(np.isnan(coords[:, 0]))
+        relevant = np.logical_not(np.isnan(coords[:, 0]))
 
         pdb_string = gen_PDB_from_conformer(
             input_seq,
-            atom_labels,#,[relevant],
-            residue_numbers,#[relevant],
-            #ROUND(coords[relevant], decimals=3),
-            ROUND(coords, decimals=3),
+            atom_labels[relevant],
+            residue_numbers[relevant],
+            ROUND(coords[relevant], decimals=3),
+            #ROUND(coords, decimals=3),
             )
 
         fname = f'{conformer_name}_{conf_n}.pdb'

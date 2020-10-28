@@ -209,6 +209,11 @@ build_bend_CA_C_O = 2.102 / 2
 distance_C_OXT = 1.27
 distance_C_O = 5556993099130213 / 4503599627370496
 
+# NH atom:
+distance_H_N = 0.9
+build_bend_H_N_C = np.radians(114) / 2
+
+
 # side chain template coordinates
 
 
@@ -222,5 +227,3 @@ sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
     for pdb in _filepath.joinpath('sidechain_templates').glob('*.pdb')
     }
-
-print(sidechain_templates['MET'])
