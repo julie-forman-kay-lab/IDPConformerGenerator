@@ -3,6 +3,8 @@ from math import pi
 from pathlib import Path
 from statistics import fmean, stdev
 
+import numpy as np
+
 from idpconfgen.libs.libstructure import Structure
 
 _filepath = Path(__file__).resolve().parent  # folder
@@ -213,7 +215,7 @@ distance_C_O = 5556993099130213 / 4503599627370496
 def _get_structure_coords(path_):
     s = Structure(path_)
     s.build()
-    return s.coords
+    return s.coords.astype(np.float64)
 
 
 sidechain_templates = {
