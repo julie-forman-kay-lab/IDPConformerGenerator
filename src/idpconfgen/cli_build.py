@@ -286,9 +286,9 @@ def main_exec(
     #        [3]])
     # >>> np.argwhere(f)[-1]
     # array([3])
-    # >>> np.argwhere(f)[-1][0]
+    # >>> np.argwhere(f)[-1, 0]
     # 3
-    OXT1_index = np.argwhere(carbonyl_mask)[-1][0]
+    OXT1_index = np.argwhere(carbonyl_mask)[-1, 0]
     carbonyl_mask[OXT1_index] = False
 
     # create coordinates and views
@@ -300,7 +300,15 @@ def main_exec(
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
     bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
+
+    # notice that NHydrogen_mask does not see Prolines
     bb_NH = np.full((np.sum(NHydrogen_mask), 3), NAN, dtype=np.float64)
+
+    # The first coordinates of the NH matrix, i.e. the N-terminal ones
+    # are not build automatically during the building pipeline. Hence,
+    # the first building index is 1
+    NHi_start = 0 if input_seq[0] == 'P' else 1
+    bb_NH_builder = bb_NH[NHi_start:, :]
 
     # the following array serves to avoid placing HN in Proline residues
     residue_labels_bb_simulating = residue_labels[bb_mask]
@@ -328,6 +336,8 @@ def main_exec(
     # excluded the 4 atoms of the backbone
 
     # this is a list but could be a dictionary because key are indexes
+    # the sublists must be lists and not tuples because they are modified
+    # during the building process
     ss = [
         [
             residue_numbers==_resnum,
@@ -335,9 +345,10 @@ def main_exec(
             ]
         for _resnum, _natoms in sorted(Counter(residue_numbers).items())
         ]
+
     # the last residue will contain an extra atom OXT, which needs to be
     # removed
-    _OXT1_index = np.argwhere(ss[-1][0])[-1][0]
+    _OXT1_index = np.argwhere(ss[-1][0])[-1, 0]
     ss[-1][0][_OXT1_index] = False
     ss[-1][1] = np.full((ss[-1][1].shape[0] - 1, 3), NAN, dtype=np.float64)
 
@@ -414,7 +425,9 @@ def main_exec(
         COi0_R_CLEAR()
         COi0_R_APPEND(COi)
 
-        NHi = 1  # 0 is the N-terminal, should be handled separately
+        # NHi is 0 because it will be applied in bb_NH_builder which ignores
+        # the first residue, see bb_NH_builder definition
+        NHi = NHi_start
         NHi0_R_CLEAR()
         NHi0_R_APPEND(NHi)
 
@@ -498,17 +511,14 @@ def main_exec(
                 COi += 1
 
             # Adds N-H Hydrogens
-            NH_offset = STR_COUNT(input_seq[:current_res_number + 1], 'P')
             for k in range(bbi0_register[-1] + 1, bbi, 3):
-                print(k, residue_labels_bb_simulating[k])
 
                 if residue_labels_bb_simulating[k] == 'PRO':
-                    NHi += 1
                     continue
 
-                actual_ = max(NHi -  NH_offset, 0)
-                print('NHi - NH offset = actual', NHi, NH_offset, actual_)
-                bb_NH[actual_, :] = MAKE_COORD_Q_CO_LOCAL(
+                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
+                # disntace and bend parameters
+                bb_NH_builder[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
                     bb_real[k, :],
                     bb_real[k + 1, :],
@@ -517,26 +527,22 @@ def main_exec(
                     )
                 NHi += 1
 
-            # IMPLEMENT SIDE CHAIN CONSTRUCTION HERE
-
-            #for bb_atom_idx in range(bbi0_register[-1] - 2, bbi - 2, 3):
+            # Adds sidechain template structures
             for res_i in range(res_R[-1], current_res_number + backbone_done):
                 sscoords = place_sidechain_template(
                     bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
                     sidechain_templates[aa1to3[input_seq[res_i]]],
                     )
-                try:
-                    ss[res_i][1][:, :]  = sscoords
-                except:
-                    import sys
-                    sys.exit(input_seq[res_i])
+                ss[res_i][1][:, :]  = sscoords
 
+            # Transfers coords to the main coord array
             for _smask, _sidecoords in ss[: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
+            # calculates the conformer energy
             energy = VALIDATE_CONF_LOCAL(
                 coords,
                 atom_labels,
@@ -545,7 +551,7 @@ def main_exec(
                 carbonyl_mask,
                 )
 
-            if False:#energy > 0:  # not valid
+            if energy > 0:  # not valid
                 #print('CLASH')
                 # reset coordinates to the original value
                 # before the last chunk added
