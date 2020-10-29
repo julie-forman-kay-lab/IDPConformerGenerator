@@ -229,16 +229,17 @@ def main_exec(
     nconfs : int
         The number of conformers to build.
     """
-    # bring global to local scope
+    # bring global variables to local scope to improve execution speed
+    BUILD_BEND_H_N_C = build_bend_H_N_C
+    DISTANCE_NH = distance_H_N
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
-    BUILD_BEND_H_N_C = build_bend_H_N_C
-    DISTANCE_NH = distance_H_N
     NAN = np.nan
     RC = randchoice
     RINT = randint
     ROUND = np.round
+    STR_COUNT = str.count
     VALIDATE_CONF_LOCAL = validate_conformer_for_builder
     angles = ANGLES
     slices = SLICES
@@ -262,13 +263,18 @@ def main_exec(
     atom_labels = np.array(generate_atom_labels(input_seq))
     num_atoms = len(atom_labels)
     residue_numbers = np.array(generate_residue_numbers(atom_labels))
+    residue_labels = np.array(generate_residue_labels(input_seq))
+
+    assert len(residue_numbers) == num_atoms
+    assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
 
     # creates masks
     bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
     carbonyl_mask = atom_labels == 'O'
     NHydrogen_mask = atom_labels == 'H'
     OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
-    # replces the last TRUE value by false because that is a carboxyl
+
+    # replaces the last TRUE value by false because that is a carboxyl
     # and not a carbonyl
     # Example explaining the implementation:
     # >>> f = np.array([False, True, True, True, False, False])
@@ -295,6 +301,9 @@ def main_exec(
     # coordinates for the carbonyl oxigen atoms
     bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
     bb_NH = np.full((np.sum(NHydrogen_mask), 3), NAN, dtype=np.float64)
+
+    # the following array serves to avoid placing HN in Proline residues
+    residue_labels_bb_simulating = residue_labels[bb_mask]
 
     # creates seed coordinates:
     # 1st) a dummy atom at the y-axis to build the first atom
@@ -489,8 +498,17 @@ def main_exec(
                 COi += 1
 
             # Adds N-H Hydrogens
+            NH_offset = STR_COUNT(input_seq[:current_res_number + 1], 'P')
             for k in range(bbi0_register[-1] + 1, bbi, 3):
-                bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
+                print(k, residue_labels_bb_simulating[k])
+
+                if residue_labels_bb_simulating[k] == 'PRO':
+                    NHi += 1
+                    continue
+
+                actual_ = max(NHi -  NH_offset, 0)
+                print('NHi - NH offset = actual', NHi, NH_offset, actual_)
+                bb_NH[actual_, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
                     bb_real[k, :],
                     bb_real[k + 1, :],
@@ -507,23 +525,28 @@ def main_exec(
                     bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
                     sidechain_templates[aa1to3[input_seq[res_i]]],
                     )
-                ss[res_i][1][:, :]  = sscoords
+                try:
+                    ss[res_i][1][:, :]  = sscoords
+                except:
+                    import sys
+                    sys.exit(input_seq[res_i])
 
-            for _smask, _sidecoords in ss[res_R[-1]: current_res_number + backbone_done]:
+            for _smask, _sidecoords in ss[: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
-            #energy = VALIDATE_CONF_LOCAL(
-            #    coords,
-            #    atom_labels,
-            #    residue_numbers,
-            #    bb_mask,
-            #    carbonyl_mask,
-            #    )
+            energy = VALIDATE_CONF_LOCAL(
+                coords,
+                atom_labels,
+                residue_numbers,
+                bb_mask,
+                carbonyl_mask,
+                )
 
             if False:#energy > 0:  # not valid
+                #print('CLASH')
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -715,6 +738,26 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
+
+
+def generate_residue_labels(
+        input_seq,
+        atom_labels=atom_labels,
+        aa1to3=aa1to3,
+        ):
+    """Generate residue 3-letter labels."""
+    residue_labels = []
+    RL_APPEND = residue_labels.append
+
+    for res_1_letter in input_seq:
+        res3 = aa1to3[res_1_letter]
+        for _ in range(len(atom_labels[res_1_letter])):
+            RL_APPEND(res3)
+
+    # To compensate for the OXT atom
+    residue_labels.append(res3)
+
+    return residue_labels
 
 
 if __name__ == "__main__":
