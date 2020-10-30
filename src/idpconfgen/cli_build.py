@@ -229,6 +229,7 @@ def main_exec(
     nconfs : int
         The number of conformers to build.
     """
+    time_to_index = []
     # bring global variables to local scope to improve execution speed
     BUILD_BEND_H_N_C = build_bend_H_N_C
     DISTANCE_NH = distance_H_N
@@ -239,7 +240,6 @@ def main_exec(
     RC = randchoice
     RINT = randint
     ROUND = np.round
-    STR_COUNT = str.count
     VALIDATE_CONF_LOCAL = validate_conformer_for_builder
     angles = ANGLES
     slices = SLICES
@@ -269,40 +269,28 @@ def main_exec(
     assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
 
     # creates masks
-    bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
-    carbonyl_mask = atom_labels == 'O'
-    NHydrogen_mask = atom_labels == 'H'
-    OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
+    bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    carbonyl_mask = np.where(atom_labels == 'O')[0]
+    NHydrogen_mask = np.where(atom_labels == 'H')[0]
+    OXT_index = np.where(atom_labels == 'OXT')[0][0]
 
-    # replaces the last TRUE value by false because that is a carboxyl
-    # and not a carbonyl
-    # Example explaining the implementation:
-    # >>> f = np.array([False, True, True, True, False, False])
-    # >>> f
-    # array([False,  True,  True,  True, False, False])
-    # >>> np.argwhere(f)
-    # array([[1],
-    #        [2],
-    #        [3]])
-    # >>> np.argwhere(f)[-1]
-    # array([3])
-    # >>> np.argwhere(f)[-1, 0]
-    # 3
-    OXT1_index = np.argwhere(carbonyl_mask)[-1, 0]
-    carbonyl_mask[OXT1_index] = False
+    # the last O value is removed because it is built in the same step
+    # OXT is built
+    OXT1_index = carbonyl_mask[-1]
+    carbonyl_mask = carbonyl_mask[:-1]
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
     # +1 because of the dummy coordinate required to start building.
     # see later
-    bb = np.full((np.sum(bb_mask) + 1, 3), NAN, dtype=np.float64)
+    bb = np.full((bb_mask.size + 1, 3), NAN, dtype=np.float64)
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
-    bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
+    bb_CO = np.full((carbonyl_mask.size, 3), NAN, dtype=np.float64)
 
     # notice that NHydrogen_mask does not see Prolines
-    bb_NH = np.full((np.sum(NHydrogen_mask), 3), NAN, dtype=np.float64)
+    bb_NH = np.full((NHydrogen_mask.size, 3), NAN, dtype=np.float64)
 
     # the following array serves to avoid placing HN in Proline residues
     residue_labels_bb_simulating = residue_labels[bb_mask]
@@ -334,7 +322,7 @@ def main_exec(
     # during the building process
     ss = [
         [
-            np.argwhere(residue_numbers==_resnum).ravel()[4:],
+            np.where(residue_numbers == _resnum)[0][4:],
             np.full((_natoms - 4, 3), NAN, dtype=np.float64),
             ]
         for _resnum, _natoms in sorted(Counter(residue_numbers).items())
@@ -527,14 +515,16 @@ def main_exec(
                     bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
                     sidechain_templates[aa1to3[input_seq[res_i]]],
                     )
-                ss[res_i][1][:, :]  = sscoords
+                ss[res_i][1][:, :] = sscoords
 
             # Transfers coords to the main coord array
             for _smask, _sidecoords in ss[: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
+            start = time()
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
+            time_to_index.append(time() - start)
 
             # calculates the conformer energy
             energy = VALIDATE_CONF_LOCAL(
@@ -634,7 +624,6 @@ def main_exec(
             broke_on_start_attempt = False
             continue
 
-
         # until sidechains are implemented this is needed
         relevant = np.logical_not(np.isnan(coords[:, 0]))
 
@@ -652,6 +641,8 @@ def main_exec(
 
         conf_n += 1
 
+    from statistics import mean
+    print(mean(time_to_index))
     return
 
 
