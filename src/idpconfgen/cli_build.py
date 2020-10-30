@@ -229,8 +229,6 @@ def main_exec(
     nconfs : int
         The number of conformers to build.
     """
-    time_to_index = []
-    # bring global variables to local scope to improve execution speed
     BUILD_BEND_H_N_C = build_bend_H_N_C
     DISTANCE_NH = distance_H_N
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
@@ -420,6 +418,7 @@ def main_exec(
 
         backbone_done = False
         number_of_trials = 0
+        number_of_trials2 = 0
         # run this loop until a specific BREAK is triggered
         while True:
 
@@ -520,11 +519,9 @@ def main_exec(
             # Transfers coords to the main coord array
             for _smask, _sidecoords in ss[: current_res_number + backbone_done]:
                 coords[_smask] = _sidecoords
-            start = time()
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
-            time_to_index.append(time() - start)
 
             # calculates the conformer energy
             energy = VALIDATE_CONF_LOCAL(
@@ -547,6 +544,14 @@ def main_exec(
                     NHi0_R_POP()
                     res_R_POP()
                     number_of_trials = 0
+                    number_of_trials2 += 1
+
+                if number_of_trials2 > 5:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
+                    number_of_trials2 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
@@ -573,6 +578,7 @@ def main_exec(
                 COi = _COi0
                 NHi = _NHi0
                 current_res_number = _resi0
+                #print(number_of_trials, res_R)
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
@@ -601,6 +607,7 @@ def main_exec(
 
             # if the conformer is valid
             number_of_trials = 0
+            #number_of_trials2 = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
             NHi0_R_APPEND(NHi)
@@ -641,8 +648,6 @@ def main_exec(
 
         conf_n += 1
 
-    from statistics import mean
-    print(mean(time_to_index))
     return
 
 
