@@ -304,12 +304,6 @@ def main_exec(
     # notice that NHydrogen_mask does not see Prolines
     bb_NH = np.full((np.sum(NHydrogen_mask), 3), NAN, dtype=np.float64)
 
-    # The first coordinates of the NH matrix, i.e. the N-terminal ones
-    # are not build automatically during the building pipeline. Hence,
-    # the first building index is 1
-    NHi_start = 0 if input_seq[0] == 'P' else 1
-    bb_NH_builder = bb_NH[NHi_start:, :]
-
     # the following array serves to avoid placing HN in Proline residues
     residue_labels_bb_simulating = residue_labels[bb_mask]
 
@@ -340,17 +334,17 @@ def main_exec(
     # during the building process
     ss = [
         [
-            residue_numbers==_resnum,
-            np.full((_natoms, 3), NAN, dtype=np.float64),
+            np.argwhere(residue_numbers==_resnum).ravel()[4:],
+            np.full((_natoms - 4, 3), NAN, dtype=np.float64),
             ]
         for _resnum, _natoms in sorted(Counter(residue_numbers).items())
         ]
 
     # the last residue will contain an extra atom OXT, which needs to be
     # removed
-    _OXT1_index = np.argwhere(ss[-1][0])[-1, 0]
-    ss[-1][0][_OXT1_index] = False
-    ss[-1][1] = np.full((ss[-1][1].shape[0] - 1, 3), NAN, dtype=np.float64)
+    ss[-1][0] = ss[-1][0][:-1]
+    ss[-1][1] = ss[-1][1][:-1]
+    assert ss[-1][0].size == ss[-1][1].shape[0]
 
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
@@ -427,7 +421,7 @@ def main_exec(
 
         # NHi is 0 because it will be applied in bb_NH_builder which ignores
         # the first residue, see bb_NH_builder definition
-        NHi = NHi_start
+        NHi = 1
         NHi0_R_CLEAR()
         NHi0_R_APPEND(NHi)
 
@@ -488,7 +482,7 @@ def main_exec(
                 backbone_done = True
 
                 # add the carboxyls
-                coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
+                coords[[OXT1_index, OXT_index]] = MAKE_COORD_Q_COO_LOCAL(
                     bb[-2, :],
                     bb[-1, :],
                     )
@@ -518,7 +512,7 @@ def main_exec(
 
                 # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
                 # disntace and bend parameters
-                bb_NH_builder[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
+                bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
                     bb_real[k, :],
                     bb_real[k + 1, :],
@@ -552,7 +546,6 @@ def main_exec(
                 )
 
             if energy > 0:  # not valid
-                #print('CLASH')
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -640,6 +633,7 @@ def main_exec(
                 return
             broke_on_start_attempt = False
             continue
+
 
         # until sidechains are implemented this is needed
         relevant = np.logical_not(np.isnan(coords[:, 0]))

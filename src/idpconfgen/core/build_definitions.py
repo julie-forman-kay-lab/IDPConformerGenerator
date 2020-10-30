@@ -26,14 +26,14 @@ atom_labels = {
     'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
     'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'SD', 'CE', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),  # noqa: E501
     'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'ND2', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),  # noqa: E501
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'H2', 'H1', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # noqa: E501
+    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # H1 H2 removed noqa: E501
     'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),  # noqa: E501
     'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),  # noqa: E501
     'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
-    'T': ('N', 'CA', 'C', 'O', 'CB', 'CG2', 'OG1', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
+    'T': ('N', 'CA', 'C', 'O', 'CB', 'OG1', 'CG2', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'NE1', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),  # noqa: E501
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HH'),  # noqa: E501
+    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2')  #, 'HH'),  # noqa: E501
     }
 
 # bend angles are in radians

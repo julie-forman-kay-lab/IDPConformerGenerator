@@ -459,14 +459,19 @@ def validate_conformer_for_builder(
     """."""
 
     # no need to compute isnan in whole coordinates because coordinates
-    # either are all nan or are all numbers
+    # either are all nan or are all numbers, hence we use index 0
     coords_in_use = LOGICAL_NOT(ISNAN(coords[:, 0]))
     assert coords_in_use.shape == (coords.shape[0], )
+
+    elements = atom_labels[coords_in_use].astype('<U1')
+    # numeric elements refer to the different H atoms as described
+    # in core/build_definitions.py
+    elements[np.char.isnumeric(elements)] = 'H'
 
     rows, *_ = vdw_clash_by_threshold(
         coords[coords_in_use, :],
         atom_labels[coords_in_use],
-        atom_labels[coords_in_use].astype('<U1'),
+        elements,
         False,
         False,
         residue_numbers[coords_in_use],

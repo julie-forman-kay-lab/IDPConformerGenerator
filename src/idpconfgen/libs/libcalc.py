@@ -464,7 +464,7 @@ def place_sidechain_template(
     # aligns to the CA-C vector maintaining the N-CA in place
     rot2 = Q_rotate(rot1, rvu, angle)
 
-    return rot2 + bb_cnf[1, :]
+    return rot2[4:, :] + bb_cnf[1, :]
 
 
 @njit
