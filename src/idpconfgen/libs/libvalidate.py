@@ -28,6 +28,11 @@ from idpconfgen.libs.libstructure import (
     )
 
 
+# Notes on improving distance calculation and vdW energy function
+# https://stackoverflow.com/questions/37298710/fastest-way-to-compute-distance-beetween-each-points-in-python
+# https://stackoverflow.com/questions/37794849/efficient-and-precise-calculation-of-the-euclidean-distance
+
+
 def vdw_clash_by_threshold_common_preparation(
         protein_atoms,
         protein_elements,
