@@ -39,6 +39,7 @@ from idpconfgen.core.definitions import aa1to3, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
+    calc_all_vs_all_dists_square,
     make_coord_Q,
     make_coord_Q_CO,
     make_coord_Q_COO,
@@ -233,13 +234,14 @@ def main_exec(
         The number of conformers to build.
     """
     BUILD_BEND_H_N_C = build_bend_H_N_C
+    CALC_DISTS = calc_all_vs_all_dists_square
     COUNT_NONZERO = np.count_nonzero
     DISTANCE_NH = distance_H_N
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
-    PDIST = spatial.distance.pdist
+    #PDIST = spatial.distance.pdist
     RC = randchoice
     RINT = randint
     ROUND = np.round
@@ -543,7 +545,7 @@ def main_exec(
             #    bb_mask,
             #    carbonyl_mask,
             #    )
-            distances = PDIST(coords)
+            distances = CALC_DISTS(coords)
             clash = distances < vdW_sums
             has_clash = COUNT_NONZERO(clash[vdW_non_bond])
             print(has_clash)
@@ -850,7 +852,7 @@ def generate_vdW_data(
 
     # creats the vdW threshold according to vdW pairs
     # the threshold is the sum of the vdW radii pair
-    vdW_sums = np.sum(vdw_pairs, axis=1)
+    vdW_sums = np.power(np.sum(vdw_pairs, axis=1), 2)
 
     # creates pairs for residue numbers, so we know from which residue number
     # is each atom of the confronted pair

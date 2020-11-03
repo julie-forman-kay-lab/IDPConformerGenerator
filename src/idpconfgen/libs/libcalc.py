@@ -753,3 +753,38 @@ def make_coord_Q_COO(
     OXT_coords = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
 
     return O_coords, OXT_coords
+
+
+@nb.njit
+def calc_all_vs_all_dists_square(coords):
+    """
+    Calculate the upper half of all vs. all distances squared.
+
+    Reproduces the operations of scipy.spatial.distance.pdist
+    but witouth applying the sqrt().
+
+    Parameters
+    ----------
+    coords : np.ndarray, shape (N, 3), dtype=np.float64
+
+    Returns
+    -------
+    np.ndarray, shape ((N * N - N) // 2,), dytpe=np.float64
+    """
+
+    len_ = coords.shape[0]
+    shape = ((len_ * len_ - len_) // 2,)
+    results = np.empty(shape, dtype=np.float64)
+
+    c = 1
+    i = -1
+    for a in coords:
+        for b in coords[c:]:
+            i += 1
+            x = b[0] - a[0]
+            y = b[1] - a[1]
+            z = b[2] - a[2]
+            results[i] = x*x + y*y + z*z
+        c += 1
+
+    return results
