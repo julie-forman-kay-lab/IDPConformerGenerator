@@ -1,20 +1,27 @@
 """Definitions for the building process."""
+from collections import defaultdict
+from copy import copy
 from math import pi
 from pathlib import Path
 from statistics import fmean, stdev
 
 import numpy as np
+from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure
 
+
+cdist = spatial.distance.cdist
 _filepath = Path(__file__).resolve().parent  # folder
+_sidechain_template_files = \
+    _filepath.joinpath('sidechain_templates').glob('*.pdb')
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
 # PDB column
 # Taken from PDB entry 6I1B REVDAT 15-OCT-92.
 atom_labels = {
-    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', 'HB1', 'HB2', 'HB3'),  # noqa: E501
+    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', '1HB', '2HB', '3HB'),  # noqa: E501
     'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
     'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),  # noqa: E501
     'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),  # noqa: E501
@@ -26,159 +33,76 @@ atom_labels = {
     'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
     'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'SD', 'CE', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),  # noqa: E501
     'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'ND2', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),  # noqa: E501
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # H1 H2 removed noqa: E501
+    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # noqa: E501
+    # in 'P' 'H1' and 'H2' were removed
     'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),  # noqa: E501
     'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),  # noqa: E501
     'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
     'T': ('N', 'CA', 'C', 'O', 'CB', 'OG1', 'CG2', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'NE1', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),  # noqa: E501
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2')  #, 'HH'),  # noqa: E501
+    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
+    # in Y 'HH' was removed
     }
 
+# Creates topoloty of amino acids templates, that is, a dictionary of
+# all vs. all covalent bond pairs
+res_covalent_bonds = defaultdict(dict)
+for pdb in _sidechain_template_files:
 
-bond_structure = {
-    'ALA': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['HB1', 'HB2', 'HB3'],
-            'N': ['CA', 'H']},
-    'ARG': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD': ['NE', '1HD', '2HD'],
-            'CG': ['CD', '1HG', '2HG'],
-            'CZ': ['NH1', 'NH2'],
-            'N': ['CA', 'H'],
-            'NE': ['CZ', 'HE'],
-            'NH1': ['1HH1', '2HH1'],
-            'NH2': ['1HH2', '2HH2']},
-    'ASN': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CG': ['OD1', 'ND2'],
-            'N': ['CA', 'H'],
-            'ND2': ['1HD2', '2HD2']},
-    'ASP': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CG': ['OD1', 'OD2'],
-            'N': ['CA', 'H']},
-    'CYS': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['1HB', '2HB'],
-            'N': ['CA', 'H'],
-            'SG': ['HG']},
-    'GLN': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD': ['OE1', 'NE2'],
-            'CG': ['CD', '1HG', '2HG'],
-            'N': ['CA', 'H'],
-            'NE2': ['1HE2', '2HE2']},
-    'GLU': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD': ['OE1', 'OE2'],
-            'CG': ['CD', '1HG', '2HG'],
-            'N': ['CA', 'H']},
-    'GLY': {'C': ['O'], 'CA': ['C', '1HA', '2HA'], 'N': ['CA', 'H']},
-    'HIS': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD2': ['NE2', 'HD2'],
-            'CE1': ['NE2', 'HE1'],
-            'CG': ['ND1', 'CD2'],
-            'N': ['CA', 'H'],
-            'ND1': ['CE1', 'HD1'],
-            'NE2': ['HE2']},
-    'ILE': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG1', 'CG2', 'HB'],
-            'CD1': ['1HD1', '2HD1', '3HD1'],
-            'CG1': ['CD1', '1HG1', '2HG1'],
-            'CG2': ['1HG2', '2HG2', '3HG2'],
-            'N': ['CA', 'H']},
-    'LEU': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD1': ['1HD1', '2HD1', '3HD1'],
-            'CD2': ['1HD2', '2HD2', '3HD2'],
-            'CG': ['CD1', 'CD2', 'HG'],
-            'N': ['CA', 'H']},
-    'LYS': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD': ['CE', '1HD', '2HD'],
-            'CE': ['NZ', '1HE', '2HE'],
-            'CG': ['CD', '1HG', '2HG'],
-            'N': ['CA', 'H'],
-            'NZ': ['1HZ', '2HZ', '3HZ']},
-    'MET': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CE': ['1HE', '2HE', '3HE'],
-            'CG': ['1HG', '2HG'],
-            'N': ['CA', 'H']},
-    'PHE': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD1': ['CE1', 'HD1'],
-            'CD2': ['CE2', 'HD2'],
-            'CE1': ['CZ', 'HE1'],
-            'CE2': ['CZ', 'HE2'],
-            'CG': ['CD1', 'CD2'],
-            'CZ': ['HZ'],
-            'N': ['CA', 'H']},
-    'PRO': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD': ['1HD', '2HD'],
-            'CG': ['CD', '1HG', '2HG'],
-            'N': ['CA', 'CD']},
-    'SER': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['OG', '1HB', '2HB'],
-            'N': ['CA', 'H'],
-            'OG': ['HG']},
-    'THR': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['OG1', 'CG2', 'HB'],
-            'CG2': ['1HG2', '2HG2', '3HG2'],
-            'N': ['CA', 'H'],
-            'OG1': ['HG1']},
-    'TRP': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD1': ['NE1', 'HD1'],
-            'CD2': ['CE2', 'CE3'],
-            'CE2': ['CZ2'],
-            'CE3': ['CZ3', 'HE3'],
-            'CG': ['CD1', 'CD2'],
-            'CH2': ['HH2'],
-            'CZ2': ['CH2', 'HZ2'],
-            'CZ3': ['CH2', 'HZ3'],
-            'N': ['CA', 'H'],
-            'NE1': ['CE2', 'HE1']},
-    'TYR': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG', '1HB', '2HB'],
-            'CD1': ['CE1', 'HD1'],
-            'CD2': ['CE2', 'HD2'],
-            'CE1': ['CZ', 'HE1'],
-            'CE2': ['CZ', 'HE2'],
-            'CG': ['CD1', 'CD2'],
-            'CZ': ['OH'],
-            'N': ['CA', 'H']},
-    'VAL': {'C': ['O'],
-            'CA': ['C', 'CB', 'HA'],
-            'CB': ['CG1', 'CG2', 'HB'],
-            'CG1': ['1HG1', '2HG1', '3HG1'],
-            'CG2': ['1HG2', '2HG2', '3HG2'],
-            'N': ['CA', 'H']}
-    }
+    pdbname = pdb.stem.upper()
 
+    s = Structure(pdb)
+    s.build()
+    coords = s.coords
+    atoms = s.data_array[:, 2]
 
+    all_dists = cdist(coords, coords)
+    cov_bonds = all_dists <= 1.6
 
+    # all vs. all atom pairs
+    atom_pairs = ((a, b) for a in atoms for b in atoms)
+
+    for (a, b), is_covalent in zip(atom_pairs, cov_bonds.ravel()):
+        if is_covalent and a != b:
+            connects = res_covalent_bonds[pdbname].setdefault(a, [])
+            connects.append(b)
+
+# creates a 4 bond away structure
+# for each atom in the residue, create a list with the atoms 4 bonds away
+bonds_4_structure = {}
+for res in res_covalent_bonds:
+
+    res_d = bonds_4_structure.setdefault(res, {})
+
+    for atom in res_covalent_bonds[res]:
+
+        atoms_4_bonds_apart = res_d.setdefault(atom, [])
+        cov_bonded = copy(res_covalent_bonds[res][atom])
+        atoms_4_bonds_apart.extend(cov_bonded)
+
+        # atoms two bonds apart,
+        # are all atoms connected to the atoms it is connected
+        for atom2 in cov_bonded:
+            cov_2 = copy(res_covalent_bonds[res][atom2])
+            atoms_4_bonds_apart.extend(
+                set(cov_2).difference(set(atoms_4_bonds_apart))
+                )
+
+            # atoms 3 bonds apart
+            for atom3 in cov_2:
+                cov_3 = copy(res_covalent_bonds[res][atom3])
+                atoms_4_bonds_apart.extend(
+                    set(cov_3).difference(set(atoms_4_bonds_apart))
+                    )
+
+                # atoms 4 bonds apart
+                for atom4 in cov_3:
+                    cov_4 = copy(res_covalent_bonds[res][atom4])
+                    atoms_4_bonds_apart.extend(
+                        set(cov_4).difference(set(atoms_4_bonds_apart))
+                        )
+        atoms_4_bonds_apart.remove(atom)
 
 # bend angles are in radians
 # bend angle for the CA-C-O bond was virtually the same, so will be computed
@@ -369,5 +293,5 @@ def _get_structure_coords(path_):
 
 sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
-    for pdb in _filepath.joinpath('sidechain_templates').glob('*.pdb')
+    for pdb in _sidechain_template_files
     }
