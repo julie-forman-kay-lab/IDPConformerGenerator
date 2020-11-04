@@ -755,7 +755,7 @@ def make_coord_Q_COO(
     return O_coords, OXT_coords
 
 
-@nb.njit
+@njit
 def calc_all_vs_all_dists_square(coords):
     """
     Calculate the upper half of all vs. all distances squared.
@@ -777,14 +777,14 @@ def calc_all_vs_all_dists_square(coords):
     results = np.empty(shape, dtype=np.float64)
 
     c = 1
-    i = -1
+    i = 0
     for a in coords:
         for b in coords[c:]:
-            i += 1
             x = b[0] - a[0]
             y = b[1] - a[1]
             z = b[2] - a[2]
             results[i] = x*x + y*y + z*z
+            i += 1
         c += 1
 
     return results

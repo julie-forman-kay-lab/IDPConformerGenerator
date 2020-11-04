@@ -9,12 +9,13 @@ import numpy as np
 from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure
+from idpconfgen.core.definitions import aa3to1
 
 
 cdist = spatial.distance.cdist
 _filepath = Path(__file__).resolve().parent  # folder
-_sidechain_template_files = \
-    _filepath.joinpath('sidechain_templates').glob('*.pdb')
+_sidechain_template_files = sorted(list(
+    _filepath.joinpath('sidechain_templates').glob('*.pdb')))
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
@@ -58,7 +59,7 @@ for pdb in _sidechain_template_files:
     atoms = s.data_array[:, 2]
 
     all_dists = cdist(coords, coords)
-    cov_bonds = all_dists <= 1.6
+    cov_bonds = all_dists <= 1.8
 
     # all vs. all atom pairs
     atom_pairs = ((a, b) for a in atoms for b in atoms)
@@ -67,6 +68,11 @@ for pdb in _sidechain_template_files:
         if is_covalent and a != b:
             connects = res_covalent_bonds[pdbname].setdefault(a, [])
             connects.append(b)
+
+# asserts proper construction
+for k1, v1 in res_covalent_bonds.items():
+    assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
+
 
 # creates a 4 bond away structure
 # for each atom in the residue, create a list with the atoms 4 bonds away
@@ -97,12 +103,31 @@ for res in res_covalent_bonds:
                     )
 
                 # atoms 4 bonds apart
-                for atom4 in cov_3:
-                    cov_4 = copy(res_covalent_bonds[res][atom4])
-                    atoms_4_bonds_apart.extend(
-                        set(cov_4).difference(set(atoms_4_bonds_apart))
-                        )
+                #for atom4 in cov_3:
+                #    cov_4 = copy(res_covalent_bonds[res][atom4])
+                #    atoms_4_bonds_apart.extend(
+                #        set(cov_4).difference(set(atoms_4_bonds_apart))
+                #        )
         atoms_4_bonds_apart.remove(atom)
+
+
+
+# interresidue 3-bonds connectivity
+N_3_connectivities = ['N']
+CA_3_connectivities = ['N', 'H', 'CA']
+C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
+O_3_connectivities = ['N', 'H', 'CA']
+HA_3_connectivities = ['N']
+
+inter_3_connect = {
+    'N': N_3_connectivities,
+    'CA': CA_3_connectivities,
+    'C': C_3_connectivities,
+    'O': O_3_connectivities,
+    'HA': HA_3_connectivities,
+    'CB': HA_3_connectivities,  # they are the same
+    }
+
 
 # bend angles are in radians
 # bend angle for the CA-C-O bond was virtually the same, so will be computed

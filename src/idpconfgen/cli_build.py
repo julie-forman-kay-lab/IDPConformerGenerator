@@ -24,15 +24,16 @@ from scipy import spatial
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     atom_labels,
-    bond_structure,
+    bonds_4_structure,
+    build_bend_H_N_C,
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
     build_bend_angles_N_CA_C,
-    build_bend_H_N_C,
     distance_H_N,
-    distances_C_Np1,
     distances_CA_C,
+    distances_C_Np1,
     distances_N_CA,
+    inter_3_connect,
     sidechain_templates,
     )
 from idpconfgen.core.definitions import aa1to3, vdW_radii_tsai_1999
@@ -237,6 +238,7 @@ def main_exec(
     CALC_DISTS = calc_all_vs_all_dists_square
     COUNT_NONZERO = np.count_nonzero
     DISTANCE_NH = distance_H_N
+    LOGICAL_AND = np.logical_and
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
@@ -546,12 +548,26 @@ def main_exec(
             #    carbonyl_mask,
             #    )
             distances = CALC_DISTS(coords)
-            clash = distances < vdW_sums
-            has_clash = COUNT_NONZERO(clash[vdW_non_bond])
-            print(has_clash)
-            sys.exit()
+            clash = distances < (vdW_sums + 0.4**2)
+            valid_clash = LOGICAL_AND(clash, vdW_non_bond)
+            has_clash = COUNT_NONZERO(valid_clash)
 
-            if False:#has_clash:#energy > 0:  # not valid
+
+            #from math import sqrt
+            #i_ = 0
+            #j_ = 0
+            #for r1, t1, a1 in zip(residue_numbers, residue_labels, atom_labels):
+            #    i_ += 1
+            #    for r2, t2, a2 in zip(residue_numbers[i_:], residue_labels[i_:], atom_labels[i_:]):
+            #        if valid_clash[j_]:
+            #            print(r1, t1, a1, '**', r2, t2, a2, sqrt(distances[j_]))
+            #        j_ += 1
+
+            ##sys.exit()
+            #print(has_clash)
+
+            if has_clash:#energy > 0:  # not valid
+                print(bbi0_register)
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -827,11 +843,18 @@ def generate_vdW_data(
         `True` where the distance between pairs must be considered.
         `False` where pairs are covalently bound.
 
+    Note
+    ----
+    This function is slow, in the order of 1 or 2 seconds, but it is
+    executed only once at the beginning of the building protocol.
     """
+    assert len(atom_labels) == len(residue_numbers)
+    assert len(atom_labels) == len(residue_labels)
     # we need to use re because hydrogen atoms start with integers some times
     atoms_char = re.compile(r'[CHNOPS]')
     findall = atoms_char.findall
-    bond_structure_local = bond_structure
+    bond_structure_local = bonds_4_structure
+    inter_3_connect_local = inter_3_connect
 
     # the following arrays/lists prepare the conformer label data in agreement
     # with the function scipy.spatial.distances.pdist, in order for masks to be
@@ -870,28 +893,24 @@ def generate_vdW_data(
         ]
 
     # we want to compute clashes to all atoms that are not covalentely bond
-    #
+    # that that have not certain connectivity between them
     # first we assum True to all cases, and we replace to False where we find
     # a bond connection
     vdW_non_bond = np.full(len(atoms), True)
+
     counter = -1
     zipit = zip(atoms, res_nums_pairs, res_labels_pairs)
     for (a1, a2), (res1, res2), (l1, _) in zipit:
         counter += 1
-        if res1 == res2:
-            try:
-                if a2 in bond_structure_local[l1][a1]:
-                    # here we found a bond connection
-                    vdW_non_bond[counter] = False
-
-            # by definition of the bond_structure dictionary
-            # will rise keyerror to all terminal atoms, i.e.: H, and Os
-            except KeyError:
-                continue
+        if res1 == res2 and a2 in bond_structure_local[l1][a1]:
+            # here we found a bond connection
+            vdW_non_bond[counter] = False
 
         # handling the special case of a covalent bond between two atoms
         # not part of the same residue
-        elif a1 == 'C' and a2 == 'N' and res2 == res1 + 1:
+        elif a1 in inter_3_connect_local \
+                and res2 == res1 + 1 \
+                and a2 in inter_3_connect_local[a1]:
             vdW_non_bond[counter] = False
 
     # inactivates the C-OXT bond
