@@ -19,12 +19,10 @@ from random import randint
 from time import time
 
 import numpy as np
-from scipy import spatial
 
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     atom_labels,
-    bonds_4_structure,
     build_bend_H_N_C,
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
@@ -33,10 +31,12 @@ from idpconfgen.core.build_definitions import (
     distances_CA_C,
     distances_C_Np1,
     distances_N_CA,
-    inter_3_connect,
+    expand_topology_bonds_apart,
+    generate_residue_template_topology,
+    inter_residue_connectivities,
     sidechain_templates,
     )
-from idpconfgen.core.definitions import aa1to3, vdW_radii_tsai_1999
+from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
@@ -50,7 +50,6 @@ from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
-from idpconfgen.libs.libvalidate import validate_conformer_for_builder
 
 
 _name = 'build'
@@ -84,7 +83,7 @@ ap.add_argument(
 ap.add_argument(
     '-nc',
     '--nconfs',
-    help='Number of conformers to build',
+    help='Number of conformers to build.',
     default=1,
     type=int,
     )
@@ -97,6 +96,9 @@ ap.add_argument(
     nargs='+',
     )
 
+libcli.add_argument_vdWb(ap)
+libcli.add_argument_vdWr(ap)
+libcli.add_argument_vdWt(ap)
 libcli.add_argument_ncores(ap)
 
 
@@ -112,6 +114,9 @@ def main(
         func=None,
         nconfs=1,
         ncores=1,
+        vdW_bonds_apart=4,
+        vdW_tolerance=0.4,
+        vdW_radii='tsai1999',
         ):
     """
     Execute main client logic.
@@ -139,6 +144,9 @@ def main(
         input_seq=input_seq,  # string
         nconfs=core_chunks,  # int
         conformer_name=conformer_name,  # string
+        vdW_bonds_apart=vdW_bonds_apart,
+        vdW_tolerance=vdW_tolerance,
+        vdW_radii=vdW_radii,
         )
 
     start = time()
@@ -180,6 +188,9 @@ def main_exec(
         input_seq,
         conformer_name='conformer',
         generative_function=None,
+        vdW_bonds_apart=4,
+        vdW_tolerance=0.4,
+        vdW_radii='tsai1999',
         nconfs=1,
         ):
     """
@@ -243,11 +254,9 @@ def main_exec(
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
-    #PDIST = spatial.distance.pdist
     RC = randchoice
     RINT = randint
     ROUND = np.round
-    #VALIDATE_CONF_LOCAL = validate_conformer_for_builder
     angles = ANGLES
     slices = SLICES
 
@@ -279,10 +288,12 @@ def main_exec(
         atom_labels,
         residue_numbers,
         residue_labels,
-        vdW_radii_tsai_1999,
+        vdW_radii_dict[vdW_radii],
+        vdW_bonds_apart,
+        vdW_tolerance,
         )
 
-    # creates masks
+    # creates index-translated boolean masks
     bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     carbonyl_mask = np.where(atom_labels == 'O')[0]
     NHydrogen_mask = np.where(atom_labels == 'H')[0]
@@ -548,9 +559,10 @@ def main_exec(
             #    carbonyl_mask,
             #    )
             distances = CALC_DISTS(coords)
-            clash = distances < (vdW_sums + 0.4**2)
+            clash = distances < vdW_sums
             valid_clash = LOGICAL_AND(clash, vdW_non_bond)
             has_clash = COUNT_NONZERO(valid_clash)
+            print('number of clashes: ', has_clash)
 
 
             #from math import sqrt
@@ -563,11 +575,11 @@ def main_exec(
             #            print(r1, t1, a1, '**', r2, t2, a2, sqrt(distances[j_]))
             #        j_ += 1
 
-            ##sys.exit()
+            #sys.exit()
             #print(has_clash)
 
-            if has_clash:#energy > 0:  # not valid
-                print(bbi0_register)
+            if False:#has_clash:#energy > 0:  # not valid
+                #print(bbi0_register)
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -800,6 +812,8 @@ def generate_vdW_data(
         residue_numbers,
         residue_labels,
         vdW_radii,
+        bonds_apart=4,
+        tolerance=0.4,
         ):
     """
     Generate van der Waals related data structures.
@@ -833,6 +847,14 @@ def generate_vdW_data(
         A dictionary containing the van der Waals radii for each atom
         type (element) present in `atom_labels`.
 
+    bonds_apart : int
+        The number of bonds apart to ignore vdW clash validation.
+        For example, 4 means vdW validation will only be computed for
+        atoms at least 5 bonds apart.
+
+    tolerance : float
+        The tolerance in Angstroms.
+
     Returns
     -------
     nd.array, dtype=np.float
@@ -850,11 +872,14 @@ def generate_vdW_data(
     """
     assert len(atom_labels) == len(residue_numbers)
     assert len(atom_labels) == len(residue_labels)
+
     # we need to use re because hydrogen atoms start with integers some times
     atoms_char = re.compile(r'[CHNOPS]')
     findall = atoms_char.findall
-    bond_structure_local = bonds_4_structure
-    inter_3_connect_local = inter_3_connect
+    cov_topologies = generate_residue_template_topology()
+    bond_structure_local = \
+        expand_topology_bonds_apart(cov_topologies, bonds_apart)
+    inter_connect_local = inter_residue_connectivities[bonds_apart]
 
     # the following arrays/lists prepare the conformer label data in agreement
     # with the function scipy.spatial.distances.pdist, in order for masks to be
@@ -875,7 +900,7 @@ def generate_vdW_data(
 
     # creats the vdW threshold according to vdW pairs
     # the threshold is the sum of the vdW radii pair
-    vdW_sums = np.power(np.sum(vdw_pairs, axis=1), 2)
+    vdW_sums = np.power(np.sum(vdw_pairs, axis=1) - tolerance, 2)
 
     # creates pairs for residue numbers, so we know from which residue number
     # is each atom of the confronted pair
@@ -886,11 +911,11 @@ def generate_vdW_data(
         ])
 
     # does the same as above but for residue 3-letter labels
-    res_labels_pairs = [
-        (a, b)
-        for i, a in enumerate(residue_labels, start=1)
-        for b in residue_labels[i:]
-        ]
+    res_labels_pairs = (
+        (_a, _b)
+        for i, _a in enumerate(residue_labels, start=1)
+        for _b in residue_labels[i:]
+        )
 
     # we want to compute clashes to all atoms that are not covalentely bond
     # that that have not certain connectivity between them
@@ -908,9 +933,9 @@ def generate_vdW_data(
 
         # handling the special case of a covalent bond between two atoms
         # not part of the same residue
-        elif a1 in inter_3_connect_local \
+        elif a1 in inter_connect_local \
                 and res2 == res1 + 1 \
-                and a2 in inter_3_connect_local[a1]:
+                and a2 in inter_connect_local[a1]:
             vdW_non_bond[counter] = False
 
     # inactivates the C-OXT bond

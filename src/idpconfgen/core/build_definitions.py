@@ -12,7 +12,7 @@ from idpconfgen.libs.libstructure import Structure
 from idpconfgen.core.definitions import aa3to1
 
 
-cdist = spatial.distance.cdist
+pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
 _sidechain_template_files = sorted(list(
     _filepath.joinpath('sidechain_templates').glob('*.pdb')))
@@ -46,88 +46,223 @@ atom_labels = {
     # in Y 'HH' was removed
     }
 
-# Creates topoloty of amino acids templates, that is, a dictionary of
-# all vs. all covalent bond pairs
-res_covalent_bonds = defaultdict(dict)
-for pdb in _sidechain_template_files:
 
-    pdbname = pdb.stem.upper()
+def generate_residue_template_topology():
+    """
+    Generate topology for the residue templates.
 
-    s = Structure(pdb)
-    s.build()
-    coords = s.coords
-    atoms = s.data_array[:, 2]
+    Residue templates are stored in folder core/sidechain_templates/
 
-    all_dists = cdist(coords, coords)
-    cov_bonds = all_dists <= 1.8
+    Generated topology represents all vs. all. Meaning, if atom A is
+    covalently bond to atom B, B appears in A records and A in B records,
+    as well.
 
-    # all vs. all atom pairs
-    atom_pairs = ((a, b) for a in atoms for b in atoms)
+    Returns
+    -------
+    dict
+        A dictionary with the topology.
+    """
+    # Creates topoloty of amino acids templates, that is, a dictionary of
+    # all vs. all covalent bond pairs
+    res_covalent_bonds = defaultdict(dict)
+    for pdb in _sidechain_template_files:
 
-    for (a, b), is_covalent in zip(atom_pairs, cov_bonds.ravel()):
-        if is_covalent and a != b:
-            connects = res_covalent_bonds[pdbname].setdefault(a, [])
-            connects.append(b)
+        pdbname = pdb.stem.upper()
 
-# asserts proper construction
-for k1, v1 in res_covalent_bonds.items():
-    assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
+        s = Structure(pdb)
+        s.build()
+        coords = s.coords
+        atoms = s.data_array[:, 2]
+
+        all_dists = pdist(coords)
+        # note that 1.6 AA wont capture the S bonds which are 1.8 A away
+        # the Cys and Met special cases are treated after the loop
+        cov_bonds = all_dists <= 1.6
+
+        # all vs. all atom pairs
+        atom_pairs = (
+            (a, b)
+            for i, a in enumerate(atoms, start=1)
+            for b in atoms[i:]
+            )
+
+        current_pdb = res_covalent_bonds[pdbname]
+        for (a, b), is_covalent in zip(atom_pairs, cov_bonds):
+            if is_covalent:
+                connects_a = current_pdb.setdefault(a, [])
+                connects_a.append(b)
+                connects_b = current_pdb.setdefault(b, [])
+                connects_b.append(a)
 
 
-# creates a 4 bond away structure
-# for each atom in the residue, create a list with the atoms 4 bonds away
-bonds_4_structure = {}
-for res in res_covalent_bonds:
+    # special cases: CYS and MET
+    res_covalent_bonds['CYS']['CB'].append('SG')
+    res_covalent_bonds['CYS']['SG'] = []
+    res_covalent_bonds['CYS']['SG'].extend(('CB', 'HG'))
+    res_covalent_bonds['CYS']['HG'] = []
+    res_covalent_bonds['CYS']['HG'].append('SG')
 
-    res_d = bonds_4_structure.setdefault(res, {})
+    res_covalent_bonds['MET']['CG'].append('SD')
+    res_covalent_bonds['MET']['SD'] = []
+    res_covalent_bonds['MET']['SD'].extend(('CG', 'CE'))
+    res_covalent_bonds['MET']['CE'].append('SD')
 
-    for atom in res_covalent_bonds[res]:
+    # asserts all atoms are considered
+    for k1, v1 in res_covalent_bonds.items():
+        assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
 
-        atoms_4_bonds_apart = res_d.setdefault(atom, [])
-        cov_bonded = copy(res_covalent_bonds[res][atom])
-        atoms_4_bonds_apart.extend(cov_bonded)
+    return res_covalent_bonds
 
-        # atoms two bonds apart,
-        # are all atoms connected to the atoms it is connected
-        for atom2 in cov_bonded:
-            cov_2 = copy(res_covalent_bonds[res][atom2])
-            atoms_4_bonds_apart.extend(
-                set(cov_2).difference(set(atoms_4_bonds_apart))
+
+def _recursive_bonds_apart(
+        init_cov_res,
+        bonds_apart,
+        cov_bonded,
+        counter,
+        max_bonds,
+        ):
+    """
+    Expand the list of bonded atoms recursively.
+
+    Parameters
+    ----------
+    init_cov_res : dict
+        A dictionary representing a residues (or structure) covalent
+        bonds for each atom of the structure.
+
+    bonds_apart : list
+        A list that will be filled with the new atoms according to the
+        `max_bond` criteria. Normally this list contains the atoms
+        already covalently bond to the atom being processed.
+        `bonds_apart` list is modified in place.
+
+    cov_bonded : list
+        The initial atoms covalentely bond to the atom being processed.
+
+    max_bonds : int
+        The maximum number of bonds to consider.
+
+    Returns
+    -------
+    None
+        Modifies `bonds_apart` in place.
+    """
+    if counter > max_bonds:
+        return
+
+    for atom in cov_bonded:
+        cov_bonded_next = copy(init_cov_res[atom])
+        bonds_apart.extend(
+            set(cov_bonded_next).difference(set(bonds_apart))
+            )
+        _recursive_bonds_apart(
+            init_cov_res,
+            bonds_apart,
+            cov_bonded_next,
+            counter + 1,
+            max_bonds)
+
+
+def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
+    """
+    Expand a topogy dictionary of covalent bonds to X bonds apart.
+
+    The resulting topology is defined by the specified number of bonds apart.
+
+    Parameters
+    ----------
+    cov_bond_dict : dict
+        A dictionary with covalent bonds topology of a structure.
+        The dictionary must be all vs. all with repetitions, meaing,
+        if A is covalently bond to B, B should be noted in A and A should
+        be noted in B, as well.
+        `cov_bond_dict` can be generated previously with
+        :func:`generate_residue_template_topology`.
+
+    bonds_apart : int
+        The number of bonds apart to consider expanding.
+
+    Returns
+    -------
+    dict
+        The expanded topology dictionary, all vs. all with repetition.
+    """
+    # the size of the data here is small so I have prioritize readability
+    # and sanity check instead of speed
+    expanded_topology = {}
+
+    for res in cov_bond_dict:
+
+        res_d = expanded_topology.setdefault(res, {})
+
+        for atom in cov_bond_dict[res]:
+
+            atoms_X_bonds_apart = res_d.setdefault(atom, [])
+
+            cov_bonded = copy(cov_bond_dict[res][atom])
+
+            atoms_X_bonds_apart.extend(cov_bonded)
+
+            _recursive_bonds_apart(
+                cov_bond_dict[res],
+                atoms_X_bonds_apart,
+                cov_bonded,
+                2,  # starts at 2 cause the 1st iteration is the 2nd bond
+                bonds_apart,
                 )
 
-            # atoms 3 bonds apart
-            for atom3 in cov_2:
-                cov_3 = copy(res_covalent_bonds[res][atom3])
-                atoms_4_bonds_apart.extend(
-                    set(cov_3).difference(set(atoms_4_bonds_apart))
-                    )
+            # the self atom is added to the list unavoidable
+            atoms_X_bonds_apart.remove(atom)
 
-                # atoms 4 bonds apart
-                #for atom4 in cov_3:
-                #    cov_4 = copy(res_covalent_bonds[res][atom4])
-                #    atoms_4_bonds_apart.extend(
-                #        set(cov_4).difference(set(atoms_4_bonds_apart))
-                #        )
-        atoms_4_bonds_apart.remove(atom)
-
+    return expanded_topology
 
 
 # interresidue 3-bonds connectivity
-N_3_connectivities = ['N']
-CA_3_connectivities = ['N', 'H', 'CA']
 C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
-O_3_connectivities = ['N', 'H', 'CA']
-HA_3_connectivities = ['N']
+CA_O_3_connectivities = ['N', 'H', 'CA']
+N_HA_CB_3_connectivities = ['N']
+
+# interresidue 4-bonds connectivity
+C_4_connectivities = [
+    'N',  # 1 bond apart
+    'H', 'CA',  # 2 bond apart
+    'HA', 'CB', 'C',  # 3 bond apart
+    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
+    ]
+CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
+N_HA_CB_4_connectivities = ['N', 'H', 'CA']
+
 
 inter_3_connect = {
-    'N': N_3_connectivities,
-    'CA': CA_3_connectivities,
     'C': C_3_connectivities,
-    'O': O_3_connectivities,
-    'HA': HA_3_connectivities,
-    'CB': HA_3_connectivities,  # they are the same
+    #
+    'N': N_HA_CB_3_connectivities,
+    'HA': N_HA_CB_3_connectivities,
+    'CB': N_HA_CB_3_connectivities,
+    #
+    'CA': CA_O_3_connectivities,
+    'O': CA_O_3_connectivities,
+    #
     }
 
+
+inter_4_connect = {
+    'C': C_4_connectivities,
+    #
+    'N': N_HA_CB_4_connectivities,
+    'HA': N_HA_CB_4_connectivities,
+    'CB': N_HA_CB_4_connectivities,
+    #
+    'CA': CA_O_4_connectivities,
+    'O': CA_O_4_connectivities,
+    #
+    }
+
+
+inter_residue_connectivities = {
+    3: inter_3_connect,
+    4: inter_4_connect,
+    }
 
 # bend angles are in radians
 # bend angle for the CA-C-O bond was virtually the same, so will be computed
