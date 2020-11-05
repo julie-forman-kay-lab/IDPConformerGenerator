@@ -1,20 +1,28 @@
 """Definitions for the building process."""
+from collections import defaultdict
+from copy import copy
 from math import pi
 from pathlib import Path
 from statistics import fmean, stdev
 
 import numpy as np
+from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure
+from idpconfgen.core.definitions import aa3to1
 
+
+pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
+_sidechain_template_files = sorted(list(
+    _filepath.joinpath('sidechain_templates').glob('*.pdb')))
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
 # PDB column
 # Taken from PDB entry 6I1B REVDAT 15-OCT-92.
 atom_labels = {
-    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', 'HB1', 'HB2', 'HB3'),  # noqa: E501
+    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', '1HB', '2HB', '3HB'),  # noqa: E501
     'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
     'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),  # noqa: E501
     'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),  # noqa: E501
@@ -26,14 +34,242 @@ atom_labels = {
     'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
     'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'SD', 'CE', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),  # noqa: E501
     'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'ND2', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),  # noqa: E501
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # H1 H2 removed noqa: E501
+    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # noqa: E501
+    # in 'P' 'H1' and 'H2' were removed
     'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),  # noqa: E501
     'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),  # noqa: E501
     'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
     'T': ('N', 'CA', 'C', 'O', 'CB', 'OG1', 'CG2', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
     'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'NE1', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),  # noqa: E501
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2')  #, 'HH'),  # noqa: E501
+    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
+    # in Y 'HH' was removed
+    }
+
+
+def generate_residue_template_topology():
+    """
+    Generate topology for the residue templates.
+
+    Residue templates are stored in folder core/sidechain_templates/
+
+    Generated topology represents all vs. all. Meaning, if atom A is
+    covalently bond to atom B, B appears in A records and A in B records,
+    as well.
+
+    Returns
+    -------
+    dict
+        A dictionary with the topology.
+    """
+    # Creates topoloty of amino acids templates, that is, a dictionary of
+    # all vs. all covalent bond pairs
+    res_covalent_bonds = defaultdict(dict)
+    for pdb in _sidechain_template_files:
+
+        pdbname = pdb.stem.upper()
+
+        s = Structure(pdb)
+        s.build()
+        coords = s.coords
+        atoms = s.data_array[:, 2]
+
+        all_dists = pdist(coords)
+        # note that 1.6 AA wont capture the S bonds which are 1.8 A away
+        # the Cys and Met special cases are treated after the loop
+        cov_bonds = all_dists <= 1.6
+
+        # all vs. all atom pairs
+        atom_pairs = (
+            (a, b)
+            for i, a in enumerate(atoms, start=1)
+            for b in atoms[i:]
+            )
+
+        current_pdb = res_covalent_bonds[pdbname]
+        for (a, b), is_covalent in zip(atom_pairs, cov_bonds):
+            if is_covalent:
+                connects_a = current_pdb.setdefault(a, [])
+                connects_a.append(b)
+                connects_b = current_pdb.setdefault(b, [])
+                connects_b.append(a)
+
+
+    # special cases: CYS and MET
+    res_covalent_bonds['CYS']['CB'].append('SG')
+    res_covalent_bonds['CYS']['SG'] = []
+    res_covalent_bonds['CYS']['SG'].extend(('CB', 'HG'))
+    res_covalent_bonds['CYS']['HG'] = []
+    res_covalent_bonds['CYS']['HG'].append('SG')
+
+    res_covalent_bonds['MET']['CG'].append('SD')
+    res_covalent_bonds['MET']['SD'] = []
+    res_covalent_bonds['MET']['SD'].extend(('CG', 'CE'))
+    res_covalent_bonds['MET']['CE'].append('SD')
+
+    # asserts all atoms are considered
+    for k1, v1 in res_covalent_bonds.items():
+        assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
+
+    return res_covalent_bonds
+
+
+def _recursive_bonds_apart(
+        init_cov_res,
+        bonds_apart,
+        cov_bonded,
+        counter,
+        max_bonds,
+        ):
+    """
+    Expand the list of bonded atoms recursively.
+
+    Parameters
+    ----------
+    init_cov_res : dict
+        A dictionary representing a residues (or structure) covalent
+        bonds for each atom of the structure.
+
+    bonds_apart : list
+        A list that will be filled with the new atoms according to the
+        `max_bond` criteria. Normally this list contains the atoms
+        already covalently bond to the atom being processed.
+        `bonds_apart` list is modified in place.
+
+    cov_bonded : list
+        The initial atoms covalentely bond to the atom being processed.
+
+    max_bonds : int
+        The maximum number of bonds to consider.
+
+    Returns
+    -------
+    None
+        Modifies `bonds_apart` in place.
+    """
+    if counter > max_bonds:
+        return
+
+    for atom in cov_bonded:
+        cov_bonded_next = copy(init_cov_res[atom])
+        bonds_apart.extend(
+            set(cov_bonded_next).difference(set(bonds_apart))
+            )
+        _recursive_bonds_apart(
+            init_cov_res,
+            bonds_apart,
+            cov_bonded_next,
+            counter + 1,
+            max_bonds)
+
+
+def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
+    """
+    Expand a topogy dictionary of covalent bonds to X bonds apart.
+
+    The resulting topology is defined by the specified number of bonds apart.
+
+    Parameters
+    ----------
+    cov_bond_dict : dict
+        A dictionary with covalent bonds topology of a structure.
+        The dictionary must be all vs. all with repetitions, meaing,
+        if A is covalently bond to B, B should be noted in A and A should
+        be noted in B, as well.
+        `cov_bond_dict` can be generated previously with
+        :func:`generate_residue_template_topology`.
+
+    bonds_apart : int
+        The number of bonds apart to consider expanding.
+
+    Returns
+    -------
+    dict
+        The expanded topology dictionary, all vs. all with repetition.
+    """
+    # the size of the data here is small so I have prioritize readability
+    # and sanity check instead of speed
+    expanded_topology = {}
+
+    for res in cov_bond_dict:
+
+        res_d = expanded_topology.setdefault(res, {})
+
+        for atom in cov_bond_dict[res]:
+
+            atoms_X_bonds_apart = res_d.setdefault(atom, [])
+
+            cov_bonded = copy(cov_bond_dict[res][atom])
+
+            atoms_X_bonds_apart.extend(cov_bonded)
+
+            _recursive_bonds_apart(
+                cov_bond_dict[res],
+                atoms_X_bonds_apart,
+                cov_bonded,
+                2,  # starts at 2 cause the 1st iteration is the 2nd bond
+                bonds_apart,
+                )
+
+            # the self atom is added to the list unavoidable
+            atoms_X_bonds_apart.remove(atom)
+
+    return expanded_topology
+
+
+def add_OXT_to_residue(connectivity_dict):
+    """Adds OXT connectivity to residue."""
+    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
+    connectivity_dict['OXT'].append('O')
+    for _atom in connectivity_dict['OXT']:
+        connectivity_dict[_atom].append('OXT')
+
+
+# interresidue 3-bonds connectivity
+C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
+CA_O_3_connectivities = ['N', 'H', 'CA']
+N_HA_CB_3_connectivities = ['N']
+
+# interresidue 4-bonds connectivity
+C_4_connectivities = [
+    'N',  # 1 bond apart
+    'H', 'CA',  # 2 bond apart
+    'HA', 'CB', 'C',  # 3 bond apart
+    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
+    ]
+CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
+N_HA_CB_4_connectivities = ['N', 'H', 'CA']
+
+
+inter_3_connect = {
+    'C': C_3_connectivities,
+    #
+    'N': N_HA_CB_3_connectivities,
+    'HA': N_HA_CB_3_connectivities,
+    'CB': N_HA_CB_3_connectivities,
+    #
+    'CA': CA_O_3_connectivities,
+    'O': CA_O_3_connectivities,
+    #
+    }
+
+
+inter_4_connect = {
+    'C': C_4_connectivities,
+    #
+    'N': N_HA_CB_4_connectivities,
+    'HA': N_HA_CB_4_connectivities,
+    'CB': N_HA_CB_4_connectivities,
+    #
+    'CA': CA_O_4_connectivities,
+    'O': CA_O_4_connectivities,
+    #
+    }
+
+
+inter_residue_connectivities = {
+    3: inter_3_connect,
+    4: inter_4_connect,
     }
 
 # bend angles are in radians
@@ -225,5 +461,5 @@ def _get_structure_coords(path_):
 
 sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
-    for pdb in _filepath.joinpath('sidechain_templates').glob('*.pdb')
+    for pdb in _sidechain_template_files
     }

@@ -46,7 +46,7 @@ from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.validate'
-VALIDATION_PROTOCOLS = ('vdw', 'bbl', 'bbd')
+VALIDATION_PROTOCOLS = ('vdw2', 'vdw', 'bbl', 'bbd')
 
 _name = 'validate'
 _help = 'Validate IDP conformers according to criteria.'
@@ -176,6 +176,11 @@ def main(
 
     # preparares available validation subroutines
     available_validations = {
+        'vdw2': partial(
+            vdw2,
+            pdb_files,
+            vdW_radii_dict[vdW_radii],
+            ),
         'vdw': partial(
             eval_vdw_clashes_cli,
             pdb_files,
@@ -201,6 +206,35 @@ def main(
     for validation in validations:
         available_validations[validation]()
 
+
+def vdw2(pdb_files, vdwR):
+   
+    from idpconfgen.cli_build import generate_vdW_data
+    from idpconfgen.libs.libcalc import calc_all_vs_all_dists_square
+
+    for pdb in pdb_files:
+        s = Structure(Path(pdb))
+        s.build()
+
+        atoms = s.data_array[:, 2]
+        res = s.data_array[:, 6]
+        res_nums = np.array([int(i) for i in res])
+        res_labels = s.data_array[:, 4]
+
+        vdW_sums, vdw_valid = generate_vdW_data(atoms, res_nums, res_labels, vdwR)
+
+        results = calc_all_vs_all_dists_square(s.coords)
+        clash = np.logical_and(results < vdW_sums, vdw_valid)
+        print(np.count_nonzero(clash), 'clashs')
+
+        i = 0
+        j = 0
+        for r1, t1, a1 in zip(res_nums, res_labels, atoms):
+            i += 1
+            for r2, t2, a2 in zip(res_nums[i:], res_labels[i:], atoms[i:]):
+                if clash[j]:
+                    print(r1, t1, a1, '**', r2, t2, a2)
+                j += 1
 
 # The following are the subroutine functions that prepare for each
 # validation routine
