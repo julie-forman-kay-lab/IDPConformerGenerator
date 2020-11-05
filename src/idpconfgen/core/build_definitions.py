@@ -217,6 +217,14 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
     return expanded_topology
 
 
+def add_OXT_to_residue(connectivity_dict):
+    """Adds OXT connectivity to residue."""
+    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
+    connectivity_dict['OXT'].append('O')
+    for _atom in connectivity_dict['OXT']:
+        connectivity_dict[_atom].append('OXT')
+
+
 # interresidue 3-bonds connectivity
 C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
 CA_O_3_connectivities = ['N', 'H', 'CA']

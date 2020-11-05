@@ -22,14 +22,15 @@ import numpy as np
 
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
+    add_OXT_to_residue,
     atom_labels,
-    build_bend_H_N_C,
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
     build_bend_angles_N_CA_C,
+    build_bend_H_N_C,
     distance_H_N,
-    distances_CA_C,
     distances_C_Np1,
+    distances_CA_C,
     distances_N_CA,
     expand_topology_bonds_apart,
     generate_residue_template_topology,
@@ -394,6 +395,7 @@ def main_exec(
     conf_n = start_conf
     # for conf_n in range(start_conf, end_conf):
     while conf_n < end_conf:
+        print('building conformer: ', conf_n)
 
         # prepares cycles for building process
         # cycles need to be regenerated every conformer because the first
@@ -550,36 +552,12 @@ def main_exec(
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
-            # calculates the conformer energy
-            #energy = VALIDATE_CONF_LOCAL(
-            #    coords,
-            #    atom_labels,
-            #    residue_numbers,
-            #    bb_mask,
-            #    carbonyl_mask,
-            #    )
             distances = CALC_DISTS(coords)
             clash = distances < vdW_sums
             valid_clash = LOGICAL_AND(clash, vdW_non_bond)
             has_clash = COUNT_NONZERO(valid_clash)
-            print('number of clashes: ', has_clash)
 
-
-            #from math import sqrt
-            #i_ = 0
-            #j_ = 0
-            #for r1, t1, a1 in zip(residue_numbers, residue_labels, atom_labels):
-            #    i_ += 1
-            #    for r2, t2, a2 in zip(residue_numbers[i_:], residue_labels[i_:], atom_labels[i_:]):
-            #        if valid_clash[j_]:
-            #            print(r1, t1, a1, '**', r2, t2, a2, sqrt(distances[j_]))
-            #        j_ += 1
-
-            #sys.exit()
-            #print(has_clash)
-
-            if False:#has_clash:#energy > 0:  # not valid
-                #print(bbi0_register)
+            if has_clash:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -625,7 +603,6 @@ def main_exec(
                 COi = _COi0
                 NHi = _NHi0
                 current_res_number = _resi0
-                #print(number_of_trials, res_R)
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
@@ -654,7 +631,6 @@ def main_exec(
 
             # if the conformer is valid
             number_of_trials = 0
-            #number_of_trials2 = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
             NHi0_R_APPEND(NHi)
@@ -686,7 +662,6 @@ def main_exec(
             atom_labels[relevant],
             residue_numbers[relevant],
             ROUND(coords[relevant], decimals=3),
-            #ROUND(coords, decimals=3),
             )
 
         fname = f'{conformer_name}_{conf_n}.pdb'
@@ -881,6 +856,10 @@ def generate_vdW_data(
         expand_topology_bonds_apart(cov_topologies, bonds_apart)
     inter_connect_local = inter_residue_connectivities[bonds_apart]
 
+    # adds OXT to the bonds connectivity, so it is included in the
+    # final for loop creating masks
+    add_OXT_to_residue(bond_structure_local[residue_labels[-1]])
+
     # the following arrays/lists prepare the conformer label data in agreement
     # with the function scipy.spatial.distances.pdist, in order for masks to be
     # used properly
@@ -938,22 +917,6 @@ def generate_vdW_data(
                 and a2 in inter_connect_local[a1]:
             vdW_non_bond[counter] = False
 
-    # inactivates the C-OXT bond
-    oxt1 = np.logical_and(
-        atoms[:, 0] == 'C',
-        atoms[:, 1] == 'OXT',
-        )
-
-    oxt2 = np.logical_and(
-        res_nums_pairs[:, 0] == residue_numbers[-1],
-        res_nums_pairs[:, 1] == residue_numbers[-1],
-        )
-
-    oxt_mask = np.logical_and(oxt1, oxt2)
-
-    vdW_non_bond[np.where(oxt_mask)[0]] = False
-
-    # finally returns
     return vdW_sums, vdW_non_bond
 
 
