@@ -61,6 +61,24 @@ class CSV2Tuple(argparse.Action):
         setattr(namespace, self.dest, tuple(values.split(',')))
 
 
+def minimum_value(minimum):
+    """Define a minimum value for action."""
+
+    class MinimumValue(argparse.Action):
+        """Definies a minimum value."""
+
+        def __call__(self, parser, namespace, value, option_string=None):
+            """Call on me :-)."""
+            if value < minimum:
+                parser.error(
+                    f'The minimum allowed value for {self.dest} is {minimum}.'
+                    )
+            else:
+                setattr(namespace, self.dest, value)
+
+    return MinimumValue
+
+
 def CheckExt(extensions):
     """Check extension for arguments in argument parser."""
     class Act(argparse.Action):
@@ -417,8 +435,9 @@ def add_argument_vdWb(parser):
         help=(
             'Maximum number of bond separation on which pairs to'
             'ignore vdW clash validation. '
-            'Defaults to 4.'
+            'Defaults to 3.'
             ),
-        default=4,
+        default=3,
+        action=minimum_value(3),
         type=int,
         )

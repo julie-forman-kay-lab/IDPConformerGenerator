@@ -97,7 +97,7 @@ ap.add_argument(
     nargs='+',
     )
 
-#libcli.add_argument_vdWb(ap)
+libcli.add_argument_vdWb(ap)
 libcli.add_argument_vdWr(ap)
 libcli.add_argument_vdWt(ap)
 libcli.add_argument_ncores(ap)
