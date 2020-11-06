@@ -97,6 +97,13 @@ ap.add_argument(
     nargs='+',
     )
 
+ap.add_argument(
+    '-dsd',
+    '--disable-sidechains',
+    help='Whether or not to compute sidechais. Defaults to True.',
+    action='store_true',
+    )
+
 libcli.add_argument_vdWb(ap)
 libcli.add_argument_vdWr(ap)
 libcli.add_argument_vdWt(ap)
@@ -110,14 +117,11 @@ ANGLES = None
 def main(
         input_seq,
         database,
-        conformer_name='conformer',
         dssp_regexes=r'(?=(L{2,6}))',
         func=None,
         nconfs=1,
         ncores=1,
-        vdW_bonds_apart=3,
-        vdW_tolerance=0.4,
-        vdW_radii='tsai1999',
+        **kwargs,
         ):
     """
     Execute main client logic.
@@ -144,10 +148,7 @@ def main(
         main_exec,
         input_seq=input_seq,  # string
         nconfs=core_chunks,  # int
-        conformer_name=conformer_name,  # string
-        vdW_bonds_apart=vdW_bonds_apart,
-        vdW_tolerance=vdW_tolerance,
-        vdW_radii=vdW_radii,
+        **kwargs,
         )
 
     start = time()
@@ -193,6 +194,7 @@ def main_exec(
         vdW_tolerance=0.4,
         vdW_radii='tsai1999',
         nconfs=1,
+        disable_sidechains=True,
         ):
     """
     Build conformers.
@@ -243,6 +245,10 @@ def main_exec(
         executed priorly, or that ANGLES and SLICES were populated
         properly.
 
+    disable_sidechains : bool
+        Disables sidechain creation. Defaults to `False`, computes
+        sidechains.
+
     nconfs : int
         The number of conformers to build.
     """
@@ -260,6 +266,9 @@ def main_exec(
     ROUND = np.round
     angles = ANGLES
     slices = SLICES
+
+    # semantic exchange for speed al readibility
+    with_sidechains = not(disable_sidechains)
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -541,16 +550,18 @@ def main_exec(
                 NHi += 1
 
             # Adds sidechain template structures
-            for res_i in range(res_R[-1], current_res_number + backbone_done):
-                sscoords = place_sidechain_template(
-                    bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
-                    sidechain_templates[aa1to3[input_seq[res_i]]],
-                    )
-                ss[res_i][1][:, :] = sscoords
+            if with_sidechains:
+                for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
+                    sscoords = place_sidechain_template(
+                        bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
+                        sidechain_templates[aa1to3[input_seq[res_i]]],
+                        )
+                    ss[res_i][1][:, :] = sscoords
 
-            # Transfers coords to the main coord array
-            for _smask, _sidecoords in ss[: current_res_number + backbone_done]:
-                coords[_smask] = _sidecoords
+                # Transfers coords to the main coord array
+                for _smask, _sidecoords in ss[: current_res_number + backbone_done]:  # noqa: E501
+                    coords[_smask] = _sidecoords
+
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
