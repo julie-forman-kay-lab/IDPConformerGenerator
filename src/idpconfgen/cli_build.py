@@ -97,7 +97,7 @@ ap.add_argument(
     nargs='+',
     )
 
-libcli.add_argument_vdWb(ap)
+#libcli.add_argument_vdWb(ap)
 libcli.add_argument_vdWr(ap)
 libcli.add_argument_vdWt(ap)
 libcli.add_argument_ncores(ap)
@@ -115,7 +115,7 @@ def main(
         func=None,
         nconfs=1,
         ncores=1,
-        vdW_bonds_apart=4,
+        vdW_bonds_apart=3,
         vdW_tolerance=0.4,
         vdW_radii='tsai1999',
         ):
@@ -189,7 +189,7 @@ def main_exec(
         input_seq,
         conformer_name='conformer',
         generative_function=None,
-        vdW_bonds_apart=4,
+        vdW_bonds_apart=3,
         vdW_tolerance=0.4,
         vdW_radii='tsai1999',
         nconfs=1,
@@ -552,9 +552,17 @@ def main_exec(
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
+            # note that CALC_DISTS computes the square (without sqrt)
             distances = CALC_DISTS(coords)
+
+            # compatibly, vdW_sums, considers squared distances
             clash = distances < vdW_sums
+
+            # it is actually faster to compute everything and select only
+            # those relevant
             valid_clash = LOGICAL_AND(clash, vdW_non_bond)
+
+            # count number of True occurrences
             has_clash = COUNT_NONZERO(valid_clash)
 
             if has_clash:
@@ -787,7 +795,7 @@ def generate_vdW_data(
         residue_numbers,
         residue_labels,
         vdW_radii,
-        bonds_apart=4,
+        bonds_apart=3,
         tolerance=0.4,
         ):
     """
@@ -824,8 +832,8 @@ def generate_vdW_data(
 
     bonds_apart : int
         The number of bonds apart to ignore vdW clash validation.
-        For example, 4 means vdW validation will only be computed for
-        atoms at least 5 bonds apart.
+        For example, 3 means vdW validation will only be computed for
+        atoms at least 4 bonds apart.
 
     tolerance : float
         The tolerance in Angstroms.
