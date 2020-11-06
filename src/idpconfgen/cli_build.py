@@ -457,7 +457,10 @@ def main_exec(
             # **kwargs handling was greater then the if-statement processing
             # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html
             if generative_function:
-                agls = generative_function(nres=RINT(1, 6), cres=bbi - 2 // 3)
+                agls = generative_function(
+                    nres=RINT(1, 6),
+                    cres=(bbi - 2) // 3,
+                    )
 
             else:
                 # following `aligndb` function,

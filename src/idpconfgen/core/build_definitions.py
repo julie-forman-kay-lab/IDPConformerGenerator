@@ -3,7 +3,7 @@ from collections import defaultdict
 from copy import copy
 from math import pi
 from pathlib import Path
-from statistics import fmean, stdev
+from statistics import mean, stdev
 
 import numpy as np
 from scipy import spatial
@@ -394,7 +394,7 @@ distances_N_CA = {
     'V': 6577083632702971 / 4503599627370496,  # 1.46 0.012
     }
 
-average_distance_N_CA = fmean(distances_N_CA.values())
+average_distance_N_CA = mean(distances_N_CA.values())
 std_distance_N_CA = stdev(distances_N_CA.values())
 
 distances_CA_C = {
@@ -420,7 +420,7 @@ distances_CA_C = {
     'V': 6867874764281747 / 4503599627370496,  # 1.525 0.012
     }
 
-average_distance_CA_C = fmean(distances_CA_C.values())
+average_distance_CA_C = mean(distances_CA_C.values())
 std_distance_CA_C = stdev(distances_CA_C.values())
 
 distances_C_Np1 = {
@@ -446,7 +446,7 @@ distances_C_Np1 = {
     'V': 2996598670315555 / 2251799813685248,  # 1.331 0.009
     }
 
-average_distance_C_Np1 = fmean(distances_C_Np1.values())
+average_distance_C_Np1 = mean(distances_C_Np1.values())
 std_distance_C_Np1 = stdev(distances_C_Np1.values())
 
 build_bend_CA_C_OXT = (pi - (2 * pi / 3)) / 2
