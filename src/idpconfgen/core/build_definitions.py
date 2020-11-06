@@ -8,7 +8,7 @@ from statistics import fmean, stdev
 import numpy as np
 from scipy import spatial
 
-from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs.libstructure import Structure, col_name
 from idpconfgen.core.definitions import aa3to1
 
 
@@ -73,6 +73,15 @@ def generate_residue_template_topology():
         s.build()
         coords = s.coords
         atoms = s.data_array[:, 2]
+
+        # atom names of residue templates must be sorted equally to the
+        # atom_names dictionary, or vice-versa.
+        _list_names = tuple(s.data_array[:, col_name])
+        _atoms = atom_labels[aa3to1[pdbname]]
+        assert _list_names == _atoms, (
+            'Atom names in `atom_names` dictionary differ from the '
+            f'atom names in {pdbname} residue template.'
+            )
 
         all_dists = pdist(coords)
         # note that 1.6 AA wont capture the S bonds which are 1.8 A away
