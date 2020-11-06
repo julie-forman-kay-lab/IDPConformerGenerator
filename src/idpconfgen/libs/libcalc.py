@@ -432,7 +432,8 @@ def place_sidechain_template(
     bbtmp = np.full(bb_cnf.shape, np.nan)
     bbtmp[:, :] = bb_cnf[:, :] - bb_cnf[1, :]
 
-    # the template ss is expected to have CA already in the 0,0,0
+    # the sidechain residue template is expected to have CA
+    # already at the the origin (0,0,0)
     N_CA = bbtmp[0, :]
     N_CA_ = ss_template[0, :]
 
