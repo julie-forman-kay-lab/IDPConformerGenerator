@@ -450,12 +450,8 @@ def place_sidechain_template(
     cross_cnf = CROSS(bbtmp[0, :], bbtmp[2, :])
     cross_ss = CROSS(rot1[0, :], rot1[2, :])
 
-    # angle between bb planes is the angle between cross vectors
-    cross_cnf_u = cross_cnf / NORM(cross_cnf)
-    cross_ss_u = cross_ss / NORM(cross_ss)
-
     # the angle of rotation is the angle between the plane normal
-    angle = angle_between_njit(cross_ss_u, cross_cnf_u)
+    angle = angle_between_njit(cross_ss, cross_cnf)
 
     # plane rotation vector is the cross vector between the two plane normals
     rv = CROSS(cross_ss, cross_cnf)
