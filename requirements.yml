@@ -1,0 +1,10 @@
+name: idpconfgen
+channels:
+    - conda-forge
+    - defaults
+dependencies:
+    - python=3.7
+    - matplotlib=3
+    - numpy=1
+    - numba
+    - tox

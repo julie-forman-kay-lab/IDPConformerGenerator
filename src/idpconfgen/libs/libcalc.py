@@ -1,6 +1,6 @@
 """Mathemical calculations."""
 import math
-from math import sin, cos, pi
+from math import cos, sin
 from numba import njit
 
 import numpy as np
@@ -333,15 +333,186 @@ def calc_MSMV(data):
     return np.mean(data), np.std(data), np.median(data), np.var(data)
 
 
+#@njit
+#def xxhamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
+#    """Hamiltonian Multiplication."""
+#    return (
+#            (a1 * a2.T) - (b1 * b2.T) - (c1 * c2.T) - (d1 * d2.T),
+#            (a1 * b2.T) + (b1 * a2.T) + (c1 * d2.T) - (d1 * c2.T),
+#            (a1 * c2.T) - (b1 * d2.T) + (c1 * a2.T) + (d1 * b2.T),
+#            (a1 * d2.T) + (b1 * c2.T) - (c1 * b2.T) + (d1 * a2.T),
+#    )
+
+
 @njit
 def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
     """Hamiltonian Multiplication."""
     return (
-            a1 * a2 - b1 * b2 - c1 * c2 - d1 * d2,
-            a1 * b2 + b1 * a2 + c1 * d2 - d1 * c2,
-            a1 * c2 - b1 * d2 + c1 * a2 + d1 * b2,
-            a1 * d2 + b1 * c2 - c1 * b2 + d1 * a2,
-    )
+        (a1 * a2) - (b1 * b2) - (c1 * c2) - (d1 * d2),
+        (a1 * b2) + (b1 * a2) + (c1 * d2) - (d1 * c2),
+        (a1 * c2) - (b1 * d2) + (c1 * a2) + (d1 * b2),
+        (a1 * d2) + (b1 * c2) - (c1 * b2) + (d1 * a2),
+        )
+
+
+def angle_between(
+        v1,
+        v2,
+        ARCCOS=np.arccos,
+        CLIP=np.clip,
+        DOT=np.dot,
+        NORM=np.linalg.norm,
+        ):
+    """Calculate the angle between two vectors."""
+    # https://stackoverflow.com/questions/2827393/
+    #assert v1.shape == v2.shape, (v1.shape, v2.shape)
+    #assert v1.dtype == v2.dtype
+    v1_u = v1 / NORM(v1)
+    v2_u = v2 / NORM(v2)
+    return ARCCOS(CLIP(DOT(v1_u, v2_u), -1.0, 1.0))
+
+
+@njit
+def angle_between_njit(
+        v1,
+        v2,
+        ARCCOS=np.arccos,
+        DOT=np.dot,
+        NORM=np.linalg.norm,
+        ):
+    """Calculate the angle between two vectors."""
+    # https://stackoverflow.com/questions/2827393/
+    v1_u = v1 / NORM(v1)
+    v2_u = v2 / NORM(v2)
+
+    dot_ncan = np.dot(v1_u, v2_u)
+
+    if dot_ncan < -1.0:
+        dot_ncan_clean = -1.0
+
+    elif dot_ncan > 1.0:
+        dot_ncan_clean = 1.0
+
+    else:
+        dot_ncan_clean = dot_ncan
+
+    return ARCCOS(dot_ncan_clean)
+
+
+@njit
+def place_sidechain_template(
+        bb_cnf,
+        ss_template,
+        CROSS=np.cross,
+        NORM=np.linalg.norm,
+        ):
+    """
+    Place sidechain templates on backbone.
+
+    Parameters
+    ----------
+    bb_cnf : numpy nd.array, shape (3, 3), dtype=float64
+        The backbone coords in the form of: N-CA-C
+        Coordinates are not expected to be at any particular position.
+
+    ss_template : numpy nd.array, shape (M, 3), dtype=float64
+        The sidechain all-atom template. Expected to have the CA atom
+        at the origin (0, 0, 0). This requirement could be easily
+        removed but it is maintained for performance reasons and
+        considering in the context where this function is meant
+        to be used.
+
+    Returns
+    -------
+    nd.array, shape (M-4, 3), dtype=float64
+        The side chain coords.
+        Backbone coords are NOT returned.
+    """
+    # places bb with CA at 0,0,0
+    bbtmp = np.full(bb_cnf.shape, np.nan)
+    bbtmp[:, :] = bb_cnf[:, :] - bb_cnf[1, :]
+
+    # the sidechain residue template is expected to have CA
+    # already at the the origin (0,0,0)
+    N_CA = bbtmp[0, :]
+    N_CA_ = ss_template[0, :]
+
+    N_CA_N = angle_between_njit(N_CA, N_CA_)
+
+    # rotation vector
+    rv = CROSS(N_CA_, N_CA)
+    rvu = rv / NORM(rv)
+
+    # aligns the N-CA vectors
+    rot1 = Q_rotate(ss_template, rvu, N_CA_N)
+
+    # starts the second rotation to align the CA-C vectors
+    # calculates the cross vectors of the planes N-CA-C
+    cross_cnf = CROSS(bbtmp[0, :], bbtmp[2, :])
+    cross_ss = CROSS(rot1[0, :], rot1[2, :])
+
+    # the angle of rotation is the angle between the plane normal
+    angle = angle_between_njit(cross_ss, cross_cnf)
+
+    # plane rotation vector is the cross vector between the two plane normals
+    rv = CROSS(cross_ss, cross_cnf)
+    rvu = rv / NORM(rv)
+
+    # aligns to the CA-C vector maintaining the N-CA in place
+    rot2 = Q_rotate(rot1, rvu, angle)
+
+    return rot2[4:, :] + bb_cnf[1, :]
+
+
+@njit
+def Q_rotate(
+        coords,
+        rot_vec,
+        angle_rad,
+        ARRAY=np.array,
+        HMQ=hamiltonian_multiplication_Q,
+        VSTACK=np.vstack,
+        ):
+    """
+    Rotate coordinates by radians along an axis.
+
+    Rotates using quaternion operations.
+
+    Parameters
+    ----------
+    coords : nd.array (N, 3), dtype=np.float64
+        The coordinates to ratote.
+
+    rot_vec : (,3)
+        A 3D space vector around which to rotate coords.
+
+    angle_rad : float
+        The angle in radians to rotate the coords.
+
+    Returns
+    -------
+    nd.array shape (N, 3), dtype=np.float64
+        The rotated coordinates
+    """
+    # assert coords.shape[1] == 3
+
+    b2, b3, b4 = sin(angle_rad / 2) * rot_vec
+    b1 = cos(angle_rad / 2)
+
+    c1, c2, c3, c4 = HMQ(
+        b1, b2, b3, b4,
+        0, coords[:, 0], coords[:, 1], coords[:, 2],
+        )
+
+    _, d2, d3, d4 = HMQ(
+        c1, c2, c3, c4,
+        b1, -b2, -b3, -b4,
+        )
+
+    rotated = VSTACK((d2, d3, d4)).T
+
+    assert rotated.shape[1] == 3
+    return rotated
 
 
 @njit
@@ -394,7 +565,7 @@ def make_coord_Q(
     o1 = v1 - v2
     o2 = v3 - v2
 
-    ocross = CROSS(o2, o1)  #changed
+    ocross = CROSS(o2, o1)  # changed
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
@@ -402,7 +573,7 @@ def make_coord_Q(
     b1 = COS(bend)
 
     # rotates the unitary of o2 according to bend angle
-    uo2 = o2  / NORM(o2)
+    uo2 = o2 / NORM(o2)
     p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
         *QM(b1, b2, b3, b4, 0, p2, p3, p4),
@@ -579,3 +750,38 @@ def make_coord_Q_COO(
     OXT_coords = ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_term
 
     return O_coords, OXT_coords
+
+
+@njit
+def calc_all_vs_all_dists_square(coords):
+    """
+    Calculate the upper half of all vs. all distances squared.
+
+    Reproduces the operations of scipy.spatial.distance.pdist
+    but witouth applying the sqrt().
+
+    Parameters
+    ----------
+    coords : np.ndarray, shape (N, 3), dtype=np.float64
+
+    Returns
+    -------
+    np.ndarray, shape ((N * N - N) // 2,), dytpe=np.float64
+    """
+
+    len_ = coords.shape[0]
+    shape = ((len_ * len_ - len_) // 2,)
+    results = np.empty(shape, dtype=np.float64)
+
+    c = 1
+    i = 0
+    for a in coords:
+        for b in coords[c:]:
+            x = b[0] - a[0]
+            y = b[1] - a[1]
+            z = b[2] - a[2]
+            results[i] = x*x + y*y + z*z
+            i += 1
+        c += 1
+
+    return results

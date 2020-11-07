@@ -1,0 +1,67 @@
+Residues were rotated 1 radian around the z axis so that neither N or C is in aligned with the N or C of the builder process. N in the building process is set to the origin and the CA to the x axis. The original version of these templates had N along the -x axis and CA in origin, which makes N-CA of both backbone and sidechain template aligned for the first residue in the protein during the building process. To avoid boolean flags during the building process, I rotated all the template sidechain coordinates.
+
+Original templates from Teresa Head-Gordon data.
+
+Code use for rotation is as follows:
+
+```python
+import sys
+from math import sin, cos
+from pathlib import Path
+
+import numpy as np
+
+from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs.libcalc import hamiltonian_multiplication_Q as QM
+
+
+def Q_rotate(coords, rot_vec, angle_rad):
+    """
+    Rotate coordinates by radians along an axis.
+
+    Uses quaternion operations as defined in the IDPConfGen package.
+
+    Parameters
+    ----------
+    coords : nd.array (N, 3), dtype=np.float64
+        The coordinates to ratote.
+
+    angle_rad : float
+        The angle in radians to rotate the coords.
+
+    rot_vec : (,3)
+        A 3D space vector around which to rotate coords.
+
+    Returns
+    -------
+    nd.array shape (N, 3), dtype=np.float64
+        The rotated coordinates
+    """
+    #assert coords.dim == 2
+    assert coords.shape[1] == 3
+
+    b2, b3, b4 = sin(angle_rad / 2) * rot_vec
+    b1 = cos(angle_rad / 2)
+
+    c1, c2, c3, c4 = QM(b1, b2, b3, b4, 0, coords[:, 0], coords[:, 1], coords[:, 2])
+    d1, d2, d3, d4 = QM(c1, c2, c3, c4, b1, -b2, -b3, -b4)
+    rotated = np.array([d2, d3, d4]).T
+
+    assert rotated.shape[1] == 3
+    return rotated
+
+aa = Path(sys.argv[1])
+s = Structure(aa)
+s.build()
+
+coords = s.coords
+
+angle = 1
+vector = np.array([0, 0, 1])
+
+ncoords = Q_rotate(coords, vector, angle)
+s.coords = ncoords
+s.write_PDB(f'{sys.argv[1]}')
+```
+
+@joaomcteixeira 2020/10/23

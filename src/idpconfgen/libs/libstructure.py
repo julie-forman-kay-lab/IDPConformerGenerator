@@ -141,6 +141,11 @@ class Structure:
         """
         return self.filtered_atoms[:, cols_coords].astype(np.float32)
 
+    @coords.setter
+    def coords(self, coords):
+        self.data_array[:, cols_coords] = \
+            np.round(coords, decimals=3).astype('<U8')
+
 
     @property
     def consecutive_residues(self):
@@ -494,8 +499,9 @@ def populate_structure_array_from_pdb(record_lines, data_array):
     None
         Populates array in place.
     """
+    AS = libpdb.atom_slicers
     for row, line in enumerate(record_lines):
-        for column, slicer_item in enumerate(libpdb.atom_slicers):
+        for column, slicer_item in enumerate(AS):
             data_array[row, column] = line[slicer_item].strip()
 
 

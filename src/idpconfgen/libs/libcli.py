@@ -4,6 +4,7 @@ import sys
 from os import cpu_count
 
 from idpconfgen import Path, __version__
+from idpconfgen.core.definitions import vdW_radii_dict
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -58,6 +59,24 @@ class CSV2Tuple(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """Call it."""
         setattr(namespace, self.dest, tuple(values.split(',')))
+
+
+def minimum_value(minimum):
+    """Define a minimum value for action."""
+
+    class MinimumValue(argparse.Action):
+        """Definies a minimum value."""
+
+        def __call__(self, parser, namespace, value, option_string=None):
+            """Call on me :-)."""
+            if value < minimum:
+                parser.error(
+                    f'The minimum allowed value for {self.dest} is {minimum}.'
+                    )
+            else:
+                setattr(namespace, self.dest, value)
+
+    return MinimumValue
 
 
 def CheckExt(extensions):
@@ -176,6 +195,9 @@ def add_version(parser):
 # -rd, --reduced          : reduces secondary structure representation
 # -rn, --record-name      : PDB RECORD name
 # -u, --update            : update (whatever shalls update)
+# -vdWt --vdW-tolerance   : vdW tolerance (vdW_A + vdW_B - tolerance)
+# -vdWr --vdW-radii       : the vdW radii set
+# -vdWb --vdW-bonds-apart : Maximum bond connective to ignore in vdW validation
 
 
 def add_argument_chunks(parser):
@@ -190,6 +212,15 @@ def add_argument_chunks(parser):
         help='Number of chunks to process in memory before saving to disk.',
         default=5_000,
         type=int,
+        )
+
+
+def add_argument_cmd(parser):
+    """Add the command for the external executable."""
+    parser.add_argument(
+        'cmd',
+        help='The path to the executable file used in this routine.',
+        type=str,
         )
 
 
@@ -359,10 +390,54 @@ def add_argument_update(parser):
         )
 
 
-def add_argument_cmd(parser):
-    """Add the command for the external executable."""
+def add_argument_vdWr(parser):
+    """Add argument for vdW radii set selection."""
     parser.add_argument(
-        'cmd',
-        help='The path to the executable file used in this routine.',
+        '-vdWr',
+        '--vdW-radii',
+        help=(
+            'The vdW radii values set. Defaults to: `tsai1999`.'
+            ),
+        default='tsai1999',
+        choices=list(vdW_radii_dict.keys()),
         type=str,
+        )
+
+
+def add_argument_vdWt(parser):
+    """Add argument for vdW tolerance."""
+    parser.add_argument(
+        '-vdWt',
+        '--vdW-tolerance',
+        help=(
+            'The tolerance applicable to the vdW clash validation, '
+            'in Angstroms. '
+            'Tolerance follows in the formula: '
+            'vdWA + vdWB - tolerance - dAB = 0. '
+            'Defaults to 0.4.'
+            ),
+        default=0.4,
+        type=float,
+        )
+
+
+def add_argument_vdWb(parser):
+    """
+    Add argument for vdW bonds apart criteria.
+
+    Further read:
+
+    https://www.cgl.ucsf.edu/chimera/docs/ContributedSoftware/findclash/findclash.html
+    """
+    parser.add_argument(
+        '-vdWb',
+        '--vdW-bonds-apart',
+        help=(
+            'Maximum number of bond separation on which pairs to'
+            'ignore vdW clash validation. '
+            'Defaults to 3.'
+            ),
+        default=3,
+        action=minimum_value(3),
+        type=int,
         )

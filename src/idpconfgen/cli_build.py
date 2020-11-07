@@ -9,6 +9,8 @@ USAGE:
 
 """
 import argparse
+import re
+from collections import Counter
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool
@@ -20,27 +22,35 @@ import numpy as np
 
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
+    add_OXT_to_residue,
     atom_labels,
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
     build_bend_angles_N_CA_C,
+    build_bend_H_N_C,
+    distance_H_N,
     distances_C_Np1,
     distances_CA_C,
     distances_N_CA,
+    expand_topology_bonds_apart,
+    generate_residue_template_topology,
+    inter_residue_connectivities,
+    sidechain_templates,
     )
-from idpconfgen.core.definitions import aa1to3
+from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
+    calc_all_vs_all_dists_square,
     make_coord_Q,
     make_coord_Q_CO,
     make_coord_Q_COO,
+    place_sidechain_template,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
-from idpconfgen.libs.libvalidate import validate_conformer_for_builder
 
 
 _name = 'build'
@@ -74,7 +84,7 @@ ap.add_argument(
 ap.add_argument(
     '-nc',
     '--nconfs',
-    help='Number of conformers to build',
+    help='Number of conformers to build.',
     default=1,
     type=int,
     )
@@ -87,6 +97,16 @@ ap.add_argument(
     nargs='+',
     )
 
+ap.add_argument(
+    '-dsd',
+    '--disable-sidechains',
+    help='Whether or not to compute sidechais. Defaults to True.',
+    action='store_true',
+    )
+
+libcli.add_argument_vdWb(ap)
+libcli.add_argument_vdWr(ap)
+libcli.add_argument_vdWt(ap)
 libcli.add_argument_ncores(ap)
 
 
@@ -97,11 +117,11 @@ ANGLES = None
 def main(
         input_seq,
         database,
-        conformer_name='conformer',
         dssp_regexes=r'(?=(L{2,6}))',
         func=None,
         nconfs=1,
         ncores=1,
+        **kwargs,
         ):
     """
     Execute main client logic.
@@ -128,7 +148,7 @@ def main(
         main_exec,
         input_seq=input_seq,  # string
         nconfs=core_chunks,  # int
-        conformer_name=conformer_name,  # string
+        **kwargs,
         )
 
     start = time()
@@ -170,7 +190,11 @@ def main_exec(
         input_seq,
         conformer_name='conformer',
         generative_function=None,
+        vdW_bonds_apart=3,
+        vdW_tolerance=0.4,
+        vdW_radii='tsai1999',
         nconfs=1,
+        disable_sidechains=True,
         ):
     """
     Build conformers.
@@ -221,10 +245,18 @@ def main_exec(
         executed priorly, or that ANGLES and SLICES were populated
         properly.
 
+    disable_sidechains : bool
+        Disables sidechain creation. Defaults to `False`, computes
+        sidechains.
+
     nconfs : int
         The number of conformers to build.
     """
-    # bring global to local scope
+    BUILD_BEND_H_N_C = build_bend_H_N_C
+    CALC_DISTS = calc_all_vs_all_dists_square
+    COUNT_NONZERO = np.count_nonzero
+    DISTANCE_NH = distance_H_N
+    LOGICAL_AND = np.logical_and
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
@@ -232,9 +264,11 @@ def main_exec(
     RC = randchoice
     RINT = randint
     ROUND = np.round
-    VALIDATE_CONF_LOCAL = validate_conformer_for_builder
     angles = ANGLES
     slices = SLICES
+
+    # semantic exchange for speed al readibility
+    with_sidechains = not(disable_sidechains)
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -255,24 +289,46 @@ def main_exec(
     atom_labels = np.array(generate_atom_labels(input_seq))
     num_atoms = len(atom_labels)
     residue_numbers = np.array(generate_residue_numbers(atom_labels))
+    residue_labels = np.array(generate_residue_labels(input_seq))
 
-    # creates masks
-    bb_mask = np.isin(atom_labels, ('N', 'CA', 'C'))
-    carbonyl_mask = atom_labels == 'O'
-    OXT_index = np.argwhere(atom_labels == 'OXT')[0][0]
-    # replces the last TRUE value by false because that is a carboxyl
-    # and not a carbonyl
-    OXT1_index = np.argwhere(carbonyl_mask)[-1][0]
-    carbonyl_mask[OXT1_index] = False
+    assert len(residue_numbers) == num_atoms
+    assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
+
+    vdW_sums, vdW_non_bond = generate_vdW_data(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        vdW_radii_dict[vdW_radii],
+        vdW_bonds_apart,
+        vdW_tolerance,
+        )
+
+    # creates index-translated boolean masks
+    bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    carbonyl_mask = np.where(atom_labels == 'O')[0]
+    NHydrogen_mask = np.where(atom_labels == 'H')[0]
+    OXT_index = np.where(atom_labels == 'OXT')[0][0]
+
+    # the last O value is removed because it is built in the same step
+    # OXT is built
+    OXT1_index = carbonyl_mask[-1]
+    carbonyl_mask = carbonyl_mask[:-1]
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
+
     # +1 because of the dummy coordinate required to start building.
     # see later
-    bb = np.full((np.sum(bb_mask) + 1, 3), NAN, dtype=np.float64)
+    bb = np.full((bb_mask.size + 1, 3), NAN, dtype=np.float64)
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
-    bb_CO = np.full((np.sum(carbonyl_mask), 3), NAN, dtype=np.float64)
+    bb_CO = np.full((carbonyl_mask.size, 3), NAN, dtype=np.float64)
+
+    # notice that NHydrogen_mask does not see Prolines
+    bb_NH = np.full((NHydrogen_mask.size, 3), NAN, dtype=np.float64)
+
+    # the following array serves to avoid placing HN in Proline residues
+    residue_labels_bb_simulating = residue_labels[bb_mask]
 
     # creates seed coordinates:
     # 1st) a dummy atom at the y-axis to build the first atom
@@ -291,6 +347,28 @@ def main_exec(
         n_terminal_CA_coord,
         ))
 
+    # side chain templates and masks
+    # create a lits of tuples, where index 0 is a boolean mask placing
+    # the side chain in coords, and index 1 is an array of the sidechain atoms
+    # excluded the 4 atoms of the backbone
+
+    # this is a list but could be a dictionary because key are indexes
+    # the sublists must be lists and not tuples because they are modified
+    # during the building process
+    ss = [
+        [
+            np.where(residue_numbers == _resnum)[0][4:],
+            np.full((_natoms - 4, 3), NAN, dtype=np.float64),
+            ]
+        for _resnum, _natoms in sorted(Counter(residue_numbers).items())
+        ]
+
+    # the last residue will contain an extra atom OXT, which needs to be
+    # removed
+    ss[-1][0] = ss[-1][0][:-1]
+    ss[-1][1] = ss[-1][1][:-1]
+    assert ss[-1][0].size == ss[-1][1].shape[0]
+
     bbi0_register = []
     bbi0_R_APPEND = bbi0_register.append
     bbi0_R_POP = bbi0_register.pop
@@ -300,6 +378,16 @@ def main_exec(
     COi0_R_APPEND = COi0_register.append
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
+
+    NHi0_register = []
+    NHi0_R_APPEND = NHi0_register.append
+    NHi0_R_POP = NHi0_register.pop
+    NHi0_R_CLEAR = NHi0_register.clear
+
+    res_R = []  # residue number register
+    res_R_APPEND = res_R.append
+    res_R_POP = res_R.pop
+    res_R_CLEAR = res_R.clear
 
     broke_on_start_attempt = False
     start_attempts = 0
@@ -316,6 +404,7 @@ def main_exec(
     conf_n = start_conf
     # for conf_n in range(start_conf, end_conf):
     while conf_n < end_conf:
+        print('building conformer: ', conf_n)
 
         # prepares cycles for building process
         # cycles need to be regenerated every conformer because the first
@@ -338,6 +427,9 @@ def main_exec(
         coords[:, :] = NAN
         bb[:, :] = NAN
         bb_CO[:, :] = NAN
+        bb_NH[:, :] = NAN
+        for _mask, _coords in ss:
+            _coords[:, :] = NAN
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
@@ -351,8 +443,20 @@ def main_exec(
         COi0_R_CLEAR()
         COi0_R_APPEND(COi)
 
+        # NHi is 0 because it will be applied in bb_NH_builder which ignores
+        # the first residue, see bb_NH_builder definition
+        NHi = 1
+        NHi0_R_CLEAR()
+        NHi0_R_APPEND(NHi)
+
+        # residue integer number
+        current_res_number = 0
+        res_R_CLEAR()
+        res_R_APPEND(current_res_number)
+
         backbone_done = False
         number_of_trials = 0
+        number_of_trials2 = 0
         # run this loop until a specific BREAK is triggered
         while True:
 
@@ -362,7 +466,10 @@ def main_exec(
             # **kwargs handling was greater then the if-statement processing
             # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html
             if generative_function:
-                agls = generative_function(nres=RINT(1, 6), cres=bbi - 2 // 3)
+                agls = generative_function(
+                    nres=RINT(1, 6),
+                    cres=(bbi - 2) // 3,
+                    )
 
             else:
                 # following `aligndb` function,
@@ -377,7 +484,8 @@ def main_exec(
                     # being placed is a C, it is placed using the PHI angle of a
                     # residue. And PHI is the first angle of that residue angle
                     # set.
-                    current_residue = input_seq[(bbi - 2) // 3]
+                    current_res_number = (bbi - 2) // 3
+                    current_residue = input_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
                     # is displaced by 1 unit from bb. So 2 in bb_read is the
@@ -402,7 +510,7 @@ def main_exec(
                 backbone_done = True
 
                 # add the carboxyls
-                coords[[OXT_index, OXT1_index]] = MAKE_COORD_Q_COO_LOCAL(
+                coords[[OXT1_index, OXT_index]] = MAKE_COORD_Q_COO_LOCAL(
                     bb[-2, :],
                     bb[-1, :],
                     )
@@ -424,21 +532,54 @@ def main_exec(
                     )
                 COi += 1
 
-            # IMPLEMENT SIDE CHAIN CONSTRUCTION HERE
+            # Adds N-H Hydrogens
+            for k in range(bbi0_register[-1] + 1, bbi, 3):
 
-            # validate conformer current state
+                if residue_labels_bb_simulating[k] == 'PRO':
+                    continue
+
+                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
+                # disntace and bend parameters
+                bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
+                    bb_real[k - 1, :],
+                    bb_real[k, :],
+                    bb_real[k + 1, :],
+                    distance=DISTANCE_NH,
+                    bend=BUILD_BEND_H_N_C,
+                    )
+                NHi += 1
+
+            # Adds sidechain template structures
+            if with_sidechains:
+                for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
+                    sscoords = place_sidechain_template(
+                        bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
+                        sidechain_templates[aa1to3[input_seq[res_i]]],
+                        )
+                    ss[res_i][1][:, :] = sscoords
+
+                # Transfers coords to the main coord array
+                for _smask, _sidecoords in ss[: current_res_number + backbone_done]:  # noqa: E501
+                    coords[_smask] = _sidecoords
+
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
+            coords[NHydrogen_mask] = bb_NH
 
-            energy = VALIDATE_CONF_LOCAL(
-                coords,
-                atom_labels,
-                residue_numbers,
-                bb_mask,
-                carbonyl_mask,
-                )
+            # note that CALC_DISTS computes the square (without sqrt)
+            distances = CALC_DISTS(coords)
 
-            if energy > 0:  # not valid
+            # compatibly, vdW_sums, considers squared distances
+            clash = distances < vdW_sums
+
+            # it is actually faster to compute everything and select only
+            # those relevant
+            valid_clash = LOGICAL_AND(clash, vdW_non_bond)
+
+            # count number of True occurrences
+            has_clash = COUNT_NONZERO(valid_clash)
+
+            if has_clash:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -447,21 +588,34 @@ def main_exec(
                 if number_of_trials > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
                     number_of_trials = 0
+                    number_of_trials2 += 1
+
+                if number_of_trials2 > 5:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
+                    number_of_trials2 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
+                    _NHi0 = NHi0_register[-1]
+                    _resi0 = res_R[-1]
                 except IndexError:
                     # if this point is reached,
                     # we erased until the beginning of the conformer
                     # discard conformer, something went really wrong
                     broke_on_start_attempt = True
-                    break  # whilte loop
+                    break  # while loop
 
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
                 bb_CO[_COi0:COi, :] = NAN
+                bb_NH[_NHi0:NHi, :] = NAN
 
                 # do the same for sidechains
                 # ...
@@ -469,6 +623,8 @@ def main_exec(
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
+                NHi = _NHi0
+                current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
@@ -499,6 +655,9 @@ def main_exec(
             number_of_trials = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
+            NHi0_R_APPEND(NHi)
+            # the residue where the build process stopped
+            res_R_APPEND(current_res_number)
 
             if backbone_done:
                 # this point guarantees all protein atoms are built
@@ -606,6 +765,10 @@ def generate_residue_numbers(atom_labels, start=1):
 
     Considers `N` to be the first atom of the residue.
     If this is not the case, the output can be meaningless.
+
+    Returns
+    -------
+    list of ints
     """
     if atom_labels[0] == 'N':
         start -= 1  # to compensate the +=1 implementation in the for loop
@@ -619,6 +782,164 @@ def generate_residue_numbers(atom_labels, start=1):
         RA(start)
 
     return residues
+
+
+def generate_residue_labels(
+        input_seq,
+        atom_labels=atom_labels,
+        aa1to3=aa1to3,
+        ):
+    """Generate residue 3-letter labels."""
+    residue_labels = []
+    RL_APPEND = residue_labels.append
+
+    for res_1_letter in input_seq:
+        res3 = aa1to3[res_1_letter]
+        for _ in range(len(atom_labels[res_1_letter])):
+            RL_APPEND(res3)
+
+    # To compensate for the OXT atom
+    residue_labels.append(res3)
+
+    return residue_labels
+
+
+def generate_vdW_data(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        vdW_radii,
+        bonds_apart=3,
+        tolerance=0.4,
+        ):
+    """
+    Generate van der Waals related data structures.
+
+    Generated data structures are aligned to the output generated by
+    scipy.spatial.distances.pdist used to compute all pairs distances.
+
+    This function generates an (N,) array with the vdW thresholds aligned
+    with the `pdist` output. And, a (N,) boolean array where `False`
+    denotes pairs of covalently bonded atoms.
+
+    Input should satisfy:
+
+    >>> len(atom_labels) == len(residue_numbers) == len(residue_labels)
+
+    Parameters
+    ----------
+    atom_labels : array or list
+        The ordered list of atom labels of the target conformer upon
+        which the returned values of this function will be used.
+
+    residue_numbers : array or list
+        The list of residue numbers corresponding to the atoms of the
+        target conformer.
+
+    residue_labels : array or list
+        The list of residue 3-letter labels of each atom of the target
+        conformer.
+
+    vdW_radii : dict
+        A dictionary containing the van der Waals radii for each atom
+        type (element) present in `atom_labels`.
+
+    bonds_apart : int
+        The number of bonds apart to ignore vdW clash validation.
+        For example, 3 means vdW validation will only be computed for
+        atoms at least 4 bonds apart.
+
+    tolerance : float
+        The tolerance in Angstroms.
+
+    Returns
+    -------
+    nd.array, dtype=np.float
+        The vdW atom pairs thresholds. Equals to the sum of atom vdW
+        radius.
+
+    nd.array, dtype=boolean
+        `True` where the distance between pairs must be considered.
+        `False` where pairs are covalently bound.
+
+    Note
+    ----
+    This function is slow, in the order of 1 or 2 seconds, but it is
+    executed only once at the beginning of the building protocol.
+    """
+    assert len(atom_labels) == len(residue_numbers)
+    assert len(atom_labels) == len(residue_labels)
+
+    # we need to use re because hydrogen atoms start with integers some times
+    atoms_char = re.compile(r'[CHNOPS]')
+    findall = atoms_char.findall
+    cov_topologies = generate_residue_template_topology()
+    bond_structure_local = \
+        expand_topology_bonds_apart(cov_topologies, bonds_apart)
+    inter_connect_local = inter_residue_connectivities[bonds_apart]
+
+    # adds OXT to the bonds connectivity, so it is included in the
+    # final for loop creating masks
+    add_OXT_to_residue(bond_structure_local[residue_labels[-1]])
+
+    # the following arrays/lists prepare the conformer label data in agreement
+    # with the function scipy.spatial.distances.pdist, in order for masks to be
+    # used properly
+    #
+    # creates atom label pairs
+    atoms = np.array([
+        (a, b)
+        for i, a in enumerate(atom_labels, start=1)
+        for b in atom_labels[i:]
+        ])
+
+    # creates vdW radii pairs according to atom labels
+    vdw_pairs = np.array([
+        (vdW_radii[findall(a)[0]], vdW_radii[findall(b)[0]])
+        for a, b in atoms
+        ])
+
+    # creats the vdW threshold according to vdW pairs
+    # the threshold is the sum of the vdW radii pair
+    vdW_sums = np.power(np.sum(vdw_pairs, axis=1) - tolerance, 2)
+
+    # creates pairs for residue numbers, so we know from which residue number
+    # is each atom of the confronted pair
+    res_nums_pairs = np.array([
+        (a, b)
+        for i, a in enumerate(residue_numbers, start=1)
+        for b in residue_numbers[i:]
+        ])
+
+    # does the same as above but for residue 3-letter labels
+    res_labels_pairs = (
+        (_a, _b)
+        for i, _a in enumerate(residue_labels, start=1)
+        for _b in residue_labels[i:]
+        )
+
+    # we want to compute clashes to all atoms that are not covalentely bond
+    # that that have not certain connectivity between them
+    # first we assum True to all cases, and we replace to False where we find
+    # a bond connection
+    vdW_non_bond = np.full(len(atoms), True)
+
+    counter = -1
+    zipit = zip(atoms, res_nums_pairs, res_labels_pairs)
+    for (a1, a2), (res1, res2), (l1, _) in zipit:
+        counter += 1
+        if res1 == res2 and a2 in bond_structure_local[l1][a1]:
+            # here we found a bond connection
+            vdW_non_bond[counter] = False
+
+        # handling the special case of a covalent bond between two atoms
+        # not part of the same residue
+        elif a1 in inter_connect_local \
+                and res2 == res1 + 1 \
+                and a2 in inter_connect_local[a1]:
+            vdW_non_bond[counter] = False
+
+    return vdW_sums, vdW_non_bond
 
 
 if __name__ == "__main__":
