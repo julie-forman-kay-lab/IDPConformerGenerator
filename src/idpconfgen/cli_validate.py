@@ -8,10 +8,12 @@ import argparse
 import sys
 from functools import partial
 from pathlib import Path
+from time import time
 
 import numpy as np
 
 from idpconfgen import log
+from idpconfgen.cli_build import generate_vdW_data
 from idpconfgen.core.definitions import (
     aa1to3,
     heavy_atoms,
@@ -28,7 +30,10 @@ from idpconfgen.core.build_definitions import (
     )
 
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libcalc import calc_MSMV
+from idpconfgen.libs.libcalc import (
+    calc_MSMV,
+    calc_all_vs_all_dists_square,
+    )
 from idpconfgen.libs.libio import FileReaderIterator
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libplot import plot_distribution_list
@@ -208,33 +213,57 @@ def main(
 
 
 def vdw2(pdb_files, vdwR):
-   
-    from idpconfgen.cli_build import generate_vdW_data
-    from idpconfgen.libs.libcalc import calc_all_vs_all_dists_square
+    """Inspect clashes within the structure."""
+    count_nonzero = np.count_nonzero
+    logical_and = np.logical_and
+    cva = calc_all_vs_all_dists_square
+    validation_folder = Path('vdW_validation_results')
+    validation_folder.mkdir(parents=False, exist_ok=True)
+
+    s = Structure(Path(pdb_files[0]))
+    s.build()
+
+    atoms = s.data_array[:, 2]
+    res = s.data_array[:, 6]
+    res_nums = np.array([int(i) for i in res])
+    res_labels = s.data_array[:, 4]
+    coords = s.coords
+
+    vdW_sums, vdw_valid = generate_vdW_data(atoms, res_nums, res_labels, vdwR)
+
+    del s
 
     for pdb in pdb_files:
-        s = Structure(Path(pdb))
+
+        pdb_path = Path(pdb)
+        s = Structure(pdb_path)
         s.build()
+        coords = s.coords
 
-        atoms = s.data_array[:, 2]
-        res = s.data_array[:, 6]
-        res_nums = np.array([int(i) for i in res])
-        res_labels = s.data_array[:, 4]
+        results = cva(coords)
+        clash = logical_and(results < vdW_sums, vdw_valid)
+        has_clash = count_nonzero(clash)
+        print(f'** Found {has_clash} clashes for {pdb}')
 
-        vdW_sums, vdw_valid = generate_vdW_data(atoms, res_nums, res_labels, vdwR)
+        # lazy operation
+        if has_clash:
+            clash_summary = []
+            clash_summary_append = clash_summary.append
+            i = 0
+            j = 0
+            for r1, t1, a1 in zip(res_nums, res_labels, atoms):
+                i += 1
+                for r2, t2, a2 in zip(res_nums[i:], res_labels[i:], atoms[i:]):
+                    if clash[j]:
+                        line = f'{r1} {t1} {a1} ** {r2} {t2} {a2}'
+                        clash_summary_append(line)
+                    j += 1
 
-        results = calc_all_vs_all_dists_square(s.coords)
-        clash = np.logical_and(results < vdW_sums, vdw_valid)
-        print(np.count_nonzero(clash), 'clashs')
+            fout = validation_folder.joinpath(
+                f'validation_clash_report_{pdb_path.stem}.txt'
+                )
+            fout.write_text('\n'.join(clash_summary))
 
-        i = 0
-        j = 0
-        for r1, t1, a1 in zip(res_nums, res_labels, atoms):
-            i += 1
-            for r2, t2, a2 in zip(res_nums[i:], res_labels[i:], atoms[i:]):
-                if clash[j]:
-                    print(r1, t1, a1, '**', r2, t2, a2)
-                j += 1
 
 # The following are the subroutine functions that prepare for each
 # validation routine
