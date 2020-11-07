@@ -8,3 +8,4 @@ dependencies:
     - numpy=1
     - numba
     - scipy
+    - tox
