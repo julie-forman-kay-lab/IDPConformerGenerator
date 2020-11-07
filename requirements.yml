@@ -7,5 +7,4 @@ dependencies:
     - matplotlib=3
     - numpy=1
     - numba
-    - scipy
     - tox
