@@ -66,6 +66,7 @@ setup(
         'matplotlib>=3',
         'numpy>=1.19',
         'numba>=0.50.1',
+        'scipy',
         # 'click',
         # eg: 'aspectlib==1.1.1', 'six>=1.7',
         ],
