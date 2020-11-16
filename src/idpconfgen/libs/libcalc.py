@@ -555,7 +555,7 @@ def make_coord_Q(
         The torsion angle (radians) around v2-v3 which will place
         the new coordinate correctly.
         Contrarily to the `bend` angle, do not compute any additional
-        calcualtions and just provide the torsion angle value as is.
+        calculations and just provide the torsion angle value as is.
 
     Returns
     -------
@@ -785,3 +785,30 @@ def calc_all_vs_all_dists_square(coords):
         c += 1
 
     return results
+
+
+def calc_vdW_AB(sigma_i, sigma_j, eps_i, eps_j, alpha=0.8):
+    """
+    non vectorized
+    """
+    rminA = (2 * sigma_i)**(1/6)
+    rminB = (2 * sigma_j)**(1/6)
+    rmin_pair = alpha * (rminA + rminB)
+    eps_pair = (eps_i * atomB_j)**0.5
+    A = eps_pair * rmin_pair**12
+    B = 2 * eps_pair * rmin_pair**6
+    return A, B
+
+
+def calc_Coulomb_ij(qi, qj, rij):
+    return qi * qj / rij
+
+def calc_all_Coulom(partial_charges, r_pairs):
+    """
+    al implementar rever que no se computa contra si mismo
+    i < j
+    """
+    coulombs = partial_charges[1:] * partial_charges[:-1]
+    coef = coulombs / r_pairs
+    energy_pair = coef / 4
+    return sum(energy_pair)
