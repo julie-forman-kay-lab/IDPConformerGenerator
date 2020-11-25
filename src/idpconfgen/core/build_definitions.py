@@ -16,6 +16,7 @@ pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
 _sidechain_template_files = sorted(list(
     _filepath.joinpath('sidechain_templates').glob('*.pdb')))
+_amber14sb = _filepath.joinpath('data', 'protein.ff14SB.xml')
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
@@ -45,6 +46,83 @@ atom_labels = {
     'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
     # in Y 'HH' was removed
     }
+
+
+def read_ff14SB_params():
+    """
+    Read Amber protein.ff14SB.xml parameters to a dictionary.
+
+    `protein.ff14SB.xml` is in `src.idpconfgen.core.data` folder.
+
+    Dictionary structure:
+
+    dict_keys(
+        ['protein-C',
+        'protein-CA',
+        (... atom types ...)
+        'protein-3C',
+        'protein-C8',
+        'ALA',
+        'ARG',
+        (... residues ...)
+        'NTYR',
+        'NVAL',
+        'coulomb14scale',   <- note these two keys
+        'lj14scale'])
+
+    Atoms types have the structure:
+
+    'protein-OH': {
+        'class': 'OH',
+        'element': 'O',
+        'epsilon': '0.8803136',
+        'mass': '16.0',
+        'sigma': '0.3066473387839048',
+        }
+
+    Residues have the structure:
+
+    'VAL': {
+        'C': {'charge': '0.5973', 'type': 'protein-C'},
+        'CA': {'charge': '-0.0875', 'type': 'protein-CX'},
+        'CB': {'charge': '0.2985', 'type': 'protein-3C'},
+        'CG1': {'charge': '-0.3192', 'type': 'protein-CT'},
+        'CG2': {'charge': '-0.3192', 'type': 'protein-CT'},
+        'H': {'charge': '0.2719', 'type': 'protein-H'},
+        (...)
+        }
+
+    Returns
+    -------
+    dict
+    """
+    with open('protein.ff14SB.xml', 'r') as fin:
+        ff14sb = ET.fromstring(fin.read())
+
+    forcefield_params = defaultdict(dict)
+
+    for child in ff14sb:
+        if child.tag == 'AtomTypes':
+            for atomtype in child:
+                atom_name = forcefield_params.setdefault(atomtype.attrib['name'], {})
+                atom_name.update(atomtype.attrib)
+                atom_name.pop('name')
+
+        elif child.tag == 'Residues':
+            for residue in child:
+                for atom in filter(lambda x: x.tag == 'Atom', residue):
+                    atom_param = forcefield_params[residue.attrib['name']].setdefault(atom.attrib['name'], {})
+                    atom_param.update(atom.attrib)
+                    atom_param.pop('name')
+
+        elif child.tag == 'NonbondedForce':
+            forcefield_params.update(child.attrib)
+            for atom in child:
+                if atom.tag == 'Atom':
+                    forcefield_params[atom.attrib['type']].update(atom.attrib)
+                    forcefield_params[atom.attrib['type']].pop('type')
+
+    return forcefield_params
 
 
 def generate_residue_template_topology():
