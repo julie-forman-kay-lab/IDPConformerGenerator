@@ -1,4 +1,5 @@
 """Definitions for the building process."""
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from copy import copy
 from math import pi
@@ -30,6 +31,11 @@ atom_labels = {
     'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),  # noqa: E501
     'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),  # noqa: E501
     'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
+    # support figure: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
+    # histidine protonated at epsilon
+    'e': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD2', 'HE1', 'HE2'),  # noqa: E501
+    # histidine protonated at gamma
+    'd': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1'),  # noqa: E501
     'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),  # noqa: E501
     'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),  # noqa: E501
     'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
@@ -96,7 +102,7 @@ def read_ff14SB_params():
     -------
     dict
     """
-    with open('protein.ff14SB.xml', 'r') as fin:
+    with open(_amber14sb, 'r') as fin:
         ff14sb = ET.fromstring(fin.read())
 
     forcefield_params = defaultdict(dict)
@@ -104,23 +110,24 @@ def read_ff14SB_params():
     for child in ff14sb:
         if child.tag == 'AtomTypes':
             for atomtype in child:
-                atom_name = forcefield_params.setdefault(atomtype.attrib['name'], {})
-                atom_name.update(atomtype.attrib)
-                atom_name.pop('name')
+                key = atomtype.attrib['name']
+                forcefield_params[key].update(atomtype.attrib)
+                forcefield_params[key].pop('name')
 
         elif child.tag == 'Residues':
             for residue in child:
                 for atom in filter(lambda x: x.tag == 'Atom', residue):
-                    atom_param = forcefield_params[residue.attrib['name']].setdefault(atom.attrib['name'], {})
-                    atom_param.update(atom.attrib)
-                    atom_param.pop('name')
+                    key = residue.attrib['name']
+                    forcefield_params[key].update(atom.attrib)
+                    forcefield_params[key].pop('name')
 
         elif child.tag == 'NonbondedForce':
             forcefield_params.update(child.attrib)
             for atom in child:
                 if atom.tag == 'Atom':
-                    forcefield_params[atom.attrib['type']].update(atom.attrib)
-                    forcefield_params[atom.attrib['type']].pop('type')
+                    key = atom.attrib['type']
+                    forcefield_params[key].update(atom.attrib)
+                    forcefield_params[key].pop('type')
 
     return forcefield_params
 
