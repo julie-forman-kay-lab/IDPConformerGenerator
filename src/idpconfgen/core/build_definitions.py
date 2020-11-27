@@ -150,7 +150,7 @@ def generate_residue_template_topology():
     # Creates topoloty of amino acids templates, that is, a dictionary of
     # all vs. all covalent bond pairs
     res_covalent_bonds = defaultdict(dict)
-    for pdb in _sidechain_template_files:
+    for pdb in _amber_pdbs:
 
         pdbname = pdb.stem.upper()
 
@@ -162,7 +162,7 @@ def generate_residue_template_topology():
         # atom names of residue templates must be sorted equally to the
         # atom_names dictionary, or vice-versa.
         _list_names = tuple(s.data_array[:, col_name])
-        _atoms = atom_labels[aa3to1[pdbname]]
+        _atoms = atom_labels_amber[pdbname]
         assert _list_names == _atoms, (
             'Atom names in `atom_names` dictionary differ from the '
             f'atom names in {pdbname} residue template.'
@@ -202,7 +202,7 @@ def generate_residue_template_topology():
 
     # asserts all atoms are considered
     for k1, v1 in res_covalent_bonds.items():
-        assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
+        assert len(v1) == len(atom_labels_amber[k1]), k1
 
     return res_covalent_bonds
 

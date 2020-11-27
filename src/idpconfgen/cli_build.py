@@ -23,7 +23,7 @@ import numpy as np
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     add_OXT_to_residue,
-    atom_labels,
+    atom_labels_amber,
     build_bend_angles_CA_C_Np1,
     build_bend_angles_Cm1_N_CA,
     build_bend_angles_N_CA_C,
@@ -579,7 +579,7 @@ def main_exec(
             # count number of True occurrences
             has_clash = COUNT_NONZERO(valid_clash)
 
-            if has_clash:
+            if False:#has_clash:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -746,7 +746,7 @@ def gen_PDB_from_conformer(
     return '\n'.join(lines)
 
 
-def generate_atom_labels(input_seq, AL=atom_labels):
+def generate_atom_labels(input_seq, AL=atom_labels_amber):
     """."""
     labels = []
     LE = labels.extend
@@ -786,7 +786,7 @@ def generate_residue_numbers(atom_labels, start=1):
 
 def generate_residue_labels(
         input_seq,
-        atom_labels=atom_labels,
+        atom_labels=atom_labels_amber,
         aa1to3=aa1to3,
         ):
     """Generate residue 3-letter labels."""
@@ -812,6 +812,7 @@ def generate_vdW_data(
         bonds_apart=3,
         tolerance=0.4,
         ):
+    # {{{
     """
     Generate van der Waals related data structures.
 
@@ -867,6 +868,7 @@ def generate_vdW_data(
     This function is slow, in the order of 1 or 2 seconds, but it is
     executed only once at the beginning of the building protocol.
     """
+    # }}}
     assert len(atom_labels) == len(residue_numbers)
     assert len(atom_labels) == len(residue_labels)
 
