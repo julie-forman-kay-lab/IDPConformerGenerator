@@ -4,54 +4,51 @@ from collections import defaultdict
 from copy import copy
 from math import pi
 from pathlib import Path
+from pprint import pprint
 from statistics import mean, stdev
 
 import numpy as np
 from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure, col_name
-from idpconfgen.core.definitions import aa3to1
+from idpconfgen.core.definitions import aa1to3, aa3to1
 
 
 pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
 _sidechain_template_files = sorted(list(
-    _filepath.joinpath('sidechain_templates').glob('*.pdb')))
+    _filepath.joinpath('sidechain_templates', 'pdb_names').glob('*.pdb')))
+_amber_pdbs = sorted(list(
+    _filepath.joinpath('sidechain_templates', 'amber_names').glob('*.pdb')))
 _amber14sb = _filepath.joinpath('data', 'protein.ff14SB.xml')
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
 # PDB column
 # Taken from PDB entry 6I1B REVDAT 15-OCT-92.
-atom_labels = {
-    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', '1HB', '2HB', '3HB'),  # noqa: E501
-    'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
-    'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),  # noqa: E501
-    'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),  # noqa: E501
-    'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),  # noqa: E501
-    'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),  # noqa: E501
-    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
-    # support figure: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
-    # histidine protonated at epsilon
-    'e': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD2', 'HE1', 'HE2'),  # noqa: E501
-    # histidine protonated at gamma
-    'd': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1'),  # noqa: E501
-    'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),  # noqa: E501
-    'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),  # noqa: E501
-    'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
-    'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'SD', 'CE', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),  # noqa: E501
-    'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'ND2', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),  # noqa: E501
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # noqa: E501
-    # in 'P' 'H1' and 'H2' were removed
-    'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),  # noqa: E501
-    'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),  # noqa: E501
-    'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
-    'T': ('N', 'CA', 'C', 'O', 'CB', 'OG1', 'CG2', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
-    'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
-    'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'NE1', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),  # noqa: E501
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
-    # in Y 'HH' was removed
-    }
+
+
+def _read_labels(pdbs):
+    """Read atom labels from residue template files."""
+    labels_d = {}
+    for pdb in pdbs:
+        s = Structure(pdb)
+        s.build()
+        a_labels = tuple(s.data_array[:, col_name])
+        pdb_name = pdb.stem.upper()
+        pdb_1letter = aa3to1[pdb_name]
+
+        # labels are duplicated for 1-letter and 3-letter codes to avoid
+        # double dictionary lookup in other implementations
+        labels_d[pdb_name] = a_labels
+        labels_d[pdb_1letter] = a_labels
+    return labels_d
+
+
+# support figure, for the different histidine protonation states.
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
+atom_labels_pdb = _read_labels(_sidechain_template_files)
+atom_labels_amber = _read_labels(_amber_pdbs)
 
 
 def read_ff14SB_params():
@@ -118,8 +115,11 @@ def read_ff14SB_params():
             for residue in child:
                 for atom in filter(lambda x: x.tag == 'Atom', residue):
                     key = residue.attrib['name']
-                    forcefield_params[key].update(atom.attrib)
-                    forcefield_params[key].pop('name')
+                    atom_name = atom.attrib['name']
+
+                    atom_par = forcefield_params[key].setdefault(atom_name, {})
+                    atom_par.update(atom.attrib)
+                    forcefield_params[key][atom_name].pop('name')
 
         elif child.tag == 'NonbondedForce':
             forcefield_params.update(child.attrib)
@@ -187,7 +187,6 @@ def generate_residue_template_topology():
                 connects_a.append(b)
                 connects_b = current_pdb.setdefault(b, [])
                 connects_b.append(a)
-
 
     # special cases: CYS and MET
     res_covalent_bonds['CYS']['CB'].append('SG')
@@ -312,7 +311,7 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
 
 
 def add_OXT_to_residue(connectivity_dict):
-    """Adds OXT connectivity to residue."""
+    """Add OXT connectivity to residue."""
     connectivity_dict['OXT'] = copy(connectivity_dict['O'])
     connectivity_dict['OXT'].append('O')
     for _atom in connectivity_dict['OXT']:
