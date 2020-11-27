@@ -204,6 +204,14 @@ def generate_residue_template_topology():
     for k1, v1 in res_covalent_bonds.items():
         assert len(v1) == len(atom_labels_amber[k1]), k1
 
+        # added 'OXT' connectivity
+        for atom, connects in v1.items():
+            if 'O' in connects:
+                connects.append('OXT')
+
+        # this should be only 'C'
+        v1['OXT'] = copy(v1['O'])
+
     return res_covalent_bonds
 
 
@@ -245,9 +253,7 @@ def _recursive_bonds_apart(
 
     for atom in cov_bonded:
         cov_bonded_next = copy(init_cov_res[atom])
-        bonds_apart.extend(
-            set(cov_bonded_next).difference(set(bonds_apart))
-            )
+        bonds_apart.extend(set(cov_bonded_next).difference(set(bonds_apart)))
         _recursive_bonds_apart(
             init_cov_res,
             bonds_apart,
@@ -310,6 +316,50 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
     return expanded_topology
 
 
+
+def topology_3_bonds_apart(covalent_bond_dict):
+    """
+    Map atom connectivity 3 bonds apart.
+
+    See Amber20 manual Figure 14.1.
+
+    Parameters
+    ----------
+    covalent_bond_dict : dict
+        Per residue covalent connectivity.
+
+    Returns
+    -------
+    dict
+        Per residue 3 bonds apart connectivity.
+    """
+    x_bonds_apart = {}
+    prevs = set()
+
+    for res, residue_atoms in covalent_bond_dict.items():
+        res_d = x_bonds_apart.setdefault(res, {})
+
+        # for all atoms in the residue
+        for atom in residue_atoms:
+            xba = res_d.setdefault(atom, set())
+            prevs.clear()
+            prevs.add(atom)
+
+            # for CA, H in N... one bond
+            for subatom1 in set(residue_atoms[atom]).difference(prevs):
+                prevs.add(subatom1)
+
+                # for CB, HA in CA... two bonds
+                for subatom2 in set(residue_atoms[subatom1]).difference(prevs):
+                    prevs.add(subatom2)
+
+                    # for HB1, HB2 in CB... three bonds
+                    for subatom3 in set(residue_atoms[subatom2]).difference(prevs):
+                        xba.add(subatom3)
+
+    return x_bonds_apart
+
+
 def add_OXT_to_residue(connectivity_dict):
     """Add OXT connectivity to residue."""
     connectivity_dict['OXT'] = copy(connectivity_dict['O'])
@@ -317,6 +367,14 @@ def add_OXT_to_residue(connectivity_dict):
     for _atom in connectivity_dict['OXT']:
         connectivity_dict[_atom].append('OXT')
 
+
+# interresidue exact 3 bonds connectivity
+inter_res_exact_3_bonds = {
+    'N': ['N'],
+    'CA': ['H', 'CA'],
+    'C': ['HA', 'HA2', 'HA3', 'CB'],
+    'O': ['CA', 'H'],
+    }
 
 # interresidue 3-bonds connectivity
 C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']

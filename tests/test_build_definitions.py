@@ -45,9 +45,12 @@ def test_ff14SB_params_atom_keys(ff14SB):
             assert set(ff14SB[key].keys()) == required_keys, f'Wrong for {key}'
 
 
-def test_ff14SB_coloumb_and_lj(ff14SB):
+def test_ff14SB_coloumb(ff14SB):
     """Assert presence of keys."""
     assert 'coulomb14scale' in ff14SB
+
+
+def test_ff14SB_lj(ff14SB):
     assert 'lj14scale' in ff14SB
 
 
@@ -67,6 +70,19 @@ def test_ff14SB_atoms_have_params(ff14SB):
         if key[0].isupper():  # this should refer only to residues
             for atom_name, aparams in residue.items():
                 assert set(aparams.keys()) == required_keys, f'Wrong for {key}'
+
+
+def test_all_atoms_are_mapped(ff14SB):
+    """
+    Test all atoms are mapped.
+
+    All atoms in residues should have a map key in ff14DB dict.
+    """
+    for key, value in ff14SB.items():
+        if key[0].isupper():
+            for atom, params in value.items():
+                assert params['type'] in ff14SB, \
+                    f'Type {params["type"]} not in ff14SB dictionary'
 
 
 def test_ff14SB_residue_atoms_names(ff14SB):
