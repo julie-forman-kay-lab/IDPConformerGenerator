@@ -404,6 +404,7 @@ def main_exec(
     conf_n = start_conf
     # for conf_n in range(start_conf, end_conf):
     while conf_n < end_conf:
+        A
         print('building conformer: ', conf_n)
 
         # prepares cycles for building process
@@ -869,6 +870,7 @@ def generate_vdW_data(
     executed only once at the beginning of the building protocol.
     """
     # }}}
+    print('here')
     assert len(atom_labels) == len(residue_numbers)
     assert len(atom_labels) == len(residue_labels)
 
@@ -940,7 +942,8 @@ def generate_vdW_data(
                 and res2 == res1 + 1 \
                 and a2 in inter_connect_local[a1]:
             vdW_non_bond[counter] = False
-
+    
+    print('done')
     return vdW_sums, vdW_non_bond
 
 

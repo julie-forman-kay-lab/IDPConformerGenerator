@@ -803,12 +803,31 @@ def calc_vdW_AB(sigma_i, sigma_j, eps_i, eps_j, alpha=0.8):
 def calc_Coulomb_ij(qi, qj, rij):
     return qi * qj / rij
 
-def calc_all_Coulom(partial_charges, r_pairs):
+
+def calc_all_Coulom(partial_charges, r_pairs, ep=4):
     """
     al implementar rever que no se computa contra si mismo
     i < j
+
+    Where ep is the dieletric constant
     """
     coulombs = partial_charges[1:] * partial_charges[:-1]
     coef = coulombs / r_pairs
-    energy_pair = coef / 4
+    energy_pair = coef / ep
     return sum(energy_pair)
+
+
+def calc_FGB(
+        const=-0.5 * (1 / 4 - 1 / 80),
+        ):
+    """."""
+
+    coulombs = partial_charges[1:] * partial_charges[:-1]
+    return const * sum(qi*qj/fGB(rij) for i in range(1))  #complete
+
+
+def calc_fGB():
+    """."""
+    rij2 = rij**2
+    (rij2+Ri*Rj*math.exp(-rij2/4*Ri*Rj))**0.5
+    return
