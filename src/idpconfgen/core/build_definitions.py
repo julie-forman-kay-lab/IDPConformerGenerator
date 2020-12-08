@@ -369,11 +369,21 @@ def add_OXT_to_residue(connectivity_dict):
 
 
 # interresidue exact 3 bonds connectivity
+inter_res_exact_2_bonds = {
+    'CA': ['N'],
+    'C': ['CA', 'H'],
+    'O': ['N'],
+    }
+
 inter_res_exact_3_bonds = {
     'N': ['N'],
     'CA': ['H', 'CA'],
-    'C': ['HA', 'HA2', 'HA3', 'CB'],
+    'C': ['HA', 'HA2', 'HA3', 'CB', 'C'],
     'O': ['CA', 'H'],
+    'HA': ['N'],
+    'HA2': ['N'],
+    'HA3': ['N'],
+    'CB': ['N'],
     }
 
 # interresidue 3-bonds connectivity
