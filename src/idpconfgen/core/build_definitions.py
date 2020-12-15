@@ -369,13 +369,9 @@ def add_OXT_to_residue(connectivity_dict):
 
 
 # interresidue exact 3 bonds connectivity
-inter_res_exact_2_bonds = {
-    'CA': ['N'],
-    'C': ['CA', 'H'],
-    'O': ['N'],
-    }
+bonds_equal_1_inter = {'C': ['N']}
 
-inter_res_exact_3_bonds = {
+bonds_equal_3_inter = {
     'N': ['N'],
     'CA': ['H', 'CA'],
     'C': ['HA', 'HA2', 'HA3', 'CB', 'C'],
@@ -386,51 +382,66 @@ inter_res_exact_3_bonds = {
     'CB': ['N'],
     }
 
+# /
+# Less than or equal to:
+# mar 15 dic 2020 15:50:48 EST
+
+bonds_le_2_inter = {
+    'C': ['CA', 'H', 'N'],
+    'CA': ['N'],
+    'O': ['N'],
+    }
+
 # interresidue 3-bonds connectivity
-C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
-CA_O_3_connectivities = ['N', 'H', 'CA']
-N_HA_CB_3_connectivities = ['N']
+_C_3_connectivities = [
+    'N',  # 1 bond apart
+    'H', 'CA',  # 2 bonds apart
+    'HA', 'HA2', 'HA3', 'CB', 'C',  # 3 bonds apart
+    ]
+_CA_O_3_connectivities = ['N', 'H', 'CA']
+_N_HA_HA2_HA3_CB_3_connectivities = ['N']
+
+# less or equal to:
+bonds_le_3_inter = {
+    'C': _C_3_connectivities,
+    #
+    'N': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA2': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA3': _N_HA_HA2_HA3_CB_3_connectivities,
+    'CB': _N_HA_HA2_HA3_CB_3_connectivities,
+    #
+    'CA': _CA_O_3_connectivities,
+    'O': _CA_O_3_connectivities,
+    #
+    }
 
 # interresidue 4-bonds connectivity
-C_4_connectivities = [
-    'N',  # 1 bond apart
-    'H', 'CA',  # 2 bond apart
-    'HA', 'CB', 'C',  # 3 bond apart
-    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
-    ]
-CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
-N_HA_CB_4_connectivities = ['N', 'H', 'CA']
+#C_4_connectivities = [
+#    'N',  # 1 bond apart
+#    'H', 'CA',  # 2 bond apart
+#    'HA', 'CB', 'C',  # 3 bond apart
+#    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
+#    ]
+#CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
+#N_HA_CB_4_connectivities = ['N', 'H', 'CA']
 
-
-inter_3_connect = {
-    'C': C_3_connectivities,
-    #
-    'N': N_HA_CB_3_connectivities,
-    'HA': N_HA_CB_3_connectivities,
-    'CB': N_HA_CB_3_connectivities,
-    #
-    'CA': CA_O_3_connectivities,
-    'O': CA_O_3_connectivities,
-    #
-    }
-
-
-inter_4_connect = {
-    'C': C_4_connectivities,
-    #
-    'N': N_HA_CB_4_connectivities,
-    'HA': N_HA_CB_4_connectivities,
-    'CB': N_HA_CB_4_connectivities,
-    #
-    'CA': CA_O_4_connectivities,
-    'O': CA_O_4_connectivities,
-    #
-    }
+#    'C': C_4_connectivities,
+#    #
+#    'N': N_HA_CB_4_connectivities,
+#    'HA': N_HA_CB_4_connectivities,
+#    'CB': N_HA_CB_4_connectivities,
+#    #
+#    'CA': CA_O_4_connectivities,
+#    'O': CA_O_4_connectivities,
+#    #
+#    }
 
 
 inter_residue_connectivities = {
-    3: inter_3_connect,
-    4: inter_4_connect,
+    2: bonds_le_2_inter,
+    3: bonds_le_3_inter,
+    #4: inter_4_connect,
     }
 
 # bend angles are in radians
