@@ -18,9 +18,11 @@ pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
 _sidechain_template_files = sorted(list(
     _filepath.joinpath('sidechain_templates', 'pdb_names').glob('*.pdb')))
-_amber_pdbs = sorted(list(
+amber_pdbs = sorted(list(
     _filepath.joinpath('sidechain_templates', 'amber_names').glob('*.pdb')))
 _amber14sb = _filepath.joinpath('data', 'protein.ff14SB.xml')
+
+backbone_atoms = ('N', 'C', 'CA', 'O', 'OXT', 'H', 'H1', 'H2', 'H3')
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
@@ -48,7 +50,7 @@ def _read_labels(pdbs):
 # support figure, for the different histidine protonation states.
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
 atom_labels_pdb = _read_labels(_sidechain_template_files)
-atom_labels_amber = _read_labels(_amber_pdbs)
+atom_labels_amber = _read_labels(amber_pdbs)
 
 
 def read_ff14SB_params():
@@ -132,7 +134,12 @@ def read_ff14SB_params():
     return forcefield_params
 
 
-def generate_residue_template_topology():
+def generate_residue_template_topology(
+        pdb_files,
+        residue_labels,
+        add_OXT=True,
+        add_Nterminal_H=True,
+        ):
     """
     Generate topology for the residue templates.
 
@@ -150,7 +157,7 @@ def generate_residue_template_topology():
     # Creates topoloty of amino acids templates, that is, a dictionary of
     # all vs. all covalent bond pairs
     res_covalent_bonds = defaultdict(dict)
-    for pdb in _amber_pdbs:
+    for pdb in pdb_files:
 
         pdbname = pdb.stem.upper()
 
@@ -162,7 +169,7 @@ def generate_residue_template_topology():
         # atom names of residue templates must be sorted equally to the
         # atom_names dictionary, or vice-versa.
         _list_names = tuple(s.data_array[:, col_name])
-        _atoms = atom_labels_amber[pdbname]
+        _atoms = residue_labels[pdbname]
         assert _list_names == _atoms, (
             'Atom names in `atom_names` dictionary differ from the '
             f'atom names in {pdbname} residue template.'
@@ -202,17 +209,54 @@ def generate_residue_template_topology():
 
     # asserts all atoms are considered
     for k1, v1 in res_covalent_bonds.items():
-        assert len(v1) == len(atom_labels_amber[k1]), k1
+        assert len(v1) == len(residue_labels[k1]), k1
 
-        # added 'OXT' connectivity
-        for atom, connects in v1.items():
-            if 'O' in connects:
-                connects.append('OXT')
+        # add OXT connectivity
+        if add_OXT:
+            add_OXT_to_connectivity(v1)
 
-        # this should be only 'C'
-        v1['OXT'] = copy(v1['O'])
+        ## added 'OXT' connectivity
+        #for atom, connects in v1.items():
+        #    if 'O' in connects:
+        #        connects.append('OXT')
+
+        ## this should be only 'C'
+        #v1['OXT'] = copy(v1['O'])
+        if k1 == 'PRO':
+            continue
+
+        if add_Nterminal_H:
+            add_Nterm_H_connectivity(v1)
 
     return res_covalent_bonds
+
+
+def add_Nterm_H_connectivity(connectivity_dict):
+    """
+    Adds protons for Nterm connectivity.
+
+    Adds H1, H2, and H3 protons to N connectivity.
+    This maintains compatibility with XML forcefields obtained
+    from the OpenMM project.
+    """
+    assert 'H' in connectivity_dict, connectivity_dict
+    for atom, list_of_connects in connectivity_dict.items():
+        if 'H' in list_of_connects:
+            list_of_connects.extend(('H1', 'H2', 'H3'))
+
+    for h in ('H1', 'H2', 'H3'):
+        connectivity_dict[h] = copy(connectivity_dict['H'])
+
+
+def add_OXT_to_connectivity(connectivity_dict):
+    """Add OXT connectivity to residue."""
+    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
+    for _atom in connectivity_dict['OXT']:
+        connectivity_dict[_atom].append('OXT')
+
+    assert 'OXT' in connectivity_dict
+    assert set(connectivity_dict['OXT']).issubset(connectivity_dict.keys())
+    assert connectivity_dict['OXT'] == connectivity_dict['O']
 
 
 def _recursive_bonds_apart(
@@ -319,7 +363,7 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
 
 def topology_3_bonds_apart(covalent_bond_dict):
     """
-    Map atom connectivity 3 bonds apart.
+    Map atom connectivity EXACTLY 3 bonds apart.
 
     See Amber20 manual Figure 14.1.
 
@@ -358,14 +402,6 @@ def topology_3_bonds_apart(covalent_bond_dict):
                         xba.add(subatom3)
 
     return x_bonds_apart
-
-
-def add_OXT_to_residue(connectivity_dict):
-    """Add OXT connectivity to residue."""
-    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
-    connectivity_dict['OXT'].append('O')
-    for _atom in connectivity_dict['OXT']:
-        connectivity_dict[_atom].append('OXT')
 
 
 # interresidue exact 3 bonds connectivity
@@ -628,7 +664,12 @@ build_bend_H_N_C = np.radians(114) / 2
 def _get_structure_coords(path_):
     s = Structure(path_)
     s.build()
-    return s.coords.astype(np.float64)
+    coords = s.coords.astype(np.float64)
+    sidechains = np.where(
+        np.logical_not(np.isin(s.data_array[:, col_name], backbone_atoms))
+        )[0]
+
+    return coords, sidechains
 
 
 sidechain_templates = {

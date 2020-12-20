@@ -416,7 +416,7 @@ def place_sidechain_template(
         Coordinates are not expected to be at any particular position.
 
     ss_template : numpy nd.array, shape (M, 3), dtype=float64
-        The sidechain all-atom template. Expected to have the CA atom
+        The sidechain all-atom template. **Expected** to have the CA atom
         at the origin (0, 0, 0). This requirement could be easily
         removed but it is maintained for performance reasons and
         considering in the context where this function is meant
@@ -424,9 +424,8 @@ def place_sidechain_template(
 
     Returns
     -------
-    nd.array, shape (M-4, 3), dtype=float64
-        The side chain coords.
-        Backbone coords are NOT returned.
+    nd.array, shape (M, 3), dtype=float64
+        The displaced side chain coords. All atoms are returned.
     """
     # places bb with CA at 0,0,0
     bbtmp = np.full(bb_cnf.shape, np.nan)
@@ -461,7 +460,8 @@ def place_sidechain_template(
     # aligns to the CA-C vector maintaining the N-CA in place
     rot2 = Q_rotate(rot1, rvu, angle)
 
-    return rot2[4:, :] + bb_cnf[1, :]
+    return rot2[:, :] + bb_cnf[1, :]
+
 
 
 @njit
@@ -758,7 +758,7 @@ def calc_all_vs_all_dists_square(coords):
     Calculate the upper half of all vs. all distances squared.
 
     Reproduces the operations of scipy.spatial.distance.pdist
-    but witouth applying the sqrt().
+    but without applying the sqrt().
 
     Parameters
     ----------
@@ -786,6 +786,39 @@ def calc_all_vs_all_dists_square(coords):
 
     return results
 
+
+@njit
+def calc_all_vs_all_dists(coords):
+    """
+    Calculate the upper half of all vs. all distances.
+
+    Reproduces the operations of scipy.spatial.distance.pdist.
+
+    Parameters
+    ----------
+    coords : np.ndarray, shape (N, 3), dtype=np.float64
+
+    Returns
+    -------
+    np.ndarray, shape ((N * N - N) // 2,), dytpe=np.float64
+    """
+
+    len_ = coords.shape[0]
+    shape = ((len_ * len_ - len_) // 2,)
+    results = np.empty(shape, dtype=np.float64)
+
+    c = 1
+    i = 0
+    for a in coords:
+        for b in coords[c:]:
+            x = b[0] - a[0]
+            y = b[1] - a[1]
+            z = b[2] - a[2]
+            results[i] = (x*x + y*y + z*z) ** 0.5
+            i += 1
+        c += 1
+
+    return results
 
 def calc_vdW_AB(sigma_i, sigma_j, eps_i, eps_j, alpha=0.8):
     """

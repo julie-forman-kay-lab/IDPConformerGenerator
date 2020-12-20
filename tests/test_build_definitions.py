@@ -119,7 +119,7 @@ def test_residue_atoms_pdb_amber():
 
 def test_amber_templates_element():
     """Test elements in Amber template files are correct."""
-    for pdb in BD._amber_pdbs:
+    for pdb in BD.amber_pdbs:
         with open(pdb, 'r') as fin:
             for line in fin:
                 from_name = line[atom_name].strip()[0]
@@ -135,3 +135,23 @@ def test_pdb_templates_element():
                 from_name = line[atom_name].strip().lstrip(digits)[0]
                 element = line[atom_element].strip()
                 assert from_name == element, f'Elements differ for {pdb.name}'
+
+def test_Nterm_H_connectivity():
+    """Test adds H1-3 connectivities to N term and all atoms."""
+    d = {
+        'A': ['H', 'C'],
+        'B': ['C', 'CB', 'O'],
+        'H': ['A'],
+        }
+
+    BD.add_Nterm_H_connectivity(d)
+
+    assert 'H1' in d['A']
+    assert 'H2' in d['A']
+    assert 'H3' in d['A']
+    assert d['B'] == ['C', 'CB', 'O']
+    assert 'H1' in d
+    assert 'H2' in d
+    assert 'H3' in d
+    assert d['H1'] == d['H2'] == d['H3']
+    assert 'A' in d['H1']
