@@ -25,3 +25,4 @@ exclude REQUIREMENTS.md
 global-exclude *.py[cod] __pycache__/* *.so *.dylib .ipynb_checkpoints/*
 global-exclude tags
 global-exclude *.swp
+global-exclude *.vim
