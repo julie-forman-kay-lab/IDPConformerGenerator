@@ -390,6 +390,7 @@ def add_argument_update(parser):
         )
 
 
+# TODO: this parameters must be discontinued
 def add_argument_vdWr(parser):
     """Add argument for vdW radii set selection."""
     parser.add_argument(
@@ -404,6 +405,7 @@ def add_argument_vdWr(parser):
         )
 
 
+# TODO: this parameters must be discontinued
 def add_argument_vdWt(parser):
     """Add argument for vdW tolerance."""
     parser.add_argument(
@@ -421,6 +423,7 @@ def add_argument_vdWt(parser):
         )
 
 
+# TODO: this parameters must be discontinued
 def add_argument_vdWb(parser):
     """
     Add argument for vdW bonds apart criteria.

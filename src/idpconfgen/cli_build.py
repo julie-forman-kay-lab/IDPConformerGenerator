@@ -268,20 +268,27 @@ def build_conformers(
     # TODO
     CALC_DISTS = calc_all_vs_all_dists
     # TODO, maybe this should be sum, if used at all: https://stackoverflow.com/questions/8364674/how-to-count-the-number-of-true-elements-in-a-numpy-bool-array
-    COUNT_NONZERO = np.count_nonzero
     DISTANCE_NH = distance_H_N
     LOGICAL_AND = np.logical_and
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
+    NANSUM = np.nansum
+    PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RC = randchoice
     RINT = randint
     ROUND = np.round
+    SIDECHAIN_TEMPLATES = sidechain_templates
     angles = ANGLES
     slices = SLICES
     # bellow an optimization for the builder loop
-    input_seq_3_letters = [aa1to3[_res] for _res in input_seq]
+
+    # TODO: correct for HIS/HIE/HID/HIP
+    input_seq_3_letters = [
+        'HIP' if _res == 'H' else aa1to3[_res]
+        for _res in input_seq
+        ]
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
@@ -337,93 +344,53 @@ def build_conformers(
         residue_labels,
         ff14SB,  # the forcefield
         )
-    # TODO: charges are not yet implemented
 
-    # creates ij combinations
-    # TODO: have to concatenate both functions because large proteins
-    # collapse
-    #print('Creates ij labels combinations')
-    #atom_labels_ij, \
-    #residue_numbers_ij, \
-    #residue_labels_ij = generate_ij_pairs_without_repetition(
-    #    atom_labels,
-    #    residue_numbers,
-    #    residue_labels,
-    #    )
-
-
-    # this is the Lennard-Jones special case, where scaling factors are applied
-    # to atoms bonded 3 bonds apart, known as the '14' cases.
-    print('Create masks')
-
-    atom_labels_ij_gen = gen_ij_pairs_upper_diagonal(atom_labels)
-    residue_numbers_ij_gen = gen_ij_pairs_upper_diagonal(residue_numbers)
-    residue_labels_ij_gen = gen_ij_pairs_upper_diagonal(residue_labels)
-
-    _bonds_exact_3_indexes = gen_atom_pair_connectivity_masks(
-        residue_labels_ij_gen,
-        residue_numbers_ij_gen,
-        atom_labels_ij_gen,
+    # The mask to identify ij pairs exactly 3 bonds apart is needed for the
+    # special scaling factor of Coulomb and LJ equations
+    # This mask will be used only aftert the calculation of the CLJ params
+    print('Create 1-4 masks')
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
         bonds_equal_3_intra,
         bonds_equal_3_inter,
         )
 
-    bonds_exact_3_mask = np.full(num_ij_pairs, False)
-    for _idx in _bonds_exact_3_indexes:
-        bonds_exact_3_mask[_idx] = True
-
     print('Create disable masks')
     # this mask will disable calculations in covalently bond atoms and
     # atoms separated 2 bonds apart
-    atom_labels_ij_gen = gen_ij_pairs_upper_diagonal(atom_labels)
-    residue_numbers_ij_gen = gen_ij_pairs_upper_diagonal(residue_numbers)
-    residue_labels_ij_gen = gen_ij_pairs_upper_diagonal(residue_labels)
-
-    _bonds_le_2_mask_gen = gen_atom_pair_connectivity_masks(
-        residue_labels_ij_gen,
-        residue_numbers_ij_gen,
-        atom_labels_ij_gen,
+    _bonds_ge_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
         bonds_le_2_intra,
         bonds_le_2_inter,
+        base_bool=True,
         )
-
-    bonds_ge_3_mask = np.full(num_ij_pairs, True)
-    for _idx in _bonds_le_2_mask_gen:
-        bonds_ge_3_mask[_idx] = False
-
-    __ = np.empty(num_ij_pairs)
-    start = time()
-    for _ in range(100000):
-        __[bonds_ge_3_mask]
-    print('with bools :', time() - start)
-
-    bonds_numeric = np.where(bonds_ge_3_mask)[0]
-    start = time()
-    for _ in range(100000):
-        __[bonds_numeric]
-    print('with numbers :', time() - start)
-    sys.exit()
-
+    # on lun 21 dic 2020 17:33:31 EST, I tested for 1M sized array
+    # the numeric indexing performed better than the boolean indexing
+    # 25 ns versus 31 ns.
+    bonds_ge_3_mask = np.where(_bonds_ge_3_mask)[0]
+    del _bonds_ge_3_mask
 
     # /
-    # Prepares Coulomb and Lennard-Jones pre computed parameters
-    if num_atoms < 1000:
-        epsilons_ij_pre = calc_outer_multiplication_upper_diagonal(epsilons_ii)
-        sigmas_ij_pre = calc_outer_sum_upper_diagonal(sigmas_ii)
-        charges_ij= calc_outer_multiplication_upper_diagonal(charges_i)
-
-    else:
-
-        print('Calculating the ij pairs')
-        print(len(epsilons_ii))
-        sigmas_ij_pre = np.empty(num_ij_pairs)
-        njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
-        print('sigmas done')
-        epsilons_ij_pre = np.empty(num_ij_pairs)
-        njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
-        print('epsilons done')
-        charges_ij = np.empty(num_ij_pairs)
-        njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+    # Prepares Coulomb and Lennard-Jones pre computed parameters:
+    # calculates ij combinations using raw njitted functions because using
+    # numpy outer variantes in very large systems overloads memory and
+    # reduces performance.
+    #
+    # sigmas
+    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
+    #
+    # epsilons
+    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
+    #
+    # charges
+    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
 
     epsilons_ij = np.sqrt(epsilons_ij_pre)  # combinatorial rule / sqrt
     del epsilons_ij_pre
@@ -436,24 +403,19 @@ def build_conformers(
 
     charges_ij *= 0.25  # dielectic constant
 
-    # TODO: calibrate lj14scaling factor
-    # 0.6 was calibrated manually, until I could find a conformer
+    # this is the Lennard-Jones special case, where scaling factors are applied
+    # to atoms bonded 3 bonds apart, known as the '14' cases.
+    # 0.4 was calibrated manually, until I could find a conformer
     # within 50 trials dom 20 dic 2020 13:16:50 EST
+    # I believe, because we are not doing local minimization here, we
+    # cannot be that strick with the 14 scaling factor, and a reduction
+    # factor of 2 is not enough
     acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
     bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
     charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
 
     # TODO: needed for other energy functions
     #atoms_VDW = 0.5 * sigmas_ii * 2**(1/6)
-
-    #vdW_sums, vdW_non_bond = generate_vdW_data(
-    #    atom_labels,
-    #    residue_numbers,
-    #    residue_labels,
-    #    vdW_radii_dict[vdW_radii],
-    #    vdW_bonds_apart,
-    #    vdW_tolerance,
-    #    )
 
     # creates index-translated boolean masks
     bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
@@ -499,7 +461,7 @@ def build_conformers(
         n_terminal_CA_coord,
         ))
 
-    ss = create_sidechains_masks_per_residue(
+    ss_masks = create_sidechains_masks_per_residue(
         residue_numbers,
         atom_labels,
         backbone_atoms,
@@ -538,7 +500,6 @@ def build_conformers(
     start_conf = nconfs * execution_run
     end_conf = start_conf + nconfs
     conf_n = start_conf
-    # for conf_n in range(start_conf, end_conf):
     while conf_n < end_conf:
         print('building conformer: ', conf_n)
 
@@ -564,7 +525,7 @@ def build_conformers(
         bb[:, :] = NAN
         bb_CO[:, :] = NAN
         bb_NH[:, :] = NAN
-        for _mask, _coords in ss:
+        for _mask, _coords in ss_masks:
             _coords[:, :] = NAN
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
@@ -593,9 +554,10 @@ def build_conformers(
 
         backbone_done = False
         number_of_trials = 0
-        number_of_trials2 = 0
+        # TODO: use or not to use number_of_trials2? To evaluate in future.
+        #number_of_trials2 = 0
         # run this loop until a specific BREAK is triggered
-        while True:
+        while 1:  # 1 is faster than True :-)
 
             # I decided to use an if-statement here instead of polymorph
             # the else clause to a `generative_function` variable because
@@ -690,35 +652,26 @@ def build_conformers(
             if with_sidechains:
                 for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
 
-                    sstemplate, _sidechain_idxs = \
-                        sidechain_templates[input_seq_3_letters[res_i]]
+                    _sstemplate, _sidechain_idxs = \
+                        SIDECHAIN_TEMPLATES[input_seq_3_letters[res_i]]  # 1 is faster than True :-)
 
-                    sscoords = place_sidechain_template(
+                    sscoords = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
-                        sstemplate,
+                        _sstemplate,
                         )
 
-                    ss[res_i][1][:, :] = sscoords[_sidechain_idxs]
+                    ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
 
                 # Transfers coords to the main coord array
-                for _smask, _sidecoords in ss[: current_res_number + backbone_done]:  # noqa: E501
+                for _smask, _sidecoords in ss_masks[: current_res_number + backbone_done]:  # noqa: E501
                     coords[_smask] = _sidecoords
 
             coords[bb_mask] = bb_real  # do not consider the initial dummy atom
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
-            # note that CALC_DISTS computes the square (without sqrt)
             distances_ij = CALC_DISTS(coords)
 
-
-
-
-
-
-
-
-            # compatibly, vdW_sums, considers squared distances
             energy = njit_calc_LJ_energy(
                 acoeff,
                 bcoeff,
@@ -726,10 +679,10 @@ def build_conformers(
                 bonds_ge_3_mask,
                 )
 
-            energy += np.nansum(charges_ij / distances_ij)
+            energy += NANSUM(charges_ij / distances_ij)
             #print(energy)
 
-            if energy > 0:#has_clash:
+            if energy > 0:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -768,7 +721,8 @@ def build_conformers(
                 bb_NH[_NHi0:NHi, :] = NAN
 
                 # do the same for sidechains
-                # ...
+                # ... it is not necessary because in the loop above
+                # sidechain coordinates are replaces when repositioned
 
                 # reset also indexes
                 bbi = _bbi0
@@ -822,46 +776,13 @@ def build_conformers(
                     f'{end_conf - conf_n} of {end_conf - start_conf} '
                     'conformers were not built.'
                     )
-
-                relevant = np.logical_not(np.isnan(coords[:, 0]))
-
-                # TODO: remove this
-                ####
-
-                #zzz = [
-                #    (_i, _e, tuple(_j), tuple(_k))
-                #    for _i, _e, _j, _k in zip(
-                #        distances_ij[bonds_ge_3_mask],
-                #        energy_ij[bonds_ge_3_mask],
-                #        np.array(atom_labels_ij)[bonds_ge_3_mask],
-                #        np.array(residue_numbers_ij)[bonds_ge_3_mask],
-                #        )
-                #    if _i is not np.nan
-                #    ]
-
-                #pprint(zzz)
-
-
-
-
-
-                ####
-                #pdb_string = gen_PDB_from_conformer(
-                #    input_seq,
-                #    atom_labels[relevant],
-                #    residue_numbers[relevant],
-                #    ROUND(coords[relevant], decimals=3),
-                #    )
-
-                #fname = f'{conformer_name}_{conf_n}.pdb'
-                #with open(fname, 'w') as fout:
-                #    fout.write(pdb_string)
-
                 return
             broke_on_start_attempt = False
             continue
 
         # until sidechains are implemented this is needed
+        # TODO: need to implement the N-terminal H1-3 atoms
+        # lun 21 dic 2020 18:14:05 EST
         relevant = np.logical_not(np.isnan(coords[:, 0]))
 
         pdb_string = gen_PDB_from_conformer(
@@ -894,6 +815,9 @@ def gen_PDB_from_conformer(
     LINES_APPEND = lines.append
     ALF_FORMAT = ALF.format
     resi = -1
+
+    # this is possible ONLY because there are no DOUBLE CHARS atoms
+    # in the atoms that constitute a protein chain
     ATOM_LABEL_FMT = ' {: <3}'.format
 
     for i in range(len(atom_labels)):
@@ -1008,6 +932,318 @@ def generate_residue_labels(
     return residue_labels
 
 
+
+# TODO: abstract out this function
+def populate_ff_parameters_in_structure(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        ):
+    """
+    Creates a list of SIGMAS, EPSILONS, and CHARGES.
+
+    Matches label information in the conformer to the respective values
+    in the force field.
+    """
+    assert len(atom_labels) == len(residue_numbers) == len(residue_labels)
+
+    sigmas_l = []
+    epsilons_l = []
+    charges_l = []
+
+    sigmas_append = sigmas_l.append
+    epsilons_append = epsilons_l.append
+    charges_append = charges_l.append
+
+    zipit = zip(atom_labels, residue_numbers, residue_labels)
+    for atom_name, res_num, res_label in zipit:
+
+        # adds C to the terminal residues
+        if res_num == residue_numbers[-1]:
+            res = 'C' + res_label
+            was_in_C_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        elif res_num == residue_numbers[0]:
+            res = 'N' + res_label
+            was_in_N_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        else:
+            res = res_label
+
+        # TODO:
+        # define protonation state in parameters
+        if res_label.endswith('HIS'):
+            res_label = res_label[:-3] + 'HIP'
+
+        try:
+            # force field atom type
+            atype = force_field[res][atom_name]['type']
+
+        # TODO:
+        # try/catch is here to avoid problems with His...
+        # for this purpose we are only using side-chains
+        except KeyError:
+            raise KeyError(tuple(force_field[res].keys()))
+
+        ep = float(force_field[atype]['epsilon'])
+        # epsilons by order of atom
+        epsilons_append(ep)
+
+        sig = float(force_field[atype]['sigma']) * 10  # conversion to Angstroms
+        # sigmas by order of atom
+        sigmas_append(sig)
+
+        charge = float(force_field[res][atom_name]['charge'])
+        charges_append(charge)
+
+    assert len(epsilons_l) == len(sigmas_l) == len(charges_l), 'Lengths differ.'
+    assert len(epsilons_l) == len(atom_labels), 'Lengths differ. There should be one epsilon per atom.'
+    assert was_in_C_terminal, 'The C terminal residue was never computed. It should have been computed'
+    assert was_in_N_terminal, 'The N terminal residue was never computed. It should have been computed'
+
+    # brief theoretical review:
+    # sigmas and epsilons are combined parameters self vs self (i vs i)
+    # charges refer only to the self alone (i)
+    sigmas_ii = np.array(sigmas_l)
+    epsilons_ii = np.array(epsilons_l)
+    charges_i = np.array(charges_l)
+
+    assert epsilons_ii.shape == (len(epsilons_l),)
+    assert sigmas_ii.shape == (len(sigmas_l),)
+    assert charges_i.shape == (len(charges_l),)
+
+    return sigmas_ii, epsilons_ii, charges_i
+
+
+def gen_ij_pairs_upper_diagonal(data):
+    """Generator"""
+    for i in range(len(data) - 1):
+        for j in range(i + 1, len(data)):
+            yield (data[i], data[j])
+
+
+def gen_atom_pair_connectivity_masks(
+        res_names_ij,
+        res_num_ij,
+        atom_names_ij,
+        connectivity_intra,
+        connectivity_inter,
+        ):
+    """
+    To generate bonds masks we need the residue numbers and the atom names.
+
+    Depends
+    -------
+    `are_connected`
+    """
+    zipit = zip(res_names_ij, res_num_ij, atom_names_ij)
+    counter = 0
+    for (rn1, _), (n1, n2), (a1, a2) in zipit:
+
+        found_connectivity = are_connected(
+            int(n1),
+            int(n2),
+            rn1,
+            a1,
+            a2,
+            connectivity_intra,
+            connectivity_inter,
+            )
+
+        if found_connectivity:
+            yield counter
+
+        counter += 1
+
+
+def are_connected(n1, n2, rn1, a1, a2, bonds_intra, bonds_inter):
+    """
+    Detect if a certain atom pair is bonded accordind to criteria.
+
+    Considers only to the self residue and next residue
+    """
+    # requires
+    assert isinstance(n1, int) and isinstance(n2, int), (type(n1), type(n2))
+    assert all(isinstance(i, str) for i in (rn1, a1, a2)), \
+        (type(i) for i in (rn1, a1, a2))
+    assert all(isinstance(i, dict) for i in (bonds_intra, bonds_inter)), \
+        (type(i) for i in (bonds_intra, bonds_inter))
+
+    answer = (
+        (n1 == n2 and a2 in bonds_intra[rn1][a1])
+        or (
+            n1 + 1 == n2
+            and (
+                a1 in bonds_inter  # this void KeyError
+                and a2 in bonds_inter[a1]
+                )
+            )
+        )
+
+    assert isinstance(answer, bool)
+    return answer
+
+
+def calc_outer_multiplication_upper_diagonal_raw(data, result):
+    """Calculate the upper diagonal multiplication with for loops."""
+    #assert data.ndim == 1, \
+    #    'Data has {data.ndim} dimensions, should have only 1.'
+
+    #result = np.empty(data.size - 1, np.float64)
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] * data[j]
+            c += 1
+
+    assert result.size == (data.size * data.size - data.size) // 2
+    assert abs(result[0] - data[0] * data[1]) < 0.0000001
+    assert abs(result[-1] - data[-2] * data[-1]) < 0.0000001
+    #return result
+
+njit_calc_multiplication_upper_diagonal_raw = \
+    njit(calc_outer_multiplication_upper_diagonal_raw)
+
+
+def calc_sum_upper_diagonal_raw(data, result):
+    """
+    Calculate outer sum for upper diagonal with for loops.
+
+    Avoids creating temporary hiper large arrays
+    """
+    #assert data.ndim == 1, \
+    #    'Data has {data.ndim} dimensions, should have only 1.'
+
+    #result = np.empty(data.size - 1, np.float64)
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] + data[j]
+            c += 1
+
+    assert result.size == (data.size * data.size - data.size) // 2
+    assert abs(result[0] - (data[0] + data[1])) < 0.0000001
+    assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
+    #return result
+
+
+njit_calc_sum_upper_diagonal_raw = njit(calc_sum_upper_diagonal_raw)
+
+
+def calc_LJ_energy(acoeff, bcoeff, dists_ij, to_eval_mask, NANSUM=np.nansum):
+    """Calculates Lennard-Jones Energy."""
+    #assert dists_ij.size == acoeff.size == bcoeff.size, (dists_ij.size, acoeff.size)
+    #assert dists_ij.size == to_eval_mask.size
+
+    ar = acoeff / (dists_ij ** 12)
+    br = bcoeff / (dists_ij ** 6)
+    energy_ij = ar - br
+
+    # nansum is used because some values in dists_ij are expected to be nan
+    #return energy_ij, NANSUM(energy_ij[to_eval_mask])
+    return NANSUM(energy_ij[to_eval_mask])
+
+njit_calc_LJ_energy = njit(calc_LJ_energy)
+
+
+def create_sidechains_masks_per_residue(
+        residue_numbers,
+        atom_labels,
+        backbone_atoms,
+        ):
+    """
+    Create a map of numeric indexing masks pointing to side chains atoms.
+
+    Create separate masks per residue.
+
+    Parameters
+    ----------
+    residue_numbers : np.ndarray, shape (N,)
+        The atom residue numbers of the protein.
+
+    atom_labels : np.ndarray, shape (N,)
+        The atom labels of the protein.
+
+    backbone_atoms : list or tuple
+        The labels of all possible backbone atoms.
+
+    Returns
+    -------
+    list of tuples of length 2
+        List indexes refer to protein residues, index 0 is residue 1.
+        Per residue, a tuple of length 2 is given. Tuple index 0 are
+        the indexes of that residue sidechain atoms mapped to an array
+        of the `atom_labels` and `residue_numbers` characteristics.
+        The tuple index 1 is an array of length M, where M is the number
+        of sidechain atoms for that residue, defaults to np.nan.
+    """
+    assert residue_numbers.size == atom_labels.size
+    assert type(backbone_atoms) in (list, tuple, np.ndarray)
+
+    ss = []
+    ssa = ss.append
+
+    is_backbone = np.isin(atom_labels, backbone_atoms)
+    is_sidechain = np.logical_not(is_backbone)
+
+    float64 = np.float64
+    full = np.full
+    logical_and = np.logical_and
+    nan = np.nan
+    where = np.where
+
+    # sorted here is mandatory because ss indexes must follow the residue
+    # numbering
+    for resnum in sorted(list(set(residue_numbers))):
+        is_residue = residue_numbers == resnum
+        bool_result = logical_and(is_residue, is_sidechain)
+        ssa((
+            where(bool_result)[0],
+            full((np.sum(bool_result), 3), nan, dtype=float64)
+            ))
+
+    return ss
+
+
+def create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_intra,
+        bonds_inter,
+        base_bool=False,
+        ):
+    """."""
+    atom_labels_ij_gen = gen_ij_pairs_upper_diagonal(atom_labels)
+    residue_numbers_ij_gen = gen_ij_pairs_upper_diagonal(residue_numbers)
+    residue_labels_ij_gen = gen_ij_pairs_upper_diagonal(residue_labels)
+
+    bonds_indexes_gen = gen_atom_pair_connectivity_masks(
+        residue_labels_ij_gen,
+        residue_numbers_ij_gen,
+        atom_labels_ij_gen,
+        bonds_intra,
+        bonds_inter,
+        )
+
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    other_bool = not base_bool
+    bonds_mask = np.full(num_ij_pairs, base_bool)
+
+    for idx in bonds_indexes_gen:
+        bonds_mask[idx] = other_bool
+
+    return bonds_mask
+
+
+# NOT USED HERE
+# kept to maintain compatibility with cli_validate.
+# TODO: revisit cli_validate
 def generate_vdW_data(
         atom_labels,
         residue_numbers,
@@ -1145,378 +1381,9 @@ def generate_vdW_data(
                 and res2 == res1 + 1 \
                 and a2 in inter_connect_local[a1]:
             vdW_non_bond[counter] = False
-    
+
     print('done')
     return vdW_sums, vdW_non_bond
-
-
-def populate_ff_parameters_in_structure(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        force_field,
-        ):
-    """
-    Creates a list of SIGMAS, EPSILONS, and CHARGES.
-
-    Matches label information in the conformer to the respective values
-    in the force field.
-    """
-    assert len(atom_labels) == len(residue_numbers) == len(residue_labels)
-
-    sigmas_l = []
-    epsilons_l = []
-    charges_l = []
-
-    sigmas_append = sigmas_l.append
-    epsilons_append = epsilons_l.append
-    charges_append = charges_l.append
-
-    zipit = zip(atom_labels, residue_numbers, residue_labels)
-    for atom_name, res_num, res_label in zipit:
-
-        # adds C to the terminal residues
-        if res_num == residue_numbers[-1]:
-            res = 'C' + res_label
-            was_in_C_terminal = True
-            assert res.isupper() and len(res) == 4, res
-
-        elif res_num == residue_numbers[0]:
-            res = 'N' + res_label
-            was_in_N_terminal = True
-            assert res.isupper() and len(res) == 4, res
-
-        else:
-            res = res_label
-
-        # TODO:
-        # define protonation state in parameters
-        if res_label.endswith('HIS'):
-            res_label = res_label[:-3] + 'HIP'
-
-        try:
-            # force field atom type
-            atype = force_field[res][atom_name]['type']
-
-        # TODO:
-        # try/catch is here to avoid problems with His...
-        # for this purpose we are only using side-chains
-        except KeyError:
-            raise KeyError(tuple(force_field[res].keys()))
-
-        ep = float(force_field[atype]['epsilon'])
-        # epsilons by order of atom
-        epsilons_append(ep)
-
-        sig = float(force_field[atype]['sigma']) * 10  # conversion to Angstroms
-        # sigmas by order of atom
-        sigmas_append(sig)
-
-        charge = float(force_field[res][atom_name]['charge'])
-        charges_append(charge)
-
-    assert len(epsilons_l) == len(sigmas_l) == len(charges_l), 'Lengths differ.'
-    assert len(epsilons_l) == len(atom_labels), 'Lengths differ. There should be one epsilon per atom.'
-    assert was_in_C_terminal, 'The C terminal residue was never computed. It should have been computed'
-    assert was_in_N_terminal, 'The N terminal residue was never computed. It should have been computed'
-
-    # brief theoretical review:
-    # sigmas and epsilons are combined parameters self vs self (i vs i)
-    # charges refer only to the self alone (i)
-    sigmas_ii = np.array(sigmas_l)
-    epsilons_ii = np.array(epsilons_l)
-    charges_i = np.array(charges_l)
-
-    assert epsilons_ii.shape == (len(epsilons_l),)
-    assert sigmas_ii.shape == (len(sigmas_l),)
-    assert charges_i.shape == (len(charges_l),)
-
-    return sigmas_ii, epsilons_ii, charges_i
-
-
-def generate_ij_pairs_without_repetition(*data):
-    """."""
-    assert all(len(data[i]) > 0 for i in range(len(data))), \
-        f'Data index {i} is empty, we expect some data in.'
-    assert sum(len(d) for d in data) // len(data) == len(data[0]), \
-        'All datasets must have the same length'
-
-    ij_pairs = [[] for i in range(len(data))]
-    ij_appends = [l.append for l in ij_pairs]
-
-    # the first two loops represent the upper matrix diagonal
-    len_ = len(data[0])
-
-    for i in range(len_ - 1):
-        for j in range(i + 1, len_):
-
-            # this loops adds the pairs to the multiple data lists
-            for append_func, series in zip(ij_appends, data):
-                append_func((series[i], series[j]))
-
-    assert ij_pairs[-1][-1] == (data[-1][-2], data[-1][-1])
-
-    assert isinstance(ij_pairs, list)
-    return ij_pairs
-
-
-def gen_ij_pairs_upper_diagonal(data):
-    """Generator"""
-    for i in range(len(data) - 1):
-        for j in range(i + 1, len(data)):
-            yield (data[i], data[j])
-
-
-def create_atom_pair_connectivity_masks(
-        res_names_ij,
-        res_num_ij,
-        atom_names_ij,
-        connectivity_intra,
-        connectivity_inter,
-        ):
-    """
-    To generate bonds masks we need the residue numbers and the atom names.
-
-    Depends
-    -------
-    `are_connected`
-    """
-    assert len(res_names_ij) == len(res_num_ij) == len(atom_names_ij), \
-        'Sizes of `ij` vectors differ.'
-
-    zipit = zip(res_names_ij, res_num_ij, atom_names_ij)
-
-    # boolean matrix arrays
-    # all are false until otherwise stated
-    connectivity_mask = np.full(len(res_names_ij), False)
-    counter = 0
-    for (rn1, rn2), (n1, n2), (a1, a2) in zipit:
-
-        found_connectivity = are_connected(
-            int(n1),
-            int(n2),
-            rn1,
-            a1,
-            a2,
-            connectivity_intra,
-            connectivity_inter,
-            )
-
-        if found_connectivity:
-            connectivity_mask[counter] = True
-
-        counter += 1
-
-    assert isinstance(connectivity_mask, np.ndarray)
-    return connectivity_mask
-
-
-def gen_atom_pair_connectivity_masks(
-        res_names_ij,
-        res_num_ij,
-        atom_names_ij,
-        connectivity_intra,
-        connectivity_inter,
-        ):
-    """
-    To generate bonds masks we need the residue numbers and the atom names.
-
-    Depends
-    -------
-    `are_connected`
-    """
-    zipit = zip(res_names_ij, res_num_ij, atom_names_ij)
-    counter = 0
-    for (rn1, rn2), (n1, n2), (a1, a2) in zipit:
-
-        found_connectivity = are_connected(
-            int(n1),
-            int(n2),
-            rn1,
-            a1,
-            a2,
-            connectivity_intra,
-            connectivity_inter,
-            )
-
-        if found_connectivity:
-            yield counter
-
-        counter += 1
-
-
-def are_connected(n1, n2, rn1, a1, a2, bonds_intra, bonds_inter):
-    """
-    Detect if a certain atom pair is bonded accordind to criteria.
-
-    Considers only to the self residue and next residue
-    """
-    # requires
-    assert isinstance(n1, int) and isinstance(n2, int), (type(n1), type(n2))
-    assert all(isinstance(i, str) for i in (rn1, a1, a2)), \
-        (type(i) for i in (rn1, a1, a2))
-    assert all(isinstance(i, dict) for i in (bonds_intra, bonds_inter)), \
-        (type(i) for i in (bonds_intra, bonds_inter))
-
-    answer = (
-        (n1 == n2 and a2 in bonds_intra[rn1][a1])
-        or (
-            n1 + 1 == n2
-            and (
-                a1 in bonds_inter  # this void KeyError
-                and a2 in bonds_inter[a1]
-                )
-            )
-        )
-
-    assert isinstance(answer, bool)
-    return answer
-
-
-def calc_outer_multiplication_upper_diagonal(data):
-    """Calculate electrostatic interactions for ij pair."""
-    assert data.ndim == 1, \
-        'Data has {data.ndim} dimensions, should have only 1.'
-
-    indices = np.triu_indices(data.size, k=+1)
-
-    result = np.outer(data, data)[indices]
-
-    # ensure
-    assert result.size == (data.size * data.size - data.size) // 2
-    assert abs(result[0] - data[0] * data[1]) < 0.0000001
-
-    return result
-
-
-def calc_outer_multiplication_upper_diagonal_raw(data, result):
-    """Calculate the upper diagonal multiplication with for loops."""
-    #assert data.ndim == 1, \
-    #    'Data has {data.ndim} dimensions, should have only 1.'
-
-    #result = np.empty(data.size - 1, np.float64)
-    c = 0
-    len_ = len(data)
-    for i in range(len_ - 1):
-        for j in range(i + 1, len_):
-            result[c] = data[i] * data[j]
-            c += 1
-
-    assert result.size == (data.size * data.size - data.size) // 2
-    assert abs(result[0] - data[0] * data[1]) < 0.0000001
-    #return result
-
-njit_calc_multiplication_upper_diagonal_raw = \
-    njit(calc_outer_multiplication_upper_diagonal_raw)
-
-
-def calc_outer_sum_upper_diagonal(data):
-    """
-    Calculate the sig_ij for all atom pairs.
-
-    See Amber20 manual equation 14.13 on page 256.
-    """
-    # require
-    assert data.ndim == 1, 'Array should have only one dimension.'
-    assert data.dtype in (np.int, np.float), data.dtype
-
-    indices = np.triu_indices(data.size, k=+1)
-
-    result = (data[:, None] + data)[indices]
-
-    # ensure
-    _expected_size = (data.size * data.size - data.size) // 2
-    assert result.size == _expected_size, f'Sizes differ from expectations: {(result.size, _expected_size)}'
-    assert abs(result[0] - (data[0] + data[1])) < 0.0000001, 'Values are not as expected.'
-    assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001, 'Values are not as expected.'
-
-    return result
-
-
-def calc_sum_upper_diagonal_raw(data, result):
-    """
-    Calculate outer sum for upper diagonal with for loops.
-
-    Avoids creating temporary hiper large arrays
-    """
-    #assert data.ndim == 1, \
-    #    'Data has {data.ndim} dimensions, should have only 1.'
-
-    #result = np.empty(data.size - 1, np.float64)
-    c = 0
-    len_ = len(data)
-    for i in range(len_ - 1):
-        for j in range(i + 1, len_):
-            result[c] = data[i] + data[j]
-            c += 1
-
-    assert result.size == (data.size * data.size - data.size) // 2
-    assert abs(result[0] - (data[0] + data[1])) < 0.0000001
-    assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
-    #return result
-
-
-njit_calc_sum_upper_diagonal_raw = njit(calc_sum_upper_diagonal_raw)
-
-
-def calc_LJ_energy(acoeff, bcoeff, dists_ij, to_eval_mask, NANSUM=np.nansum):
-    """Calculates Lennard-Jones Energy."""
-    #assert dists_ij.size == acoeff.size == bcoeff.size, (dists_ij.size, acoeff.size)
-    #assert dists_ij.size == to_eval_mask.size
-
-    ar = acoeff / (dists_ij ** 12)
-    br = bcoeff / (dists_ij ** 6)
-    energy_ij = ar - br
-
-    # nansum is used because some values in dists_ij are expected to be nan
-    #return energy_ij, NANSUM(energy_ij[to_eval_mask])
-    return NANSUM(energy_ij[to_eval_mask])
-
-njit_calc_LJ_energy = njit(calc_LJ_energy)
-
-
-def create_sidechains_masks_per_residue(
-        residue_numbers,
-        atom_labels,
-        backbone_atoms,
-        ):
-    """
-    Create a map of int masks to where side chains are in sequence.
-
-    Create separate masks per residue.
-
-    Parameters
-    ----------
-    residue_numbers : np.ndarray, shape (N,)
-        The atom residue numbers of the protein.
-
-    atom_labels : np.ndarray, shape (N,)
-        The atom labels of the protein.
-
-    Returns
-    -------
-    list of tuples of length 2
-        List indexes refer to protein residues, index 0 is residue 1.
-        Per residue, a tuple of length 2 is given. Tuple index 0 are
-        the indexes of that residue sidechain atoms mapped to an array
-        of the `atom_labels` and `residue_numbers` characteristics.
-        The tuple index 1 is an array of length M, where M is the number
-        of sidechain atoms for that residue, defaults to np.nan.
-    """
-    assert residue_numbers.size == atom_labels.size
-    ss = []
-    indexes = np.arange(atom_labels.size)
-    for resnum in sorted(list(set(residue_numbers))):
-        is_residue = residue_numbers == resnum
-        is_backbone = np.isin(atom_labels, backbone_atoms)
-        is_sidechain = np.logical_not(is_backbone)
-        bool_result = np.logical_and(is_residue, is_sidechain)
-        ss.append((
-            indexes[bool_result],
-            np.full((np.sum(bool_result), 3), np.nan, dtype=np.float64)
-            ))
-
-    return ss
 
 
 if __name__ == "__main__":
