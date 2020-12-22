@@ -1445,14 +1445,19 @@ def generate_vdW_data(
     # we need to use re because hydrogen atoms start with integers some times
     atoms_char = re.compile(r'[CHNOPS]')
     findall = atoms_char.findall
-    cov_topologies = generate_residue_template_topology()
+    cov_topologies = generate_residue_template_topology(
+        amber_pdbs,
+        atom_labels_amber,
+        add_OXT=True,
+        add_Nterminal_H=True,
+        )
     bond_structure_local = \
         expand_topology_bonds_apart(cov_topologies, bonds_apart)
     inter_connect_local = inter_residue_connectivities[bonds_apart]
 
     # adds OXT to the bonds connectivity, so it is included in the
     # final for loop creating masks
-    add_OXT_to_residue(bond_structure_local[residue_labels[-1]])
+    #add_OXT_to_residue(bond_structure_local[residue_labels[-1]])
 
     # the following arrays/lists prepare the conformer label data in agreement
     # with the function scipy.spatial.distances.pdist, in order for masks to be
