@@ -10,7 +10,7 @@ USAGE:
 """
 import argparse
 import re
-# import sys
+import sys
 from collections import Counter
 from functools import partial
 from itertools import cycle
@@ -351,6 +351,8 @@ def build_conformers(
     bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
     bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
 
+    # units in:
+    # nm, kJ/mol, proton units
     sigmas_ii, epsilons_ii, charges_i = populate_ff_parameters_in_structure(
         atom_labels,
         residue_numbers,
@@ -391,13 +393,14 @@ def build_conformers(
     charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
     njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
 
-    epsilons_ij = np.sqrt(epsilons_ij_pre)  # combinatorial rule / sqrt
-    sigmas_ij = sigmas_ij_pre * 0.5  # combinatorial rule / average
+    # mixing rules
+    epsilons_ij = epsilons_ij_pre ** 0.5
+    sigmas_ij = sigmas_ij_pre * 5  # mixing + nm to Angstrom converstion
 
     acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
     bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
 
-    charges_ij *= 0.25  # dielectic constant
+    charges_ij *= 1389 #0.25  # dielectic constant
 
     # The mask to identify ij pairs exactly 3 bonds apart is needed for the
     # special scaling factor of Coulomb and LJ equations
@@ -578,7 +581,7 @@ def build_conformers(
         backbone_done = False
         number_of_trials = 0
         # TODO: use or not to use number_of_trials2? To evaluate in future.
-        #number_of_trials2 = 0
+        number_of_trials2 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
 
@@ -697,14 +700,18 @@ def build_conformers(
 
             # /
             # calc energy
-            energy = njit_calc_LJ_energy(
+            energy_lj = njit_calc_LJ_energy(
                 acoeff,
                 bcoeff,
                 distances_ij,
                 bonds_ge_3_mask,
                 )
 
-            energy += NANSUM(charges_ij / distances_ij)
+            charges_d_ = charges_ij / distances_ij
+            energy_qq = NANSUM(charges_d_[bonds_ge_3_mask])
+
+            energy = energy_lj + energy_qq
+            print(energy_lj, energy_qq, energy)
             # ?
 
             if energy > 0:
@@ -719,14 +726,14 @@ def build_conformers(
                     NHi0_R_POP()
                     res_R_POP()
                     number_of_trials = 0
-                    # number_of_trials2 += 1
+                    number_of_trials2 += 1
 
-                #if number_of_trials2 > 50:
-                #    bbi0_R_POP()
-                #    COi0_R_POP()
-                #    NHi0_R_POP()
-                #    res_R_POP()
-                #    number_of_trials2 = 0
+                if number_of_trials2 > 500:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
+                    number_of_trials2 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
@@ -1313,7 +1320,7 @@ def populate_ff_parameters_in_structure(
         # epsilons by order of atom
         epsilons_append(ep)
 
-        sig = float(force_field[atype]['sigma']) * 10  # conversion to Angstroms
+        sig = float(force_field[atype]['sigma'])
         # sigmas by order of atom
         sigmas_append(sig)
 
