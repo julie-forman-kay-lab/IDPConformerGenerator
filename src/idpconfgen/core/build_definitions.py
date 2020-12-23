@@ -1,53 +1,145 @@
 """Definitions for the building process."""
+import xml.etree.ElementTree as ET
 from collections import defaultdict
 from copy import copy
 from math import pi
 from pathlib import Path
+from pprint import pprint
 from statistics import mean, stdev
 
 import numpy as np
 from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure, col_name
-from idpconfgen.core.definitions import aa3to1
+from idpconfgen.core.definitions import aa1to3, aa3to1
 
 
 pdist = spatial.distance.pdist
 _filepath = Path(__file__).resolve().parent  # folder
 _sidechain_template_files = sorted(list(
-    _filepath.joinpath('sidechain_templates').glob('*.pdb')))
+    _filepath.joinpath('sidechain_templates', 'pdb_names').glob('*.pdb')))
+amber_pdbs = sorted(list(
+    _filepath.joinpath('sidechain_templates', 'amber_names').glob('*.pdb')))
+_amber14sb = _filepath.joinpath('data', 'protein.ff14SB.xml')
+
+backbone_atoms = ('N', 'C', 'CA', 'O', 'OXT', 'H', 'H1', 'H2', 'H3')
 
 # amino-acids atom labels
 # from: http://www.bmrb.wisc.edu/ref_info/atom_nom.tbl
 # PDB column
 # Taken from PDB entry 6I1B REVDAT 15-OCT-92.
-atom_labels = {
-    'A': ('N', 'CA', 'C', 'O', 'CB', 'H', 'HA', '1HB', '2HB', '3HB'),  # noqa: E501
-    'C': ('N', 'CA', 'C', 'O', 'CB', 'SG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
-    'D': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'OD2', 'H', 'HA', '1HB', '2HB'),  # noqa: E501
-    'E': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'OE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG'),  # noqa: E501
-    'F': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2', 'HZ'),  # noqa: E501
-    'G': ('N', 'CA', 'C', 'O', 'H', '1HA', '2HA'),  # noqa: E501
-    'H': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'ND1', 'CD2', 'CE1', 'NE2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
-    'I': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'CD1', 'H', 'HA', 'HB', '1HG1', '2HG1', '1HG2', '2HG2', '3HG2', '1HD1', '2HD1', '3HD1'),  # noqa: E501
-    'K': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'CE', 'NZ', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', '1HE', '2HE', '1HZ', '2HZ', '3HZ'),  # noqa: E501
-    'L': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'H', 'HA', '1HB', '2HB', 'HG', '1HD1', '2HD1', '3HD1', '1HD2', '2HD2', '3HD2'),  # noqa: E501
-    'M': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'SD', 'CE', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE', '2HE', '3HE'),  # noqa: E501
-    'N': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'OD1', 'ND2', 'H', 'HA', '1HB', '2HB', '1HD2', '2HD2'),  # noqa: E501
-    'P': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD'),  # noqa: E501
-    # in 'P' 'H1' and 'H2' were removed
-    'Q': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'OE1', 'NE2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HE2', '2HE2'),  # noqa: E501
-    'R': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD', 'NE', 'CZ', 'NH1', 'NH2', 'H', 'HA', '1HB', '2HB', '1HG', '2HG', '1HD', '2HD', 'HE', '1HH1', '2HH1', '1HH2', '2HH2'),  # noqa: E501
-    'S': ('N', 'CA', 'C', 'O', 'CB', 'OG', 'H', 'HA', '1HB', '2HB', 'HG'),  # noqa: E501
-    'T': ('N', 'CA', 'C', 'O', 'CB', 'OG1', 'CG2', 'H', 'HA', 'HB', 'HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
-    'V': ('N', 'CA', 'C', 'O', 'CB', 'CG1', 'CG2', 'H', 'HA', 'HB', '1HG1', '2HG1', '3HG1', '1HG2', '2HG2', '3HG2'),  # noqa: E501
-    'W': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'NE1', 'CE2', 'CE3', 'CZ2', 'CZ3', 'CH2', 'H', 'HA', '1HB', '2HB', 'HD1', 'HE1', 'HE3', 'HZ2', 'HZ3', 'HH2'),  # noqa: E501
-    'Y': ('N', 'CA', 'C', 'O', 'CB', 'CG', 'CD1', 'CD2', 'CE1', 'CE2', 'CZ', 'OH', 'H', 'HA', '1HB', '2HB', 'HD1', 'HD2', 'HE1', 'HE2'),  # noqa: E501
-    # in Y 'HH' was removed
-    }
 
 
-def generate_residue_template_topology():
+def _read_labels(pdbs):
+    """Read atom labels from residue template files."""
+    labels_d = {}
+    for pdb in pdbs:
+        s = Structure(pdb)
+        s.build()
+        a_labels = tuple(s.data_array[:, col_name])
+        pdb_name = pdb.stem.upper()
+        pdb_1letter = aa3to1[pdb_name]
+
+        # labels are duplicated for 1-letter and 3-letter codes to avoid
+        # double dictionary lookup in other implementations
+        labels_d[pdb_name] = a_labels
+        labels_d[pdb_1letter] = a_labels
+    return labels_d
+
+
+# support figure, for the different histidine protonation states.
+# https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
+atom_labels_pdb = _read_labels(_sidechain_template_files)
+atom_labels_amber = _read_labels(amber_pdbs)
+
+
+def read_ff14SB_params():
+    """
+    Read Amber protein.ff14SB.xml parameters to a dictionary.
+
+    `protein.ff14SB.xml` is in `src.idpconfgen.core.data` folder.
+
+    Dictionary structure:
+
+    dict_keys(
+        ['protein-C',
+        'protein-CA',
+        (... atom types ...)
+        'protein-3C',
+        'protein-C8',
+        'ALA',
+        'ARG',
+        (... residues ...)
+        'NTYR',
+        'NVAL',
+        'coulomb14scale',   <- note these two keys
+        'lj14scale'])
+
+    Atoms types have the structure:
+
+    'protein-OH': {
+        'class': 'OH',
+        'element': 'O',
+        'epsilon': '0.8803136',
+        'mass': '16.0',
+        'sigma': '0.3066473387839048',
+        }
+
+    Residues have the structure:
+
+    'VAL': {
+        'C': {'charge': '0.5973', 'type': 'protein-C'},
+        'CA': {'charge': '-0.0875', 'type': 'protein-CX'},
+        'CB': {'charge': '0.2985', 'type': 'protein-3C'},
+        'CG1': {'charge': '-0.3192', 'type': 'protein-CT'},
+        'CG2': {'charge': '-0.3192', 'type': 'protein-CT'},
+        'H': {'charge': '0.2719', 'type': 'protein-H'},
+        (...)
+        }
+
+    Returns
+    -------
+    dict
+    """
+    with open(_amber14sb, 'r') as fin:
+        ff14sb = ET.fromstring(fin.read())
+
+    forcefield_params = defaultdict(dict)
+
+    for child in ff14sb:
+        if child.tag == 'AtomTypes':
+            for atomtype in child:
+                key = atomtype.attrib['name']
+                forcefield_params[key].update(atomtype.attrib)
+                forcefield_params[key].pop('name')
+
+        elif child.tag == 'Residues':
+            for residue in child:
+                for atom in filter(lambda x: x.tag == 'Atom', residue):
+                    key = residue.attrib['name']
+                    atom_name = atom.attrib['name']
+
+                    atom_par = forcefield_params[key].setdefault(atom_name, {})
+                    atom_par.update(atom.attrib)
+                    forcefield_params[key][atom_name].pop('name')
+
+        elif child.tag == 'NonbondedForce':
+            forcefield_params.update(child.attrib)
+            for atom in child:
+                if atom.tag == 'Atom':
+                    key = atom.attrib['type']
+                    forcefield_params[key].update(atom.attrib)
+                    forcefield_params[key].pop('type')
+
+    return forcefield_params
+
+
+def generate_residue_template_topology(
+        pdb_files,
+        residue_labels,
+        add_OXT=True,
+        add_Nterminal_H=True,
+        ):
     """
     Generate topology for the residue templates.
 
@@ -65,7 +157,7 @@ def generate_residue_template_topology():
     # Creates topoloty of amino acids templates, that is, a dictionary of
     # all vs. all covalent bond pairs
     res_covalent_bonds = defaultdict(dict)
-    for pdb in _sidechain_template_files:
+    for pdb in pdb_files:
 
         pdbname = pdb.stem.upper()
 
@@ -77,7 +169,7 @@ def generate_residue_template_topology():
         # atom names of residue templates must be sorted equally to the
         # atom_names dictionary, or vice-versa.
         _list_names = tuple(s.data_array[:, col_name])
-        _atoms = atom_labels[aa3to1[pdbname]]
+        _atoms = residue_labels[pdbname]
         assert _list_names == _atoms, (
             'Atom names in `atom_names` dictionary differ from the '
             f'atom names in {pdbname} residue template.'
@@ -103,7 +195,6 @@ def generate_residue_template_topology():
                 connects_b = current_pdb.setdefault(b, [])
                 connects_b.append(a)
 
-
     # special cases: CYS and MET
     res_covalent_bonds['CYS']['CB'].append('SG')
     res_covalent_bonds['CYS']['SG'] = []
@@ -118,9 +209,54 @@ def generate_residue_template_topology():
 
     # asserts all atoms are considered
     for k1, v1 in res_covalent_bonds.items():
-        assert len(v1) == len(atom_labels[aa3to1[k1]]), k1
+        assert len(v1) == len(residue_labels[k1]), k1
+
+        # add OXT connectivity
+        if add_OXT:
+            add_OXT_to_connectivity(v1)
+
+        ## added 'OXT' connectivity
+        #for atom, connects in v1.items():
+        #    if 'O' in connects:
+        #        connects.append('OXT')
+
+        ## this should be only 'C'
+        #v1['OXT'] = copy(v1['O'])
+        if k1 == 'PRO':
+            continue
+
+        if add_Nterminal_H:
+            add_Nterm_H_connectivity(v1)
 
     return res_covalent_bonds
+
+
+def add_Nterm_H_connectivity(connectivity_dict):
+    """
+    Adds protons for Nterm connectivity.
+
+    Adds H1, H2, and H3 protons to N connectivity.
+    This maintains compatibility with XML forcefields obtained
+    from the OpenMM project.
+    """
+    assert 'H' in connectivity_dict, connectivity_dict
+    for atom, list_of_connects in connectivity_dict.items():
+        if 'H' in list_of_connects:
+            list_of_connects.extend(('H1', 'H2', 'H3'))
+
+    for h in ('H1', 'H2', 'H3'):
+        connectivity_dict[h] = copy(connectivity_dict['H'])
+
+
+def add_OXT_to_connectivity(connectivity_dict):
+    """Add OXT connectivity to residue."""
+    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
+    for _atom in connectivity_dict['OXT']:
+        connectivity_dict[_atom].append('OXT')
+
+    assert 'OXT' in connectivity_dict
+    assert set(connectivity_dict['OXT']).issubset(connectivity_dict.keys())
+    assert connectivity_dict['OXT'] == connectivity_dict['O']
 
 
 def _recursive_bonds_apart(
@@ -161,9 +297,7 @@ def _recursive_bonds_apart(
 
     for atom in cov_bonded:
         cov_bonded_next = copy(init_cov_res[atom])
-        bonds_apart.extend(
-            set(cov_bonded_next).difference(set(bonds_apart))
-            )
+        bonds_apart.extend(set(cov_bonded_next).difference(set(bonds_apart)))
         _recursive_bonds_apart(
             init_cov_res,
             bonds_apart,
@@ -226,59 +360,124 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
     return expanded_topology
 
 
-def add_OXT_to_residue(connectivity_dict):
-    """Adds OXT connectivity to residue."""
-    connectivity_dict['OXT'] = copy(connectivity_dict['O'])
-    connectivity_dict['OXT'].append('O')
-    for _atom in connectivity_dict['OXT']:
-        connectivity_dict[_atom].append('OXT')
 
+def topology_3_bonds_apart(covalent_bond_dict):
+    """
+    Map atom connectivity EXACTLY 3 bonds apart.
+
+    See Amber20 manual Figure 14.1.
+
+    Parameters
+    ----------
+    covalent_bond_dict : dict
+        Per residue covalent connectivity.
+
+    Returns
+    -------
+    dict
+        Per residue 3 bonds apart connectivity.
+    """
+    x_bonds_apart = {}
+    prevs = set()
+
+    for res, residue_atoms in covalent_bond_dict.items():
+        res_d = x_bonds_apart.setdefault(res, {})
+
+        # for all atoms in the residue
+        for atom in residue_atoms:
+            xba = res_d.setdefault(atom, set())
+            prevs.clear()
+            prevs.add(atom)
+
+            # for CA, H in N... one bond
+            for subatom1 in set(residue_atoms[atom]).difference(prevs):
+                prevs.add(subatom1)
+
+                # for CB, HA in CA... two bonds
+                for subatom2 in set(residue_atoms[subatom1]).difference(prevs):
+                    prevs.add(subatom2)
+
+                    # for HB1, HB2 in CB... three bonds
+                    for subatom3 in set(residue_atoms[subatom2]).difference(prevs):
+                        xba.add(subatom3)
+
+    return x_bonds_apart
+
+
+# interresidue exact 3 bonds connectivity
+bonds_equal_1_inter = {'C': ['N']}
+
+bonds_equal_3_inter = {
+    'N': ['N'],
+    'CA': ['H', 'CA'],
+    'C': ['HA', 'HA2', 'HA3', 'CB', 'C'],
+    'O': ['CA', 'H'],
+    'HA': ['N'],
+    'HA2': ['N'],
+    'HA3': ['N'],
+    'CB': ['N'],
+    }
+
+# /
+# Less than or equal to:
+# mar 15 dic 2020 15:50:48 EST
+
+bonds_le_2_inter = {
+    'C': ['CA', 'H', 'N'],
+    'CA': ['N'],
+    'O': ['N'],
+    }
 
 # interresidue 3-bonds connectivity
-C_3_connectivities = ['N', 'H', 'CA', 'HA', 'CB', 'C']
-CA_O_3_connectivities = ['N', 'H', 'CA']
-N_HA_CB_3_connectivities = ['N']
+_C_3_connectivities = [
+    'N',  # 1 bond apart
+    'H', 'CA',  # 2 bonds apart
+    'HA', 'HA2', 'HA3', 'CB', 'C',  # 3 bonds apart
+    ]
+_CA_O_3_connectivities = ['N', 'H', 'CA']
+_N_HA_HA2_HA3_CB_3_connectivities = ['N']
+
+# less or equal to:
+bonds_le_3_inter = {
+    'C': _C_3_connectivities,
+    #
+    'N': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA2': _N_HA_HA2_HA3_CB_3_connectivities,
+    'HA3': _N_HA_HA2_HA3_CB_3_connectivities,
+    'CB': _N_HA_HA2_HA3_CB_3_connectivities,
+    #
+    'CA': _CA_O_3_connectivities,
+    'O': _CA_O_3_connectivities,
+    #
+    }
 
 # interresidue 4-bonds connectivity
-C_4_connectivities = [
-    'N',  # 1 bond apart
-    'H', 'CA',  # 2 bond apart
-    'HA', 'CB', 'C',  # 3 bond apart
-    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
-    ]
-CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
-N_HA_CB_4_connectivities = ['N', 'H', 'CA']
+#C_4_connectivities = [
+#    'N',  # 1 bond apart
+#    'H', 'CA',  # 2 bond apart
+#    'HA', 'CB', 'C',  # 3 bond apart
+#    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
+#    ]
+#CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
+#N_HA_CB_4_connectivities = ['N', 'H', 'CA']
 
-
-inter_3_connect = {
-    'C': C_3_connectivities,
-    #
-    'N': N_HA_CB_3_connectivities,
-    'HA': N_HA_CB_3_connectivities,
-    'CB': N_HA_CB_3_connectivities,
-    #
-    'CA': CA_O_3_connectivities,
-    'O': CA_O_3_connectivities,
-    #
-    }
-
-
-inter_4_connect = {
-    'C': C_4_connectivities,
-    #
-    'N': N_HA_CB_4_connectivities,
-    'HA': N_HA_CB_4_connectivities,
-    'CB': N_HA_CB_4_connectivities,
-    #
-    'CA': CA_O_4_connectivities,
-    'O': CA_O_4_connectivities,
-    #
-    }
+#    'C': C_4_connectivities,
+#    #
+#    'N': N_HA_CB_4_connectivities,
+#    'HA': N_HA_CB_4_connectivities,
+#    'CB': N_HA_CB_4_connectivities,
+#    #
+#    'CA': CA_O_4_connectivities,
+#    'O': CA_O_4_connectivities,
+#    #
+#    }
 
 
 inter_residue_connectivities = {
-    3: inter_3_connect,
-    4: inter_4_connect,
+    2: bonds_le_2_inter,
+    3: bonds_le_3_inter,
+    #4: inter_4_connect,
     }
 
 # bend angles are in radians
@@ -465,7 +664,12 @@ build_bend_H_N_C = np.radians(114) / 2
 def _get_structure_coords(path_):
     s = Structure(path_)
     s.build()
-    return s.coords.astype(np.float64)
+    coords = s.coords.astype(np.float64)
+    sidechains = np.where(
+        np.logical_not(np.isin(s.data_array[:, col_name], backbone_atoms))
+        )[0]
+
+    return coords, sidechains
 
 
 sidechain_templates = {

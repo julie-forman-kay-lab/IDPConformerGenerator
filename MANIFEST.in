@@ -8,6 +8,7 @@ include .bumpversion.cfg
 include .coveragerc
 include .editorconfig
 include .readthedocs.yml
+include requirements.yml
 include pyproject.toml
 
 include AUTHORS.rst
@@ -21,6 +22,7 @@ include tox.ini .travis.yml
 exclude PULLREQUEST.rst
 exclude REQUIREMENTS.md
 
-global-exclude *.py[cod] __pycache__/* *.so *.dylib
+global-exclude *.py[cod] __pycache__/* *.so *.dylib .ipynb_checkpoints/*
 global-exclude tags
 global-exclude *.swp
+global-exclude *.vim

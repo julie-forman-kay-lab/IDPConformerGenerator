@@ -51,7 +51,7 @@ def aligndb(db):
 
         if any(len(i) != len_segment for i in lists_to_compare):
             log.error(
-                'number of residues, SS chars and angles does not match, '
+                'number of residues, SS chars and angles do not match, '
                 f'ignoring... {pdb}'
                 )
             continue
