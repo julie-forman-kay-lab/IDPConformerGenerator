@@ -400,7 +400,7 @@ def build_conformers(
     acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
     bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
 
-    charges_ij *= 1389 #0.25  # dielectic constant
+    charges_ij *= 0.25  # dielectic constant
 
     # The mask to identify ij pairs exactly 3 bonds apart is needed for the
     # special scaling factor of Coulomb and LJ equations
@@ -707,14 +707,13 @@ def build_conformers(
                 bonds_ge_3_mask,
                 )
 
-            charges_d_ = charges_ij / distances_ij
-            energy_qq = NANSUM(charges_d_[bonds_ge_3_mask])
+            energy_elec_ij = charges_ij / distances_ij
+            energy_elec = NANSUM(energy_elec_ij[bonds_ge_3_mask])
 
-            energy = energy_lj + energy_qq
-            print(energy_lj, energy_qq, energy)
+            total_energy = energy_lj + energy_elec
             # ?
 
-            if energy > 0:
+            if total_energy > 0:
                 # reset coordinates to the original value
                 # before the last chunk added
 
