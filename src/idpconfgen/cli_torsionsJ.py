@@ -1,16 +1,28 @@
 """
 Calculates J-torsion angles from PDB/mmCIF files.
 
-Calculated torsion angles are between HN-CaHA.
+Calculated torsion angles are for the HN-CaHA atoms, where H is the first
+atom and HA the last atom and angles are given by the right-hand rule
+where the thumb points from N to CA. If the resulting angle exceeds 180
+degrees, the corresponding value in negative angles is given instead.
 
 The calculated angles will be stored in a JSON file, one entry per
-structure, named 'torsionsJ_HN-CaHA.json'.
+structure, named 'torsionsJ_HN-CaHA.json', in the folder where the CLI
+run.
 
-Structures are allowed to have unordered atoms as long as residues are
+Structures are allowed to have unsorted atoms as long as residues are
 ordered.
 
-If input structures lack protons at the N-terminal the flag `--hn_term`
-should be set to 0, fails otherwise.
+If input structures lack protons at the N-terminal, the flag `--no_hn_term`
+should be given. In this case, the first calculated torsion angle
+corresponds to the second residue.
+
+In the case the N-terminal nitrogen has protons, the dihedral angle
+between `H1` or `H` and the `HA` for the first residue will also be
+calculated. It is up to the user to decide whether or not this first angle
+has physical meaning.
+
+NaN values will be placed at proline sites.
 
 USAGE:
     $ idpconfgen torsionsJ [PDBS]
