@@ -4,6 +4,7 @@ Higher level functions.
 Function which operate with several libraries
 and are defined here to avoid circular imports.
 """
+import re
 from contextlib import suppress
 from functools import partial, reduce
 
@@ -29,7 +30,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
-from idpconfgen.libs.libstructure import Structure, col_name, cols_coords
+from idpconfgen.libs.libstructure import Structure, col_name, cols_coords, col_resSeq, col_resName
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -239,6 +240,101 @@ def extract_secondary_structure(
             counter += 1
 
 
+def get_torsionsJ(
+        fdata,
+        decimals=5,
+        degrees=False,
+        hn_terminal=True,
+        ):
+    """
+    Calculate HN-CaHA torsion angles from a PDB/mmCIF file path.
+
+    Needs atom labels: H or H1, N, CA, HA or HA2 (Glycine).
+
+    Parameters
+    ----------
+    decimals : int
+        The decimal number to round the result.
+
+    degrees : bool
+        Whether or not to return values as degrees. If `False` returns
+        radians.
+
+    hn_terminal : bool
+        If the N-terminal has no hydrogens, flag `hn_terminal` should be
+    provided as `False`, and the first residue will be discarded.
+    If `True` expects N-terminal to have `H` or `H1`.
+
+    Returns
+    -------
+    np.ndarray
+        The NH-CaHA torsion angles for the whole protein.
+        Array has the same length of the protein if N-terminal has H,
+        otherwise has length of protein minus 1.
+
+    Notes
+    -----
+    Not optimized for speed. Not slow either.
+    """
+    # reads the structure file
+    structure = Structure(fdata)
+    structure.build()
+    data = structure.data_array
+
+    # to adjust data to calc_torsion_angles(), we consider the CD of Prolines
+    # later we will DELETE those entries
+    protons_and_proline = np.logical_or(
+        np.isin(data[:, col_name], ('H', 'H1')),
+        np.logical_and(data[:, col_resName] == 'PRO', data[:, col_name] == 'CD')
+        )
+
+    print(hn_terminal)
+    hn_idx = 0 if hn_terminal else 1
+
+    # some PDBs may not be sorted, this part sorts atoms properly before
+    # performing calculation
+    hs = data[protons_and_proline, :]
+
+    n = data[data[:, col_name] == 'N', :][hn_idx:, :]
+    ca = data[data[:, col_name] == 'CA', :][hn_idx:, :]
+    ha = data[np.isin(data[:, col_name], ('HA', 'HA2')), :][hn_idx:, :]
+
+    # expects N-terminal to have `H` or `H1`
+    assert hs.shape == n.shape == ca.shape == ha.shape, (
+        'We expected shapes to be equal. '
+        'A possible reason is that the presence/absence of protons in '
+        'the N-terminal does not match the flag `hn_terminal`. '
+        f'Shapes found are as follow: {hs.shape, n.shape, ca.shape, ha.shape}'
+        )
+
+    n_data = np.hstack([hs, n, ca, ha]).reshape(hs.shape[0] * 4, hs.shape[1])
+
+    coords = (n_data[:, cols_coords].astype(np.float64) * 1000).astype(int)
+
+    # notice that calc_torsion_angles() is designed to accepted sequential
+    # atoms for which torsions can be calculated. In this particular case
+    # because of the nature of `n_data`, the only torsion angles that will have
+    # physical meaning are the ones referrent to HN-CaHA, which are at indexes
+    # 0::4
+    torsions = calc_torsion_angles(coords)[0::4]
+
+    # not the fastest approach
+    # increase performance when needed
+    tfasta = structure.fasta
+
+    # assumes there is a single chain
+    fasta = list(tfasta.values())[0][hn_idx:]
+    pro_idx = [m.start() for m in re.finditer('P', fasta)]
+
+    # assigns nan to proline positions
+    torsions[pro_idx] = np.nan
+
+    if degrees:
+        torsions = np.degrees(torsions)
+
+    return np.round(torsions, decimals)
+
+
 def get_torsions(fdata, degrees=False, decimals=3):
     """Calculate torsion angles for structure.
 
@@ -295,3 +391,8 @@ def cli_helper_calc_torsions(fname, fdata, **kwargs):
     torsions = get_torsions(fdata, **kwargs)
     CA_C, C_N, N_CA = get_separate_torsions(torsions)
     return fname, {'phi': N_CA, 'psi': CA_C, 'omega': C_N}
+
+
+def cli_helper_calc_torsionsJ(fdata_tuple, **kwargs):
+    """Help cli_torsionsJ.py."""
+    return fdata_tuple[0], get_torsionsJ(fdata_tuple[1], **kwargs)
