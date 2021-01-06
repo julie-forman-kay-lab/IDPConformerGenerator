@@ -30,7 +30,12 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import group_by
 from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
-from idpconfgen.libs.libstructure import Structure, col_name, cols_coords, col_resSeq, col_resName
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    col_resName,
+    cols_coords,
+    )
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -383,7 +388,7 @@ def get_torsions(fdata, degrees=False, decimals=3):
     if degrees:
         torsions = np.degrees(torsions)
 
-    return torsions#.round(decimals=decimals)
+    return torsions
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):

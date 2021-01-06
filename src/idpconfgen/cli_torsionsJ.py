@@ -25,16 +25,11 @@ USAGE:
 import argparse
 from functools import partial
 
-from idpconfgen import Path, log
+from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import cli_helper_calc_torsionsJ
-from idpconfgen.libs.libio import (
-    FileReaderIterator,
-    read_dictionary_from_disk,
-    save_dict_to_json,
-    )
-from idpconfgen.libs.libmulticore import pool_function, starunpack
-from idpconfgen.libs.libparse import pop_difference_with_log
+from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
+from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
