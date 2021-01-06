@@ -17,7 +17,7 @@ import sys
 
 from idpconfgen import cli_build, cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
-from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_validate, log
+from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_torsionsJ, cli_validate, log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
@@ -40,6 +40,7 @@ Other useful routines:
     * {cli_ssext._name}
     * {cli_fastaext._name}
     * {cli_validate._name}
+    * {cli_torsionsJ._name}
 """
 
 ap = libcli.CustomParser(
@@ -61,6 +62,7 @@ subparsers = ap.add_subparsers(
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
+libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
 
 # argument parsers for secondary routines

@@ -189,6 +189,8 @@ def add_version(parser):
 # -c, --chunks            : number of chunks to process in memory
 # -d, --destination       : destination folder
 # -deg, --degrees         : degrees
+# -dec, --decimals        : decimal numbers
+# --no_hn_term                : has H of N-terminal
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # --replace               : replace (whatever shalls replace)
@@ -240,6 +242,29 @@ def add_argument_degrees(parser):
         '-deg',
         '--degrees',
         help='Whether to save angles in degrees.\nUse radians otherwise.',
+        action='store_true',
+        )
+
+
+def add_argument_decimals(parser):
+    """Add decimals to parser."""
+    parser.add_argument(
+        '-dec',
+        '--decimals',
+        help='Size of decimal numbers. Default to 5.',
+        default=5,
+        type=int,
+        )
+
+
+def add_argument_nohnterm(parser):
+    """Add boolean flag to H in N-terminal."""
+    parser.add_argument(
+        '--no_hn_term',
+        help=(
+            'If given, consideres no protons exist in the N-terminal Nitrogen. '
+            'If not given, considers N-terminal to have `H` or `H1` labels.'
+            ),
         action='store_true',
         )
 
