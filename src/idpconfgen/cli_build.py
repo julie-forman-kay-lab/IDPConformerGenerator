@@ -41,6 +41,7 @@ from idpconfgen.core.build_definitions import (
     expand_topology_bonds_apart,
     generate_residue_template_topology,
     inter_residue_connectivities,
+    n_terminal_h_coords_at_origin,
     read_ff14SB_params,
     sidechain_templates,
     topology_3_bonds_apart,
@@ -51,10 +52,12 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
     calc_all_vs_all_dists,
+    calc_torsion_angles,
     make_coord_Q,
     make_coord_Q_CO,
     make_coord_Q_COO,
     place_sidechain_template,
+    rotate_coordinates_Q_njit,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
@@ -267,17 +270,23 @@ def build_conformers(
     # CALC_DISTS = calc_all_vs_all_dists_square
     # TODO
     CALC_DISTS = calc_all_vs_all_dists
+    CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NANSUM = np.nansum
+    N_TERMINAL_H = n_terminal_h_coords_at_origin
+    PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RC = randchoice
+    RAD_60 = np.radians(60)
     RINT = randint
+    ROT_COORDINATES = rotate_coordinates_Q_njit
     ROUND = np.round
     SIDECHAIN_TEMPLATES = sidechain_templates
+    VEC_1_X_AXIS = np.array([1, 0, 0])
     angles = ANGLES
     slices = SLICES
     # bellow an optimization for the builder loop
@@ -444,6 +453,27 @@ def build_conformers(
     OXT1_index = carbonyl_mask[-1]
     carbonyl_mask = carbonyl_mask[:-1]
 
+    # used to rotate the N-terminal Hs to -60 degrees to  HA during
+    # the building process
+    _H1_idx = np.where(atom_labels == 'H1')[0]
+
+    _N_CA_idx = np.where(np.logical_and(
+        np.isin(atom_labels, ('N', 'CA')),
+        residue_numbers == residue_numbers[0],
+        ))[0]
+
+    _HA_HA2_idx = np.where(np.logical_and(
+        np.isin(atom_labels, ('HA', 'HA2')),
+        residue_numbers == residue_numbers[0],
+        ))[0]
+
+    H1_N_CA_HA_idx = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
+
+    assert len(H1_N_CA_HA_idx) == 4
+    del _H1_idx, _N_CA_idx, _HA_HA2_idx
+
+    H_terminal_idx = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
+
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
@@ -556,7 +586,8 @@ def build_conformers(
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
-        # IMPLEMENT SIDECHAINS HERE
+        # add N-terminal hydrogens to the origin
+        coords[H_terminal_idx, :] = N_TERMINAL_H
 
         bbi = 2  # starts at 2 because the first 3 atoms are already placed
         bbi0_R_CLEAR()
@@ -692,14 +723,36 @@ def build_conformers(
                 for _smask, _sidecoords in ss_masks[: current_res_number + backbone_done]:  # noqa: E501
                     coords[_smask] = _sidecoords
 
-            coords[bb_mask] = bb_real  # do not consider the initial dummy atom
+            # / Place coordinates for energy calculation
+            #
+            # use `bb_real` to do not consider the initial dummy atom
+            coords[bb_mask] = bb_real
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
-            distances_ij = CALC_DISTS(coords)
+            if len(bbi0_register) == 1:
+                # rotates the N-terminal Hs only if it is the first
+                # chunk being built
+
+                # measure torsion angle reference H1 - HA
+                _h1_ha_angle = CALC_TORSION_ANGLES(coords[H1_N_CA_HA_idx, :])[0]
+
+                # given any angle calculated along an axis, calculate how
+                # much to rotate along that axis to place the
+                # angle at 60 degrees
+                _rot_angle = _h1_ha_angle % PI2 - RAD_60
+
+                coords[H_terminal_idx, :] = ROT_COORDINATES(
+                    coords[H_terminal_idx, :],
+                    VEC_1_X_AXIS,
+                    _rot_angle,
+                    )
+            # ?
 
             # /
             # calc energy
+            distances_ij = CALC_DISTS(coords)
+
             energy_lj = njit_calc_LJ_energy(
                 acoeff,
                 bcoeff,
@@ -744,7 +797,7 @@ def build_conformers(
                     # we erased until the beginning of the conformer
                     # discard conformer, something went really wrong
                     broke_on_start_attempt = True
-                    break  # while loop
+                    break # conformer while loop, starts conformer from scratch
 
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
@@ -763,7 +816,9 @@ def build_conformers(
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
+                _n_term_h_coords = coords[H_terminal_idx, :]
                 coords[:, :] = NAN
+                coords[H_terminal_idx, :] = _n_term_h_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -784,7 +839,7 @@ def build_conformers(
                 # or not
                 backbone_done = False
                 number_of_trials += 1
-                continue  # send back to the while loop
+                continue  # send back to the CHUNK while loop
 
             # if the conformer is valid
             number_of_trials = 0
@@ -796,8 +851,8 @@ def build_conformers(
 
             if backbone_done:
                 # this point guarantees all protein atoms are built
-                break  # while loop
-        # END of while loop
+                break  # CHUNK while loop
+        # END of CHUNK while loop, go up and build the next CHUNK
 
         if broke_on_start_attempt:
             start_attempts += 1
@@ -809,7 +864,7 @@ def build_conformers(
                     )
                 return
             broke_on_start_attempt = False
-            continue
+            continue  # send back to the CHUNK while loop
 
         # until sidechains are implemented this is needed
         # TODO: need to implement the N-terminal H1-3 atoms
