@@ -14,7 +14,7 @@ import sys
 from collections import Counter
 from functools import partial
 from itertools import cycle
-from multiprocessing import Pool
+from multiprocessing import Pool, Queue
 # from numbers import Number
 from random import choice as randchoice
 from random import randint
@@ -125,6 +125,7 @@ libcli.add_argument_ncores(ap)
 
 SLICES = []
 ANGLES = None
+CONF_NUMBER = Queue()
 
 
 def main(
@@ -155,10 +156,13 @@ def main(
 
     _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
     SLICES.extend(_slices)
+    # creates a list of reversed numbers to name the conformers
+    for i in range(1, nconfs + 1):
+        CONF_NUMBER.put(i)
 
     # prepars execution function
     execute = partial(
-        build_conformers,
+        _build_conformers,
         input_seq=input_seq,  # string
         nconfs=core_chunks,  # int
         **kwargs,
@@ -200,6 +204,10 @@ def read_db_to_slices(database, dssp_regexes, ncores=1):
 
 def create_conformer_labels(input_seq, input_seq_3_letters):
     """
+    Create all atom labels model based on an input sequence.
+
+    The use of `input_seq_3_letters` is still experimental. Is likely
+    to be refactored.
     """
     # /
     # prepares data based on the input sequence
@@ -233,37 +241,41 @@ def create_conformer_labels(input_seq, input_seq_3_letters):
     return atom_labels, residue_numbers, residue_labels
 
 
-def build_conformers(
-        execution_run,
-        input_seq,
+# private function because it depends on the global `CONF_NUMBER`
+# which is assembled in `main()`
+def _build_conformers(
         *args,
+        input_seq=None,
         conformer_name='conformer',
         nconfs=1,
         **kwargs):
-    """."""
+    """
+    Arrange building of conformers and saves them to PDB files.
+    """
     ROUND = np.round
-    print(execution_run)
 
-    builder = conformer_generator(input_seq, *args, **kwargs)
+    # TODO: this has to be parametrized for the different HIS types
+    input_seq_3_letters = [
+        'HIP' if _res == 'H' else aa1to3[_res]
+        for _res in input_seq
+        ]
+
+    builder = conformer_generator(input_seq=input_seq, **kwargs)
+
     atom_labels, residue_numbers, residue_labels = next(builder)
 
-    # numbers conformers according to the multiprocessing numbering
-
-    start_conf = nconfs * execution_run
-    #with ProgressCounter(suffix=f'CPU: {execution_run}') as pc:
-    for conf_n in range(start_conf, nconfs):
+    for conf_n in range(nconfs):
 
         coords = next(builder)
 
         pdb_string = gen_PDB_from_conformer(
-            input_seq,
+            input_seq_3_letters,
             atom_labels,
             residue_numbers,
             ROUND(coords, decimals=3),
             )
 
-        fname = f'{conformer_name}_{conf_n}.pdb'
-            #pc.increment()
+        fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
         with open(fname, 'w') as fout:
             fout.write(pdb_string)
@@ -272,12 +284,11 @@ def build_conformers(
     return
 
 
-
 # the name of this function is likely to change in the future
 def conformer_generator(
-        input_seq,
+        *,
+        input_seq=None,
         generative_function=None,
-        #nconfs=1,
         disable_sidechains=True,
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
@@ -287,32 +298,64 @@ def conformer_generator(
     """
     Build conformers.
 
-    *Note*: `execution_run` is a positional parameter in order to maintain
-    operability with the multiprocessing operations in `main`, sorry for
-    that :-)
+    `conformer_generator` is actually a Python generator. Examples on
+    how it works:
+
+    Note that all arguments are **named** arguments.
+
+    >>> builder = conformer_generator(
+    >>>    input_seq='MGAETTWSCAAA'  # the primary sequence of the protein
+    >>>    )
+
+    `conformer_generator` is a generator, you can instantiate it simply
+    providing the residue sequence of your protein of interest.
+
+    The **very first** iteration will return the labels of the protein
+    being built. Labels are sorted by all atom models. Likewise,
+    `residue_number` and `residue_labels` sample **all atoms**. These
+    three are numpy arrays and can be used to index the actual coordinates.
+
+    >>> atom_labels, residue_numbers, residue_labels = next(builder)
+
+    After this point, each iteraction `next(builder)` yields the coordinates
+    for a new conformer. There is no limit in the generator.
+
+    >>> new_coords = next(builder)
+
+    `new_coords` is a (N, 3) np.float64 array where N is the number of
+    atoms. As expected, atom coordinates are aligned with the labels
+    previously generated.
+
+    When no longer needed,
+
+    >>> del builder
+
+    Should delete the builder generator.
+
+    You can gather the coordinates of several conformers in a single
+    multi dimensional array with the following:
+
+    >>> builder = conformer_generator(
+    >>>     input_seq='MGGGGG...',
+    >>>     generative_function=your_function)
+    >>>
+    >>> atoms, res3letter, resnums = next(builder)
+    >>>
+    >>> num_of_conformers = 10_000
+    >>> shape = (num_of_conformers, len(atoms), 3)
+    >>> all_coords = np.empty(shape, dtype=float64)
+    >>>
+    >>> for i in range(num_of_conformers):
+    >>>     all_coords[i, :, :] = next(builder)
+    >>>
 
     Parameters
     ----------
-    execution_run : int
-        A zero or positive integer. `execution_run` will number the
-        conformers accordingly to the CPU job number which generates
-        them.
-
-        `execution_run` dictate the numbering suffix of the PDBs saved
-        to disk.
-
-        If a single CPU is being used, just use 0 for convenience.
-
-    input_seq : str
-        The FASTA sequence of the protein being built. This parameter
-        needs to be accurate and is extremely important to create an
-        appropriate data structure able to contain all conformer's
-        atoms.
+    input_seq : str, mandatory
+        The primary sequence of the protein being built in FASTA format.
+        `input_seq` will be used to generate the whole conformers' and
+        labels arrangement.
         Example: "MAGERDDAPL".
-
-    conformer_name : str, optional
-        The prefix name of the PDB file saved to disk.
-        Defaults to 'conformer'.
 
     generative_function : callable, optional
         The generative function used by the builder to retrieve torsion
@@ -340,6 +383,7 @@ def conformer_generator(
     nconfs : int
         The number of conformers to build.
     """
+    assert input_seq, f'`input_seq` must be given! {input_seq}'
     BUILD_BEND_H_N_C = build_bend_H_N_C
     # CALC_DISTS = calc_all_vs_all_dists_square
     # TODO
@@ -1224,7 +1268,7 @@ def gen_ij_pairs_upper_diagonal(data):
 
 
 def gen_PDB_from_conformer(
-        input_seq,
+        input_seq_3_letters,
         atom_labels,
         residues,
         coords,
@@ -1246,7 +1290,7 @@ def gen_PDB_from_conformer(
 
         if atom_labels[i] == 'N':
             resi += 1
-            current_residue = input_seq[resi]
+            current_residue = input_seq_3_letters[resi]
             current_resnum = residues[i]
 
         atm = atom_labels[i].strip()
@@ -1260,7 +1304,7 @@ def gen_PDB_from_conformer(
             i,
             atm,
             '',
-            AA1TO3[current_residue],
+            current_residue,
             'A',
             current_resnum,
             '',
