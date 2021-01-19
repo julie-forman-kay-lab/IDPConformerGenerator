@@ -198,17 +198,81 @@ def read_db_to_slices(database, dssp_regexes, ncores=1):
     return slices, angles
 
 
+def create_conformer_labels(input_seq, input_seq_3_letters):
+    """
+    """
+    # /
+    # prepares data based on the input sequence
+    # considers sidechain all-atoms
+    atom_labels = np.array(make_list_atom_labels(input_seq, atom_labels_amber))
+
+    # /
+    # per atom labels
+    residue_numbers = np.empty(num_atoms, dtype=np.int)
+    residue_labels = np.empty(num_atoms, dtype='<U3')
+
+    # generators
+    _res_nums_gen = gen_residue_number_per_atom(atom_labels, start=1)
+    _res_labels_gen = \
+        gen_3l_residue_labels_per_atom(input_seq_3_letters, atom_labels)
+
+    # fills empty arrays from generators
+    _zipit = zip(range(num_atoms), _res_nums_gen, _res_labels_gen)
+    for _i, _num, _label in _zipit:
+        residue_numbers[_i] = _num
+        residue_labels[_i] = _label
+
+    # maniatic cleaning from pre-function isolation
+    del _res_labels_gen, _res_nums_gen, _zipit
+
+    # ensure
+    assert len(residue_numbers) == num_atoms
+    assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
+    # ?
+    return atom_labels, residue_numbers, residue_labels
+
+
 def build_conformers(
         execution_run,
         input_seq,
+        *args,
         conformer_name='conformer',
+        nconfs=1,
+        **kwargs):
+    """."""
+    ROUND = np.round
+
+    builder = _build_conformers(input_seq, *args, nconfs=nconfs, **kwargs)
+    atom_labels, residue_numbers, residue_labels = next(builder)
+
+    # numbers conformers according to the multiprocessing numbering
+    start_conf = nconfs * execution_run
+    for conf_n, coords in enumerate(builder, start=start_conf):
+
+        pdb_string = gen_PDB_from_conformer(
+            input_seq,
+            atom_labels,
+            residue_numbers,
+            ROUND(coords, decimals=3),
+            )
+
+        fname = f'{conformer_name}_{conf_n}.pdb'
+        print(fname)
+        with open(fname, 'w') as fout:
+            fout.write(pdb_string)
+
+
+# TODO NOTE IDEA
+# I could do an infinite generator to generate conformers continously
+def _build_conformers(
+        input_seq,
         generative_function=None,
+        nconfs=1,
+        disable_sidechains=True,
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
         # vdW_tolerance=0.4,
         # vdW_radii='tsai1999',
-        nconfs=1,
-        disable_sidechains=True,
         ):
     """
     Build conformers.
@@ -314,37 +378,16 @@ def build_conformers(
 
     # Start building process
 
-    # /
-    # prepares data based on the input sequence
-    # considers sidechain all-atoms
-    atom_labels = np.array(make_list_atom_labels(input_seq, atom_labels_amber))
+    atom_labels, residue_numbers, residue_labels = \
+        create_conformer_labels(input_seq, input_seq_3_letters)
+
+    # first yields the labels for the caller to handle them
+    # because later the conformers will be yielded and all share the
+    # same labels
+    yield atom_labels, residue_numbers, residue_labels
 
     num_atoms = len(atom_labels)
-    print('num atoms: ', num_atoms)
-
     num_ij_pairs = num_atoms * (num_atoms - 1) // 2
-    print('num ij pairs: ', num_ij_pairs)
-    # ?
-
-    # /
-    # per atom labels
-    residue_numbers = np.empty(num_atoms, dtype=np.int)
-    residue_labels = np.empty(num_atoms, dtype='<U3')
-
-    _res_nums_gen = gen_residue_number_per_atom(atom_labels, start=1)
-    _res_labels_gen = \
-        gen_3l_residue_labels_per_atom(input_seq_3_letters, atom_labels)
-
-    _zipit = zip(range(num_atoms), _res_nums_gen, _res_labels_gen)
-    for _i, _num, _label in _zipit:
-        residue_numbers[_i] = _num
-        residue_labels[_i] = _label
-
-    del _res_labels_gen, _res_nums_gen, _zipit
-
-    assert len(residue_numbers) == num_atoms
-    assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
-    # ?
 
     # /
     # Prepares terms for the energy function
@@ -547,16 +590,12 @@ def build_conformers(
     # because we are building from a experimental database there can be
     # some angle combinations that fail on our validation process from start
     # if this happens more than `max_start_attemps` the production is canceled.
-    #
-    # numbers conformers according to the multiprocessing numbering
-    start_conf = nconfs * execution_run
-    end_conf = start_conf + nconfs
-    conf_n = start_conf
     # ?
 
     # /
     # STARTS BUILDING
-    while conf_n < end_conf:
+    conf_n = 1
+    while conf_n < nconfs:
         print('building conformer: ', conf_n)
 
         # prepares cycles for building process
@@ -859,29 +898,14 @@ def build_conformers(
             if start_attempts > max_start_attempts:
                 log.error(
                     'Reached maximum amount of starts. Canceling... '
-                    f'{end_conf - conf_n} of {end_conf - start_conf} '
+                    f'{conf_n} of {n_confs} '
                     'conformers were not built.'
                     )
                 return
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
 
-        # until sidechains are implemented this is needed
-        # TODO: need to implement the N-terminal H1-3 atoms
-        # lun 21 dic 2020 18:14:05 EST
-        relevant = np.logical_not(np.isnan(coords[:, 0]))
-
-        pdb_string = gen_PDB_from_conformer(
-            input_seq,
-            atom_labels[relevant],
-            residue_numbers[relevant],
-            ROUND(coords[relevant], decimals=3),
-            )
-
-        fname = f'{conformer_name}_{conf_n}.pdb'
-        with open(fname, 'w') as fout:
-            fout.write(pdb_string)
-
+        yield coords
         conf_n += 1
 
     return
