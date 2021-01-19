@@ -676,3 +676,11 @@ sidechain_templates = {
     pdb.stem.upper(): _get_structure_coords(pdb)
     for pdb in _sidechain_template_files
     }
+
+# these template coordinates were created using Chimera-X daily given
+# a N-terminal at 0,0,0 and a CA along the X axis.
+n_terminal_h_coords_at_origin = np.array([
+    [-0.337, -0.036, 0.951],
+    [-0.336, 0.842, -0.444],
+    [-0.337, -0.806, -0.507],
+    ])

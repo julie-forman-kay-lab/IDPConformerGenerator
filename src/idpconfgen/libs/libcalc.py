@@ -13,6 +13,9 @@ from idpconfgen.core.build_definitions import (
     )
 
 
+# NOTE:
+# numba.njit functions are defined at the end of the module
+
 AXIS_111 = np.array([
     [1.0, 0.0, 0.0],
     [0.0, 1.0, 0.0],
@@ -443,7 +446,7 @@ def place_sidechain_template(
     rvu = rv / NORM(rv)
 
     # aligns the N-CA vectors
-    rot1 = Q_rotate(ss_template, rvu, N_CA_N)
+    rot1 = rotate_coordinates_Q_njit(ss_template, rvu, N_CA_N)
 
     # starts the second rotation to align the CA-C vectors
     # calculates the cross vectors of the planes N-CA-C
@@ -458,14 +461,12 @@ def place_sidechain_template(
     rvu = rv / NORM(rv)
 
     # aligns to the CA-C vector maintaining the N-CA in place
-    rot2 = Q_rotate(rot1, rvu, angle)
+    rot2 = rotate_coordinates_Q_njit(rot1, rvu, angle)
 
     return rot2[:, :] + bb_cnf[1, :]
 
 
-
-@njit
-def Q_rotate(
+def rotate_coordinates_Q(
         coords,
         rot_vec,
         angle_rad,
@@ -481,10 +482,11 @@ def Q_rotate(
     Parameters
     ----------
     coords : nd.array (N, 3), dtype=np.float64
-        The coordinates to ratote.
+        The coordinates to rotate.
 
     rot_vec : (,3)
         A 3D space vector around which to rotate coords.
+        Rotation vector **must** be a unitary vector.
 
     angle_rad : float
         The angle in radians to rotate the coords.
@@ -864,3 +866,6 @@ def calc_fGB():
     rij2 = rij**2
     (rij2+Ri*Rj*math.exp(-rij2/4*Ri*Rj))**0.5
     return
+
+
+rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
