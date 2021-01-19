@@ -62,7 +62,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libpdb import atom_line_formatter
-from idpconfgen.libs.libtimer import timeme
+from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
 
 _name = 'build'
@@ -205,6 +205,7 @@ def create_conformer_labels(input_seq, input_seq_3_letters):
     # prepares data based on the input sequence
     # considers sidechain all-atoms
     atom_labels = np.array(make_list_atom_labels(input_seq, atom_labels_amber))
+    num_atoms = len(atom_labels)
 
     # /
     # per atom labels
@@ -241,13 +242,18 @@ def build_conformers(
         **kwargs):
     """."""
     ROUND = np.round
+    print(execution_run)
 
-    builder = _build_conformers(input_seq, *args, nconfs=nconfs, **kwargs)
+    builder = conformer_generator(input_seq, *args, **kwargs)
     atom_labels, residue_numbers, residue_labels = next(builder)
 
     # numbers conformers according to the multiprocessing numbering
+
     start_conf = nconfs * execution_run
-    for conf_n, coords in enumerate(builder, start=start_conf):
+    #with ProgressCounter(suffix=f'CPU: {execution_run}') as pc:
+    for conf_n in range(start_conf, nconfs):
+
+        coords = next(builder)
 
         pdb_string = gen_PDB_from_conformer(
             input_seq,
@@ -257,17 +263,21 @@ def build_conformers(
             )
 
         fname = f'{conformer_name}_{conf_n}.pdb'
-        print(fname)
+            #pc.increment()
+
         with open(fname, 'w') as fout:
             fout.write(pdb_string)
 
+    del builder
+    return
 
-# TODO NOTE IDEA
-# I could do an infinite generator to generate conformers continously
-def _build_conformers(
+
+
+# the name of this function is likely to change in the future
+def conformer_generator(
         input_seq,
         generative_function=None,
-        nconfs=1,
+        #nconfs=1,
         disable_sidechains=True,
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
@@ -595,9 +605,7 @@ def _build_conformers(
     # /
     # STARTS BUILDING
     conf_n = 1
-    while conf_n < nconfs:
-        print('building conformer: ', conf_n)
-
+    while 1:
         # prepares cycles for building process
         # cycles need to be regenerated every conformer because the first
         # atom build is a C and the last atom built is the CA, which breaks
@@ -897,18 +905,15 @@ def _build_conformers(
             start_attempts += 1
             if start_attempts > max_start_attempts:
                 log.error(
-                    'Reached maximum amount of starts. Canceling... '
-                    f'{conf_n} of {n_confs} '
-                    'conformers were not built.'
+                    'Reached maximum amount of re-starts. Canceling... '
+                    f'Built a total of {conf_n} conformers.'
                     )
-                return
+                raise TypeError
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
 
         yield coords
         conf_n += 1
-
-    return
 
 
 def calc_outer_multiplication_upper_diagonal_raw(data, result):
@@ -1523,7 +1528,6 @@ def generate_vdW_data(
     executed only once at the beginning of the building protocol.
     """
     # }}}
-    print('here')
     assert len(atom_labels) == len(residue_numbers)
     assert len(atom_labels) == len(residue_labels)
 
@@ -1601,7 +1605,6 @@ def generate_vdW_data(
                 and a2 in inter_connect_local[a1]:
             vdW_non_bond[counter] = False
 
-    print('done')
     return vdW_sums, vdW_non_bond
 
 
