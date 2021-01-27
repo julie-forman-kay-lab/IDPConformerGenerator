@@ -640,7 +640,7 @@ def conformer_generator(
     # required inits
     broke_on_start_attempt = False
     start_attempts = 0
-    max_start_attempts = 50  # maximum attempts to start a conformer
+    max_start_attempts = 500  # maximum attempts to start a conformer
     # because we are building from a experimental database there can be
     # some angle combinations that fail on our validation process from start
     # if this happens more than `max_start_attemps` the production is canceled.
@@ -833,11 +833,12 @@ def conformer_generator(
                 # angle at 60 degrees
                 _rot_angle = _h1_ha_angle % PI2 - RAD_60
 
-                coords[H_terminal_idx, :] = ROT_COORDINATES(
+                current_Hterm_coords = ROT_COORDINATES(
                     coords[H_terminal_idx, :],
                     VEC_1_X_AXIS,
                     _rot_angle,
                     )
+                coords[H_terminal_idx, :] = current_Hterm_coords
             # ?
 
             # /
@@ -907,9 +908,8 @@ def conformer_generator(
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
-                _n_term_h_coords = coords[H_terminal_idx, :]
                 coords[:, :] = NAN
-                coords[H_terminal_idx, :] = _n_term_h_coords
+                coords[H_terminal_idx, :] = current_Hterm_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -952,7 +952,7 @@ def conformer_generator(
                     'Reached maximum amount of re-starts. Canceling... '
                     f'Built a total of {conf_n} conformers.'
                     )
-                raise TypeError
+                return
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
 
