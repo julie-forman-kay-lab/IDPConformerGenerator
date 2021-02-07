@@ -8,6 +8,16 @@ from glob import glob
 from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
+from pybind11.setup_helpers import Pybind11Extension, build_ext
+
+
+ext_modules = [
+    Pybind11Extension(
+        "idpcpp",
+        #sorted(glob(join('src', 'idpconfgen', 'cpp', '*.cpp'))),
+        [join('src', 'idpconfgen', 'cpp', 'idpcpp.cpp')],
+        )
+    ]
 
 
 def read(*names, **kwargs):
@@ -35,7 +45,7 @@ setup(
     long_description=long_description,
     author='Julie Forman-Kay Lab',
     author_email='forman@sickkids.ca',
-    url='https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader',
+    url='https://github.com/julie-forman-kay-lab/IDPConformerGenerator',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     py_modules=[splitext(basename(i))[0] for i in glob("src/*.py")],
@@ -86,14 +96,6 @@ setup(
             'icgsscalc = idpconfgen.cli_sscalc:maincli',
             ]
         },
-    # cmdclass={'build_ext': optional_build_ext},
-    # ext_modules=[
-    #    Extension(
-    #        splitext(relpath(path, 'src').replace(os.sep, '.'))[0],
-    #        sources=[path],
-    #        include_dirs=[dirname(path)]
-    #    )
-    #    for root, _, _ in os.walk('src')
-    #    for path in glob(join(root, '*.c'))
-    # ],
+    cmdclass={'build_ext': build_ext},
+    ext_modules=ext_modules,
     )
