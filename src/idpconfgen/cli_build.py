@@ -23,6 +23,7 @@ from time import time
 import numpy as np
 from numba import njit
 
+import idpcpp
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     amber_pdbs,
@@ -64,6 +65,14 @@ from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
+
+fsc = idpcpp.faspr_sidechains
+dun2010bbdeb_path = Path(
+    Path(__file__).myparents(),
+    'core',
+    'data',
+    'dun2010bbdep.bin',
+    )
 
 _name = 'build'
 _help = 'Builds conformers from database.'
