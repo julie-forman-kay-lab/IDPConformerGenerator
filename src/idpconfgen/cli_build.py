@@ -11,7 +11,7 @@ USAGE:
 import argparse
 import re
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -24,7 +24,8 @@ import numpy as np
 from numba import njit
 
 import idpcpp
-from idpconfgen import log
+#from idpconfgen.cpp.faspr import faspr_sidechains as fsc
+from idpconfgen import log, Path
 from idpconfgen.core.build_definitions import (
     amber_pdbs,
     atom_labels_amber,
@@ -67,13 +68,12 @@ from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
 
 fsc = idpcpp.faspr_sidechains
-dun2010bbdeb_path = Path(
+dun2010bbdep_path = Path(
     Path(__file__).myparents(),
     'core',
     'data',
     'dun2010bbdep.bin',
-    )
-
+    ).str()
 _name = 'build'
 _help = 'Builds conformers from database.'
 
@@ -135,6 +135,29 @@ libcli.add_argument_ncores(ap)
 SLICES = []
 ANGLES = None
 CONF_NUMBER = Queue()
+
+
+
+ConfMasks = namedtuple(
+    'ConfMaks',
+    [
+        'bb_mask',
+        'bb4_mask',
+        'CO_mask',
+        'NH_mask',
+        'OXT_mask',
+        ]
+    )
+
+
+
+
+
+
+
+
+
+
 
 
 def main(
@@ -419,10 +442,14 @@ def conformer_generator(
     # bellow an optimization for the builder loop
 
     # TODO: correct for HIS/HIE/HID/HIP
-    input_seq_3_letters = [
-        'HIP' if _res == 'H' else aa1to3[_res]
-        for _res in input_seq
-        ]
+    def translate_seq_to_3l(input_seq):
+        return [
+            'HIP' if _res == 'H' else aa1to3[_res]
+            for _res in input_seq
+            ]
+
+    r_input_seq = input_seq
+    r_input_seq_3_letters = translate_seq_to_3l(input_seq)
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
@@ -441,16 +468,34 @@ def conformer_generator(
 
     # Start building process
 
-    atom_labels, residue_numbers, residue_labels = \
-        create_conformer_labels(input_seq, input_seq_3_letters)
+    r_atom_labels, r_residue_numbers, r_residue_labels = \
+        create_conformer_labels(r_input_seq, r_input_seq_3_letters)
 
     # first yields the labels for the caller to handle them
     # because later the conformers will be yielded and all share the
     # same labels
-    yield atom_labels, residue_numbers, residue_labels
+    yield r_atom_labels, r_residue_numbers, r_residue_labels
+
+    r_num_atoms = len(atom_labels)
+    #num_ij_pairs = num_atoms * (num_atoms - 1) // 2
+
+
+    # /
+    # Prepares alanine/proline template backbone
+    input_seq = ''.join('A' if res not in ('P', 'G') else res for res in r_input_seq)
+    input_seq_3_letters = translate_seq_to_3l(input_seq)
+    atom_labels, residue_numbers, residue_labels = \
+        create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
 
     num_atoms = len(atom_labels)
     num_ij_pairs = num_atoms * (num_atoms - 1) // 2
+
+
+
+
+
+
+
 
     # /
     # Prepares terms for the energy function
@@ -550,9 +595,15 @@ def conformer_generator(
     # creates coordinate data-structures and,
     # creates index-translated boolean masks
     bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    bb_4atoms_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
     carbonyl_mask = np.where(atom_labels == 'O')[0]
     NHydrogen_mask = np.where(atom_labels == 'H')[0]
     OXT_index = np.where(atom_labels == 'OXT')[0][0]
+
+    rr = re.compile(r'H+')
+    non_hs_match = np.vectorize(lambda x: bool(rr.match(x)))
+    non_Hs_mask = np.where(np.logical_not(non_hs_match(atom_labels)))[0][:-1]  #OXT
+    del rr, non_hs_match
 
     # the last O value is removed because it is built in the same step
     # OXT is built
@@ -688,6 +739,7 @@ def conformer_generator(
 
         # add N-terminal hydrogens to the origin
         coords[H_terminal_idx, :] = N_TERMINAL_H
+        current_Hterm_coords = N_TERMINAL_H
 
         bbi = 2  # starts at 2 because the first 3 atoms are already placed
         bbi0_R_CLEAR()
@@ -806,7 +858,7 @@ def conformer_generator(
                 NHi += 1
 
             # Adds sidechain template structures
-            if with_sidechains:
+            if True:#with_sidechains:
                 for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
 
                     _sstemplate, _sidechain_idxs = \
@@ -830,7 +882,7 @@ def conformer_generator(
             coords[carbonyl_mask] = bb_CO
             coords[NHydrogen_mask] = bb_NH
 
-            if len(bbi0_register) == 1:
+            if len(bbi0_register) == 1 and input_seq[0] != 'G':
                 # rotates the N-terminal Hs only if it is the first
                 # chunk being built
 
@@ -852,20 +904,14 @@ def conformer_generator(
 
             # /
             # calc energy
-            distances_ij = CALC_DISTS(coords)
-
-            energy_lj = njit_calc_LJ_energy(
+            total_energy = calc_energy(
+                coords,
                 acoeff,
                 bcoeff,
-                distances_ij,
+                charges_ij,
                 bonds_ge_3_mask,
                 )
 
-            energy_elec_ij = charges_ij / distances_ij
-            energy_elec = NANSUM(energy_elec_ij[bonds_ge_3_mask])
-
-            total_energy = energy_lj + energy_elec
-            # ?
 
             if total_energy > 0:
                 # reset coordinates to the original value
@@ -964,6 +1010,33 @@ def conformer_generator(
                 return
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
+
+        if with_sidechains:
+
+            # TODO: preparar uma namedtuple con as mascaras.posso
+            # contruir a named tuple con uma funcao entao a named tuple
+            # vai ter bb_mask, bb_4atoms_mask, etc.
+            r_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
+
+            coords[non_Hs_mask] = fsc(
+                coords[bb_4atoms_mask],
+                input_seq,
+                dun2010bbdep_path,
+                )
+
+            total_energy = calc_energy(
+                coords,
+                acoeff,
+                bcoeff,
+                charges_ij,
+                bonds_ge_3_mask,
+                )
+
+            if total_energy > 1000:
+                print('Conformer with WORST energy')
+                continue
+            else:
+                print(conf_n, total_energy)
 
         yield coords
         conf_n += 1
@@ -1295,7 +1368,12 @@ def gen_PDB_from_conformer(
     # in the atoms that constitute a protein chain
     ATOM_LABEL_FMT = ' {: <3}'.format
 
+    assert len(atom_labels) == coords.shape[0]
+
     for i in range(len(atom_labels)):
+
+        if np.isnan(coords[i, 0]):
+            continue
 
         if atom_labels[i] == 'N':
             resi += 1
@@ -1659,6 +1737,25 @@ def generate_vdW_data(
             vdW_non_bond[counter] = False
 
     return vdW_sums, vdW_non_bond
+
+
+def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
+    CALC_DISTS = calc_all_vs_all_dists
+    NANSUM = np.nansum
+    distances_ij = CALC_DISTS(coords)
+
+    energy_lj = njit_calc_LJ_energy(
+        acoeff,
+        bcoeff,
+        distances_ij,
+        bonds_ge_3_mask,
+        )
+
+    energy_elec_ij = charges_ij / distances_ij
+    energy_elec = NANSUM(energy_elec_ij[bonds_ge_3_mask])
+
+    # total energy
+    return energy_lj + energy_elec
 
 
 if __name__ == "__main__":
