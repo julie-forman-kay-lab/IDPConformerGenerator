@@ -212,8 +212,8 @@ def init_confmasks(atom_labels):
     assert len(_H1_idx) == 1
 
     # of the first residue
-    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:-2]
-    assert len(_N_CA_idx) == 2
+    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
+    assert len(_N_CA_idx) == 2, _N_CA_idx
 
     _HA_HA2_idx = np.where(np.isin(atom_labels, ('HA', 'HA2')))[0][0:1]
     assert len(_HA_HA2_idx) == 1
@@ -538,6 +538,7 @@ def conformer_generator(
 
     r_input_seq = input_seq
     r_input_seq_3_letters = translate_seq_to_3l(input_seq)
+    del input_seq
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
@@ -564,14 +565,14 @@ def conformer_generator(
     # same labels
     yield r_atom_labels, r_residue_numbers, r_residue_labels
 
-    r_num_atoms = len(atom_labels)
+    r_num_atoms = len(r_atom_labels)
     #num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
 
     # /
     # Prepares alanine/proline template backbone
-    input_seq = ''.join('A' if res not in ('P', 'G') else res for res in r_input_seq)
-    input_seq_3_letters = translate_seq_to_3l(input_seq)
+    ala_pro_seq = ''.join('A' if res not in ('P', 'G') else res for res in r_input_seq)
+    ala_pro_seq_3l = translate_seq_to_3l(ala_pro_seq)
     atom_labels, residue_numbers, residue_labels = \
         create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
 
@@ -668,8 +669,8 @@ def conformer_generator(
     # I believe, because we are not doing local minimization here, we
     # cannot be that strick with the 14 scaling factor, and a reduction
     # factor of 2 is not enough
-    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
-    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
+    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
     charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
 
     del sigmas_ij_pre, epsilons_ij_pre, epsilons_ij, sigmas_ij
@@ -682,58 +683,67 @@ def conformer_generator(
     # /
     # creates coordinate data-structures and,
     # creates index-translated boolean masks
-    bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    bb_4atoms_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
-    carbonyl_mask = np.where(atom_labels == 'O')[0]
-    NHydrogen_mask = np.where(atom_labels == 'H')[0]
-    OXT_index = np.where(atom_labels == 'OXT')[0][0]
 
-    rr = re.compile(r'H+')
-    non_hs_match = np.vectorize(lambda x: bool(rr.match(x)))
-    non_Hs_mask = np.where(np.logical_not(non_hs_match(atom_labels)))[0][:-1]  #OXT
-    del rr, non_hs_match
+    r_confmasks = init_confmasks(r_atom_labels)
+    ap_confmasks = init_confmasks(atom_labels)
+
+
+
+
+
+
+    #bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    #bb_4atoms_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
+    #carbonyl_mask = np.where(atom_labels == 'O')[0]
+    #NHydrogen_mask = np.where(atom_labels == 'H')[0]
+    #OXT_index = np.where(atom_labels == 'OXT')[0][0]
+
+    #rr = re.compile(r'H+')
+    #non_hs_match = np.vectorize(lambda x: bool(rr.match(x)))
+    #non_Hs_mask = np.where(np.logical_not(non_hs_match(atom_labels)))[0][:-1]  #OXT
+    #del rr, non_hs_match
 
     # the last O value is removed because it is built in the same step
     # OXT is built
-    OXT1_index = carbonyl_mask[-1]
-    carbonyl_mask = carbonyl_mask[:-1]
+    #OXT1_index = carbonyl_mask[-1]
+    #carbonyl_mask = carbonyl_mask[:-1]
 
     # used to rotate the N-terminal Hs to -60 degrees to  HA during
     # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
+    #_H1_idx = np.where(atom_labels == 'H1')[0]
 
-    _N_CA_idx = np.where(np.logical_and(
-        np.isin(atom_labels, ('N', 'CA')),
-        residue_numbers == residue_numbers[0],
-        ))[0]
+    #_N_CA_idx = np.where(np.logical_and(
+    #    np.isin(atom_labels, ('N', 'CA')),
+    #    residue_numbers == residue_numbers[0],
+    #    ))[0]
 
-    _HA_HA2_idx = np.where(np.logical_and(
-        np.isin(atom_labels, ('HA', 'HA2')),
-        residue_numbers == residue_numbers[0],
-        ))[0]
+    #_HA_HA2_idx = np.where(np.logical_and(
+    #    np.isin(atom_labels, ('HA', 'HA2')),
+    #    residue_numbers == residue_numbers[0],
+    #    ))[0]
 
-    H1_N_CA_HA_idx = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
+    #H1_N_CA_HA_idx = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
 
-    assert len(H1_N_CA_HA_idx) == 4
-    del _H1_idx, _N_CA_idx, _HA_HA2_idx
+    #assert len(H1_N_CA_HA_idx) == 4
+    #del _H1_idx, _N_CA_idx, _HA_HA2_idx
 
-    H_terminal_idx = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
+    #H_terminal_idx = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
     # +1 because of the dummy coordinate required to start building.
     # see later
-    bb = np.full((bb_mask.size + 1, 3), NAN, dtype=np.float64)
+    bb = np.full((ap_confmasks.bb3.size + 1, 3), NAN, dtype=np.float64)
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
-    bb_CO = np.full((carbonyl_mask.size, 3), NAN, dtype=np.float64)
+    bb_CO = np.full((ap_confmasks.COs.size, 3), NAN, dtype=np.float64)
 
     # notice that NHydrogen_mask does not see Prolines
-    bb_NH = np.full((NHydrogen_mask.size, 3), NAN, dtype=np.float64)
+    bb_NH = np.full((ap_confmasks.NHs.size, 3), NAN, dtype=np.float64)
 
     # the following array serves to avoid placing HN in Proline residues
-    residue_labels_bb_simulating = residue_labels[bb_mask]
+    residue_labels_bb_simulating = residue_labels[ap_confmasks.bb3]
 
     ss_masks = create_sidechains_masks_per_residue(
         residue_numbers,
@@ -741,6 +751,10 @@ def conformer_generator(
         backbone_atoms,
         )
     # ?
+
+    all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
+    all_atoms_masks = init_confmasks(r_atom_labels)
+
 
     # /
     # creates seed coordinates:
@@ -751,7 +765,7 @@ def conformer_generator(
     # # definitions of IDPConfGen
     dummy_CA_m1_coord = np.array((0.0, 1.0, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-    n_terminal_CA_coord = np.array((distances_N_CA[input_seq[0]], 0.0, 0.0))
+    n_terminal_CA_coord = np.array((distances_N_CA[ala_pro_seq[0]], 0.0, 0.0))
 
     # seed coordinates array
     seed_coords = np.array((
@@ -826,7 +840,7 @@ def conformer_generator(
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
         # add N-terminal hydrogens to the origin
-        coords[H_terminal_idx, :] = N_TERMINAL_H
+        coords[ap_confmasks.Hterm, :] = N_TERMINAL_H
         current_Hterm_coords = N_TERMINAL_H
 
         bbi = 2  # starts at 2 because the first 3 atoms are already placed
@@ -881,7 +895,7 @@ def conformer_generator(
                     # residue. And PHI is the first angle of that residue angle
                     # set.
                     current_res_number = (bbi - 2) // 3
-                    current_residue = input_seq[current_res_number]
+                    current_residue = ala_pro_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
                     # is displaced by 1 unit from bb. So 2 in bb_read is the
@@ -906,10 +920,8 @@ def conformer_generator(
                 backbone_done = True
 
                 # add the carboxyls
-                coords[[OXT1_index, OXT_index]] = MAKE_COORD_Q_COO_LOCAL(
-                    bb[-2, :],
-                    bb[-1, :],
-                    )
+                coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
+                    MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
 
             # builds carbonyl atoms. Two situations can happen here:
             # 1) the backbone is not complete - the last atom is CA
@@ -950,7 +962,7 @@ def conformer_generator(
                 for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
 
                     _sstemplate, _sidechain_idxs = \
-                        SIDECHAIN_TEMPLATES[input_seq_3_letters[res_i]]  # 1 is faster than True :-)
+                        SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]  # 1 is faster than True :-)
 
                     sscoords = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
@@ -966,16 +978,17 @@ def conformer_generator(
             # / Place coordinates for energy calculation
             #
             # use `bb_real` to do not consider the initial dummy atom
-            coords[bb_mask] = bb_real
-            coords[carbonyl_mask] = bb_CO
-            coords[NHydrogen_mask] = bb_NH
+            coords[ap_confmasks.bb3] = bb_real
+            coords[ap_confmasks.COs] = bb_CO
+            coords[ap_confmasks.NHs] = bb_NH
 
-            if len(bbi0_register) == 1 and input_seq[0] != 'G':
+            if len(bbi0_register) == 1 and ala_pro_seq[0] != 'G':
                 # rotates the N-terminal Hs only if it is the first
                 # chunk being built
 
                 # measure torsion angle reference H1 - HA
-                _h1_ha_angle = CALC_TORSION_ANGLES(coords[H1_N_CA_HA_idx, :])[0]
+                _h1_ha_angle = \
+                    CALC_TORSION_ANGLES(coords[ap_confmasks.H1_N_CA_HA, :])[0]
 
                 # given any angle calculated along an axis, calculate how
                 # much to rotate along that axis to place the
@@ -983,11 +996,11 @@ def conformer_generator(
                 _rot_angle = _h1_ha_angle % PI2 - RAD_60
 
                 current_Hterm_coords = ROT_COORDINATES(
-                    coords[H_terminal_idx, :],
+                    coords[ap_confmasks.Hterm, :],
                     VEC_1_X_AXIS,
                     _rot_angle,
                     )
-                coords[H_terminal_idx, :] = current_Hterm_coords
+                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
             # ?
 
             # /
@@ -1001,7 +1014,7 @@ def conformer_generator(
                 )
 
 
-            if total_energy > 0:
+            if total_energy > 10:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1015,7 +1028,7 @@ def conformer_generator(
                     number_of_trials = 0
                     number_of_trials2 += 1
 
-                if number_of_trials2 > 500:
+                if number_of_trials2 > 50:
                     bbi0_R_POP()
                     COi0_R_POP()
                     NHi0_R_POP()
@@ -1045,6 +1058,7 @@ def conformer_generator(
 
                 # reset also indexes
                 bbi = _bbi0
+                print(bbi)
                 COi = _COi0
                 NHi = _NHi0
                 current_res_number = _resi0
@@ -1052,7 +1066,7 @@ def conformer_generator(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 coords[:, :] = NAN
-                coords[H_terminal_idx, :] = current_Hterm_coords
+                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -1099,18 +1113,19 @@ def conformer_generator(
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
 
+        # we do not want sidechains at this point
+        all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
+        all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
+        all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
+
         if with_sidechains:
 
-            # TODO: preparar uma namedtuple con as mascaras.posso
-            # contruir a named tuple con uma funcao entao a named tuple
-            # vai ter bb_mask, bb_4atoms_mask, etc.
-            r_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
-
-            coords[non_Hs_mask] = fsc(
-                coords[bb_4atoms_mask],
-                input_seq,
+            all_atoms_coords[all_atoms_masks.non_Hs_non_OXT] = fsc(
+                coords[ap_confmasks.bb4],
+                r_input_seq,
                 dun2010bbdep_path,
                 )
+
 
             total_energy = calc_energy(
                 coords,
@@ -1126,7 +1141,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
-        yield coords
+        yield all_atoms_coords
         conf_n += 1
 
 
