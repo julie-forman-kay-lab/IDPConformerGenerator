@@ -568,6 +568,8 @@ def conformer_generator(
     r_num_atoms = len(r_atom_labels)
     #num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
+    r_acoeff, r_bcoeff, r_charges_ij, r_bonds_ge_3_mask = \
+        create_energy_func_params(r_atom_labels, r_residue_numbers, r_residue_labels)
 
     # /
     # Prepares alanine/proline template backbone
@@ -579,103 +581,8 @@ def conformer_generator(
     num_atoms = len(atom_labels)
     num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
-
-
-
-
-
-
-
-    # /
-    # Prepares terms for the energy function
-    # TODO: parametrize this.
-    # the user should be able to chose different forcefields
-    ff14SB = read_ff14SB_params()
-    res_topology = generate_residue_template_topology(
-        amber_pdbs,
-        atom_labels_amber,
-        add_OXT=True,
-        add_Nterminal_H=True,
-        )
-    bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
-    bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
-
-    # units in:
-    # nm, kJ/mol, proton units
-    sigmas_ii, epsilons_ii, charges_i = populate_ff_parameters_in_structure(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        ff14SB,  # the forcefield dictionary
-        )
-
-    # this mask will deactivate calculations in covalently bond atoms and
-    # atoms separated 2 bonds apart
-    _bonds_ge_3_mask = create_bonds_apart_mask_for_ij_pairs(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        bonds_le_2_intra,
-        bonds_le_2_inter,
-        base_bool=True,
-        )
-    # on lun 21 dic 2020 17:33:31 EST, I tested for 1M sized array
-    # the numeric indexing performed better than the boolean indexing
-    # 25 ns versus 31 ns.
-    bonds_ge_3_mask = np.where(_bonds_ge_3_mask)[0]
-
-    # /
-    # Prepares Coulomb and Lennard-Jones pre computed parameters:
-    # calculates ij combinations using raw njitted functions because using
-    # numpy outer variantes in very large systems overloads memory and
-    # reduces performance.
-    #
-    # sigmas
-    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
-    #
-    # epsilons
-    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
-    #
-    # charges
-    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
-
-    # mixing rules
-    epsilons_ij = epsilons_ij_pre ** 0.5
-    sigmas_ij = sigmas_ij_pre * 5  # mixing + nm to Angstrom converstion
-
-    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
-    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
-
-    charges_ij *= 0.25  # dielectic constant
-
-    # The mask to identify ij pairs exactly 3 bonds apart is needed for the
-    # special scaling factor of Coulomb and LJ equations
-    # This mask will be used only aftert the calculation of the CLJ params
-    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        bonds_equal_3_intra,
-        bonds_equal_3_inter,
-        )
-
-    # this is the Lennard-Jones special case, where scaling factors are applied
-    # to atoms bonded 3 bonds apart, known as the '14' cases.
-    # 0.4 was calibrated manually, until I could find a conformer
-    # within 50 trials dom 20 dic 2020 13:16:50 EST
-    # I believe, because we are not doing local minimization here, we
-    # cannot be that strick with the 14 scaling factor, and a reduction
-    # factor of 2 is not enough
-    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
-    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
-    charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
-
-    del sigmas_ij_pre, epsilons_ij_pre, epsilons_ij, sigmas_ij
-    del bonds_exact_3_mask, _bonds_ge_3_mask, ff14SB
-    # ?
+    ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
+        create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
     # TODO: needed for other energy functions
     #atoms_VDW = 0.5 * sigmas_ii * 2**(1/6)
@@ -686,48 +593,6 @@ def conformer_generator(
 
     r_confmasks = init_confmasks(r_atom_labels)
     ap_confmasks = init_confmasks(atom_labels)
-
-
-
-
-
-
-    #bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    #bb_4atoms_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
-    #carbonyl_mask = np.where(atom_labels == 'O')[0]
-    #NHydrogen_mask = np.where(atom_labels == 'H')[0]
-    #OXT_index = np.where(atom_labels == 'OXT')[0][0]
-
-    #rr = re.compile(r'H+')
-    #non_hs_match = np.vectorize(lambda x: bool(rr.match(x)))
-    #non_Hs_mask = np.where(np.logical_not(non_hs_match(atom_labels)))[0][:-1]  #OXT
-    #del rr, non_hs_match
-
-    # the last O value is removed because it is built in the same step
-    # OXT is built
-    #OXT1_index = carbonyl_mask[-1]
-    #carbonyl_mask = carbonyl_mask[:-1]
-
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    #_H1_idx = np.where(atom_labels == 'H1')[0]
-
-    #_N_CA_idx = np.where(np.logical_and(
-    #    np.isin(atom_labels, ('N', 'CA')),
-    #    residue_numbers == residue_numbers[0],
-    #    ))[0]
-
-    #_HA_HA2_idx = np.where(np.logical_and(
-    #    np.isin(atom_labels, ('HA', 'HA2')),
-    #    residue_numbers == residue_numbers[0],
-    #    ))[0]
-
-    #H1_N_CA_HA_idx = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
-
-    #assert len(H1_N_CA_HA_idx) == 4
-    #del _H1_idx, _N_CA_idx, _HA_HA2_idx
-
-    #H_terminal_idx = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
@@ -1008,15 +873,14 @@ def conformer_generator(
             # calc energy
             total_energy = calc_energy(
                 coords,
-                acoeff,
-                bcoeff,
-                charges_ij,
-                bonds_ge_3_mask,
+                ap_acoeff,
+                ap_bcoeff,
+                ap_charges_ij,
+                ap_bonds_ge_3_mask,
                 )
 
 
             if total_energy > 10:
-                print(bbi)
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1137,15 +1001,15 @@ def conformer_generator(
 
 
             total_energy = calc_energy(
-                coords,
-                acoeff,
-                bcoeff,
-                charges_ij,
-                bonds_ge_3_mask,
+                all_atoms_coords,
+                r_acoeff,
+                r_bcoeff,
+                r_charges_ij,
+                r_bonds_ge_3_mask,
                 )
 
-            if total_energy > 1000:
-                print('Conformer with WORST energy')
+            if total_energy > 10:
+                print('Conformer with WORST energy', total_energy)
                 continue
             else:
                 print(conf_n, total_energy)
@@ -1868,6 +1732,103 @@ def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
 
     # total energy
     return energy_lj + energy_elec
+
+
+def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
+    # /
+    # Prepares terms for the energy function
+    # TODO: parametrize this.
+    # the user should be able to chose different forcefields
+    ff14SB = read_ff14SB_params()
+    res_topology = generate_residue_template_topology(
+        amber_pdbs,
+        atom_labels_amber,
+        add_OXT=True,
+        add_Nterminal_H=True,
+        )
+    bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
+    bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
+
+    # units in:
+    # nm, kJ/mol, proton units
+    sigmas_ii, epsilons_ii, charges_i = populate_ff_parameters_in_structure(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ff14SB,  # the forcefield dictionary
+        )
+
+    # this mask will deactivate calculations in covalently bond atoms and
+    # atoms separated 2 bonds apart
+    _bonds_ge_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_le_2_intra,
+        bonds_le_2_inter,
+        base_bool=True,
+        )
+    # on lun 21 dic 2020 17:33:31 EST, I tested for 1M sized array
+    # the numeric indexing performed better than the boolean indexing
+    # 25 ns versus 31 ns.
+    bonds_ge_3_mask = np.where(_bonds_ge_3_mask)[0]
+
+    # /
+    # Prepares Coulomb and Lennard-Jones pre computed parameters:
+    # calculates ij combinations using raw njitted functions because using
+    # numpy outer variantes in very large systems overloads memory and
+    # reduces performance.
+    #
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    # sigmas
+    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
+    #
+    # epsilons
+    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
+    #
+    # charges
+    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+
+    # mixing rules
+    epsilons_ij = epsilons_ij_pre ** 0.5
+    sigmas_ij = sigmas_ij_pre * 5  # mixing + nm to Angstrom converstion
+
+    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
+    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
+
+    charges_ij *= 0.25  # dielectic constant
+
+    # The mask to identify ij pairs exactly 3 bonds apart is needed for the
+    # special scaling factor of Coulomb and LJ equations
+    # This mask will be used only aftert the calculation of the CLJ params
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_equal_3_intra,
+        bonds_equal_3_inter,
+        )
+
+    # this is the Lennard-Jones special case, where scaling factors are applied
+    # to atoms bonded 3 bonds apart, known as the '14' cases.
+    # 0.4 was calibrated manually, until I could find a conformer
+    # within 50 trials dom 20 dic 2020 13:16:50 EST
+    # I believe, because we are not doing local minimization here, we
+    # cannot be that strick with the 14 scaling factor, and a reduction
+    # factor of 2 is not enough
+    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
+    charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
+
+    #del sigmas_ij_pre, epsilons_ij_pre, epsilons_ij, sigmas_ij
+    #del bonds_exact_3_mask, _bonds_ge_3_mask, ff14SB
+    assert len(acoeff) == len(bcoeff) == len(charges_ij)
+
+    return acoeff, bcoeff, charges_ij, bonds_ge_3_mask
+    # ?
 
 
 if __name__ == "__main__":
