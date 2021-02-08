@@ -867,6 +867,7 @@ def conformer_generator(
         number_of_trials = 0
         # TODO: use or not to use number_of_trials2? To evaluate in future.
         number_of_trials2 = 0
+        number_of_trials3 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
 
@@ -1015,6 +1016,7 @@ def conformer_generator(
 
 
             if total_energy > 10:
+                print(bbi)
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1028,12 +1030,20 @@ def conformer_generator(
                     number_of_trials = 0
                     number_of_trials2 += 1
 
-                if number_of_trials2 > 50:
+                if number_of_trials2 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
                     NHi0_R_POP()
                     res_R_POP()
                     number_of_trials2 = 0
+                    number_of_trials3 += 1
+
+                if number_of_trials3 > 5:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
+                    number_of_trials3 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
@@ -1058,7 +1068,6 @@ def conformer_generator(
 
                 # reset also indexes
                 bbi = _bbi0
-                print(bbi)
                 COi = _COi0
                 NHi = _NHi0
                 current_res_number = _resi0
