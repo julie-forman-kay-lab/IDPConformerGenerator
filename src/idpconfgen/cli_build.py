@@ -68,7 +68,7 @@ from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
 
-fsc = idpcpp.faspr_sidechains
+faspr_sc = idpcpp.faspr_sidechains
 dun2010bbdep_path = Path(
     Path(__file__).myparents(),
     'core',
@@ -137,8 +137,6 @@ SLICES = []
 ANGLES = None
 CONF_NUMBER = Queue()
 
-
-
 ConfMasks = namedtuple(
     'ConfMaks',
     [
@@ -154,6 +152,23 @@ ConfMasks = namedtuple(
         'H1_N_CA_HA',
         ]
     )
+
+
+def init_faspr_sidechains(input_seq=None):
+    """."""
+    dun2010db = dun2010bbdep_path
+    faspr_func = faspr_sc
+    def compute_faspr_sidechains(coords):
+        """Does calculation."""
+        return faspr_func(coords, input_seq, dun2010db)
+
+    return compute_faspr_sidechains
+
+
+compute_sidechains = {
+    'faspr': init_faspr_sidechains,
+    }
+
 
 def init_confmasks(atom_labels):
     """
@@ -410,6 +425,7 @@ def conformer_generator(
         input_seq=None,
         generative_function=None,
         disable_sidechains=True,
+        sidechain_method='faspr',
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
         # vdW_tolerance=0.4,
@@ -542,6 +558,10 @@ def conformer_generator(
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
+
+    if with_sidechains:
+        calc_sidechains = compute_sidechains[sidechain_method](r_input_seq)
+
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -993,12 +1013,10 @@ def conformer_generator(
 
         if with_sidechains:
 
-            all_atoms_coords[all_atoms_masks.non_Hs_non_OXT] = fsc(
-                coords[ap_confmasks.bb4],
-                r_input_seq,
-                dun2010bbdep_path,
-                )
-
+            all_atoms_coords[all_atoms_masks.non_Hs_non_OXT] = \
+                calc_sidechains(
+                    coords[ap_confmasks.bb4],
+                    )
 
             total_energy = calc_energy(
                 all_atoms_coords,
