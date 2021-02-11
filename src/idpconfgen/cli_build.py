@@ -154,7 +154,9 @@ ConfMasks = namedtuple(
     )
 
 
-def init_faspr_sidechains(input_seq=None):
+# Other functions should have the same APIs:
+# parameters = input_seq
+def init_faspr_sidechains(input_seq):
     """."""
     dun2010db = dun2010bbdep_path
     faspr_func = faspr_sc
@@ -1026,7 +1028,7 @@ def conformer_generator(
                 r_bonds_ge_3_mask,
                 )
 
-            if total_energy > 10:
+            if total_energy > 0:
                 print('Conformer with WORST energy', total_energy)
                 continue
             else:
