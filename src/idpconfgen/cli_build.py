@@ -901,14 +901,13 @@ def conformer_generator(
                 ap_bonds_ge_3_mask,
                 )
 
-
-            if total_energy > 10:
+            if total_energy > 0:
                 # reset coordinates to the original value
                 # before the last chunk added
 
                 # reset the same chunk maximum 5 times,
                 # after that reset also the chunk before
-                if number_of_trials > 5:
+                if number_of_trials > 50:
                     bbi0_R_POP()
                     COi0_R_POP()
                     NHi0_R_POP()
