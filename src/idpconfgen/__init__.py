@@ -41,4 +41,9 @@ class Path(type(_Path())):
         return self.resolve().parent
 
 
+def assert_type(obj, typ):
+    """Asserts an obj is of type."""
+    assert isinstance(obj, typ), f"Expected {typ} got {type(obj)}"
+
+
 __version__ = '0.1.0'

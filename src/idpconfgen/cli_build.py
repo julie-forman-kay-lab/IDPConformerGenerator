@@ -11,7 +11,7 @@ USAGE:
 import argparse
 import re
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -24,7 +24,9 @@ import numpy as np
 from numba import njit
 
 import idpcpp
-from idpconfgen import log
+#from idpconfgen.cpp.faspr import faspr_sidechains as fsc
+from idpconfgen import log, Path
+from idpconfgen import assert_type as AT
 from idpconfgen.core.build_definitions import (
     amber_pdbs,
     atom_labels_amber,
@@ -66,14 +68,13 @@ from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
 
-fsc = idpcpp.faspr_sidechains
-dun2010bbdeb_path = Path(
+faspr_sc = idpcpp.faspr_sidechains
+dun2010bbdep_path = Path(
     Path(__file__).myparents(),
     'core',
     'data',
     'dun2010bbdep.bin',
-    )
-
+    ).str()
 _name = 'build'
 _help = 'Builds conformers from database.'
 
@@ -135,6 +136,125 @@ libcli.add_argument_ncores(ap)
 SLICES = []
 ANGLES = None
 CONF_NUMBER = Queue()
+
+ConfMasks = namedtuple(
+    'ConfMaks',
+    [
+        'bb3',
+        'bb4',
+        'NHs',
+        'COs',
+        'Hterm',
+        'OXT1',
+        'OXT2',
+        'non_Hs',
+        'non_Hs_non_OXT',
+        'H1_N_CA_HA',
+        ]
+    )
+
+
+# Other functions should have the same APIs:
+# parameters = input_seq
+def init_faspr_sidechains(input_seq):
+    """."""
+    dun2010db = dun2010bbdep_path
+    faspr_func = faspr_sc
+    def compute_faspr_sidechains(coords):
+        """Does calculation."""
+        return faspr_func(coords, input_seq, dun2010db)
+
+    return compute_faspr_sidechains
+
+
+compute_sidechains = {
+    'faspr': init_faspr_sidechains,
+    }
+
+
+def init_confmasks(atom_labels):
+    """
+    Create a ConfMask object (namedtuple).
+
+    ConfMask is a named tuple which attributes are integer masks for the
+    respective groups.
+
+    Parameters
+    ----------
+    atom_labels : array-like
+        The atom names of the protein.
+
+    Returns
+    -------
+    namedtuple
+
+    Notes
+    -----
+    ConfMask attributes map to the following atom groups:
+
+    bb3 : N, CA, C
+    bb4 : N, CA, C, O
+    NHs : amide protons
+    Hterm : N-terminal protons
+    OXT1 : O atom of C-terminal carboxyl group
+    OXT2 : OXT atom of the C-terminal carboxyl group
+    non_Hs : all but hydrogens
+    non_Hs_non_OXT : all but hydrogens and the only OXT atom
+    H1_N_CA_HA : these four atoms from the first residue
+    """
+    bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    assert len(bb3) % 3 == 0
+
+    bb4 = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
+    assert len(bb4) % 4 == 0
+
+    NHs = np.where(atom_labels == 'H')[0]
+
+    # last O belongs to the C-term carboxyl, we don't want it in the carbonyl
+    # mask
+    COs = np.where(atom_labels == 'O')[0][:-1]
+
+    OXT1 = np.where(atom_labels == 'O')[0][-1]
+    # the actual OXT atom, this is only one O of the C-term carboxyl pair
+    OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
+
+    rr = re.compile(r'H+')
+    hs_match = np.vectorize(lambda x: bool(rr.match(x)))
+    non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
+    non_Hs_non_OXT = non_Hs[:-1]
+
+    # used to rotate the N-terminal Hs to -60 degrees to  HA during
+    # the building process
+    _H1_idx = np.where(atom_labels == 'H1')[0]
+    assert len(_H1_idx) == 1
+
+    # of the first residue
+    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
+    assert len(_N_CA_idx) == 2, _N_CA_idx
+
+    _HA_HA2_idx = np.where(np.isin(atom_labels, ('HA', 'HA2')))[0][0:1]
+    assert len(_HA_HA2_idx) == 1
+
+    H1_N_CA_HA = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
+    assert len(H1_N_CA_HA) == 4
+
+    Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
+    assert len(Hterm) == 3
+
+    conf_mask = ConfMasks(
+        bb3=bb3,
+        bb4=bb4,
+        NHs=NHs,
+        COs=COs,
+        Hterm=Hterm,
+        OXT1=OXT1,
+        OXT2=OXT2,
+        non_Hs=non_Hs,
+        non_Hs_non_OXT=non_Hs_non_OXT,
+        H1_N_CA_HA=H1_N_CA_HA,
+        )
+
+    return conf_mask
 
 
 def main(
@@ -299,6 +419,7 @@ def conformer_generator(
         input_seq=None,
         generative_function=None,
         disable_sidechains=True,
+        sidechain_method='faspr',
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
         # vdW_tolerance=0.4,
@@ -419,13 +540,22 @@ def conformer_generator(
     # bellow an optimization for the builder loop
 
     # TODO: correct for HIS/HIE/HID/HIP
-    input_seq_3_letters = [
-        'HIP' if _res == 'H' else aa1to3[_res]
-        for _res in input_seq
-        ]
+    def translate_seq_to_3l(input_seq):
+        return [
+            'HIP' if _res == 'H' else aa1to3[_res]
+            for _res in input_seq
+            ]
+
+    r_input_seq = input_seq
+    r_input_seq_3_letters = translate_seq_to_3l(input_seq)
+    del input_seq
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
+
+    if with_sidechains:
+        calc_sidechains = compute_sidechains[sidechain_method](r_input_seq)
+
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -441,107 +571,32 @@ def conformer_generator(
 
     # Start building process
 
-    atom_labels, residue_numbers, residue_labels = \
-        create_conformer_labels(input_seq, input_seq_3_letters)
+    r_atom_labels, r_residue_numbers, r_residue_labels = \
+        create_conformer_labels(r_input_seq, r_input_seq_3_letters)
 
     # first yields the labels for the caller to handle them
     # because later the conformers will be yielded and all share the
     # same labels
-    yield atom_labels, residue_numbers, residue_labels
+    yield r_atom_labels, r_residue_numbers, r_residue_labels
+
+    r_num_atoms = len(r_atom_labels)
+    #num_ij_pairs = num_atoms * (num_atoms - 1) // 2
+
+    r_acoeff, r_bcoeff, r_charges_ij, r_bonds_ge_3_mask = \
+        create_energy_func_params(r_atom_labels, r_residue_numbers, r_residue_labels)
+
+    # /
+    # Prepares alanine/proline template backbone
+    ala_pro_seq = ''.join('A' if res not in ('P', 'G') else res for res in r_input_seq)
+    ala_pro_seq_3l = translate_seq_to_3l(ala_pro_seq)
+    atom_labels, residue_numbers, residue_labels = \
+        create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
 
     num_atoms = len(atom_labels)
     num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
-    # /
-    # Prepares terms for the energy function
-    # TODO: parametrize this.
-    # the user should be able to chose different forcefields
-    ff14SB = read_ff14SB_params()
-    res_topology = generate_residue_template_topology(
-        amber_pdbs,
-        atom_labels_amber,
-        add_OXT=True,
-        add_Nterminal_H=True,
-        )
-    bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
-    bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
-
-    # units in:
-    # nm, kJ/mol, proton units
-    sigmas_ii, epsilons_ii, charges_i = populate_ff_parameters_in_structure(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        ff14SB,  # the forcefield dictionary
-        )
-
-    # this mask will deactivate calculations in covalently bond atoms and
-    # atoms separated 2 bonds apart
-    _bonds_ge_3_mask = create_bonds_apart_mask_for_ij_pairs(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        bonds_le_2_intra,
-        bonds_le_2_inter,
-        base_bool=True,
-        )
-    # on lun 21 dic 2020 17:33:31 EST, I tested for 1M sized array
-    # the numeric indexing performed better than the boolean indexing
-    # 25 ns versus 31 ns.
-    bonds_ge_3_mask = np.where(_bonds_ge_3_mask)[0]
-
-    # /
-    # Prepares Coulomb and Lennard-Jones pre computed parameters:
-    # calculates ij combinations using raw njitted functions because using
-    # numpy outer variantes in very large systems overloads memory and
-    # reduces performance.
-    #
-    # sigmas
-    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
-    #
-    # epsilons
-    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
-    #
-    # charges
-    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
-
-    # mixing rules
-    epsilons_ij = epsilons_ij_pre ** 0.5
-    sigmas_ij = sigmas_ij_pre * 5  # mixing + nm to Angstrom converstion
-
-    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
-    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
-
-    charges_ij *= 0.25  # dielectic constant
-
-    # The mask to identify ij pairs exactly 3 bonds apart is needed for the
-    # special scaling factor of Coulomb and LJ equations
-    # This mask will be used only aftert the calculation of the CLJ params
-    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        bonds_equal_3_intra,
-        bonds_equal_3_inter,
-        )
-
-    # this is the Lennard-Jones special case, where scaling factors are applied
-    # to atoms bonded 3 bonds apart, known as the '14' cases.
-    # 0.4 was calibrated manually, until I could find a conformer
-    # within 50 trials dom 20 dic 2020 13:16:50 EST
-    # I believe, because we are not doing local minimization here, we
-    # cannot be that strick with the 14 scaling factor, and a reduction
-    # factor of 2 is not enough
-    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
-    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.4
-    charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
-
-    del sigmas_ij_pre, epsilons_ij_pre, epsilons_ij, sigmas_ij
-    del bonds_exact_3_mask, _bonds_ge_3_mask, ff14SB
-    # ?
+    ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
+        create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
     # TODO: needed for other energy functions
     #atoms_VDW = 0.5 * sigmas_ii * 2**(1/6)
@@ -549,52 +604,25 @@ def conformer_generator(
     # /
     # creates coordinate data-structures and,
     # creates index-translated boolean masks
-    bb_mask = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    carbonyl_mask = np.where(atom_labels == 'O')[0]
-    NHydrogen_mask = np.where(atom_labels == 'H')[0]
-    OXT_index = np.where(atom_labels == 'OXT')[0][0]
 
-    # the last O value is removed because it is built in the same step
-    # OXT is built
-    OXT1_index = carbonyl_mask[-1]
-    carbonyl_mask = carbonyl_mask[:-1]
-
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
-
-    _N_CA_idx = np.where(np.logical_and(
-        np.isin(atom_labels, ('N', 'CA')),
-        residue_numbers == residue_numbers[0],
-        ))[0]
-
-    _HA_HA2_idx = np.where(np.logical_and(
-        np.isin(atom_labels, ('HA', 'HA2')),
-        residue_numbers == residue_numbers[0],
-        ))[0]
-
-    H1_N_CA_HA_idx = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
-
-    assert len(H1_N_CA_HA_idx) == 4
-    del _H1_idx, _N_CA_idx, _HA_HA2_idx
-
-    H_terminal_idx = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
+    r_confmasks = init_confmasks(r_atom_labels)
+    ap_confmasks = init_confmasks(atom_labels)
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
     # +1 because of the dummy coordinate required to start building.
     # see later
-    bb = np.full((bb_mask.size + 1, 3), NAN, dtype=np.float64)
+    bb = np.full((ap_confmasks.bb3.size + 1, 3), NAN, dtype=np.float64)
     bb_real = bb[1:, :]  # backbone coordinates without the dummy
     # coordinates for the carbonyl oxigen atoms
-    bb_CO = np.full((carbonyl_mask.size, 3), NAN, dtype=np.float64)
+    bb_CO = np.full((ap_confmasks.COs.size, 3), NAN, dtype=np.float64)
 
     # notice that NHydrogen_mask does not see Prolines
-    bb_NH = np.full((NHydrogen_mask.size, 3), NAN, dtype=np.float64)
+    bb_NH = np.full((ap_confmasks.NHs.size, 3), NAN, dtype=np.float64)
 
     # the following array serves to avoid placing HN in Proline residues
-    residue_labels_bb_simulating = residue_labels[bb_mask]
+    residue_labels_bb_simulating = residue_labels[ap_confmasks.bb3]
 
     ss_masks = create_sidechains_masks_per_residue(
         residue_numbers,
@@ -602,6 +630,10 @@ def conformer_generator(
         backbone_atoms,
         )
     # ?
+
+    all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
+    all_atoms_masks = init_confmasks(r_atom_labels)
+
 
     # /
     # creates seed coordinates:
@@ -612,7 +644,7 @@ def conformer_generator(
     # # definitions of IDPConfGen
     dummy_CA_m1_coord = np.array((0.0, 1.0, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-    n_terminal_CA_coord = np.array((distances_N_CA[input_seq[0]], 0.0, 0.0))
+    n_terminal_CA_coord = np.array((distances_N_CA[ala_pro_seq[0]], 0.0, 0.0))
 
     # seed coordinates array
     seed_coords = np.array((
@@ -687,7 +719,8 @@ def conformer_generator(
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
         # add N-terminal hydrogens to the origin
-        coords[H_terminal_idx, :] = N_TERMINAL_H
+        coords[ap_confmasks.Hterm, :] = N_TERMINAL_H
+        current_Hterm_coords = N_TERMINAL_H
 
         bbi = 2  # starts at 2 because the first 3 atoms are already placed
         bbi0_R_CLEAR()
@@ -713,6 +746,7 @@ def conformer_generator(
         number_of_trials = 0
         # TODO: use or not to use number_of_trials2? To evaluate in future.
         number_of_trials2 = 0
+        number_of_trials3 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
 
@@ -741,7 +775,7 @@ def conformer_generator(
                     # residue. And PHI is the first angle of that residue angle
                     # set.
                     current_res_number = (bbi - 2) // 3
-                    current_residue = input_seq[current_res_number]
+                    current_residue = ala_pro_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
                     # is displaced by 1 unit from bb. So 2 in bb_read is the
@@ -766,10 +800,8 @@ def conformer_generator(
                 backbone_done = True
 
                 # add the carboxyls
-                coords[[OXT1_index, OXT_index]] = MAKE_COORD_Q_COO_LOCAL(
-                    bb[-2, :],
-                    bb[-1, :],
-                    )
+                coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
+                    MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
 
             # builds carbonyl atoms. Two situations can happen here:
             # 1) the backbone is not complete - the last atom is CA
@@ -806,11 +838,12 @@ def conformer_generator(
                 NHi += 1
 
             # Adds sidechain template structures
-            if with_sidechains:
+            # TODO: remove this if-statement
+            if True:#with_sidechains:
                 for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
 
                     _sstemplate, _sidechain_idxs = \
-                        SIDECHAIN_TEMPLATES[input_seq_3_letters[res_i]]  # 1 is faster than True :-)
+                        SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]  # 1 is faster than True :-)
 
                     sscoords = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
@@ -826,16 +859,17 @@ def conformer_generator(
             # / Place coordinates for energy calculation
             #
             # use `bb_real` to do not consider the initial dummy atom
-            coords[bb_mask] = bb_real
-            coords[carbonyl_mask] = bb_CO
-            coords[NHydrogen_mask] = bb_NH
+            coords[ap_confmasks.bb3] = bb_real
+            coords[ap_confmasks.COs] = bb_CO
+            coords[ap_confmasks.NHs] = bb_NH
 
-            if len(bbi0_register) == 1:
+            if len(bbi0_register) == 1 and ala_pro_seq[0] != 'G':
                 # rotates the N-terminal Hs only if it is the first
                 # chunk being built
 
                 # measure torsion angle reference H1 - HA
-                _h1_ha_angle = CALC_TORSION_ANGLES(coords[H1_N_CA_HA_idx, :])[0]
+                _h1_ha_angle = \
+                    CALC_TORSION_ANGLES(coords[ap_confmasks.H1_N_CA_HA, :])[0]
 
                 # given any angle calculated along an axis, calculate how
                 # much to rotate along that axis to place the
@@ -843,29 +877,22 @@ def conformer_generator(
                 _rot_angle = _h1_ha_angle % PI2 - RAD_60
 
                 current_Hterm_coords = ROT_COORDINATES(
-                    coords[H_terminal_idx, :],
+                    coords[ap_confmasks.Hterm, :],
                     VEC_1_X_AXIS,
                     _rot_angle,
                     )
-                coords[H_terminal_idx, :] = current_Hterm_coords
+                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
             # ?
 
             # /
             # calc energy
-            distances_ij = CALC_DISTS(coords)
-
-            energy_lj = njit_calc_LJ_energy(
-                acoeff,
-                bcoeff,
-                distances_ij,
-                bonds_ge_3_mask,
+            total_energy = calc_energy(
+                coords,
+                ap_acoeff,
+                ap_bcoeff,
+                ap_charges_ij,
+                ap_bonds_ge_3_mask,
                 )
-
-            energy_elec_ij = charges_ij / distances_ij
-            energy_elec = NANSUM(energy_elec_ij[bonds_ge_3_mask])
-
-            total_energy = energy_lj + energy_elec
-            # ?
 
             if total_energy > 0:
                 # reset coordinates to the original value
@@ -873,7 +900,7 @@ def conformer_generator(
 
                 # reset the same chunk maximum 5 times,
                 # after that reset also the chunk before
-                if number_of_trials > 5:
+                if number_of_trials > 50:
                     bbi0_R_POP()
                     COi0_R_POP()
                     NHi0_R_POP()
@@ -881,12 +908,20 @@ def conformer_generator(
                     number_of_trials = 0
                     number_of_trials2 += 1
 
-                if number_of_trials2 > 500:
+                if number_of_trials2 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
                     NHi0_R_POP()
                     res_R_POP()
                     number_of_trials2 = 0
+                    number_of_trials3 += 1
+
+                if number_of_trials3 > 5:
+                    bbi0_R_POP()
+                    COi0_R_POP()
+                    NHi0_R_POP()
+                    res_R_POP()
+                    number_of_trials3 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
@@ -918,7 +953,7 @@ def conformer_generator(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 coords[:, :] = NAN
-                coords[H_terminal_idx, :] = current_Hterm_coords
+                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -965,7 +1000,33 @@ def conformer_generator(
             broke_on_start_attempt = False
             continue  # send back to the CHUNK while loop
 
-        yield coords
+        # we do not want sidechains at this point
+        all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
+        all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
+        all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
+
+        if with_sidechains:
+
+            all_atoms_coords[all_atoms_masks.non_Hs_non_OXT] = \
+                calc_sidechains(
+                    coords[ap_confmasks.bb4],
+                    )
+
+            total_energy = calc_energy(
+                all_atoms_coords,
+                r_acoeff,
+                r_bcoeff,
+                r_charges_ij,
+                r_bonds_ge_3_mask,
+                )
+
+            if total_energy > 0:
+                print('Conformer with WORST energy', total_energy)
+                continue
+            else:
+                print(conf_n, total_energy)
+
+        yield all_atoms_coords
         conf_n += 1
 
 
@@ -1295,7 +1356,12 @@ def gen_PDB_from_conformer(
     # in the atoms that constitute a protein chain
     ATOM_LABEL_FMT = ' {: <3}'.format
 
+    assert len(atom_labels) == coords.shape[0]
+
     for i in range(len(atom_labels)):
+
+        if np.isnan(coords[i, 0]):
+            continue
 
         if atom_labels[i] == 'N':
             resi += 1
@@ -1659,6 +1725,122 @@ def generate_vdW_data(
             vdW_non_bond[counter] = False
 
     return vdW_sums, vdW_non_bond
+
+
+def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
+    CALC_DISTS = calc_all_vs_all_dists
+    NANSUM = np.nansum
+    distances_ij = CALC_DISTS(coords)
+
+    energy_lj = njit_calc_LJ_energy(
+        acoeff,
+        bcoeff,
+        distances_ij,
+        bonds_ge_3_mask,
+        )
+
+    energy_elec_ij = charges_ij / distances_ij
+    energy_elec = NANSUM(energy_elec_ij[bonds_ge_3_mask])
+
+    # total energy
+    return energy_lj + energy_elec
+
+
+def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
+    # /
+    # Prepares terms for the energy function
+    # TODO: parametrize this.
+    # the user should be able to chose different forcefields
+    ff14SB = read_ff14SB_params()
+    res_topology = generate_residue_template_topology(
+        amber_pdbs,
+        atom_labels_amber,
+        add_OXT=True,
+        add_Nterminal_H=True,
+        )
+    bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
+    bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
+
+    # units in:
+    # nm, kJ/mol, proton units
+    sigmas_ii, epsilons_ii, charges_i = populate_ff_parameters_in_structure(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ff14SB,  # the forcefield dictionary
+        )
+
+    # this mask will deactivate calculations in covalently bond atoms and
+    # atoms separated 2 bonds apart
+    _bonds_ge_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_le_2_intra,
+        bonds_le_2_inter,
+        base_bool=True,
+        )
+    # on lun 21 dic 2020 17:33:31 EST, I tested for 1M sized array
+    # the numeric indexing performed better than the boolean indexing
+    # 25 ns versus 31 ns.
+    bonds_ge_3_mask = np.where(_bonds_ge_3_mask)[0]
+
+    # /
+    # Prepares Coulomb and Lennard-Jones pre computed parameters:
+    # calculates ij combinations using raw njitted functions because using
+    # numpy outer variantes in very large systems overloads memory and
+    # reduces performance.
+    #
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    # sigmas
+    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_sum_upper_diagonal_raw(sigmas_ii, sigmas_ij_pre)
+    #
+    # epsilons
+    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(epsilons_ii, epsilons_ij_pre)
+    #
+    # charges
+    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+
+    # mixing rules
+    epsilons_ij = epsilons_ij_pre ** 0.5
+    sigmas_ij = sigmas_ij_pre * 5  # mixing + nm to Angstrom converstion
+
+    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
+    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
+
+    charges_ij *= 0.25  # dielectic constant
+
+    # The mask to identify ij pairs exactly 3 bonds apart is needed for the
+    # special scaling factor of Coulomb and LJ equations
+    # This mask will be used only aftert the calculation of the CLJ params
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_equal_3_intra,
+        bonds_equal_3_inter,
+        )
+
+    # this is the Lennard-Jones special case, where scaling factors are applied
+    # to atoms bonded 3 bonds apart, known as the '14' cases.
+    # 0.4 was calibrated manually, until I could find a conformer
+    # within 50 trials dom 20 dic 2020 13:16:50 EST
+    # I believe, because we are not doing local minimization here, we
+    # cannot be that strick with the 14 scaling factor, and a reduction
+    # factor of 2 is not enough
+    acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+    bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
+    charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
+
+    #del sigmas_ij_pre, epsilons_ij_pre, epsilons_ij, sigmas_ij
+    #del bonds_exact_3_mask, _bonds_ge_3_mask, ff14SB
+    assert len(acoeff) == len(bcoeff) == len(charges_ij)
+
+    return acoeff, bcoeff, charges_ij, bonds_ge_3_mask
+    # ?
 
 
 if __name__ == "__main__":
