@@ -257,14 +257,6 @@ def init_confmasks(atom_labels):
     return conf_mask
 
 
-
-
-
-
-
-
-
-
 def main(
         input_seq,
         database,
@@ -846,6 +838,7 @@ def conformer_generator(
                 NHi += 1
 
             # Adds sidechain template structures
+            # TODO: remove this if-statement
             if True:#with_sidechains:
                 for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
 
