@@ -105,7 +105,7 @@ def aligndb(db):
 
     _resseq = '|'.join(resseq)
     _dssp = '|'.join(dssp)
-    _angles = np.array((phi, psi, omg), dtype=np.float32).T
+    _angles = np.array((omg, phi, psi), dtype=np.float32).T
 
     return pdbs, _angles, _dssp, _resseq
 
