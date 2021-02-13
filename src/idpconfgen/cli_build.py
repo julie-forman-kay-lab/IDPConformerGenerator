@@ -257,6 +257,28 @@ def init_confmasks(atom_labels):
     return conf_mask
 
 
+def get_cycle_distances_backbone():
+    """
+    Return an inifinite iterator of backbone atom distances.
+    """
+    return cycle((
+            distances_N_CA,  # used for OMEGA
+            distances_CA_C,  # used for PHI
+            distances_C_Np1,  # used for PSI
+            ))
+
+
+def get_cycle_bend_angles():
+    """
+    Return an infinite iterator of the bend angles.
+    """
+    return cycle((
+        build_bend_angles_Cm1_N_CA,  # used for OMEGA
+        build_bend_angles_N_CA_C,  # used for PHI
+        build_bend_angles_CA_C_Np1,  # used for PSI
+        ))
+
+
 def main(
         input_seq,
         database,
@@ -642,15 +664,17 @@ def conformer_generator(
     # 3rd) CA atom of the firs residue is at the x-axis
     # # coordinates are created always from the parameters in the core
     # # definitions of IDPConfGen
-    dummy_CA_m1_coord = np.array((0.0, 1.0, 0.0))
+    dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
+    dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-    n_terminal_CA_coord = np.array((distances_N_CA[ala_pro_seq[0]], 0.0, 0.0))
+    #n_terminal_CA_coord = np.array((distances_N_CA[ala_pro_seq[0]], 0.0, 0.0))
 
     # seed coordinates array
     seed_coords = np.array((
         dummy_CA_m1_coord,
+        dummy_C_m1_coord,
         n_terminal_N_coord,
-        n_terminal_CA_coord,
+        #n_terminal_CA_coord,
         ))
     # ?
 
@@ -696,16 +720,8 @@ def conformer_generator(
         # atom build is a C and the last atom built is the CA, which breaks
         # periodicity
         # all these are dictionaries
-        bond_lens = cycle((
-            distances_CA_C,  # used for PHI
-            distances_C_Np1,  # used for PSI
-            distances_N_CA,  # used for OMEGA
-            ))
-        bond_bend = cycle((
-            build_bend_angles_N_CA_C,  # used for PHI
-            build_bend_angles_CA_C_Np1,  # used for PSI
-            build_bend_angles_Cm1_N_CA,  # used for OMEGA
-            ))
+        bond_lens = get_cycle_distances_backbone()
+        bond_bend = get_cycle_bend_angles()
 
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
@@ -959,16 +975,8 @@ def conformer_generator(
                 # this is required because the last chunk created may have been
                 # the final part of the conformer
                 if backbone_done:
-                    bond_lens = cycle((
-                        distances_CA_C,
-                        distances_C_Np1,
-                        distances_N_CA,
-                        ))
-                    bond_bend = cycle((
-                        build_bend_angles_N_CA_C,
-                        build_bend_angles_CA_C_Np1,
-                        build_bend_angles_Cm1_N_CA,
-                        ))
+                    bond_lens = get_cycle_distances_backbone()
+                    bond_bend = get_cycle_bend_angles()
 
                 # we do not know if the next chunk will finish the protein
                 # or not
