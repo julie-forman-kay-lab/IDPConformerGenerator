@@ -816,10 +816,12 @@ def conformer_generator(
 
                 # activate flag to finish loop at the end
                 backbone_done = True
+                print('adding COO')
 
                 # add the carboxyls
                 coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
+                print(coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]])
 
             # builds carbonyl atoms. Two situations can happen here:
             # 1) the backbone is not complete - the last atom is CA
@@ -830,7 +832,8 @@ def conformer_generator(
             # this is so because range(X, Y, Z) equals range(X, Y-1, Z)
             # if Y-1 is not in range(X, Y, Z). And, this is the case for N-CA
             # pair.
-            for k in range(bbi0_register[-1], bbi - 1, 3):
+            for k in range(bbi0_register[-1] + 1, bbi - 2, 3):
+                print(k, atom_labels[ap_confmasks.bb3][k])
                 bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
                     bb_real[k, :],
@@ -839,7 +842,7 @@ def conformer_generator(
                 COi += 1
 
             # Adds N-H Hydrogens
-            for k in range(bbi0_register[-1] + 1, bbi, 3):
+            for k in range(bbi0_register[-1] + 2, bbi - 1, 3):
 
                 if residue_labels_bb_simulating[k] == 'PRO':
                     continue
@@ -912,7 +915,7 @@ def conformer_generator(
                 ap_bonds_ge_3_mask,
                 )
 
-            if total_energy > 0:
+            if False:#total_energy > 0:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1014,6 +1017,8 @@ def conformer_generator(
         all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
         all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
         all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
+        all_atoms_coords[[all_atoms_masks.OXT2, all_atoms_masks.OXT1], :] = \
+            coords[[ap_confmasks.OXT2, ap_confmasks.OXT1], :]
 
         if with_sidechains:
 
