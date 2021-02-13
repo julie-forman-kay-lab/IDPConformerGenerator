@@ -41,7 +41,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb1": {
                     "dssp": "XLLLLX",
                     "fasta": "XMMMMX",
-                    "omega": [0, 2, 2, 2, 2],
+                    "omega": [2, 2, 2, 2, 0],
                     "psi": [0, 1, 1, 1, 1],
                     "phi": [3, 3, 3, 3, 0],
                     "resids": "1,2,3,4,5",
@@ -65,7 +65,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb1": {
                     "dssp": "XLLLLX",
                     "fasta": "XMMMMX",
-                    "omega": [0, 2, 2, 2, 2],
+                    "omega": [2, 2, 2, 2, 0],
                     "psi": [0, 1, 1, 1, 1],
                     "phi": [3, 3, 3, 3, 0],
                     "resids": "1,2,3,4,5,6",
@@ -73,7 +73,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb2": {
                     "dssp": "XHHHHX",
                     "fasta": "XAAAAX",
-                    "omega": [0, 5, 5, 5, 5],
+                    "omega": [5, 5, 5, 5, 0],
                     "psi": [0, 4, 4, 4, 4],
                     "phi": [6, 6, 6, 6, 0],
                     "resids": "7,8,9,10,11,12",
@@ -105,7 +105,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb1": {
                     "dssp": "XLLLLX",
                     "fasta": "XMMMMX",
-                    "omega": [0, 2, 2, 2, 2],
+                    "omega": [2, 2, 2, 2, 0],
                     "psi": [0, 1, 1, 1, 1],
                     "phi": [3, 3, 3, 3, 0],
                     "resids": "1,2,3,4,5,6",
@@ -113,7 +113,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb2": {
                     "dssp": "XHHHHX",
                     "fasta": "XAAAAX",
-                    "omega": [0, 5, 5, 5, 5],
+                    "omega": [5, 5, 5, 5, 0],
                     "psi": [0, 4, 4, 4, 4],
                     "phi": [6, 6, 6, 6, 0],
                     "resids": "7,8,9,10,11,12",
@@ -121,7 +121,7 @@ def test_REX_RANGE_regex(regex, expected):
                 "pdb3": {
                     "dssp": "XEEEEX",
                     "fasta": "XWWWWX",
-                    "omega": [0, 8, 8, 8, 8],
+                    "omega": [8, 8, 8, 8, 0],
                     "psi": [0, 7, 7, 7, 7],
                     "phi": [9, 9, 9, 9, 0],
                     "resids": "13,14,15,16,17,18",
@@ -175,7 +175,7 @@ def test_aligndb(in1, out):
                 "pdb1": {
                     "dssp": "xLLLLX",
                     "fasta": "xMMMMx",
-                    "omega": [0, 2, 2, 2, 2],
+                    "omega": [2, 2, 2, 2, 0],
                     "psi": [0, 1, 1, 1, 1],
                     "phi": [3, 3, 3, 3, 0],
                     "resids": "1,2,3,4,5,6",
@@ -225,7 +225,7 @@ def test_aligndb_continue_1(in1, out):
                 "pdb1": {
                     "dssp": "xLLLLx",
                     "fasta": "xMMMMx",
-                    "omega": [0, 2, 2, 2, 2],
+                    "omega": [2, 2, 2, 2, 0],
                     "psi": [0, 1, 1, 1, 1],
                     "phi": [3, 3, 3, 3, 0],
                     "resids": "1,2,3,4,5,6",

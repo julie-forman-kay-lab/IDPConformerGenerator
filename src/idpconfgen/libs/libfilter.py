@@ -34,11 +34,42 @@ def aligndb(db):
     current = 0
     for pdb, data in db.items():
 
+        # the first and the last residues are discarded because these
+        # residues lack the information for the three angles. The first
+        # residue lack information on the Omega and Phi angles, because
+        # Ca-1--C-1--N--Ca does not exist and C-1--N--Ca--C does not
+        # exist also.
+        # Likewise, the last residue lacks information for the Psi
+        # angle. Hence, the first and last residues for each protein are
+        # discarded.
         fasta_truncated = data['fasta'][1:-1]
         dssp_truncated = data['dssp'][1:-1]
+
+        # As described in
+        # http://dunbrack.fccc.edu/bbdep2010/Tutorial.php
+        # he phi dihedral angle for residue i is defined by
+        # Ci-1-Ni-Cαi-Ci; the psi dihedral angle for residue i is defined
+        # by Ni-Cαi-Ci-Ni+1; the omega dihedral angle for residue i is
+        # defined by Cαi-1-Ci-1-Ni-Cαi.
+        # The last omega and phi are discarded.
+        # The first psi in the list is discarded.
+        # Example:
+        # in a 6 residue protein, first and last residues are discarded
+        # same of the DSSP information associated
+        # M  QWET  Y
+        # L  EEEE  L
+        #
+        # S -> psi
+        # O -> omega
+        # H -> phi
+        #
+        # letters identify angles in the backbone
+        #
+        #     S O H  S O H
+        # N-CA-C-N-CA-C-N-CA-C
+        omg_truncated = data['omega'][:-1]
         phi_truncated = data['phi'][:-1]
         psi_truncated = data['psi'][1:]
-        omg_truncated = data['omega'][1:]
 
         len_segment = len(fasta_truncated)
 

@@ -276,16 +276,16 @@ def calc_torsion_angles(
 
 def get_separate_torsions(torsions_array):
     """
-    Separate torsion angles accorindg to the protein backbone concept.
+    Separate torsion angles according to the protein backbone concept.
 
-    Considers torsions angles for bonds in between atom pairs:
+    Considers torsion angles for bonds in between atom pairs:
         - CA - C
         - C - N
         - N - CA
 
     Backbone obeys the order: N-CA-C-N-CA-C(...)
 
-    And the firt value corresponds to a CA-C pair, because the
+    And the first value corresponds to a CA-C pair, because the
     first N-CA pair of the protein backbone has no torsion angle.
     """
     assert torsions_array.ndim == 1
