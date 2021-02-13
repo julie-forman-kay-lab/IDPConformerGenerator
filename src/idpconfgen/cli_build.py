@@ -633,10 +633,10 @@ def conformer_generator(
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
-    # +1 because of the dummy coordinate required to start building.
-    # see later
-    bb = np.full((ap_confmasks.bb3.size + 1, 3), NAN, dtype=np.float64)
-    bb_real = bb[1:, :]  # backbone coordinates without the dummy
+    # +2 because of the dummy coordinates required to start building.
+    # see later adding dummy coordinates to the structure seed
+    bb = np.full((ap_confmasks.bb3.size + 2, 3), NAN, dtype=np.float64)
+    bb_real = bb[2:, :]  # backbone coordinates without the dummies
     # coordinates for the carbonyl oxigen atoms
     bb_CO = np.full((ap_confmasks.COs.size, 3), NAN, dtype=np.float64)
 
@@ -738,7 +738,7 @@ def conformer_generator(
         coords[ap_confmasks.Hterm, :] = N_TERMINAL_H
         current_Hterm_coords = N_TERMINAL_H
 
-        bbi = 2  # starts at 2 because the first 3 atoms are already placed
+        bbi = 1  # starts at 1 because there are two dummy atoms
         bbi0_R_CLEAR()
         bbi0_R_APPEND(bbi)
 
@@ -774,7 +774,7 @@ def conformer_generator(
             if generative_function:
                 agls = generative_function(
                     nres=RINT(1, 6),
-                    cres=(bbi - 2) // 3,
+                    cres=abs(bbi - 2) // 3,
                     )
 
             else:
@@ -786,25 +786,27 @@ def conformer_generator(
             # index at the start of the current cycle
             try:
                 for torsion in agls:
-                    # bbi -2 makes the match, because despite the first atom
-                    # being placed is a C, it is placed using the PHI angle of a
-                    # residue. And PHI is the first angle of that residue angle
-                    # set.
-                    current_res_number = (bbi - 2) // 3
+                    # TODO: remove this comment
+                    # #bbi -2 makes the match, because despite the first atom
+                    # #being placed is a C, it is placed using the PHI angle of a
+                    # #residue. And PHI is the first angle of that residue angle
+                    # #set.
+                    current_res_number = abs(bbi - 2) // 3
                     current_residue = ala_pro_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
                     # is displaced by 1 unit from bb. So 2 in bb_read is the
                     # next atom of 2 in bb.
                     bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
-                        bb[bbi - 2, :],
                         bb[bbi - 1, :],
                         bb[bbi, :],
+                        bb[bbi + 1, :],
                         next(bond_lens)[current_residue],
                         next(bond_bend)[current_residue],
                         torsion,
                         )
                     bbi += 1
+                    print('builded_atom', bbi)
 
             except IndexError:
                 # IndexError happens when the backbone is complete
