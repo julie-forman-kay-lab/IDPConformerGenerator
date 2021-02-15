@@ -412,6 +412,8 @@ def place_sidechain_template(
     """
     Place sidechain templates on backbone.
 
+    Sidechain residue template is expected to have CA already at 0,0,0.
+
     Parameters
     ----------
     bb_cnf : numpy nd.array, shape (3, 3), dtype=float64

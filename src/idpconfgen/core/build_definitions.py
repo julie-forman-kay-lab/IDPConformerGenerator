@@ -680,7 +680,10 @@ sidechain_templates = {
 # these template coordinates were created using Chimera-X daily given
 # a N-terminal at 0,0,0 and a CA along the X axis.
 n_terminal_h_coords_at_origin = np.array([
-    [-0.337, -0.036, 0.951],
-    [-0.336, 0.842, -0.444],
-    [-0.337, -0.806, -0.507],
+    [ 0.087,  0.76 ,  1.245],
+    [ 0.   ,  0.   ,  0.   ],
+    [ 1.231,  0.229, -0.869],
+    [-0.789,  1.241,  1.392],
+    [ 0.837,  1.435,  1.189],
+    [ 0.258,  0.13 ,  2.015]
     ])

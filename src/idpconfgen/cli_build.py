@@ -150,7 +150,7 @@ ConfMasks = namedtuple(
         'OXT2',
         'non_Hs',
         'non_Hs_non_OXT',
-        'H1_N_CA_HA',
+        'H1_N_CA_CB',
         ]
     )
 
@@ -201,7 +201,7 @@ def init_confmasks(atom_labels):
     OXT2 : OXT atom of the C-terminal carboxyl group
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    H1_N_CA_HA : these four atoms from the first residue
+    H1_N_CA_CB : these four atoms from the first residue
     """
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     assert len(bb3) % 3 == 0
@@ -233,11 +233,11 @@ def init_confmasks(atom_labels):
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
     assert len(_N_CA_idx) == 2, _N_CA_idx
 
-    _HA_HA2_idx = np.where(np.isin(atom_labels, ('HA', 'HA2')))[0][0:1]
-    assert len(_HA_HA2_idx) == 1
+    _CB_idx = np.where(atom_labels == 'CB')[0][0:1]
+    assert len(_CB_idx) == 1
 
-    H1_N_CA_HA = list(_H1_idx) + list(_N_CA_idx) + list(_HA_HA2_idx)
-    assert len(H1_N_CA_HA) == 4
+    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_CB_idx)
+    assert len(H1_N_CA_CB) == 4
 
     Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
     assert len(Hterm) == 3
@@ -252,7 +252,7 @@ def init_confmasks(atom_labels):
         OXT2=OXT2,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
-        H1_N_CA_HA=H1_N_CA_HA,
+        H1_N_CA_CB=H1_N_CA_CB,
         )
 
     return conf_mask
@@ -549,6 +549,7 @@ def conformer_generator(
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NANSUM = np.nansum
+    NORM = np.linalg.norm
     N_TERMINAL_H = n_terminal_h_coords_at_origin
     PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
@@ -558,7 +559,6 @@ def conformer_generator(
     ROT_COORDINATES = rotate_coordinates_Q_njit
     ROUND = np.round
     SIDECHAIN_TEMPLATES = sidechain_templates
-    VEC_1_X_AXIS = np.array([1, 0, 0])
     angles = ANGLES
     slices = SLICES
     # bellow an optimization for the builder loop
@@ -737,8 +737,6 @@ def conformer_generator(
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
 
         # add N-terminal hydrogens to the origin
-        coords[ap_confmasks.Hterm, :] = N_TERMINAL_H
-        current_Hterm_coords = N_TERMINAL_H
 
         bbi = 1  # starts at 1 because there are two dummy atoms
         bbi0_R_CLEAR()
@@ -856,9 +854,6 @@ def conformer_generator(
 
                     # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
                     # disntace and bend parameters
-                    print(bb_real[k - 1, :])
-                    print(bb_real[k, :])
-                    print(bb_real[k + 1, :])
                     bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
                         bb_real[k - 1, :],
                         bb_real[k, :],
@@ -866,7 +861,6 @@ def conformer_generator(
                         distance=DISTANCE_NH,
                         bend=BUILD_BEND_H_N_C,
                         )
-                    assert not np.all(np.isnan(bb_NH[NHi, :]))
                     NHi += 1
 
             # Adds sidechain template structures
@@ -874,12 +868,8 @@ def conformer_generator(
             if True:#with_sidechains:
                 for res_i in range(res_R[-1], current_res_number):  # noqa: E501
 
-                    print('res i for sidechain', res_i)
-
                     _sstemplate, _sidechain_idxs = \
                         SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
-
-                    print('sidechain atoms', atom_labels[ap_confmasks.bb3][res_i * 3:res_i * 3 + 3])
 
                     sscoords = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
@@ -899,25 +889,36 @@ def conformer_generator(
             coords[ap_confmasks.COs] = bb_CO
             coords[ap_confmasks.NHs] = bb_NH
 
-            if False:#len(bbi0_register) == 1 and ala_pro_seq[0] != 'G':
+            if len(bbi0_register) == 1:
                 # rotates the N-terminal Hs only if it is the first
                 # chunk being built
 
-                # measure torsion angle reference H1 - HA
-                _h1_ha_angle = \
-                    CALC_TORSION_ANGLES(coords[ap_confmasks.H1_N_CA_HA, :])[0]
+                _ = PLACE_SIDECHAIN_TEMPLATE(
+                        bb_real[0:3, :],
+                        N_TERMINAL_H,
+                        )
 
-                # given any angle calculated along an axis, calculate how
-                # much to rotate along that axis to place the
-                # angle at 60 degrees
-                _rot_angle = _h1_ha_angle % PI2 - RAD_60
+                coords[ap_confmasks.Hterm, :] = _[3:, :]
+                current_Hterm_coords = _[3:, :]
 
-                current_Hterm_coords = ROT_COORDINATES(
-                    coords[ap_confmasks.Hterm, :],
-                    VEC_1_X_AXIS,
-                    _rot_angle,
+                if ala_pro_seq[0] != 'G':
+
+                    # measure torsion angle reference H1 - HA
+                    _h1_ha_angle = \
+                        CALC_TORSION_ANGLES(coords[ap_confmasks.H1_N_CA_CB, :])[0]  # noqa: E501
+
+                    ## given any angle calculated along an axis, calculate how
+                    ## much to rotate along that axis to place the
+                    ## angle at 60 degrees
+                    _rot_angle = _h1_ha_angle % PI2 - RAD_60
+
+                    current_Hterm_coords = ROT_COORDINATES(
+                        coords[ap_confmasks.Hterm, :],
+                        coords[1] / NORM(coords[1]),
+                        _rot_angle,
                     )
-                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
+
+                    coords[ap_confmasks.Hterm, :] = current_Hterm_coords
             # ?
 
             # /
@@ -930,7 +931,7 @@ def conformer_generator(
                 ap_bonds_ge_3_mask,
                 )
 
-            if False:#total_energy > 0:
+            if total_energy > 10:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1031,14 +1032,9 @@ def conformer_generator(
         # we do not want sidechains at this point
         all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
         all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
-        #TODO Hterm
-        #all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
+        all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
         all_atoms_coords[[all_atoms_masks.OXT2, all_atoms_masks.OXT1], :] = \
             coords[[ap_confmasks.OXT2, ap_confmasks.OXT1], :]
-
-
-        print(all_atoms_coords[all_atoms_masks.NHs])
-
 
         if with_sidechains:
 
