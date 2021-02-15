@@ -202,6 +202,7 @@ def init_confmasks(atom_labels):
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
     H1_N_CA_CB : these four atoms from the first residue
+                 if Gly, uses HA3.
     """
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     assert len(bb3) % 3 == 0
@@ -233,10 +234,10 @@ def init_confmasks(atom_labels):
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
     assert len(_N_CA_idx) == 2, _N_CA_idx
 
-    _CB_idx = np.where(atom_labels == 'CB')[0][0:1]
-    assert len(_CB_idx) == 1
+    _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
+    assert len(_final_idx) == 1
 
-    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_CB_idx)
+    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
     assert len(H1_N_CA_CB) == 4
 
     Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
@@ -544,6 +545,7 @@ def conformer_generator(
     CALC_DISTS = calc_all_vs_all_dists
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
+    ISNAN = np.isnan
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
@@ -639,15 +641,25 @@ def conformer_generator(
     # see later adding dummy coordinates to the structure seed
     bb = np.full((ap_confmasks.bb3.size + 2, 3), NAN, dtype=np.float64)
     bb_real = bb[2:, :]  # backbone coordinates without the dummies
+
     # coordinates for the carbonyl oxigen atoms
     bb_CO = np.full((ap_confmasks.COs.size, 3), NAN, dtype=np.float64)
 
     # notice that NHydrogen_mask does not see Prolines
     bb_NH = np.full((ap_confmasks.NHs.size, 3), NAN, dtype=np.float64)
+    bb_NH_idx = np.arange(len(bb_NH))
+    # creates masks and indexes for the `for` loop used to place NHs
+    # the first residue has no NH, prolines have no NH
+    non_pro = np.array(list(ala_pro_seq)[1:]) != 'P'
+    # NHs index numbers in bb_real
+    bb_NH_nums = np.arange(3, (len(ala_pro_seq) - 1) * 3 + 1, 3)[non_pro]
+    # CAs index numbers in bb_real
+    bb_NH_nums_p1 = bb_NH_nums + 1
+    assert bb_NH.shape[0] == bb_NH_nums.size == bb_NH_idx.size
 
-    # the following array serves to avoid placing HN in Proline residues
-    residue_labels_bb_simulating = residue_labels[ap_confmasks.bb3]
-
+    # sidechain masks
+    # this is sidechain agnostic, works for every sidechain, yet here we
+    # use only ALA, PRO, GLY - Mon Feb 15 17:29:20 2021
     ss_masks = create_sidechains_masks_per_residue(
         residue_numbers,
         atom_labels,
@@ -692,10 +704,10 @@ def conformer_generator(
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
 
-    NHi0_register = []
-    NHi0_R_APPEND = NHi0_register.append
-    NHi0_R_POP = NHi0_register.pop
-    NHi0_R_CLEAR = NHi0_register.clear
+    #NHi0_register = []
+    #NHi0_R_APPEND = NHi0_register.append
+    #NHi0_R_POP = NHi0_register.pop
+    #NHi0_R_CLEAR = NHi0_register.clear
 
     res_R = []  # residue number register
     res_R_APPEND = res_R.append
@@ -749,9 +761,9 @@ def conformer_generator(
         # NHi is 0 because
         # the first residue, remember the first residue as 'H1,2,3'
         # see bb_NH_builder definition
-        NHi = 0
-        NHi0_R_CLEAR()
-        NHi0_R_APPEND(NHi)
+        #NHi = 0
+        #NHi0_R_CLEAR()
+        #NHi0_R_APPEND(NHi)
 
         # residue integer number
         current_res_number = 0
@@ -817,16 +829,10 @@ def conformer_generator(
 
                 # activate flag to finish loop at the end
                 backbone_done = True
-                print('adding COO')
 
                 # add the carboxyls
                 coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
-                print(coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]])
-
-            
-            finally:
-                print('bbi register: ', bbi0_register[-1], bbi)
 
             # builds carbonyl atoms. Two situations can happen here:
             # 1) the backbone is not complete - the last atom is CA
@@ -846,22 +852,21 @@ def conformer_generator(
                 COi += 1
 
             # Adds N-H Hydrogens
-            if len(bbi0_register) > 1:
-                for k in range(bbi0_register[-2] + 2, bbi - 1, 3):
+            # Not a perfect loop. It repeats for Hs already placed.
+            # However, was a simpler solution than matching the indexes
+            # and the time cost is not a bottle neck.
+            _ = ~ISNAN(bb_real[bb_NH_nums_p1, 0])
+            for k, j in zip(bb_NH_nums[_], bb_NH_idx[_]):
 
-                    if residue_labels_bb_simulating[k] == 'PRO':
-                        continue
-
-                    # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
-                    # disntace and bend parameters
-                    bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
-                        bb_real[k - 1, :],
-                        bb_real[k, :],
-                        bb_real[k + 1, :],
-                        distance=DISTANCE_NH,
-                        bend=BUILD_BEND_H_N_C,
-                        )
-                    NHi += 1
+                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
+                # distance and bend parameters
+                bb_NH[j, :] = MAKE_COORD_Q_CO_LOCAL(
+                    bb_real[k - 1, :],
+                    bb_real[k, :],
+                    bb_real[k + 1, :],
+                    distance=DISTANCE_NH,
+                    bend=BUILD_BEND_H_N_C,
+                    )
 
             # Adds sidechain template structures
             # TODO: remove this if-statement
@@ -940,7 +945,7 @@ def conformer_generator(
                 if number_of_trials > 50:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    NHi0_R_POP()
+                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials = 0
                     number_of_trials2 += 1
@@ -948,7 +953,7 @@ def conformer_generator(
                 if number_of_trials2 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    NHi0_R_POP()
+                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials2 = 0
                     number_of_trials3 += 1
@@ -956,14 +961,14 @@ def conformer_generator(
                 if number_of_trials3 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    NHi0_R_POP()
+                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials3 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
-                    _NHi0 = NHi0_register[-1]
+                    #_NHi0 = NHi0_register[-1]
                     _resi0 = res_R[-1]
                 except IndexError:
                     # if this point is reached,
@@ -975,7 +980,7 @@ def conformer_generator(
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
                 bb_CO[_COi0:COi, :] = NAN
-                bb_NH[_NHi0:NHi, :] = NAN
+                #bb_NH[_NHi0:NHi, :] = NAN
 
                 # do the same for sidechains
                 # ... it is not necessary because in the loop above
@@ -984,7 +989,7 @@ def conformer_generator(
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
-                NHi = _NHi0
+                #NHi = _NHi0
                 current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
@@ -1009,7 +1014,7 @@ def conformer_generator(
             number_of_trials = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
-            NHi0_R_APPEND(NHi)
+            #NHi0_R_APPEND(NHi)
             # the residue where the build process stopped
             res_R_APPEND(current_res_number)
 
