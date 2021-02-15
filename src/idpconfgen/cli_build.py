@@ -10,7 +10,6 @@ USAGE:
 """
 import argparse
 import re
-import sys
 from collections import Counter, namedtuple
 from functools import partial
 from itertools import cycle
@@ -26,7 +25,6 @@ from numba import njit
 import idpcpp
 #from idpconfgen.cpp.faspr import faspr_sidechains as fsc
 from idpconfgen import log, Path
-from idpconfgen import assert_type as AT
 from idpconfgen.core.build_definitions import (
     amber_pdbs,
     atom_labels_amber,
@@ -66,7 +64,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libpdb import atom_line_formatter
-from idpconfgen.libs.libtimer import timeme, ProgressCounter
+from idpconfgen.libs.libtimer import timeme
 
 
 faspr_sc = idpcpp.faspr_sidechains
@@ -417,7 +415,7 @@ def _build_conformers(
 
     atom_labels, residue_numbers, residue_labels = next(builder)
 
-    for conf_n in range(nconfs):
+    for _ in range(nconfs):
 
         coords = next(builder)
 
@@ -542,7 +540,6 @@ def conformer_generator(
     BUILD_BEND_H_N_C = build_bend_H_N_C
     # CALC_DISTS = calc_all_vs_all_dists_square
     # TODO
-    CALC_DISTS = calc_all_vs_all_dists
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
     ISNAN = np.isnan
@@ -550,7 +547,6 @@ def conformer_generator(
     MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
-    NANSUM = np.nansum
     NORM = np.linalg.norm
     N_TERMINAL_H = n_terminal_h_coords_at_origin
     PI2 = np.pi * 2
@@ -559,7 +555,6 @@ def conformer_generator(
     RAD_60 = np.radians(60)
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
-    ROUND = np.round
     SIDECHAIN_TEMPLATES = sidechain_templates
     angles = ANGLES
     slices = SLICES
@@ -606,7 +601,6 @@ def conformer_generator(
     yield r_atom_labels, r_residue_numbers, r_residue_labels
 
     r_num_atoms = len(r_atom_labels)
-    #num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
     r_acoeff, r_bcoeff, r_charges_ij, r_bonds_ge_3_mask = \
         create_energy_func_params(r_atom_labels, r_residue_numbers, r_residue_labels)
@@ -619,7 +613,6 @@ def conformer_generator(
         create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
 
     num_atoms = len(atom_labels)
-    num_ij_pairs = num_atoms * (num_atoms - 1) // 2
 
     ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
         create_energy_func_params(atom_labels, residue_numbers, residue_labels)
@@ -631,7 +624,6 @@ def conformer_generator(
     # creates coordinate data-structures and,
     # creates index-translated boolean masks
 
-    r_confmasks = init_confmasks(r_atom_labels)
     ap_confmasks = init_confmasks(atom_labels)
 
     # create coordinates and views
@@ -669,7 +661,6 @@ def conformer_generator(
 
     all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
     all_atoms_masks = init_confmasks(r_atom_labels)
-
 
     # /
     # creates seed coordinates:
@@ -757,13 +748,6 @@ def conformer_generator(
         COi = 0  # carbonyl atoms
         COi0_R_CLEAR()
         COi0_R_APPEND(COi)
-
-        # NHi is 0 because
-        # the first residue, remember the first residue as 'H1,2,3'
-        # see bb_NH_builder definition
-        #NHi = 0
-        #NHi0_R_CLEAR()
-        #NHi0_R_APPEND(NHi)
 
         # residue integer number
         current_res_number = 0
@@ -869,23 +853,21 @@ def conformer_generator(
                     )
 
             # Adds sidechain template structures
-            # TODO: remove this if-statement
-            if True:#with_sidechains:
-                for res_i in range(res_R[-1], current_res_number):  # noqa: E501
+            for res_i in range(res_R[-1], current_res_number):  # noqa: E501
 
-                    _sstemplate, _sidechain_idxs = \
-                        SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
+                _sstemplate, _sidechain_idxs = \
+                    SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
 
-                    sscoords = PLACE_SIDECHAIN_TEMPLATE(
-                        bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
-                        _sstemplate,
-                        )
+                sscoords = PLACE_SIDECHAIN_TEMPLATE(
+                    bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
+                    _sstemplate,
+                    )
 
-                    ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
+                ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
 
-                # Transfers coords to the main coord array
-                for _smask, _sidecoords in ss_masks[: current_res_number + backbone_done]:  # noqa: E501
-                    coords[_smask] = _sidecoords
+            # Transfers coords to the main coord array
+            for _smask, _sidecoords in ss_masks[:current_res_number]:
+                coords[_smask] = _sidecoords
 
             # / Place coordinates for energy calculation
             #
@@ -921,7 +903,7 @@ def conformer_generator(
                         coords[ap_confmasks.Hterm, :],
                         coords[1] / NORM(coords[1]),
                         _rot_angle,
-                    )
+                        )
 
                     coords[ap_confmasks.Hterm, :] = current_Hterm_coords
             # ?
@@ -945,7 +927,6 @@ def conformer_generator(
                 if number_of_trials > 50:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials = 0
                     number_of_trials2 += 1
@@ -953,7 +934,6 @@ def conformer_generator(
                 if number_of_trials2 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials2 = 0
                     number_of_trials3 += 1
@@ -961,14 +941,12 @@ def conformer_generator(
                 if number_of_trials3 > 5:
                     bbi0_R_POP()
                     COi0_R_POP()
-                    #NHi0_R_POP()
                     res_R_POP()
                     number_of_trials3 = 0
 
                 try:
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
-                    #_NHi0 = NHi0_register[-1]
                     _resi0 = res_R[-1]
                 except IndexError:
                     # if this point is reached,
@@ -980,16 +958,10 @@ def conformer_generator(
                 # clean previously built protein chunk
                 bb_real[_bbi0:bbi, :] = NAN
                 bb_CO[_COi0:COi, :] = NAN
-                #bb_NH[_NHi0:NHi, :] = NAN
-
-                # do the same for sidechains
-                # ... it is not necessary because in the loop above
-                # sidechain coordinates are replaces when repositioned
 
                 # reset also indexes
                 bbi = _bbi0
                 COi = _COi0
-                #NHi = _NHi0
                 current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
@@ -1014,7 +986,6 @@ def conformer_generator(
             number_of_trials = 0
             bbi0_R_APPEND(bbi)
             COi0_R_APPEND(COi)
-            #NHi0_R_APPEND(NHi)
             # the residue where the build process stopped
             res_R_APPEND(current_res_number)
 
@@ -1764,6 +1735,7 @@ def generate_vdW_data(
 
 
 def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
+    """Calculates energy."""
     CALC_DISTS = calc_all_vs_all_dists
     NANSUM = np.nansum
     distances_ij = CALC_DISTS(coords)
@@ -1783,6 +1755,7 @@ def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
 
 
 def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
+    """Create parameters for energy function."""
     # /
     # Prepares terms for the energy function
     # TODO: parametrize this.
