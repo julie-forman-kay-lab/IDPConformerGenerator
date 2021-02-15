@@ -36,3 +36,4 @@ def test_conf_masks():
     assert np.array_equal(confmask.non_Hs, [3, 4, 5, 6, 7, 12, 13, 14, 15, 19])
     assert np.array_equal(confmask.non_Hs_non_OXT, [3, 4, 5, 6, 7, 12, 13, 14, 15])
 
+

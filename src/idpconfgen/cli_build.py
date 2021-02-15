@@ -55,6 +55,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
     calc_all_vs_all_dists,
+    calc_residue_num_from_index,
     calc_torsion_angles,
     make_coord_Q,
     make_coord_Q_CO,
@@ -435,6 +436,7 @@ def _build_conformers(
     return
 
 
+
 # the name of this function is likely to change in the future
 def conformer_generator(
         *,
@@ -774,7 +776,8 @@ def conformer_generator(
             if generative_function:
                 agls = generative_function(
                     nres=RINT(1, 6),
-                    cres=abs(bbi - 2) // 3,
+                    #cres=abs(bbi - 2) // 3,  #TODO: remove
+                    cres=calc_residue_num_from_index(bbi)
                     )
 
             else:
@@ -791,7 +794,8 @@ def conformer_generator(
                     # #being placed is a C, it is placed using the PHI angle of a
                     # #residue. And PHI is the first angle of that residue angle
                     # #set.
-                    current_res_number = abs(bbi - 2) // 3
+                    #current_res_number = abs(bbi - 2) // 3  #TODO: remove
+                    current_res_number = calc_residue_num_from_index(bbi)
                     current_residue = ala_pro_seq[current_res_number]
 
                     # bbi is the same for bb_real and bb, but bb_real indexing
@@ -806,7 +810,6 @@ def conformer_generator(
                         torsion,
                         )
                     bbi += 1
-                    print('builded_atom', bbi)
 
             except IndexError:
                 # IndexError happens when the backbone is complete
@@ -823,6 +826,10 @@ def conformer_generator(
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
                 print(coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]])
 
+            
+            finally:
+                print('bbi register: ', bbi0_register[-1], bbi)
+
             # builds carbonyl atoms. Two situations can happen here:
             # 1) the backbone is not complete - the last atom is CA
             # 2) the backbone is complete - the last atom is C
@@ -832,8 +839,7 @@ def conformer_generator(
             # this is so because range(X, Y, Z) equals range(X, Y-1, Z)
             # if Y-1 is not in range(X, Y, Z). And, this is the case for N-CA
             # pair.
-            for k in range(bbi0_register[-1] + 1, bbi - 2, 3):
-                print(k, atom_labels[ap_confmasks.bb3][k])
+            for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
                 bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
                     bb_real[k, :],
@@ -842,29 +848,38 @@ def conformer_generator(
                 COi += 1
 
             # Adds N-H Hydrogens
-            for k in range(bbi0_register[-1] + 2, bbi - 1, 3):
+            if len(bbi0_register) > 1:
+                for k in range(bbi0_register[-2] + 2, bbi - 1, 3):
 
-                if residue_labels_bb_simulating[k] == 'PRO':
-                    continue
+                    if residue_labels_bb_simulating[k] == 'PRO':
+                        continue
 
-                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
-                # disntace and bend parameters
-                bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb_real[k - 1, :],
-                    bb_real[k, :],
-                    bb_real[k + 1, :],
-                    distance=DISTANCE_NH,
-                    bend=BUILD_BEND_H_N_C,
-                    )
-                NHi += 1
+                    # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
+                    # disntace and bend parameters
+                    print(bb_real[k - 1, :])
+                    print(bb_real[k, :])
+                    print(bb_real[k + 1, :])
+                    bb_NH[NHi, :] = MAKE_COORD_Q_CO_LOCAL(
+                        bb_real[k - 1, :],
+                        bb_real[k, :],
+                        bb_real[k + 1, :],
+                        distance=DISTANCE_NH,
+                        bend=BUILD_BEND_H_N_C,
+                        )
+                    assert not np.all(np.isnan(bb_NH[NHi, :]))
+                    NHi += 1
 
             # Adds sidechain template structures
             # TODO: remove this if-statement
             if True:#with_sidechains:
-                for res_i in range(res_R[-1], current_res_number + backbone_done):  # noqa: E501
+                for res_i in range(res_R[-1], current_res_number):  # noqa: E501
+
+                    print('res i for sidechain', res_i)
 
                     _sstemplate, _sidechain_idxs = \
-                        SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]  # 1 is faster than True :-)
+                        SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
+
+                    print('sidechain atoms', atom_labels[ap_confmasks.bb3][res_i * 3:res_i * 3 + 3])
 
                     sscoords = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
@@ -884,7 +899,7 @@ def conformer_generator(
             coords[ap_confmasks.COs] = bb_CO
             coords[ap_confmasks.NHs] = bb_NH
 
-            if len(bbi0_register) == 1 and ala_pro_seq[0] != 'G':
+            if False:#len(bbi0_register) == 1 and ala_pro_seq[0] != 'G':
                 # rotates the N-terminal Hs only if it is the first
                 # chunk being built
 
@@ -1016,9 +1031,14 @@ def conformer_generator(
         # we do not want sidechains at this point
         all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
         all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
-        all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
+        #TODO Hterm
+        #all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
         all_atoms_coords[[all_atoms_masks.OXT2, all_atoms_masks.OXT1], :] = \
             coords[[ap_confmasks.OXT2, ap_confmasks.OXT1], :]
+
+
+        print(all_atoms_coords[all_atoms_masks.NHs])
+
 
         if with_sidechains:
 

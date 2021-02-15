@@ -868,4 +868,26 @@ def calc_fGB():
     return
 
 
+@njit
+def calc_residue_num_from_index(i, step=3):
+    """Calculates residue number from index.
+
+    Parameters
+    ----------
+    i : int
+        The index.
+
+    step : int, optional
+        How many residue numbers define a residue.
+        Defaults to 3.
+
+    Returns
+    -------
+    int
+        The corresponding residue number for the index.
+    """
+    return i // step
+
+
+
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
