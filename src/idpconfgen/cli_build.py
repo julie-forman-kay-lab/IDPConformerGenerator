@@ -63,6 +63,7 @@ from idpconfgen.libs.libcalc import (
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libio import read_dictionary_from_disk
+from idpconfgen.libs.libparse import remap_sequence
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
 
@@ -435,6 +436,13 @@ def _build_conformers(
     return
 
 
+# TODO: correct for HIS/HIE/HID/HIP
+def translate_seq_to_3l(input_seq):
+    return [
+        'HIP' if _res == 'H' else aa1to3[_res]
+        for _res in input_seq
+        ]
+
 
 # the name of this function is likely to change in the future
 def conformer_generator(
@@ -538,8 +546,6 @@ def conformer_generator(
     """
     assert input_seq, f'`input_seq` must be given! {input_seq}'
     BUILD_BEND_H_N_C = build_bend_H_N_C
-    # CALC_DISTS = calc_all_vs_all_dists_square
-    # TODO
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
     ISNAN = np.isnan
@@ -551,21 +557,13 @@ def conformer_generator(
     N_TERMINAL_H = n_terminal_h_coords_at_origin
     PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
-    RC = randchoice
     RAD_60 = np.radians(60)
+    RC = randchoice
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
     angles = ANGLES
     slices = SLICES
-    # bellow an optimization for the builder loop
-
-    # TODO: correct for HIS/HIE/HID/HIP
-    def translate_seq_to_3l(input_seq):
-        return [
-            'HIP' if _res == 'H' else aa1to3[_res]
-            for _res in input_seq
-            ]
 
     r_input_seq = input_seq
     r_input_seq_3_letters = translate_seq_to_3l(input_seq)
@@ -576,7 +574,6 @@ def conformer_generator(
 
     if with_sidechains:
         calc_sidechains = compute_sidechains[sidechain_method](r_input_seq)
-
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -591,23 +588,35 @@ def conformer_generator(
             raise IDPConfGenException(errmsg) from err
 
     # Start building process
-
+    # the r_ prefix stands for `real`
+    # `real` is used to differentiate from the ALA/PRO template created later
     r_atom_labels, r_residue_numbers, r_residue_labels = \
         create_conformer_labels(r_input_seq, r_input_seq_3_letters)
 
-    # first yields the labels for the caller to handle them
-    # because later the conformers will be yielded and all share the
-    # same labels
+    # yields atom labels
+    # all conformers generated will share these labels
     yield r_atom_labels, r_residue_numbers, r_residue_labels
 
     r_num_atoms = len(r_atom_labels)
 
-    r_acoeff, r_bcoeff, r_charges_ij, r_bonds_ge_3_mask = \
-        create_energy_func_params(r_atom_labels, r_residue_numbers, r_residue_labels)
+    # these energy function parameters are created for the final func
+    # evaluation before yielding the conformer.
+    r_acoeff, r_bcoeff, \
+    r_charges_ij, r_bonds_ge_3_mask = create_energy_func_params(
+        r_atom_labels,
+        r_residue_numbers,
+        r_residue_labels,
+        )
+
+    all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
+    all_atoms_masks = init_confmasks(r_atom_labels)
+
 
     # /
     # Prepares alanine/proline template backbone
-    ala_pro_seq = ''.join('A' if res not in ('P', 'G') else res for res in r_input_seq)
+    # Converts sequence to Ala/Pro/Gly
+    ala_pro_seq = remap_sequence(r_input_seq)
+
     ala_pro_seq_3l = translate_seq_to_3l(ala_pro_seq)
     atom_labels, residue_numbers, residue_labels = \
         create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
@@ -617,14 +626,8 @@ def conformer_generator(
     ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
         create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-    # TODO: needed for other energy functions
-    #atoms_VDW = 0.5 * sigmas_ii * 2**(1/6)
-
-    # /
-    # creates coordinate data-structures and,
-    # creates index-translated boolean masks
-
     ap_confmasks = init_confmasks(atom_labels)
+    # ?
 
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
@@ -659,27 +662,22 @@ def conformer_generator(
         )
     # ?
 
-    all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
-    all_atoms_masks = init_confmasks(r_atom_labels)
-
     # /
     # creates seed coordinates:
-    # 1st) a dummy atom at the y-axis to build the first atom
-    # 2nd) N-terminal N-atom is at 0, 0, 0
-    # 3rd) CA atom of the firs residue is at the x-axis
-    # # coordinates are created always from the parameters in the core
-    # # definitions of IDPConfGen
+    # because the first torsion angle of a residue is the omega, we need
+    # to prepare 2 dummy atoms to simulate the residue -1, so that the
+    # first omega can be placed. There is no need to setup specific
+    # positions, just to create a place upon which the build atom
+    # routine can create a new atom from a torsion.
     dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
     dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-    #n_terminal_CA_coord = np.array((distances_N_CA[ala_pro_seq[0]], 0.0, 0.0))
 
     # seed coordinates array
     seed_coords = np.array((
         dummy_CA_m1_coord,
         dummy_C_m1_coord,
         n_terminal_N_coord,
-        #n_terminal_CA_coord,
         ))
     # ?
 
@@ -694,11 +692,6 @@ def conformer_generator(
     COi0_R_APPEND = COi0_register.append
     COi0_R_POP = COi0_register.pop
     COi0_R_CLEAR = COi0_register.clear
-
-    #NHi0_register = []
-    #NHi0_R_APPEND = NHi0_register.append
-    #NHi0_R_POP = NHi0_register.pop
-    #NHi0_R_CLEAR = NHi0_register.clear
 
     res_R = []  # residue number register
     res_R_APPEND = res_R.append
@@ -721,10 +714,6 @@ def conformer_generator(
     conf_n = 1
     while 1:
         # prepares cycles for building process
-        # cycles need to be regenerated every conformer because the first
-        # atom build is a C and the last atom built is the CA, which breaks
-        # periodicity
-        # all these are dictionaries
         bond_lens = get_cycle_distances_backbone()
         bond_bend = get_cycle_bend_angles()
 
@@ -770,14 +759,13 @@ def conformer_generator(
             if generative_function:
                 agls = generative_function(
                     nres=RINT(1, 6),
-                    #cres=abs(bbi - 2) // 3,  #TODO: remove
                     cres=calc_residue_num_from_index(bbi)
                     )
 
             else:
                 # following `aligndb` function,
                 # `angls` will always be cyclic with:
-                # phi - psi - omega - phi - psi - omega - (...)
+                # omega - phi - psi - omega - phi - psi - (...)
                 agls = angles[RC(slices), :].ravel()
 
             # index at the start of the current cycle
@@ -788,7 +776,6 @@ def conformer_generator(
                     # #being placed is a C, it is placed using the PHI angle of a
                     # #residue. And PHI is the first angle of that residue angle
                     # #set.
-                    #current_res_number = abs(bbi - 2) // 3  #TODO: remove
                     current_res_number = calc_residue_num_from_index(bbi)
                     current_residue = ala_pro_seq[current_res_number]
 
@@ -819,14 +806,10 @@ def conformer_generator(
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
 
             # builds carbonyl atoms. Two situations can happen here:
-            # 1) the backbone is not complete - the last atom is CA
-            # 2) the backbone is complete - the last atom is C
-            # whichever the case, with `bbi - 1` applying on the range bellow
-            # will build carbonyls for the new chain expect for the last C
-            # if the chain is completed.
-            # this is so because range(X, Y, Z) equals range(X, Y-1, Z)
-            # if Y-1 is not in range(X, Y, Z). And, this is the case for N-CA
-            # pair.
+            # [-1] + 1 is always a C because building ends in the N and
+            # CA index (bbi)
+            # bbi - 1 serves both main chain and the final addition when
+            # the backbone is complete.
             for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
                 bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
                     bb_real[k - 1, :],
@@ -877,9 +860,8 @@ def conformer_generator(
             coords[ap_confmasks.NHs] = bb_NH
 
             if len(bbi0_register) == 1:
-                # rotates the N-terminal Hs only if it is the first
+                # places the N-terminal Hs only if it is the first
                 # chunk being built
-
                 _ = PLACE_SIDECHAIN_TEMPLATE(
                         bb_real[0:3, :],
                         N_TERMINAL_H,
@@ -889,6 +871,8 @@ def conformer_generator(
                 current_Hterm_coords = _[3:, :]
 
                 if ala_pro_seq[0] != 'G':
+                    # rotates only if the first residue is not an
+                    # alanie
 
                     # measure torsion angle reference H1 - HA
                     _h1_ha_angle = \
@@ -1365,6 +1349,7 @@ def gen_PDB_from_conformer(
 
     assert len(atom_labels) == coords.shape[0]
 
+    atom_i = 1
     for i in range(len(atom_labels)):
 
         if np.isnan(coords[i, 0]):
@@ -1383,7 +1368,7 @@ def gen_PDB_from_conformer(
 
         LINES_APPEND(ALF_FORMAT(
             'ATOM',
-            i,
+            atom_i,
             atm,
             '',
             current_residue,
@@ -1399,6 +1384,8 @@ def gen_PDB_from_conformer(
             ele,
             '',
             ))
+
+        atom_i += 1
 
     return '\n'.join(lines)
 
