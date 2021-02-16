@@ -91,9 +91,12 @@ dssp_ss_keys = Namespace(
 
 dssp_ss_keys.all_helix = (
     dssp_ss_keys.ahelix,
-    dssp_ss_keys.helix_3,
-    dssp_ss_keys.helix_5,
+    #dssp_ss_keys.helix_3,
+    #dssp_ss_keys.helix_5,
     )
+
+dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
+#dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
 
 dssp_ss_keys.all_strand = (
     # dssp_ss_keys.bbridge,
@@ -105,6 +108,9 @@ dssp_ss_keys.all_loops = (
     dssp_ss_keys.bend,
     dssp_ss_keys.loop,
     dssp_ss_keys.bbridge,  # convention break!
+    # helix_5 added as loops, following
+    # Balasco, N. et al. BioMed Research International vol. 2017 e2617629 (2017)
+    dssp_ss_keys.helix_5,
     )
 
 dssp_ss_keys.all = \

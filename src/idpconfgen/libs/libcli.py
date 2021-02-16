@@ -358,7 +358,7 @@ def add_argument_reduced(parser):
         '--reduced',
         help=(
             'Reduces nomenclature for secondary structure identity '
-            'to \'L\', \'H\' and \'E\'.'
+            'to \'L\', \'H\', \'G\', and \'E\'.'
             ),
         action='store_true',
         )
