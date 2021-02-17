@@ -3,21 +3,28 @@
 """Setup dot py."""
 from __future__ import absolute_import, print_function
 
+import os
 import re
 from glob import glob
 from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
-from pybind11.setup_helpers import Pybind11Extension, build_ext
 
+if 'TOX_ENV_NAME' not in os.environ:
+    from pybind11.setup_helpers import Pybind11Extension, build_ext
 
-ext_modules = [
-    Pybind11Extension(
-        "idpcpp",
-        #sorted(glob(join('src', 'idpconfgen', 'cpp', '*.cpp'))),
-        [join('src', 'idpconfgen', 'cpp', 'idpcpp.cpp')],
-        )
-    ]
+    ext_modules = [
+        Pybind11Extension(
+            "idpcpp",
+            #sorted(glob(join('src', 'idpconfgen', 'cpp', '*.cpp'))),
+            [join('src', 'idpconfgen', 'cpp', 'idpcpp.cpp')],
+            )
+        ]
+    cmdclass={'build_ext': build_ext}
+
+else:
+    ext_modules = []
+    cmdclass = {}
 
 
 def read(*names, **kwargs):
@@ -96,6 +103,6 @@ setup(
             'icgsscalc = idpconfgen.cli_sscalc:maincli',
             ]
         },
-    cmdclass={'build_ext': build_ext},
+    cmdclass=cmdclass,
     ext_modules=ext_modules,
     )

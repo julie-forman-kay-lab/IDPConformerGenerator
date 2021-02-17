@@ -276,16 +276,16 @@ def calc_torsion_angles(
 
 def get_separate_torsions(torsions_array):
     """
-    Separate torsion angles accorindg to the protein backbone concept.
+    Separate torsion angles according to the protein backbone concept.
 
-    Considers torsions angles for bonds in between atom pairs:
+    Considers torsion angles for bonds in between atom pairs:
         - CA - C
         - C - N
         - N - CA
 
     Backbone obeys the order: N-CA-C-N-CA-C(...)
 
-    And the firt value corresponds to a CA-C pair, because the
+    And the first value corresponds to a CA-C pair, because the
     first N-CA pair of the protein backbone has no torsion angle.
     """
     assert torsions_array.ndim == 1
@@ -411,6 +411,8 @@ def place_sidechain_template(
         ):
     """
     Place sidechain templates on backbone.
+
+    Sidechain residue template is expected to have CA already at 0,0,0.
 
     Parameters
     ----------
@@ -866,6 +868,28 @@ def calc_fGB():
     rij2 = rij**2
     (rij2+Ri*Rj*math.exp(-rij2/4*Ri*Rj))**0.5
     return
+
+
+@njit
+def calc_residue_num_from_index(i, step=3):
+    """Calculates residue number from index.
+
+    Parameters
+    ----------
+    i : int
+        The index.
+
+    step : int, optional
+        How many residue numbers define a residue.
+        Defaults to 3.
+
+    Returns
+    -------
+    int
+        The corresponding residue number for the index.
+    """
+    return i // step
+
 
 
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)

@@ -264,3 +264,33 @@ def pop_difference_with_log(dict1, dict2):
 
         for key in diff:
             dict1.pop(key)
+
+
+def remap_sequence(seq, target='A', group=('P', 'G')):
+    """
+    Remap sequence.
+
+    Parameters
+    ----------
+    seq : Protein primary sequence in FASTA format.
+
+    target : str (1-char)
+        The residue to which all other residues will be converted
+        to.
+
+    group : tuple
+        The list of residues that excape map/conversion.
+
+    Return
+    ------
+    str
+        The remaped string.
+
+    Examples
+    --------
+
+    >>> remap_sequence('AGTKLPHNG')
+    'AGAAAPAAG'
+    """
+    return ''.join(target if res not in group else res for res in seq)
+
