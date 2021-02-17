@@ -82,6 +82,7 @@ dun2010bbdep_path = Path(
 
 
 #BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
+#BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_corrected.json'))
 BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_2qho.json'))
 
 
@@ -299,6 +300,20 @@ def get_cycle_bond_type():
         'Ca_C_Np1',
         ))
 
+@njit
+def get_trimer_seq(seq, idx):
+    pre = seq[idx - 1] if idx > 0 else 'G'
+    curr_res = seq[idx]
+    try:
+        pos = seq[idx + 1]
+    except:  #IndexError in plain python
+        pos = 'G'
+
+    return pre + curr_res + pos
+get_trimer_seq('QWERT', 2)
+
+
+
 
 
 def main(
@@ -460,7 +475,7 @@ def _build_conformers(
 @njit
 def mods(x0):
     """Rounds to the nearest bin."""
-    x = int(round(x0, 0))
+    x = int(round((x0 * 180 / 3.141592653589793), 0))
     mod_ = x % 10
     if mod_ <= 5 and not(x % 2):
         return x - mod_
@@ -579,8 +594,10 @@ def conformer_generator(
     """
     assert input_seq, f'`input_seq` must be given! {input_seq}'
     BUILD_BEND_H_N_C = build_bend_H_N_C
+    BUILD_BEND_CA_C_O = build_bend_CA_C_O
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
+    DISTANCE_C_O = distance_C_O
     ISNAN = np.isnan
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_PLANAR = make_coord_Q_planar
@@ -807,43 +824,24 @@ def conformer_generator(
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    bgeo_res = calc_residue_num_from_index(bbi - 1)
-                    print('bgeo res', bgeo_res)
-
-                    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'M'
-                    bgeo_curr_res = r_input_seq[bgeo_res]
-                    try:
-                        _pos = r_input_seq[bgeo_res + 1]
-                    except IndexError:
-                        _pos = 'R'
-
-                    _res3mer = f'{_pre}{bgeo_curr_res}{_pos}'
-
-                    if _res3mer == 'VKA':
-                        print(phi, psi)
-
-                    bgeo_key = f'{_res3mer}:{mods(degrees(phi))},{mods(degrees(psi))}'
-                    print(bgeo_key)
-                    # zoom in function
-
+                    _bgeo_res = calc_residue_num_from_index(bbi - 1)
+                    res3mer = get_trimer_seq(r_input_seq, _bgeo_res)
+                    bgeo_key = f'{res3mer}:{mods(phi)},{mods(psi)}'
 
                     for tangl in (omg, phi, psi):
-                        # bbi -2 makes the match, because despite the first atom
-                        # being placed is a C, it is placed using the PHI angle of a
-                        # residue. And PHI is the first angle of that residue angle
-                        # set.
+
                         current_res_number = calc_residue_num_from_index(bbi)
                         current_residue = r_input_seq[current_res_number]
-                        # bbi is the same for bb_real and bb, but bb_real indexing
-                        # is displaced by 1 unit from bb. So 2 in bb_read is the
-                        # next atom of 2 in bb.
 
+                        # these two have to be nexted together so they go paired
+                        _bt = next(bond_type)
+                        _bb = next(bond_bend)
                         try:
-                            _ = RC(BGEO[bgeo_key][next(bond_type)])
-                            bend_angle = (np.pi - _) / 2
+                            # angles are expected to be corrected in the form
+                            # (pi - angle) / 2
+                            _bend_angle = RC(BGEO[bgeo_key][_bt])
                         except KeyError:
-                            print(f'{bgeo_key} not found!')
-                            bend_angle = next(bond_bend)[bgeo_curr_res]
+                            _bend_angle = _bb[res3mer[1]]  # 1letter code
 
                         _bond_lens = next(bond_lens)[current_residue]
 
@@ -852,7 +850,7 @@ def conformer_generator(
                             bb[bbi, :],
                             bb[bbi + 1, :],
                             _bond_lens,
-                            bend_angle,
+                            _bend_angle,
                             tangl,
                             )
                         bbi += 1
@@ -860,20 +858,16 @@ def conformer_generator(
                     try:
                         co_bend = RC(BGEO[bgeo_key]['Ca_C_O'])
                     except KeyError:
-                        co_bend = build_bend_CA_C_O
-                        print('co_bend fail')
-
-                    print('co_bend ', co_bend)
+                        co_bend = BUILD_BEND_CA_C_O
 
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],
                         bb_real[bbi - 2, :],
                         bb_real[bbi - 1, :],
-                        distance=distance_C_O,
+                        distance=DISTANCE_C_O,
                         bend=co_bend
                         )
                     COi += 1
-
 
             except IndexError:
                 # IndexError happens when the backbone is complete
@@ -887,32 +881,6 @@ def conformer_generator(
                 # add the carboxyls
                 coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
-
-            # builds carbonyl atoms. Two situations can happen here:
-            # [-1] + 1 is always a C because building ends in the N and
-            # CA index (bbi)
-            # bbi - 1 serves both main chain and the final addition when
-            # the backbone is complete.
-            #for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
-
-            #    bgeo_res = calc_residue_num_from_index(bbi - 1)
-            #    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'M'
-            #    bgeo_curr_res = r_input_seq[bgeo_res]
-            #    try:
-            #        _pos = r_input_seq[bgeo_res + 1]
-            #    except IndexError:
-            #        _pos = 'R'
-            #    _res3mer = f'{_pre}{bgeo_curr_res}{_pos}'
-
-
-            #    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
-            #        bb_real[k - 1, :],
-            #        bb_real[k, :],
-            #        bb_real[k + 1, :],
-            #        distance=DISTANCE_C_O,
-            #        bend=
-            #        )
-            #    COi += 1
 
             # Adds N-H Hydrogens
             # Not a perfect loop. It repeats for Hs already placed.
