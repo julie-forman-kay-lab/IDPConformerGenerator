@@ -79,7 +79,8 @@ dun2010bbdep_path = Path(
     ).str()
 
 
-BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
+#BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
+BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_2qho.json'))
 
 
 
@@ -797,24 +798,30 @@ def conformer_generator(
                 # following `aligndb` function,
                 # `angls` will always be cyclic with:
                 # omega - phi - psi - omega - phi - psi - (...)
-                agls = angles[RC(slices), :].ravel()
+                #agls = angles[RC(slices), :].ravel()
+                agls = angles[:, :].ravel()
 
             # index at the start of the current cycle
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    bgeo_res = abs(bbi - 3) // 3
+                    bgeo_res = calc_residue_num_from_index(bbi - 1)
                     print('bgeo res', bgeo_res)
 
-                    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'G'
+                    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'M'
                     bgeo_curr_res = r_input_seq[bgeo_res]
                     try:
                         _pos = r_input_seq[bgeo_res + 1]
                     except IndexError:
-                        _pos = 'G'
+                        _pos = 'R'
 
                     _res3mer = f'{_pre}{bgeo_curr_res}{_pos}'
+
+                    if _res3mer == 'VKA':
+                        print(phi, psi)
+
                     bgeo_key = f'{_res3mer}:{mods(degrees(phi))},{mods(degrees(psi))}'
+                    print(bgeo_key)
                     # zoom in function
 
 
@@ -958,7 +965,7 @@ def conformer_generator(
                 ap_bonds_ge_3_mask,
                 )
 
-            if total_energy > 10:
+            if False:#total_energy > 10:
                 # reset coordinates to the original value
                 # before the last chunk added
 
