@@ -59,8 +59,8 @@ from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
     calc_torsion_angles,
     make_coord_Q,
-    make_coord_Q_planar,
     make_coord_Q_COO,
+    make_coord_Q_planar,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     )
@@ -583,7 +583,7 @@ def conformer_generator(
     DISTANCE_NH = distance_H_N
     ISNAN = np.isnan
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
-    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_planar
+    MAKE_COORD_Q_PLANAR = make_coord_Q_planar
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NORM = np.linalg.norm
@@ -865,7 +865,7 @@ def conformer_generator(
 
                     print('co_bend ', co_bend)
 
-                    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+                    bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],
                         bb_real[bbi - 2, :],
                         bb_real[bbi - 1, :],
@@ -921,9 +921,7 @@ def conformer_generator(
             _ = ~ISNAN(bb_real[bb_NH_nums_p1, 0])
             for k, j in zip(bb_NH_nums[_], bb_NH_idx[_]):
 
-                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
-                # distance and bend parameters
-                bb_NH[j, :] = MAKE_COORD_Q_CO_LOCAL(
+                bb_NH[j, :] = MAKE_COORD_Q_PLANAR(
                     bb_real[k + 1, :],
                     bb_real[k, :],
                     bb_real[k - 1, :],

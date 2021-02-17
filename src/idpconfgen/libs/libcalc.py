@@ -610,11 +610,11 @@ def make_coord_Q(
 
 @njit
 def make_coord_Q_planar(
-        CA_coords,
-        C_coords,
-        N_coords,
-        distance,#=distance_C_O,
-        bend,#=build_bend_CA_C_O,
+        vector1,
+        center_point,
+        vector2,
+        distance,
+        bend,
         ARRAY=np.array,
         CROSS=np.cross,
         NORM=np.linalg.norm,
@@ -629,27 +629,23 @@ def make_coord_Q_planar(
 
     Parameters
     ----------
-    CA_coords, C_coods, N_coords : np.ndarray, shape (3,), dtype=np.float
-        The XYZ coordinates for the CA, C and N atoms surrounding the
-        C=O bond, respectively.
+    vector1, center_point, vector2 : np.ndarray, shpe(3,), dtype=np.float
+        The coordinates of the three point that form a plane.
+        `center_point` is considered the origin of vector1 and vector2.
 
-    distance : float, optional
-        The distance of the C-O bond pair.
-        Defaults to ~1.234.
+    distance : float
+        The distance between center_point and the new point.
 
-    bend : float, optional
-        The angle in radians for the CA-C-O.
-        Defaults to ~2.1428 radians (~122.777 degress).
-        If `bend` is given, consider the actual `bend` value must be
-        `(pi - bend) / 2`, this calculation must be computed outside
-        this function for perfomance reasons.
+    bend : float
+        The angle in radians for vector1 - center_point - new system.
+        `bend` should be half of the desired value.
 
     Returns
     -------
     np.ndarray of shape (3,), dtype=np.float32
     """
-    o1 = CA_coords - C_coords
-    o2 = N_coords - C_coords
+    o1 = vector1 - center_point
+    o2 = vector2 - center_point
 
     ocross = CROSS(o2, o1)
     u_ocross = ocross / NORM(ocross)
@@ -666,7 +662,7 @@ def make_coord_Q_planar(
         b1, -b2, -b3, -b4,
         )
 
-    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_coords
+    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + center_point
 
 
 @njit
