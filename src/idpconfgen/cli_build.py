@@ -47,6 +47,8 @@ from idpconfgen.core.build_definitions import (
     read_ff14SB_params,
     sidechain_templates,
     topology_3_bonds_apart,
+    build_bend_CA_C_O,
+    distance_C_O,
     )
 from idpconfgen.core.definitions import aa1to3  # , vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
@@ -57,7 +59,7 @@ from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
     calc_torsion_angles,
     make_coord_Q,
-    make_coord_Q_CO,
+    make_coord_Q_planar,
     make_coord_Q_COO,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
@@ -581,7 +583,7 @@ def conformer_generator(
     DISTANCE_NH = distance_H_N
     ISNAN = np.isnan
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
-    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
+    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_planar
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NORM = np.linalg.norm
@@ -855,6 +857,24 @@ def conformer_generator(
                             )
                         bbi += 1
 
+                    try:
+                        co_bend = RC(BGEO[bgeo_key]['Ca_C_O'])
+                    except KeyError:
+                        co_bend = build_bend_CA_C_O
+                        print('co_bend fail')
+
+                    print('co_bend ', co_bend)
+
+                    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+                        bb_real[bbi - 3, :],
+                        bb_real[bbi - 2, :],
+                        bb_real[bbi - 1, :],
+                        distance=distance_C_O,
+                        bend=co_bend
+                        )
+                    COi += 1
+
+
             except IndexError:
                 # IndexError happens when the backbone is complete
                 # in this protocol the last atom build was a carbonyl C
@@ -873,13 +893,26 @@ def conformer_generator(
             # CA index (bbi)
             # bbi - 1 serves both main chain and the final addition when
             # the backbone is complete.
-            for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
-                bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb_real[k - 1, :],
-                    bb_real[k, :],
-                    bb_real[k + 1, :],
-                    )
-                COi += 1
+            #for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
+
+            #    bgeo_res = calc_residue_num_from_index(bbi - 1)
+            #    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'M'
+            #    bgeo_curr_res = r_input_seq[bgeo_res]
+            #    try:
+            #        _pos = r_input_seq[bgeo_res + 1]
+            #    except IndexError:
+            #        _pos = 'R'
+            #    _res3mer = f'{_pre}{bgeo_curr_res}{_pos}'
+
+
+            #    bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
+            #        bb_real[k - 1, :],
+            #        bb_real[k, :],
+            #        bb_real[k + 1, :],
+            #        distance=DISTANCE_C_O,
+            #        bend=
+            #        )
+            #    COi += 1
 
             # Adds N-H Hydrogens
             # Not a perfect loop. It repeats for Hs already placed.
@@ -891,9 +924,9 @@ def conformer_generator(
                 # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
                 # distance and bend parameters
                 bb_NH[j, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb_real[k - 1, :],
-                    bb_real[k, :],
                     bb_real[k + 1, :],
+                    bb_real[k, :],
+                    bb_real[k - 1, :],
                     distance=DISTANCE_NH,
                     bend=BUILD_BEND_H_N_C,
                     )

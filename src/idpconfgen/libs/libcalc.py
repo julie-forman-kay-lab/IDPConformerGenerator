@@ -609,12 +609,12 @@ def make_coord_Q(
 
 
 @njit
-def make_coord_Q_CO(
+def make_coord_Q_planar(
         CA_coords,
         C_coords,
         N_coords,
-        distance=distance_C_O,
-        bend=build_bend_CA_C_O,
+        distance,#=distance_C_O,
+        bend,#=build_bend_CA_C_O,
         ARRAY=np.array,
         CROSS=np.cross,
         NORM=np.linalg.norm,
@@ -651,7 +651,7 @@ def make_coord_Q_CO(
     o1 = CA_coords - C_coords
     o2 = N_coords - C_coords
 
-    ocross = CROSS(o1, o2)
+    ocross = CROSS(o2, o1)
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
@@ -659,8 +659,8 @@ def make_coord_Q_CO(
     b1 = COS(bend)
 
     # rotates a the unitary of o2 according to bend angle
-    uo2 = o2 / NORM(o2)
-    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    uo1 = o1 / NORM(o1)
+    p2, p3, p4 = uo1  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
         *QM(b1, b2, b3, b4, 0, p2, p3, p4),
         b1, -b2, -b3, -b4,
