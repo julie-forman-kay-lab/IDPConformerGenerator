@@ -803,19 +803,19 @@ def conformer_generator(
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    bgeo_res = (bbi - 3) // 3
+                    bgeo_res = abs(bbi - 3) // 3
+                    print('bgeo res', bgeo_res)
 
-                    _pre = r_input_seq[bgeo_res - 1] if current_res_number > 0 else 'G'
-                    _self = r_input_seq[bgeo_res]
+                    _pre = r_input_seq[bgeo_res - 1] if bgeo_res > 0 else 'G'
+                    bgeo_curr_res = r_input_seq[bgeo_res]
                     try:
                         _pos = r_input_seq[bgeo_res + 1]
                     except IndexError:
                         _pos = 'G'
 
-                    _res3mer = f'{_pre}{_self}{_pos}'
+                    _res3mer = f'{_pre}{bgeo_curr_res}{_pos}'
                     bgeo_key = f'{_res3mer}:{mods(degrees(phi))},{mods(degrees(psi))}'
                     # zoom in function
-                    bend_angle = RC(BGEO[bgeo_key][next(bond_type)])
 
 
                     for tangl in (omg, phi, psi):
@@ -828,11 +828,21 @@ def conformer_generator(
                         # bbi is the same for bb_real and bb, but bb_real indexing
                         # is displaced by 1 unit from bb. So 2 in bb_read is the
                         # next atom of 2 in bb.
+
+                        try:
+                            _ = RC(BGEO[bgeo_key][next(bond_type)])
+                            bend_angle = (np.pi - _) / 2
+                        except KeyError:
+                            print(f'{bgeo_key} not found!')
+                            bend_angle = next(bond_bend)[bgeo_curr_res]
+
+                        _bond_lens = next(bond_lens)[current_residue]
+
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
-                            bb[bbi - 2, :],
                             bb[bbi - 1, :],
                             bb[bbi, :],
-                            next(bond_lens)[current_residue],
+                            bb[bbi + 1, :],
+                            _bond_lens,
                             bend_angle,
                             tangl,
                             )
