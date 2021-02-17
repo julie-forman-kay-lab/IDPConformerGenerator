@@ -18,6 +18,7 @@ from multiprocessing import Pool, Queue
 from random import choice as randchoice
 from random import randint
 from time import time
+from math import degrees
 
 import numpy as np
 from numba import njit
@@ -285,6 +286,16 @@ def get_cycle_bend_angles():
         build_bend_angles_N_CA_C,  # used for PHI
         build_bend_angles_CA_C_Np1,  # used for PSI
         ))
+
+
+def get_cycle_bond_type():
+    """Return an infinite interator of the bond types."""
+    return cycle((
+        'Cm1_N_Ca',
+        'N_Ca_C',
+        'Ca_C_Np1',
+        ))
+
 
 
 def main(
@@ -735,6 +746,7 @@ def conformer_generator(
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
         bond_bend = get_cycle_bend_angles()
+        bond_type = get_cycle_bond_type()
 
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
@@ -801,8 +813,9 @@ def conformer_generator(
                         _pos = 'G'
 
                     _res3mer = f'{_pre}{_self}{_pos}'
-                    bgeo_key = f'{_res3mer}:{mods(phi)},{mods(psi)}'
-                    bend_angle = RC(BGEO[bgeo_key][next(bond_bend)])
+                    bgeo_key = f'{_res3mer}:{mods(degrees(phi))},{mods(degrees(psi))}'
+                    # zoom in function
+                    bend_angle = RC(BGEO[bgeo_key][next(bond_type)])
 
 
                     for tangl in (omg, phi, psi):
@@ -992,6 +1005,7 @@ def conformer_generator(
                 if backbone_done:
                     bond_lens = get_cycle_distances_backbone()
                     bond_bend = get_cycle_bend_angles()
+                    bond_type = get_cycle_bond_type()
 
                 # we do not know if the next chunk will finish the protein
                 # or not
