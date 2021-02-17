@@ -69,12 +69,19 @@ from idpconfgen.libs.libtimer import timeme, ProgressCounter
 
 
 faspr_sc = idpcpp.faspr_sidechains
+_file = Path(__file__).myparents()
 dun2010bbdep_path = Path(
-    Path(__file__).myparents(),
+    _file,
     'core',
     'data',
     'dun2010bbdep.bin',
     ).str()
+
+
+BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
+
+
+
 _name = 'build'
 _help = 'Builds conformers from database.'
 
@@ -411,6 +418,19 @@ def _build_conformers(
 
     del builder
     return
+
+
+@njit
+def mods(x0):
+    """Rounds to the nearest bin."""
+    x = int(round(x0, 0))
+    mod_ = x % 10
+    if mod_ <= 5 and not(x % 2):
+        return x - mod_
+    else:
+        return x + (10 - mod_)
+mods(19.2)
+
 
 
 # the name of this function is likely to change in the future
@@ -769,26 +789,41 @@ def conformer_generator(
 
             # index at the start of the current cycle
             try:
-                for torsion in agls:
-                    # bbi -2 makes the match, because despite the first atom
-                    # being placed is a C, it is placed using the PHI angle of a
-                    # residue. And PHI is the first angle of that residue angle
-                    # set.
-                    current_res_number = (bbi - 2) // 3
-                    current_residue = ala_pro_seq[current_res_number]
+                for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    # bbi is the same for bb_real and bb, but bb_real indexing
-                    # is displaced by 1 unit from bb. So 2 in bb_read is the
-                    # next atom of 2 in bb.
-                    bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
-                        bb[bbi - 2, :],
-                        bb[bbi - 1, :],
-                        bb[bbi, :],
-                        next(bond_lens)[current_residue],
-                        next(bond_bend)[current_residue],
-                        torsion,
-                        )
-                    bbi += 1
+                    bgeo_res = (bbi - 3) // 3
+
+                    _pre = r_input_seq[bgeo_res - 1] if current_res_number > 0 else 'G'
+                    _self = r_input_seq[bgeo_res]
+                    try:
+                        _pos = r_input_seq[bgeo_res + 1]
+                    except IndexError:
+                        _pos = 'G'
+
+                    _res3mer = f'{_pre}{_self}{_pos}'
+                    bgeo_key = f'{_res3mer}:{mods(phi)},{mods(psi)}'
+                    bend_angle = RC(BGEO[bgeo_key][next(bond_bend)])
+
+
+                    for tangl in (omg, phi, psi):
+                        # bbi -2 makes the match, because despite the first atom
+                        # being placed is a C, it is placed using the PHI angle of a
+                        # residue. And PHI is the first angle of that residue angle
+                        # set.
+                        current_res_number = (bbi - 2) // 3
+                        current_residue = r_input_seq[current_res_number]
+                        # bbi is the same for bb_real and bb, but bb_real indexing
+                        # is displaced by 1 unit from bb. So 2 in bb_read is the
+                        # next atom of 2 in bb.
+                        bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
+                            bb[bbi - 2, :],
+                            bb[bbi - 1, :],
+                            bb[bbi, :],
+                            next(bond_lens)[current_residue],
+                            bend_angle,
+                            tangl,
+                            )
+                        bbi += 1
 
             except IndexError:
                 # IndexError happens when the backbone is complete
