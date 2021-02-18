@@ -472,17 +472,6 @@ def _build_conformers(
     return
 
 
-@njit
-def mods(x0):
-    """Rounds to the nearest bin."""
-    x = int(round((x0 * 180 / 3.141592653589793), 0))
-    mod_ = x % 10
-    if mod_ <= 5 and not(x % 2):
-        return x - mod_
-    else:
-        return x + (10 - mod_)
-mods(19.2)
-
 
 # TODO: correct for HIS/HIE/HID/HIP
 def translate_seq_to_3l(input_seq):
@@ -824,14 +813,14 @@ def conformer_generator(
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    _bgeo_res = calc_residue_num_from_index(bbi - 1)
-                    res3mer = get_trimer_seq(r_input_seq, _bgeo_res)
+                    current_res_number = calc_residue_num_from_index(bbi - 1)
+                    res3mer = get_trimer_seq(r_input_seq, current_res_number)
                     bgeo_key = f'{res3mer}:{mods(phi)},{mods(psi)}'
 
                     for tangl in (omg, phi, psi):
 
-                        current_res_number = calc_residue_num_from_index(bbi)
-                        current_residue = r_input_seq[current_res_number]
+                        #current_res_number = calc_residue_num_from_index(bbi)
+                        #current_residue = r_input_seq[current_res_number]
 
                         # these two have to be nexted together so they go paired
                         _bt = next(bond_type)
@@ -843,7 +832,7 @@ def conformer_generator(
                         except KeyError:
                             _bend_angle = _bb[res3mer[1]]  # 1letter code
 
-                        _bond_lens = next(bond_lens)[current_residue]
+                        _bond_lens = next(bond_lens)[res3mer[1]]
 
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
@@ -898,7 +887,7 @@ def conformer_generator(
                     )
 
             # Adds sidechain template structures
-            for res_i in range(res_R[-1], current_res_number):  # noqa: E501
+            for res_i in range(res_R[-1], current_res_number + 1):  # noqa: E501
 
                 _sstemplate, _sidechain_idxs = \
                     SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
@@ -911,7 +900,7 @@ def conformer_generator(
                 ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
 
             # Transfers coords to the main coord array
-            for _smask, _sidecoords in ss_masks[:current_res_number]:
+            for _smask, _sidecoords in ss_masks[:current_res_number + 1]:
                 coords[_smask] = _sidecoords
 
             # / Place coordinates for energy calculation

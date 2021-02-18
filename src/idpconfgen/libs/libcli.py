@@ -193,6 +193,7 @@ def add_version(parser):
 # --no_hn_term                : has H of N-terminal
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
+# -o, --ouput             : general output string
 # --replace               : replace (whatever shalls replace)
 # -rd, --reduced          : reduces secondary structure representation
 # -rn, --record-name      : PDB RECORD name
@@ -315,6 +316,17 @@ def add_argument_ncores(parser):
         default=1,
         const=ncpus,
         nargs='?',
+        )
+
+
+def add_argument_output(parser):
+    """Add argument for general output string."""
+    parser.add_argument(
+        '-o',
+        '--output',
+        help='Output file.',
+        type=str,
+        default=None,
         )
 
 

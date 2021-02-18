@@ -887,5 +887,44 @@ def calc_residue_num_from_index(i, step=3):
     return i // step
 
 
+def round_radian_to_degree_bin_10(x0):
+    """
+    Round RADIAN to the nearest 10 degree bin.
+
+    23 degrees round to 20 degrees.
+    27 degrees round to 30 degrees.
+
+    Parameters
+    ----------
+    x0 : float
+        The angle in radians.
+
+    Returns
+    -------
+    int
+        The nearest bind of 10 degrees according to rounding rules.
+    """
+    x = int(round((x0 * 180 / 3.141592653589793), 0))
+    mod_ = x % 10
+
+    if mod_ < 5:
+        return x - mod_
+
+    elif mod_ > 5:
+        return x + (10 - mod_)
+
+    elif mod_ == 5:
+
+        x10 = x // 10
+
+        if x10 % 2:
+            return x + 5
+        else:
+            return x - 5
+    else:
+        assert False, 'Code should not reach this point.'
+
+
 
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
+rrd10_njit = njit(round_radian_to_degree_bin_10)
