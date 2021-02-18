@@ -324,7 +324,10 @@ def add_argument_output(parser):
     parser.add_argument(
         '-o',
         '--output',
-        help='Output file.',
+        help=(
+            'Output file. Defaults to `None`. '
+            'Read CLI instructions for `None` behaviour.'
+            ),
         type=str,
         default=None,
         )

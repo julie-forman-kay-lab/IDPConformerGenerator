@@ -11,11 +11,13 @@ from functools import partial, reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import blocked_ids
-from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core.definitions import aa3to1, blocked_ids
+from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
 from idpconfgen.libs.libcalc import (
+    calc_angle_njit,
     calc_torsion_angles,
     get_separate_torsions,
+    rrd10_njit,
     validate_backbone_labels_for_torsion,
     )
 from idpconfgen.libs.libio import (
@@ -405,3 +407,141 @@ def cli_helper_calc_torsions(fname, fdata, **kwargs):
 def cli_helper_calc_torsionsJ(fdata_tuple, **kwargs):
     """Help cli_torsionsJ.py."""
     return fdata_tuple[0], get_torsionsJ(fdata_tuple[1], **kwargs)
+
+
+def read_trimer_torsion_planar_angles(pdb, bond_geometry):
+    """
+    Create a trimer/torsion library of bend/planar angles.
+
+    Given a PDB file:
+
+    1) reads each of its trimers, and for the middle residue:
+    2) Calculates phi/psi and rounds them to the closest 10 degree bin
+    3) assigns the planar angles found for that residue to the
+        trimer/torsion key.
+    4) updates that information in `bond_gemetry`.
+
+    Created key:values have the following form in `bond_geometry` dict:
+
+    {
+        'AAA:10,-30': {
+            'Cm1_N_Ca': [],
+            'N_Ca_C': [],
+            'Ca_C_Np1': [],
+            'Ca_C_O': [],
+            }
+        }
+
+
+    Parameters
+    ----------
+    pdb : any input of `libstructure.Structure`
+        The PDB/mmCIF file data.
+
+    bond_geometry : dict
+        The library dictionary to update.
+
+    Returns
+    -------
+    None
+    """
+    ALL = np.all
+    CEQ = np.char.equal
+    TORSION_LABELS = np.array(['CA', 'C', 'N', 'CA', 'C', 'N', 'CA'])
+    CO_LABELS = np.array(['CA', 'C', 'O', 'CA', 'C', 'O', 'CA'])
+    aa3to1['MSE'] = 'M'  # seleno methionine
+
+    s = Structure(pdb)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+
+    if s.data_array[0, col_name] != 'N':
+        raise PDBFormatError(
+            'PDB does not start with N. '
+            f'{s.data_array[0, col_name]} instead.'
+            )
+
+    bb_minimal_names = s.filtered_atoms[:, col_name]
+    bb_residue_names = s.filtered_atoms[:, col_resName]
+
+    N_CA_C_coords = s.coords
+    s.clear_filters()
+
+    s.add_filter(lambda x: x[col_name] in ('CA', 'C', 'O'))
+    CA_C_O_coords = s.coords
+    co_minimal_names = s.filtered_atoms[:, col_name]
+
+    # calc torsion angles
+    for i in range(1, len(N_CA_C_coords) - 7, 3):
+
+        idx = list(range(i, i + 7))
+
+        _trimer = bb_residue_names[idx][0::3]
+
+        try:
+            trimer = ''.join(aa3to1[_t] for _t in _trimer)
+        except KeyError:
+            log.info('trimer ', ','.join(_trimer), ' not found. Skipping...')
+            continue
+
+        assert len(trimer) == 3
+        del _trimer
+
+        if not ALL(CEQ(bb_minimal_names[idx], TORSION_LABELS)):
+            log.info(
+                'Found non-matching labels: ',
+                ','.join(bb_minimal_names[idx]),
+                )
+            continue
+
+        # selects omega, phi, and psi for the centra residue
+        rad_tor = np.round(calc_torsion_angles(N_CA_C_coords[idx])[1:3], 10)
+        torsions = np.degrees(rad_tor)
+        ptorsions = [rrd10_njit(_) for _ in np.round(torsions, 0).astype(int)]
+
+        # TODO: better key
+        tuple_key = trimer + ':' + ','.join(str(_) for _ in ptorsions)
+
+        # calc bend angles
+        c = N_CA_C_coords[idx]
+        Cm1_N = c[1] - c[2]
+        Ca_N = c[3] - c[2]
+        N_Ca = c[2] - c[3]
+        C_Ca = c[4] - c[3]
+        Ca_C = c[3] - c[4]
+        Np1_C = c[5] - c[4]
+        assert Cm1_N.shape == (3,)
+
+        # the angles here are already corrected to the format needed by the
+        # builder, which is (pi - a) / 2
+        Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
+        N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
+        Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
+
+        _ = bond_geometry[tuple_key].setdefault('Cm1_N_Ca', [])
+        _.append(Cm1_N_Ca)
+
+        _ = bond_geometry[tuple_key].setdefault('N_Ca_C', [])
+        _.append(N_Ca_C)
+
+        _ = bond_geometry[tuple_key].setdefault('Ca_C_Np1', [])
+        _.append(Ca_C_Np1)
+
+        co_idx = np.array(idx) - 1
+
+        if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
+            log.info(
+                'Found not matching labels ',
+                ','.join(co_minimal_names[co_idx])
+                )
+            continue
+
+        c = CA_C_O_coords[co_idx]
+        Ca_C = c[3] - c[4]
+        O_C = c[5] - c[4]
+
+        Ca_C_O = calc_angle_njit(Ca_C, O_C)
+        _ = bond_geometry[tuple_key].setdefault('Ca_C_O', [])
+        _.append(Ca_C_O / 2)
+
+    return

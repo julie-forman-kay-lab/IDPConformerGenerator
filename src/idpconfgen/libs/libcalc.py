@@ -358,7 +358,7 @@ def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
         )
 
 
-def angle_between(
+def calc_angle(
         v1,
         v2,
         ARCCOS=np.arccos,
@@ -376,7 +376,7 @@ def angle_between(
 
 
 @njit
-def angle_between_njit(
+def calc_angle_njit(
         v1,
         v2,
         ARCCOS=np.arccos,
@@ -441,7 +441,7 @@ def place_sidechain_template(
     N_CA = bbtmp[0, :]
     N_CA_ = ss_template[0, :]
 
-    N_CA_N = angle_between_njit(N_CA, N_CA_)
+    N_CA_N = calc_angle_njit(N_CA, N_CA_)
 
     # rotation vector
     rv = CROSS(N_CA_, N_CA)
@@ -456,7 +456,7 @@ def place_sidechain_template(
     cross_ss = CROSS(rot1[0, :], rot1[2, :])
 
     # the angle of rotation is the angle between the plane normal
-    angle = angle_between_njit(cross_ss, cross_cnf)
+    angle = calc_angle_njit(cross_ss, cross_cnf)
 
     # plane rotation vector is the cross vector between the two plane normals
     rv = CROSS(cross_ss, cross_cnf)
@@ -887,6 +887,7 @@ def calc_residue_num_from_index(i, step=3):
     return i // step
 
 
+# njit available
 def round_radian_to_degree_bin_10(x0):
     """
     Round RADIAN to the nearest 10 degree bin.
@@ -926,5 +927,12 @@ def round_radian_to_degree_bin_10(x0):
 
 
 
+def unit_vector(vector):
+    """Calculate the unitary vector."""
+    return vector / np.linalgn.norm(vector)
+
+
+
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
 rrd10_njit = njit(round_radian_to_degree_bin_10)
+unit_vec_njit = njit(unit_vector)
