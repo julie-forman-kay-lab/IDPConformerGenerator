@@ -483,17 +483,21 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
         try:
             trimer = ''.join(aa3to1[_t] for _t in _trimer)
         except KeyError:
-            log.info('trimer ', ','.join(_trimer), ' not found. Skipping...')
+            log.info(S(
+                'trimer '
+                f"{','.join(_trimer)}"
+                ' not found. Skipping...'
+                ))
             continue
 
         assert len(trimer) == 3
         del _trimer
 
         if not ALL(CEQ(bb_minimal_names[idx], TORSION_LABELS)):
-            log.info(
-                'Found non-matching labels: ',
-                ','.join(bb_minimal_names[idx]),
-                )
+            log.info(S(
+                'Found non-matching labels: '
+                f'{",".join(bb_minimal_names[idx])}'
+                ))
             continue
 
         # selects omega, phi, and psi for the centra residue
@@ -535,10 +539,10 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
         co_idx = np.array(idx) - 1
 
         if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
-            log.info(
-                'Found not matching labels ',
-                ','.join(co_minimal_names[co_idx])
-                )
+            log.info(S(
+                'Found not matching labels '
+                f'{",".join(co_minimal_names[co_idx])}'
+                ))
             continue
 
         c = CA_C_O_coords[co_idx]
