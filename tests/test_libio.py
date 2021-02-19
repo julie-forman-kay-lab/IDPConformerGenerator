@@ -111,6 +111,18 @@ def test_read_dictionary_from_disk():
     assert result == {'somestring': 'some value'}
 
 
+def test_read_dictionary_from_disk_tar():
+    """Read dictionary from disk in tar."""
+    result = libio.read_dictionary_from_disk(tcommons.dict1tar)
+    assert result == {'somestring': 'some value'}
+
+
+def test_read_dictionary_from_disk_tar2():
+    """Read dictionary from disk in tar."""
+    result = libio.read_dict_from_tar(tcommons.dict1tar)
+    assert result == {'somestring': 'some value'}
+
+
 def test_save_read_from_pickle():
     """Save and read to pickle."""
     d = {'somekey': 'some value'}
