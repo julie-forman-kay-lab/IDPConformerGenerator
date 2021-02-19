@@ -60,11 +60,9 @@ ap = libcli.CustomParser(
     )
 
 libcli.add_argument_pdb_files(ap)
-libcli.add_argument_output(ap)
-libcli.add_argument_ncores(ap)
 
 
-def main(pdb_files, output, ncores=1, func=None):
+def main(pdb_files, func=None):
     """Main logic."""
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
@@ -83,7 +81,26 @@ def main(pdb_files, output, ncores=1, func=None):
             log.info(str(err))
             continue
 
-    save_dict_to_json(bond_geo_db, output=output)
+    dres = {}
+    dpairs = {}
+    for btype in d.keys():
+        dres_ = dres.setdefault(btype, {})
+        dpairs_ = dpairs.setdefault(btype, {})
+
+        for res in d[btype].keys():
+            resangs = dres_.setdefault(res, [])
+            dpairs__ = dpairs_.setdefault(res, {})
+
+            for pairs in d[btype][res].keys():
+                respairs = dpairs__.setdefault(pairs, [])
+
+                for tor in d[btype][res][pairs].keys():
+                    resangs.extend(d[btype][res][pairs][tor])
+                    respairs.extend(d[btype][res][pairs][tor])
+
+    save_dict_to_json(bond_geo_db, output='bgeo.json')
+    save_dict_to_json(dres, output='bgeo_res.json')
+    save_dict_to_json(dpairs, output='bgeo_pairs.json')
     return
 
 
