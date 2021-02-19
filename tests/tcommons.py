@@ -65,6 +65,7 @@ pdb_res_gap = Path(data_folder, 'pdb_residue_gap.pdb')
 pdbs_fasta = Path(data_folder, 'pdbs.fasta')
 EXPL_A = Path(data_folder, 'EXPL_A.pdb')
 EXPL_B = Path(data_folder, 'EXPL_B.pdb')
+expl_a_bgeo = Path(data_folder, 'EXPL_A_bgeo.json')
 
 
 cif_example_headers = [

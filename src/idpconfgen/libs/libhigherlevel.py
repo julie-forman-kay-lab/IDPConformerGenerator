@@ -419,7 +419,9 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
     2) Calculates phi/psi and rounds them to the closest 10 degree bin
     3) assigns the planar angles found for that residue to the
         trimer/torsion key.
-    4) updates that information in `bond_gemetry`.
+    4) the planar angles are converted to the format needed by cli_build,
+        which is that of (pi - angle) / 2.
+    5) updates that information in `bond_gemetry`.
 
     Created key:values have the following form in `bond_geometry` dict:
 
@@ -496,8 +498,11 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
 
         # selects omega, phi, and psi for the centra residue
         rad_tor = np.round(calc_torsion_angles(N_CA_C_coords[idx])[1:3], 10)
-        torsions = np.degrees(rad_tor)
-        ptorsions = [rrd10_njit(_) for _ in np.round(torsions, 0).astype(int)]
+        ptorsions = [rrd10_njit(_) for _ in rad_tor]
+
+        assert len(ptorsions) == 2
+        for angle in ptorsions:
+            assert -180 <= angle <= 180, 'Bin angle out of expected range.'
 
         # TODO: better key
         tuple_key = trimer + ':' + ','.join(str(_) for _ in ptorsions)

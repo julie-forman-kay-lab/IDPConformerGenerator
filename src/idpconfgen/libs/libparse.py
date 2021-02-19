@@ -293,4 +293,3 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
     'AGAAAPAAG'
     """
     return ''.join(target if res not in group else res for res in seq)
-
