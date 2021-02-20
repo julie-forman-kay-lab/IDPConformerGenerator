@@ -8,6 +8,8 @@ import subprocess
 from itertools import product
 from pathlib import Path as Path_
 
+from numba import njit
+
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import dssp_trans_bytes, jsonparameters
 from idpconfgen.core.exceptions import DSSPParserError
@@ -293,3 +295,18 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
     'AGAAAPAAG'
     """
     return ''.join(target if res not in group else res for res in seq)
+
+
+# njit
+def get_trimer_seq(seq, idx):
+    pre = seq[idx - 1] if idx > 0 else 'G'
+    curr_res = seq[idx]
+    try:
+        pos = seq[idx + 1]
+    except:  #IndexError in plain python
+        pos = 'G'
+
+    return curr_res, pre + pos
+
+
+get_trimer_seq_njit = njit(get_trimer_seq)

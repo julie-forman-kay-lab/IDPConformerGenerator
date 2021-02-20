@@ -63,10 +63,12 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q_planar,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
+    rrd10_njit,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
+from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import remap_sequence
+from idpconfgen.libs.libparse import get_trimer_seq_njit, remap_sequence
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
 
@@ -83,7 +85,12 @@ dun2010bbdep_path = Path(
 
 #BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
 #BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_corrected.json'))
-BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_2qho.json'))
+#BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_2qho.json'))
+# these will be populated in main()
+BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
+BGEO_full = {}
+BGEO_trimer = {}
+BGEO_res = {}
 
 
 
@@ -300,21 +307,6 @@ def get_cycle_bond_type():
         'Ca_C_Np1',
         ))
 
-@njit
-def get_trimer_seq(seq, idx):
-    pre = seq[idx - 1] if idx > 0 else 'G'
-    curr_res = seq[idx]
-    try:
-        pos = seq[idx + 1]
-    except:  #IndexError in plain python
-        pos = 'G'
-
-    return pre + curr_res + pos
-get_trimer_seq('QWERT', 2)
-
-
-
-
 
 def main(
         input_seq,
@@ -331,6 +323,8 @@ def main(
     Distributes over processors.
     """
     global ANGLES
+    global BGEO_full, BGEO_trimer, BGEO_res
+
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -344,6 +338,18 @@ def main(
 
     _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
     SLICES.extend(_slices)
+
+    # Populates bond geometry dictionaries
+    _bgeo_full = read_dictionary_from_disk(BGEO_path)
+    BGEO_full.update(_bgeo_full)
+    _bgeo_trimer, _bgeo_res = bgeo_reduce(BGEO_full)
+    BGEO_trimer.update(_bgeo_trimer)
+    BGEO_res.update(_bgeo_res)
+    del _bgeo_full,_bgeo_trimer, _bgeo_res
+    assert BGEO_full
+    assert BGEO_trimer
+    assert BGEO_res
+
     # creates a list of reversed numbers to name the conformers
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
@@ -588,6 +594,7 @@ def conformer_generator(
     DISTANCE_NH = distance_H_N
     DISTANCE_C_O = distance_C_O
     ISNAN = np.isnan
+    GET_TRIMER_SEQ = get_trimer_seq_njit
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
     MAKE_COORD_Q_PLANAR = make_coord_Q_planar
     MAKE_COORD_Q_LOCAL = make_coord_Q
@@ -600,6 +607,7 @@ def conformer_generator(
     RC = randchoice
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
+    RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
     angles = ANGLES
     slices = SLICES
@@ -806,33 +814,35 @@ def conformer_generator(
                 # following `aligndb` function,
                 # `angls` will always be cyclic with:
                 # omega - phi - psi - omega - phi - psi - (...)
-                #agls = angles[RC(slices), :].ravel()
-                agls = angles[:, :].ravel()
+                agls = angles[RC(slices), :].ravel()
+                #agls = angles[:, :].ravel()
 
             # index at the start of the current cycle
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
                     current_res_number = calc_residue_num_from_index(bbi - 1)
-                    res3mer = get_trimer_seq(r_input_seq, current_res_number)
-                    bgeo_key = f'{res3mer}:{mods(phi)},{mods(psi)}'
+                    curr_res, tpair = GET_TRIMER_SEQ(
+                        r_input_seq,
+                        current_res_number,
+                        )
+                    torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
                     for tangl in (omg, phi, psi):
-
-                        #current_res_number = calc_residue_num_from_index(bbi)
-                        #current_residue = r_input_seq[current_res_number]
 
                         # these two have to be nexted together so they go paired
                         _bt = next(bond_type)
                         _bb = next(bond_bend)
-                        try:
-                            # angles are expected to be corrected in the form
-                            # (pi - angle) / 2
-                            _bend_angle = RC(BGEO[bgeo_key][_bt])
-                        except KeyError:
-                            _bend_angle = _bb[res3mer[1]]  # 1letter code
 
-                        _bond_lens = next(bond_lens)[res3mer[1]]
+                        try:
+                            _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])
+                        except KeyError:
+                            try:
+                                _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])
+                            except KeyError:
+                                _bend_angle = RC(BGEO_res[_bt][curr_res])
+
+                        _bond_lens = next(bond_lens)[curr_res]
 
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
@@ -845,9 +855,12 @@ def conformer_generator(
                         bbi += 1
 
                     try:
-                        co_bend = RC(BGEO[bgeo_key]['Ca_C_O'])
+                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])
                     except KeyError:
-                        co_bend = BUILD_BEND_CA_C_O
+                        try:
+                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][_tpair])
+                        except KeyError:
+                            co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
 
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],

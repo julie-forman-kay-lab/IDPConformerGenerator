@@ -500,7 +500,7 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
                 ))
             continue
 
-        # selects omega, phi, and psi for the centra residue
+        # selects omega, phi, and psi for the central residue
         rad_tor = np.round(calc_torsion_angles(N_CA_C_coords[idx])[1:3], 10)
         ptorsions = [rrd10_njit(_) for _ in rad_tor]
 
@@ -554,3 +554,61 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
         _.append(Ca_C_O / 2)
 
     return
+
+
+def convert_bond_geo_lib(bond_geo_db):
+    """
+    Convert bond geometry library to bond type first hierarchy.
+
+    Restructure the output of `read_trimer_torsion_planar_angles` such
+    that the main keys are the bond types, followed by the main residue,
+    the pairs in the trimer, and, finally, the torsion angles.
+
+    Parameters
+    ----------
+    bond_geo_db : dict
+        The output of `read_PDBID_from_source`.
+
+    Returns
+    -------
+    dict
+    """
+    converted = {}
+    for key in bond_geo_db:
+        trimer, torsion = key.split(':')
+        letters = list(trimer)
+
+        for at in bond_geo_db[key].keys():
+
+            atkey = converted.setdefault(at, {})
+
+            main = atkey.setdefault(letters[1], {})
+            pairs = main.setdefault(''.join(letters[::2]), {})
+            tor = pairs.setdefault(torsion, [])
+            tor.extend(bond_geo_db[key][at])
+
+    return converted
+
+def bgeo_reduce(bgeo):
+    """
+    Reduce BGEO DB to trimer and residue scopes.
+    """
+    dres = {}
+    dpairs = {}
+    for btype in bgeo.keys():
+        dres_ = dres.setdefault(btype, {})
+        dpairs_ = dpairs.setdefault(btype, {})
+
+        for res in bgeo[btype].keys():
+            resangs = dres_.setdefault(res, [])
+            dpairs__ = dpairs_.setdefault(res, {})
+
+            for pairs in bgeo[btype][res].keys():
+                respairs = dpairs__.setdefault(pairs, [])
+
+                for tor in bgeo[btype][res][pairs].keys():
+                    resangs.extend(bgeo[btype][res][pairs][tor])
+                    respairs.extend(bgeo[btype][res][pairs][tor])
+
+    return dpairs, dres
+

@@ -41,7 +41,10 @@ from idpconfgen.core.definitions import aa3to1
 from idpconfgen.core.exceptions import PDBFormatError
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
-from idpconfgen.libs.libhigherlevel import read_trimer_torsion_planar_angles
+from idpconfgen.libs.libhigherlevel import (
+    convert_bond_geo_lib,
+    read_trimer_torsion_planar_angles,
+    )
 from idpconfgen.logger import S, T, init_files
 
 
@@ -61,8 +64,15 @@ ap = libcli.CustomParser(
 
 libcli.add_argument_pdb_files(ap)
 
+ap.add_argument(
+    '-c',
+    '--convert',
+    help='Convert Bond Geometry DB to bond type hierarchy.',
+    action='store_true',
+    )
 
-def main(pdb_files, func=None):
+
+def main(pdb_files, convert=False, func=None):
     """Main logic."""
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
@@ -81,26 +91,33 @@ def main(pdb_files, func=None):
             log.info(str(err))
             continue
 
-    dres = {}
-    dpairs = {}
-    for btype in d.keys():
-        dres_ = dres.setdefault(btype, {})
-        dpairs_ = dpairs.setdefault(btype, {})
+    if convert:
+        log.info(S('Converting'))
+        converted = convert_bond_geo_lib(bond_geo_db)
+        save_dict_to_json(converted, output='bgeo.json')
 
-        for res in d[btype].keys():
-            resangs = dres_.setdefault(res, [])
-            dpairs__ = dpairs_.setdefault(res, {})
+    else:
+        save_dict_to_json(bond_geo_db, output='bgeo.json')
+    #dres = {}
+    #dpairs = {}
+    #for btype in d.keys():
+    #    dres_ = dres.setdefault(btype, {})
+    #    dpairs_ = dpairs.setdefault(btype, {})
 
-            for pairs in d[btype][res].keys():
-                respairs = dpairs__.setdefault(pairs, [])
+    #    for res in d[btype].keys():
+    #        resangs = dres_.setdefault(res, [])
+    #        dpairs__ = dpairs_.setdefault(res, {})
 
-                for tor in d[btype][res][pairs].keys():
-                    resangs.extend(d[btype][res][pairs][tor])
-                    respairs.extend(d[btype][res][pairs][tor])
+    #        for pairs in d[btype][res].keys():
+    #            respairs = dpairs__.setdefault(pairs, [])
 
-    save_dict_to_json(bond_geo_db, output='bgeo.json')
-    save_dict_to_json(dres, output='bgeo_res.json')
-    save_dict_to_json(dpairs, output='bgeo_pairs.json')
+    #            for tor in d[btype][res][pairs].keys():
+    #                resangs.extend(d[btype][res][pairs][tor])
+    #                respairs.extend(d[btype][res][pairs][tor])
+
+    #save_dict_to_json(bond_geo_db, output='bgeo.json')
+    #save_dict_to_json(dres, output='bgeo_res.json')
+    #save_dict_to_json(dpairs, output='bgeo_pairs.json')
     return
 
 
