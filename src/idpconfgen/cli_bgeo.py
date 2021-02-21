@@ -1,5 +1,5 @@
 """
-Create a database of covalent bond geometry for the backbone.
+Create a database of covalent bond geometries for the backbone.
 
 Given a PDB file:
 
@@ -9,7 +9,9 @@ Given a PDB file:
     trimer/torsion key.
 4) updates that information in dictionary (library)
 
-Created key:values have the following form in the output JSON:
+You can provide a folder with several PDB/mmCIF files.
+
+Created key:values have the following form (example) in the output JSON.
 
 {
     'AAA:10,-30': {
@@ -26,25 +28,55 @@ planar bond angles around the referred atoms. Cm1 is the carbonyl atom
 for the first A, Np1 is the amide nitrogen of the third residue.
 
 Angles are stored in radians and in sync with the expectations of the
-`idpconfgen build` command. That is, angles are in the form of:
+`$ idpconfgen build` command. That is, angles are in the form of:
 
     (PI - angle) / 2
 
+
+**NOTE:** the `-c` flag will convert the above representation into the one
+discribed below. The actual form required by `$ idpconfgen build` is the one
+below.
+
+Main keys for the bond types are exact.
+
+{
+    'Cm1_N_Ca': {               <- bond type
+        'A': {                  <- central residue
+            'DE': {             <- previous and next residues (DAE)
+                '10,-40': [     <- PHI and PSI angles rounded to 10º bins
+                    ...         <- observed bend angles in (pi - radians) / 2
+                    ],
+                },
+            },
+        },
+    'N_Ca_C': {                 <- other examples
+        'G': {
+            'PL': {
+                '50,-110'[],
+                },
+            },
+        },
+    'Ca_C_Np1': {...},
+    'Ca_C_O': {...},
+        }
+    }
+
 USAGE:
     $ idpconfgen bgeo [PDBS]
+    $ idpconfgen bgeo [PDBS] -c
+    $ idpconfgen bgeo [PDBS] --convert
 """
 import argparse
 from collections import defaultdict
 
 from idpconfgen import log
-from idpconfgen.core.definitions import aa3to1
 from idpconfgen.core.exceptions import PDBFormatError
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
 from idpconfgen.libs.libhigherlevel import (
     convert_bond_geo_lib,
     read_trimer_torsion_planar_angles,
     )
+from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
 from idpconfgen.logger import S, T, init_files
 
 
@@ -73,7 +105,7 @@ ap.add_argument(
 
 
 def main(pdb_files, convert=False, func=None):
-    """Main logic."""
+    """Perform main logic."""
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
 
