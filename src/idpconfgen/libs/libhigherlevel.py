@@ -341,15 +341,17 @@ def get_torsionsJ(
 
 
 def get_torsions(fdata, degrees=False, decimals=3):
-    """Calculate torsion angles for structure.
+    """
+    Calculate torsion angles from structure.
 
     Parameters
     ----------
     fdata : str, bytes or Path
-        Any type that can be feed to :class:`libstructure.Structure`.
+        A path to the structure file, or the string representing
+        the file. Actually, Any type acceptable by :class:`libstructure.Structure`.
 
     degrees : bool, optional
-        Whether to report torsion angles in degrees or radians.
+        Whether to return torsion angles in degrees or radians.
 
     decimals : int, optional
         The number of decimals to return.

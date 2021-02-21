@@ -171,3 +171,61 @@ def test_separate_torsions():
     assert set(q) == {1}
     assert set(w) == {2}
     assert set(e) == {3}
+
+
+@pytest.mark.parametrize(
+    'i,e',
+    (
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [3, 1],
+        [4, 1],
+        [5, 1],
+        [6, 2],
+        [7, 2],
+        [8, 2],
+        [10, 3],
+        )
+    )
+def test_residue_number_ste3(i, e):
+    """
+    Test obtain residue number by index.
+
+    Considers negative indexes.
+
+    i = input
+    e = expected
+    o = output
+    """
+    o = libcalc.calc_residue_num_from_index(i)
+    assert e == o
+
+
+@pytest.mark.parametrize(
+    'i,e',
+    (
+        [0, 0],
+        [1, 0],
+        [2, 0],
+        [3, 0],
+        [4, 1],
+        [5, 1],
+        [6, 1],
+        [7, 1],
+        [8, 2],
+        )
+    )
+def test_residue_number_step4(i, e):
+    """
+    Test obtain residue number by index.
+
+    Considers negative indexes.
+
+    i = input
+    e = expected
+    o = output
+    """
+    o = libcalc.calc_residue_num_from_index(i, step=4)
+    assert e == o
+
