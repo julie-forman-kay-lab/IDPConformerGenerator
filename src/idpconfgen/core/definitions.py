@@ -20,7 +20,7 @@ aa3to1 = {
     'GLN': 'Q',
     'GLY': 'G',
     'HIS': 'H',
-    'HIP': 'H',  # other name for double protonated histidine
+    'HIP': 'p',  # other name for double protonated histidine
     'HIE': 'e',  # epsilon protonated histidine
     'HID': 'd',  # gamma protonated histidine
     'ILE': 'I',

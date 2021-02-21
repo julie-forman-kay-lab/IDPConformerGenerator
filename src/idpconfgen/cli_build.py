@@ -53,6 +53,7 @@ from idpconfgen.core.build_definitions import (
 from idpconfgen.core.definitions import aa1to3  # , vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libbuild import init_confmasks
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
     calc_all_vs_all_dists,
@@ -82,17 +83,11 @@ dun2010bbdep_path = Path(
     'dun2010bbdep.bin',
     ).str()
 
-
-#BGEO = read_dictionary_from_disk(Path(_file, 'core', 'data', 'bgeo.json'))
-#BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_corrected.json'))
-#BGEO = read_dictionary_from_disk(Path(Path.home(), 'projects', 'idpconfgen', 'bond_geometry', 'bgeo_2qho.json'))
 # these will be populated in main()
 BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
 BGEO_full = {}
 BGEO_trimer = {}
 BGEO_res = {}
-
-
 
 _name = 'build'
 _help = 'Builds conformers from database.'
@@ -156,23 +151,6 @@ SLICES = []
 ANGLES = None
 CONF_NUMBER = Queue()
 
-ConfMasks = namedtuple(
-    'ConfMaks',
-    [
-        'bb3',
-        'bb4',
-        'NHs',
-        'COs',
-        'Hterm',
-        'OXT1',
-        'OXT2',
-        'non_Hs',
-        'non_Hs_non_OXT',
-        'H1_N_CA_CB',
-        ]
-    )
-
-
 # Other functions should have the same APIs:
 # parameters = input_seq
 def init_faspr_sidechains(input_seq):
@@ -189,92 +167,6 @@ def init_faspr_sidechains(input_seq):
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
-
-
-def init_confmasks(atom_labels):
-    """
-    Create a ConfMask object (namedtuple).
-
-    ConfMask is a named tuple which attributes are integer masks for the
-    respective groups.
-
-    Parameters
-    ----------
-    atom_labels : array-like
-        The atom names of the protein.
-
-    Returns
-    -------
-    namedtuple
-
-    Notes
-    -----
-    ConfMask attributes map to the following atom groups:
-
-    bb3 : N, CA, C
-    bb4 : N, CA, C, O
-    NHs : amide protons
-    Hterm : N-terminal protons
-    OXT1 : O atom of C-terminal carboxyl group
-    OXT2 : OXT atom of the C-terminal carboxyl group
-    non_Hs : all but hydrogens
-    non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    H1_N_CA_CB : these four atoms from the first residue
-                 if Gly, uses HA3.
-    """
-    bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    assert len(bb3) % 3 == 0
-
-    bb4 = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
-    assert len(bb4) % 4 == 0
-
-    NHs = np.where(atom_labels == 'H')[0]
-
-    # last O belongs to the C-term carboxyl, we don't want it in the carbonyl
-    # mask
-    COs = np.where(atom_labels == 'O')[0][:-1]
-
-    OXT1 = np.where(atom_labels == 'O')[0][-1]
-    # the actual OXT atom, this is only one O of the C-term carboxyl pair
-    OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
-
-    rr = re.compile(r'H+')
-    hs_match = np.vectorize(lambda x: bool(rr.match(x)))
-    non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
-    non_Hs_non_OXT = non_Hs[:-1]
-
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
-    assert len(_H1_idx) == 1
-
-    # of the first residue
-    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
-    assert len(_N_CA_idx) == 2, _N_CA_idx
-
-    _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
-    assert len(_final_idx) == 1
-
-    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
-    assert len(H1_N_CA_CB) == 4
-
-    Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
-    assert len(Hterm) == 3
-
-    conf_mask = ConfMasks(
-        bb3=bb3,
-        bb4=bb4,
-        NHs=NHs,
-        COs=COs,
-        Hterm=Hterm,
-        OXT1=OXT1,
-        OXT2=OXT2,
-        non_Hs=non_Hs,
-        non_Hs_non_OXT=non_Hs_non_OXT,
-        H1_N_CA_CB=H1_N_CA_CB,
-        )
-
-    return conf_mask
 
 
 def get_cycle_distances_backbone():
@@ -351,7 +243,7 @@ def main(
     assert BGEO_trimer
     assert BGEO_res
     # this asserts only the first layer of keys
-    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())
+    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
     # creates a list of reversed numbers to name the conformers
     for i in range(1, nconfs + 1):
@@ -1398,8 +1290,6 @@ def gen_PDB_from_conformer(
         residues,
         coords,
         ALF=atom_line_formatter,
-        AA1TO3=aa1to3,
-        ROUND=np.round,
         ):
     """."""
     lines = []

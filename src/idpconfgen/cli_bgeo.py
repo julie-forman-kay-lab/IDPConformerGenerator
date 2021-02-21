@@ -98,26 +98,7 @@ def main(pdb_files, convert=False, func=None):
 
     else:
         save_dict_to_json(bond_geo_db, output='bgeo.json')
-    #dres = {}
-    #dpairs = {}
-    #for btype in d.keys():
-    #    dres_ = dres.setdefault(btype, {})
-    #    dpairs_ = dpairs.setdefault(btype, {})
 
-    #    for res in d[btype].keys():
-    #        resangs = dres_.setdefault(res, [])
-    #        dpairs__ = dpairs_.setdefault(res, {})
-
-    #        for pairs in d[btype][res].keys():
-    #            respairs = dpairs__.setdefault(pairs, [])
-
-    #            for tor in d[btype][res][pairs].keys():
-    #                resangs.extend(d[btype][res][pairs][tor])
-    #                respairs.extend(d[btype][res][pairs][tor])
-
-    #save_dict_to_json(bond_geo_db, output='bgeo.json')
-    #save_dict_to_json(dres, output='bgeo_res.json')
-    #save_dict_to_json(dpairs, output='bgeo_pairs.json')
     return
 
 
