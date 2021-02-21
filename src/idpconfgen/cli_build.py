@@ -10,7 +10,7 @@ USAGE:
 """
 import argparse
 import re
-from collections import Counter, namedtuple
+from collections import Counter
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -18,7 +18,6 @@ from multiprocessing import Pool, Queue
 from random import choice as randchoice
 from random import randint
 from time import time
-from math import degrees
 
 import numpy as np
 from numba import njit
@@ -33,9 +32,6 @@ from idpconfgen.core.build_definitions import (
     bonds_equal_3_inter,
     bonds_le_2_inter,
     build_bend_H_N_C,
-    build_bend_angles_CA_C_Np1,
-    build_bend_angles_Cm1_N_CA,
-    build_bend_angles_N_CA_C,
     distance_H_N,
     distances_CA_C,
     distances_C_Np1,
@@ -484,7 +480,6 @@ def conformer_generator(
     """
     assert input_seq, f'`input_seq` must be given! {input_seq}'
     BUILD_BEND_H_N_C = build_bend_H_N_C
-    BUILD_BEND_CA_C_O = build_bend_CA_C_O
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
     DISTANCE_C_O = distance_C_O
