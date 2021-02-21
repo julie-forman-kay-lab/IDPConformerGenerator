@@ -10,7 +10,7 @@ USAGE:
 """
 import argparse
 import re
-from collections import Counter, namedtuple
+from collections import Counter
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -32,9 +32,6 @@ from idpconfgen.core.build_definitions import (
     bonds_equal_3_inter,
     bonds_le_2_inter,
     build_bend_H_N_C,
-    build_bend_angles_CA_C_Np1,
-    build_bend_angles_Cm1_N_CA,
-    build_bend_angles_N_CA_C,
     distance_H_N,
     distances_CA_C,
     distances_C_Np1,
@@ -46,35 +43,48 @@ from idpconfgen.core.build_definitions import (
     read_ff14SB_params,
     sidechain_templates,
     topology_3_bonds_apart,
+    build_bend_CA_C_O,
+    distance_C_O,
     )
 from idpconfgen.core.definitions import aa1to3  # , vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libbuild import init_confmasks
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
     calc_all_vs_all_dists,
     calc_residue_num_from_index,
     calc_torsion_angles,
     make_coord_Q,
-    make_coord_Q_CO,
     make_coord_Q_COO,
+    make_coord_Q_planar,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
+    rrd10_njit,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
+from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import remap_sequence
+from idpconfgen.libs.libparse import get_trimer_seq_njit, remap_sequence
 from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
 
 
 faspr_sc = idpcpp.faspr_sidechains
+_file = Path(__file__).myparents()
 dun2010bbdep_path = Path(
-    Path(__file__).myparents(),
+    _file,
     'core',
     'data',
     'dun2010bbdep.bin',
     ).str()
+
+# these will be populated in main()
+BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
+BGEO_full = {}
+BGEO_trimer = {}
+BGEO_res = {}
+
 _name = 'build'
 _help = 'Builds conformers from database.'
 
@@ -137,23 +147,6 @@ SLICES = []
 ANGLES = None
 CONF_NUMBER = Queue()
 
-ConfMasks = namedtuple(
-    'ConfMaks',
-    [
-        'bb3',
-        'bb4',
-        'NHs',
-        'COs',
-        'Hterm',
-        'OXT1',
-        'OXT2',
-        'non_Hs',
-        'non_Hs_non_OXT',
-        'H1_N_CA_CB',
-        ]
-    )
-
-
 # Other functions should have the same APIs:
 # parameters = input_seq
 def init_faspr_sidechains(input_seq):
@@ -172,92 +165,6 @@ compute_sidechains = {
     }
 
 
-def init_confmasks(atom_labels):
-    """
-    Create a ConfMask object (namedtuple).
-
-    ConfMask is a named tuple which attributes are integer masks for the
-    respective groups.
-
-    Parameters
-    ----------
-    atom_labels : array-like
-        The atom names of the protein.
-
-    Returns
-    -------
-    namedtuple
-
-    Notes
-    -----
-    ConfMask attributes map to the following atom groups:
-
-    bb3 : N, CA, C
-    bb4 : N, CA, C, O
-    NHs : amide protons
-    Hterm : N-terminal protons
-    OXT1 : O atom of C-terminal carboxyl group
-    OXT2 : OXT atom of the C-terminal carboxyl group
-    non_Hs : all but hydrogens
-    non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    H1_N_CA_CB : these four atoms from the first residue
-                 if Gly, uses HA3.
-    """
-    bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    assert len(bb3) % 3 == 0
-
-    bb4 = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
-    assert len(bb4) % 4 == 0
-
-    NHs = np.where(atom_labels == 'H')[0]
-
-    # last O belongs to the C-term carboxyl, we don't want it in the carbonyl
-    # mask
-    COs = np.where(atom_labels == 'O')[0][:-1]
-
-    OXT1 = np.where(atom_labels == 'O')[0][-1]
-    # the actual OXT atom, this is only one O of the C-term carboxyl pair
-    OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
-
-    rr = re.compile(r'H+')
-    hs_match = np.vectorize(lambda x: bool(rr.match(x)))
-    non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
-    non_Hs_non_OXT = non_Hs[:-1]
-
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
-    assert len(_H1_idx) == 1
-
-    # of the first residue
-    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
-    assert len(_N_CA_idx) == 2, _N_CA_idx
-
-    _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
-    assert len(_final_idx) == 1
-
-    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
-    assert len(H1_N_CA_CB) == 4
-
-    Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
-    assert len(Hterm) == 3
-
-    conf_mask = ConfMasks(
-        bb3=bb3,
-        bb4=bb4,
-        NHs=NHs,
-        COs=COs,
-        Hterm=Hterm,
-        OXT1=OXT1,
-        OXT2=OXT2,
-        non_Hs=non_Hs,
-        non_Hs_non_OXT=non_Hs_non_OXT,
-        H1_N_CA_CB=H1_N_CA_CB,
-        )
-
-    return conf_mask
-
-
 def get_cycle_distances_backbone():
     """
     Return an inifinite iterator of backbone atom distances.
@@ -269,14 +176,24 @@ def get_cycle_distances_backbone():
             ))
 
 
-def get_cycle_bend_angles():
-    """
-    Return an infinite iterator of the bend angles.
-    """
+# deactivated after using bend library BGEO
+#def get_cycle_bend_angles():
+#    """
+#    Return an infinite iterator of the bend angles.
+#    """
+#    return cycle((
+#        build_bend_angles_Cm1_N_CA,  # used for OMEGA
+#        build_bend_angles_N_CA_C,  # used for PHI
+#        build_bend_angles_CA_C_Np1,  # used for PSI
+#        ))
+
+
+def get_cycle_bond_type():
+    """Return an infinite interator of the bond types."""
     return cycle((
-        build_bend_angles_Cm1_N_CA,  # used for OMEGA
-        build_bend_angles_N_CA_C,  # used for PHI
-        build_bend_angles_CA_C_Np1,  # used for PSI
+        'Cm1_N_Ca',
+        'N_Ca_C',
+        'Ca_C_Np1',
         ))
 
 
@@ -295,6 +212,8 @@ def main(
     Distributes over processors.
     """
     global ANGLES
+    global BGEO_full, BGEO_trimer, BGEO_res
+
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -308,6 +227,20 @@ def main(
 
     _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
     SLICES.extend(_slices)
+
+    # Populates bond geometry dictionaries
+    _bgeo_full = read_dictionary_from_disk(BGEO_path)
+    BGEO_full.update(_bgeo_full)
+    _bgeo_trimer, _bgeo_res = bgeo_reduce(BGEO_full)
+    BGEO_trimer.update(_bgeo_trimer)
+    BGEO_res.update(_bgeo_res)
+    del _bgeo_full,_bgeo_trimer, _bgeo_res
+    assert BGEO_full
+    assert BGEO_trimer
+    assert BGEO_res
+    # this asserts only the first layer of keys
+    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
+
     # creates a list of reversed numbers to name the conformers
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
@@ -436,6 +369,7 @@ def _build_conformers(
     return
 
 
+
 # TODO: correct for HIS/HIE/HID/HIP
 def translate_seq_to_3l(input_seq):
     return [
@@ -548,9 +482,11 @@ def conformer_generator(
     BUILD_BEND_H_N_C = build_bend_H_N_C
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
+    DISTANCE_C_O = distance_C_O
     ISNAN = np.isnan
+    GET_TRIMER_SEQ = get_trimer_seq_njit
     MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
-    MAKE_COORD_Q_CO_LOCAL = make_coord_Q_CO
+    MAKE_COORD_Q_PLANAR = make_coord_Q_planar
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NORM = np.linalg.norm
@@ -561,6 +497,7 @@ def conformer_generator(
     RC = randchoice
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
+    RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
     angles = ANGLES
     slices = SLICES
@@ -715,7 +652,7 @@ def conformer_generator(
     while 1:
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
-        bond_bend = get_cycle_bend_angles()
+        bond_type = get_cycle_bond_type()
 
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
@@ -767,30 +704,59 @@ def conformer_generator(
                 # `angls` will always be cyclic with:
                 # omega - phi - psi - omega - phi - psi - (...)
                 agls = angles[RC(slices), :].ravel()
+                #agls = angles[:, :].ravel()
 
             # index at the start of the current cycle
             try:
-                for torsion in agls:
-                    # TODO: remove this comment
-                    # #bbi -2 makes the match, because despite the first atom
-                    # #being placed is a C, it is placed using the PHI angle of a
-                    # #residue. And PHI is the first angle of that residue angle
-                    # #set.
-                    current_res_number = calc_residue_num_from_index(bbi)
-                    current_residue = ala_pro_seq[current_res_number]
+                for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
-                    # bbi is the same for bb_real and bb, but bb_real indexing
-                    # is displaced by 1 unit from bb. So 2 in bb_read is the
-                    # next atom of 2 in bb.
-                    bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
-                        bb[bbi - 1, :],
-                        bb[bbi, :],
-                        bb[bbi + 1, :],
-                        next(bond_lens)[current_residue],
-                        next(bond_bend)[current_residue],
-                        torsion,
+                    current_res_number = calc_residue_num_from_index(bbi - 1)
+                    curr_res, tpair = GET_TRIMER_SEQ(
+                        r_input_seq,
+                        current_res_number,
                         )
-                    bbi += 1
+                    torpair = f'{RRD10(phi)},{RRD10(psi)}'
+
+                    for tangl in (omg, phi, psi):
+
+                        _bt = next(bond_type)
+
+                        try:
+                            _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])  # noqa: E501
+                        except KeyError:
+                            try:
+                                _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])  # noqa: E501
+                            except KeyError:
+                                _bend_angle = RC(BGEO_res[_bt][curr_res])
+
+                        _bond_lens = next(bond_lens)[curr_res]
+
+                        bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
+                            bb[bbi - 1, :],
+                            bb[bbi, :],
+                            bb[bbi + 1, :],
+                            _bond_lens,
+                            _bend_angle,
+                            tangl,
+                            )
+                        bbi += 1
+
+                    try:
+                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
+                    except KeyError:
+                        try:
+                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                        except KeyError:
+                            co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+
+                    bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
+                        bb_real[bbi - 3, :],
+                        bb_real[bbi - 2, :],
+                        bb_real[bbi - 1, :],
+                        distance=DISTANCE_C_O,
+                        bend=co_bend
+                        )
+                    COi += 1
 
             except IndexError:
                 # IndexError happens when the backbone is complete
@@ -805,19 +771,6 @@ def conformer_generator(
                 coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
 
-            # builds carbonyl atoms. Two situations can happen here:
-            # [-1] + 1 is always a C because building ends in the N and
-            # CA index (bbi)
-            # bbi - 1 serves both main chain and the final addition when
-            # the backbone is complete.
-            for k in range(bbi0_register[-1] + 1, bbi - 1, 3):
-                bb_CO[COi, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb_real[k - 1, :],
-                    bb_real[k, :],
-                    bb_real[k + 1, :],
-                    )
-                COi += 1
-
             # Adds N-H Hydrogens
             # Not a perfect loop. It repeats for Hs already placed.
             # However, was a simpler solution than matching the indexes
@@ -825,18 +778,16 @@ def conformer_generator(
             _ = ~ISNAN(bb_real[bb_NH_nums_p1, 0])
             for k, j in zip(bb_NH_nums[_], bb_NH_idx[_]):
 
-                # MAKE_COORD_Q_CO_LOCAL can be used for NH by giving
-                # distance and bend parameters
-                bb_NH[j, :] = MAKE_COORD_Q_CO_LOCAL(
-                    bb_real[k - 1, :],
-                    bb_real[k, :],
+                bb_NH[j, :] = MAKE_COORD_Q_PLANAR(
                     bb_real[k + 1, :],
+                    bb_real[k, :],
+                    bb_real[k - 1, :],
                     distance=DISTANCE_NH,
                     bend=BUILD_BEND_H_N_C,
                     )
 
             # Adds sidechain template structures
-            for res_i in range(res_R[-1], current_res_number):  # noqa: E501
+            for res_i in range(res_R[-1], current_res_number + 1):  # noqa: E501
 
                 _sstemplate, _sidechain_idxs = \
                     SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
@@ -849,7 +800,7 @@ def conformer_generator(
                 ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
 
             # Transfers coords to the main coord array
-            for _smask, _sidecoords in ss_masks[:current_res_number]:
+            for _smask, _sidecoords in ss_masks[:current_res_number + 1]:
                 coords[_smask] = _sidecoords
 
             # / Place coordinates for energy calculation
@@ -958,7 +909,7 @@ def conformer_generator(
                 # the final part of the conformer
                 if backbone_done:
                     bond_lens = get_cycle_distances_backbone()
-                    bond_bend = get_cycle_bend_angles()
+                    bond_type = get_cycle_bond_type()
 
                 # we do not know if the next chunk will finish the protein
                 # or not
@@ -1334,8 +1285,6 @@ def gen_PDB_from_conformer(
         residues,
         coords,
         ALF=atom_line_formatter,
-        AA1TO3=aa1to3,
-        ROUND=np.round,
         ):
     """."""
     lines = []

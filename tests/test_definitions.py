@@ -16,4 +16,5 @@ from idpconfgen.core.definitions import aa1to3, aa3to1
 def test_aa_letter_dictionaries(aadict):
     """Test amino acids letter conversion dictionaries."""
     assert isinstance(aadict, dict)
-    assert len(aadict) == 20  # there are 20 natural aminoacids
+    # there are 20 natural aminoacids + 3 His protonation states
+    assert len(aadict) == 23

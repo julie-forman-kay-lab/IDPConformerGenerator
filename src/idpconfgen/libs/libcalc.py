@@ -358,7 +358,7 @@ def hamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
         )
 
 
-def angle_between(
+def calc_angle(
         v1,
         v2,
         ARCCOS=np.arccos,
@@ -376,7 +376,7 @@ def angle_between(
 
 
 @njit
-def angle_between_njit(
+def calc_angle_njit(
         v1,
         v2,
         ARCCOS=np.arccos,
@@ -441,7 +441,7 @@ def place_sidechain_template(
     N_CA = bbtmp[0, :]
     N_CA_ = ss_template[0, :]
 
-    N_CA_N = angle_between_njit(N_CA, N_CA_)
+    N_CA_N = calc_angle_njit(N_CA, N_CA_)
 
     # rotation vector
     rv = CROSS(N_CA_, N_CA)
@@ -456,7 +456,7 @@ def place_sidechain_template(
     cross_ss = CROSS(rot1[0, :], rot1[2, :])
 
     # the angle of rotation is the angle between the plane normal
-    angle = angle_between_njit(cross_ss, cross_cnf)
+    angle = calc_angle_njit(cross_ss, cross_cnf)
 
     # plane rotation vector is the cross vector between the two plane normals
     rv = CROSS(cross_ss, cross_cnf)
@@ -609,12 +609,12 @@ def make_coord_Q(
 
 
 @njit
-def make_coord_Q_CO(
-        CA_coords,
-        C_coords,
-        N_coords,
-        distance=distance_C_O,
-        bend=build_bend_CA_C_O,
+def make_coord_Q_planar(
+        vector1,
+        center_point,
+        vector2,
+        distance,
+        bend,
         ARRAY=np.array,
         CROSS=np.cross,
         NORM=np.linalg.norm,
@@ -629,29 +629,25 @@ def make_coord_Q_CO(
 
     Parameters
     ----------
-    CA_coords, C_coods, N_coords : np.ndarray, shape (3,), dtype=np.float
-        The XYZ coordinates for the CA, C and N atoms surrounding the
-        C=O bond, respectively.
+    vector1, center_point, vector2 : np.ndarray, shpe(3,), dtype=np.float
+        The coordinates of the three point that form a plane.
+        `center_point` is considered the origin of vector1 and vector2.
 
-    distance : float, optional
-        The distance of the C-O bond pair.
-        Defaults to ~1.234.
+    distance : float
+        The distance between center_point and the new point.
 
-    bend : float, optional
-        The angle in radians for the CA-C-O.
-        Defaults to ~2.1428 radians (~122.777 degress).
-        If `bend` is given, consider the actual `bend` value must be
-        `(pi - bend) / 2`, this calculation must be computed outside
-        this function for perfomance reasons.
+    bend : float
+        The angle in radians for vector1 - center_point - new system.
+        `bend` should be half of the desired value.
 
     Returns
     -------
     np.ndarray of shape (3,), dtype=np.float32
     """
-    o1 = CA_coords - C_coords
-    o2 = N_coords - C_coords
+    o1 = vector1 - center_point
+    o2 = vector2 - center_point
 
-    ocross = CROSS(o1, o2)
+    ocross = CROSS(o2, o1)
     u_ocross = ocross / NORM(ocross)
 
     # creates quaterion to rotate on the bend angle
@@ -659,14 +655,14 @@ def make_coord_Q_CO(
     b1 = COS(bend)
 
     # rotates a the unitary of o2 according to bend angle
-    uo2 = o2 / NORM(o2)
-    p2, p3, p4 = uo2  # p1 is zero according to Quaternion theory
+    uo1 = o1 / NORM(o1)
+    p2, p3, p4 = uo1  # p1 is zero according to Quaternion theory
     n1, n2, n3, n4 = QM(
         *QM(b1, b2, b3, b4, 0, p2, p3, p4),
         b1, -b2, -b3, -b4,
         )
 
-    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + C_coords
+    return ARRAY((n2 * distance, n3 * distance, n4 * distance)) + center_point
 
 
 @njit
@@ -891,5 +887,52 @@ def calc_residue_num_from_index(i, step=3):
     return i // step
 
 
+# njit available
+def round_radian_to_degree_bin_10(x0):
+    """
+    Round RADIAN to the nearest 10 degree bin.
+
+    23 degrees round to 20 degrees.
+    27 degrees round to 30 degrees.
+
+    Parameters
+    ----------
+    x0 : float
+        The angle in radians.
+
+    Returns
+    -------
+    int
+        The nearest bind of 10 degrees according to rounding rules.
+    """
+    x = int(round((x0 * 180 / 3.141592653589793), 0))
+    mod_ = x % 10
+
+    if mod_ < 5:
+        return x - mod_
+
+    elif mod_ > 5:
+        return x + (10 - mod_)
+
+    elif mod_ == 5:
+
+        x10 = x // 10
+
+        if x10 % 2:
+            return x + 5
+        else:
+            return x - 5
+    else:
+        assert False, 'Code should not reach this point.'
+
+
+
+def unit_vector(vector):
+    """Calculate the unitary vector."""
+    return vector / np.linalgn.norm(vector)
+
+
 
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
+rrd10_njit = njit(round_radian_to_degree_bin_10)
+unit_vec_njit = njit(unit_vector)

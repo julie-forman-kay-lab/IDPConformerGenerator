@@ -346,9 +346,8 @@ def read_dictionary_from_disk(path):
     -------
     dict
     """
-    dispacher = read_dictionary_from_disk_dispacher  # global to local
     suffix = Path(path).suffix
-    the_dict = dispacher[suffix](path)
+    the_dict = read_dictionary_from_disk_dispacher[suffix](path)
     assert isinstance(the_dict, dict)
     return the_dict
 
@@ -364,6 +363,14 @@ def read_dict_from_json(path):
 def read_dict_from_pickle(path):
     """Read dictionary from pickle."""
     return pickle.load(open(path, 'rb'))
+
+
+def read_dict_from_tar(path):
+    """Read dictionary from .tar"""
+    tar = tarfile.open(path)
+    f = tar.extractfile(tar.getmembers()[0])
+    d = json.loads(f.read())
+    return d
 
 
 # USED OKAY
@@ -707,6 +714,7 @@ read_PDBID_from_source_dispacher = {
 read_dictionary_from_disk_dispacher = {
     # '.pickle': read_dict_from_pickle,
     '.json': read_dict_from_json,
+    '.tar': read_dict_from_tar,
     }
 
 save_pairs_dispacher = {

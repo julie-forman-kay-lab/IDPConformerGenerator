@@ -1,4 +1,6 @@
 """Test libcalc."""
+from math import radians
+
 import numpy as np
 import pytest
 
@@ -229,3 +231,40 @@ def test_residue_number_step4(i, e):
     o = libcalc.calc_residue_num_from_index(i, step=4)
     assert e == o
 
+
+@pytest.fixture(
+    params=[
+        [23, 20],
+        [-34, -30],
+        [180, 180],
+        [-179, -180],
+        [15, 20],
+        [25, 20],
+        [35, 40],
+        [0, 0],
+        [-1, 0],
+        [8, 10],
+        [5, 0],
+        [-5, 0],
+        ],
+    )
+def radians_to_degree_bins_data(request):
+    return request.param
+
+
+def test_rrd10(radians_to_degree_bins_data):
+    """
+    Test rounding radians to nearest degree.
+    """
+    x0, expected = radians_to_degree_bins_data
+    result = libcalc.round_radian_to_degree_bin_10(radians(x0))
+    assert result == expected
+
+
+def test_rrd10_njit(radians_to_degree_bins_data):
+    """
+    Test rounding radians to nearest degree.
+    """
+    x0, expected = radians_to_degree_bins_data
+    result = libcalc.rrd10_njit(radians(x0))
+    assert result == expected

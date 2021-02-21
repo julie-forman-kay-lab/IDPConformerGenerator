@@ -11,11 +11,13 @@ from functools import partial, reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import blocked_ids
-from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core.definitions import aa3to1, blocked_ids
+from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
 from idpconfgen.libs.libcalc import (
+    calc_angle_njit,
     calc_torsion_angles,
     get_separate_torsions,
+    rrd10_njit,
     validate_backbone_labels_for_torsion,
     )
 from idpconfgen.libs.libio import (
@@ -384,13 +386,15 @@ def get_torsions(fdata, degrees=False, decimals=3):
         # by logger.report_on_crash
         raise err
 
-    coords = (data[:, cols_coords].astype(np.float64) * 1000).astype(int)
+    #coords = (data[:, cols_coords].astype(np.float64) * 1000).astype(int)
+    coords = structure.coords
+    #print(coords)
     torsions = calc_torsion_angles(coords)
 
     if degrees:
         torsions = np.degrees(torsions)
 
-    return torsions
+    return np.round(torsions, decimals)
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):
@@ -403,3 +407,208 @@ def cli_helper_calc_torsions(fname, fdata, **kwargs):
 def cli_helper_calc_torsionsJ(fdata_tuple, **kwargs):
     """Help cli_torsionsJ.py."""
     return fdata_tuple[0], get_torsionsJ(fdata_tuple[1], **kwargs)
+
+
+def read_trimer_torsion_planar_angles(pdb, bond_geometry):
+    """
+    Create a trimer/torsion library of bend/planar angles.
+
+    Given a PDB file:
+
+    1) reads each of its trimers, and for the middle residue:
+    2) Calculates phi/psi and rounds them to the closest 10 degree bin
+    3) assigns the planar angles found for that residue to the
+        trimer/torsion key.
+    4) the planar angles are converted to the format needed by cli_build,
+        which is that of (pi - angle) / 2.
+    5) updates that information in `bond_gemetry`.
+
+    Created key:values have the following form in `bond_geometry` dict:
+
+    {
+        'AAA:10,-30': {
+            'Cm1_N_Ca': [],
+            'N_Ca_C': [],
+            'Ca_C_Np1': [],
+            'Ca_C_O': [],
+            }
+        }
+
+
+    Parameters
+    ----------
+    pdb : any input of `libstructure.Structure`
+        The PDB/mmCIF file data.
+
+    bond_geometry : dict
+        The library dictionary to update.
+
+    Returns
+    -------
+    None
+    """
+    ALL = np.all
+    CEQ = np.char.equal
+    TORSION_LABELS = np.array(['CA', 'C', 'N', 'CA', 'C', 'N', 'CA'])
+    CO_LABELS = np.array(['CA', 'C', 'O', 'CA', 'C', 'O', 'CA'])
+    aa3to1['MSE'] = 'M'  # seleno methionine
+
+    s = Structure(pdb)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+
+    if s.data_array[0, col_name] != 'N':
+        raise PDBFormatError(
+            'PDB does not start with N. '
+            f'{s.data_array[0, col_name]} instead.'
+            )
+
+    bb_minimal_names = s.filtered_atoms[:, col_name]
+    bb_residue_names = s.filtered_atoms[:, col_resName]
+
+    N_CA_C_coords = s.coords
+    s.clear_filters()
+
+    s.add_filter(lambda x: x[col_name] in ('CA', 'C', 'O'))
+    CA_C_O_coords = s.coords
+    co_minimal_names = s.filtered_atoms[:, col_name]
+
+    # calc torsion angles
+    for i in range(1, len(N_CA_C_coords) - 7, 3):
+
+        idx = list(range(i, i + 7))
+
+        _trimer = bb_residue_names[idx][0::3]
+
+        try:
+            trimer = ''.join(aa3to1[_t] for _t in _trimer)
+        except KeyError:
+            log.info(S(
+                'trimer '
+                f"{','.join(_trimer)}"
+                ' not found. Skipping...'
+                ))
+            continue
+
+        assert len(trimer) == 3
+        del _trimer
+
+        if not ALL(CEQ(bb_minimal_names[idx], TORSION_LABELS)):
+            log.info(S(
+                'Found non-matching labels: '
+                f'{",".join(bb_minimal_names[idx])}'
+                ))
+            continue
+
+        # selects omega, phi, and psi for the central residue
+        rad_tor = np.round(calc_torsion_angles(N_CA_C_coords[idx])[1:3], 10)
+        ptorsions = [rrd10_njit(_) for _ in rad_tor]
+
+        assert len(ptorsions) == 2
+        for angle in ptorsions:
+            assert -180 <= angle <= 180, 'Bin angle out of expected range.'
+
+        # TODO: better key
+        tuple_key = trimer + ':' + ','.join(str(_) for _ in ptorsions)
+
+        # calc bend angles
+        c = N_CA_C_coords[idx]
+        Cm1_N = c[1] - c[2]
+        Ca_N = c[3] - c[2]
+        N_Ca = c[2] - c[3]
+        C_Ca = c[4] - c[3]
+        Ca_C = c[3] - c[4]
+        Np1_C = c[5] - c[4]
+        assert Cm1_N.shape == (3,)
+
+        # the angles here are already corrected to the format needed by the
+        # builder, which is (pi - a) / 2
+        Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
+        N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
+        Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
+
+        _ = bond_geometry[tuple_key].setdefault('Cm1_N_Ca', [])
+        _.append(Cm1_N_Ca)
+
+        _ = bond_geometry[tuple_key].setdefault('N_Ca_C', [])
+        _.append(N_Ca_C)
+
+        _ = bond_geometry[tuple_key].setdefault('Ca_C_Np1', [])
+        _.append(Ca_C_Np1)
+
+        co_idx = np.array(idx) - 1
+
+        if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
+            log.info(S(
+                'Found not matching labels '
+                f'{",".join(co_minimal_names[co_idx])}'
+                ))
+            continue
+
+        c = CA_C_O_coords[co_idx]
+        Ca_C = c[3] - c[4]
+        O_C = c[5] - c[4]
+
+        Ca_C_O = calc_angle_njit(Ca_C, O_C)
+        _ = bond_geometry[tuple_key].setdefault('Ca_C_O', [])
+        _.append(Ca_C_O / 2)
+
+    return
+
+
+def convert_bond_geo_lib(bond_geo_db):
+    """
+    Convert bond geometry library to bond type first hierarchy.
+
+    Restructure the output of `read_trimer_torsion_planar_angles` such
+    that the main keys are the bond types, followed by the main residue,
+    the pairs in the trimer, and, finally, the torsion angles.
+
+    Parameters
+    ----------
+    bond_geo_db : dict
+        The output of `read_PDBID_from_source`.
+
+    Returns
+    -------
+    dict
+    """
+    converted = {}
+    for key in bond_geo_db:
+        trimer, torsion = key.split(':')
+        letters = list(trimer)
+
+        for at in bond_geo_db[key].keys():
+
+            atkey = converted.setdefault(at, {})
+
+            main = atkey.setdefault(letters[1], {})
+            pairs = main.setdefault(''.join(letters[::2]), {})
+            tor = pairs.setdefault(torsion, [])
+            tor.extend(bond_geo_db[key][at])
+
+    return converted
+
+def bgeo_reduce(bgeo):
+    """
+    Reduce BGEO DB to trimer and residue scopes.
+    """
+    dres = {}
+    dpairs = {}
+    for btype in bgeo.keys():
+        dres_ = dres.setdefault(btype, {})
+        dpairs_ = dpairs.setdefault(btype, {})
+
+        for res in bgeo[btype].keys():
+            resangs = dres_.setdefault(res, [])
+            dpairs__ = dpairs_.setdefault(res, {})
+
+            for pairs in bgeo[btype][res].keys():
+                respairs = dpairs__.setdefault(pairs, [])
+
+                for tor in bgeo[btype][res][pairs].keys():
+                    resangs.extend(bgeo[btype][res][pairs][tor])
+                    respairs.extend(bgeo[btype][res][pairs][tor])
+
+    return dpairs, dres
+

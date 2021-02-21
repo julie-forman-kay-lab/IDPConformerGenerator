@@ -55,6 +55,7 @@ cif_noatomsite = Path(data_folder, 'cif_no_atom_site.cif')
 cif_nohash = Path(data_folder, 'cif_nohash.cif')
 cull = Path(data_folder, 'cull.list')
 dict1json = Path(data_folder, 'dict1.json')
+dict1tar = Path(data_folder, 'dict1.tar')
 example_dssp = Path(data_folder, 'example.dssp')
 file_tar = Path(data_folder, 'files.tar')
 pdb_example = Path(data_folder, 'pdb_example.pdb')
@@ -65,6 +66,10 @@ pdb_res_gap = Path(data_folder, 'pdb_residue_gap.pdb')
 pdbs_fasta = Path(data_folder, 'pdbs.fasta')
 EXPL_A = Path(data_folder, 'EXPL_A.pdb')
 EXPL_B = Path(data_folder, 'EXPL_B.pdb')
+expl_a_bgeo = Path(data_folder, 'EXPL_A_bgeo.json')
+expl_a_bgeo_converted = Path(data_folder, 'EXPL_A_bgeo_converted.json')
+expl_a_bgeo_trimer = Path(data_folder, 'EXPL_A_bgeo_trimer.json')
+expl_a_bgeo_res = Path(data_folder, 'EXPL_A_bgeo_res.json')
 
 
 cif_example_headers = [

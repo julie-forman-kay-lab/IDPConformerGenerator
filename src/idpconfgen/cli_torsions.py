@@ -58,7 +58,7 @@ def main(
     pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
 
-    consume = partial(starunpack, cli_helper_calc_torsions, degrees=degrees)
+    consume = partial(starunpack, cli_helper_calc_torsions, degrees=degrees, decimals=10)
 
     execute = partial(
         report_on_crash,
