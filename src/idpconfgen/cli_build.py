@@ -288,15 +288,16 @@ def get_cycle_distances_backbone():
             ))
 
 
-def get_cycle_bend_angles():
-    """
-    Return an infinite iterator of the bend angles.
-    """
-    return cycle((
-        build_bend_angles_Cm1_N_CA,  # used for OMEGA
-        build_bend_angles_N_CA_C,  # used for PHI
-        build_bend_angles_CA_C_Np1,  # used for PSI
-        ))
+# deactivated after using bend library BGEO
+#def get_cycle_bend_angles():
+#    """
+#    Return an infinite iterator of the bend angles.
+#    """
+#    return cycle((
+#        build_bend_angles_Cm1_N_CA,  # used for OMEGA
+#        build_bend_angles_N_CA_C,  # used for PHI
+#        build_bend_angles_CA_C_Np1,  # used for PSI
+#        ))
 
 
 def get_cycle_bond_type():
@@ -349,6 +350,8 @@ def main(
     assert BGEO_full
     assert BGEO_trimer
     assert BGEO_res
+    # this asserts only the first layer of keys
+    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())
 
     # creates a list of reversed numbers to name the conformers
     for i in range(1, nconfs + 1):
@@ -762,7 +765,6 @@ def conformer_generator(
     while 1:
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
-        bond_bend = get_cycle_bend_angles()
         bond_type = get_cycle_bond_type()
 
         # in the first run of the loop this is unnecessary, but is better to
@@ -830,15 +832,13 @@ def conformer_generator(
 
                     for tangl in (omg, phi, psi):
 
-                        # these two have to be nexted together so they go paired
                         _bt = next(bond_type)
-                        _bb = next(bond_bend)
 
                         try:
-                            _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])
+                            _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
                             try:
-                                _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])
+                                _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])  # noqa: E501
                             except KeyError:
                                 _bend_angle = RC(BGEO_res[_bt][curr_res])
 
@@ -855,10 +855,10 @@ def conformer_generator(
                         bbi += 1
 
                     try:
-                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])
+                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                     except KeyError:
                         try:
-                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][_tpair])
+                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
                         except KeyError:
                             co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
 
@@ -966,7 +966,7 @@ def conformer_generator(
                 ap_bonds_ge_3_mask,
                 )
 
-            if False:#total_energy > 10:
+            if total_energy > 10:
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1022,7 +1022,6 @@ def conformer_generator(
                 # the final part of the conformer
                 if backbone_done:
                     bond_lens = get_cycle_distances_backbone()
-                    bond_bend = get_cycle_bend_angles()
                     bond_type = get_cycle_bond_type()
 
                 # we do not know if the next chunk will finish the protein
