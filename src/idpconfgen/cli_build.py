@@ -563,10 +563,24 @@ def conformer_generator(
     ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
         create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-    calc_energy = create_energy_func_calculator(
-        init_lennard_jones_calculator(),
-        init_coulomb_calculator(),
-        )
+
+    # /
+    # build dictionary for energy function
+    # by combining the different energy terms
+    energy_func_terms = {
+        'lj': {
+            'func': calc_LJ_energy_njit,
+            'acoeff': ap_acoeff,
+            'bcoeff': ap_bcoeff,
+            },
+        'coulomb' : {
+            'func': calc_coulomb_njit,
+            'charges_ij': ap_charges_ij,
+            },
+        }
+
+    ap_energy_calculator = EnergyCalculator_ij(energy_func_terms, CALC_DISTS)
+    calc_energy = ap_energy_calculator.calculate
     # ?
 
     ap_confmasks = init_confmasks(atom_labels)
@@ -853,6 +867,7 @@ def conformer_generator(
             #TODO:
             # * separate create_energy_func_params
             # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
+            # * homogeneizar energy function terms for ij.
 
 
             total_energy = calc_energy(
@@ -1698,6 +1713,12 @@ def calc_energy(coords, acoeff, bcoeff, charges_ij, bonds_ge_3_mask):
 
     # total energy
     return energy_lj + energy_elec
+
+
+def calc_coulomb(distances_ij, charges_ij, NANSUM=np.nansum):
+    return NANSUM(charges_ij / distances_ij)
+
+calc_coulomb_njit = njit(calc_coulomb)
 
 
 def create_energy_func_params(atom_labels, residue_numbers, residue_labels):

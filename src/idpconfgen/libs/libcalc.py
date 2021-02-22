@@ -945,29 +945,23 @@ def init_lennard_jones_calculator(acoeff, bcoeff):
 
 
 
-class EnergyFuncCalculator_ij:
-    def __init__(self, **kwargs):
-        #self.funcs = {}
-        self.funcs = []
-        self.args = []
-        self.kwargs = []
-        for key in kwargs:
-            #self.funcs[key] = {'func': kwargs[key].pop('func')}
-            #self.funcs[key]['args'] = kwargs[key]
-            self.funcs.append(kwargs[key]['func'])
-            self.args.append(kwargs[key]['args'])
-            self.kwargs.append(kwargs[key]['kwargs'])
+class EnergyCalculator_ij:
+    def __init__(self, efunc_terms, distance_calculator):
 
-        self.num_funcs = list(range(len(self.funcs)))
+        self.funcs = []
+        self.distscalc = distance_calculator
+
+        for key in efunc_terms:
+            self.funcs.append((efunc_terms[key].pop('func'), efunc_terms[key]))
+
         return
 
     def calculate(self, coordinates):
-        # dist_ij = calculate distances ij
+        dist_ij = self.distscalc(coordinates)
         energy = 0
-        #for efunc in self.funcs.values():
-        for i in self.num_funcs:
-            #energy += efunc['func'](dist_ij, **efuc['args'])
-            energy += self.funcs[i](dist_ij, *self.args[i], **self.kwargs[i])
+
+        for efunc, kwargs in self.funcs:
+            energy += efunc(dist_ij, **kwargs)
 
         return energy
 
