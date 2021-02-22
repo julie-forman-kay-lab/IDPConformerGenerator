@@ -563,9 +563,13 @@ def conformer_generator(
     ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
         create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-    ap_confmasks = init_confmasks(atom_labels)
+    calc_energy = create_energy_func_calculator(
+        init_lennard_jones_calculator(),
+        init_coulomb_calculator(),
+        )
     # ?
 
+    ap_confmasks = init_confmasks(atom_labels)
     # create coordinates and views
     coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
 
@@ -845,6 +849,12 @@ def conformer_generator(
 
             # /
             # calc energy
+            total_energy = calc_energy(coords)
+            #TODO:
+            # * separate create_energy_func_params
+            # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
+
+
             total_energy = calc_energy(
                 coords,
                 ap_acoeff,
@@ -1786,6 +1796,7 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
 
     return acoeff, bcoeff, charges_ij, bonds_ge_3_mask
     # ?
+
 
 
 if __name__ == "__main__":

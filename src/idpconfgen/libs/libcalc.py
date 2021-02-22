@@ -932,6 +932,46 @@ def unit_vector(vector):
     return vector / np.linalgn.norm(vector)
 
 
+def init_lennard_jones_calculator(acoeff, bcoeff):
+    """."""
+    @njit
+    def calc_lennard_jones(distances_ij, NANSUM=np.nansum):
+        ar = acoeff / (distances_ij ** 12)
+        br = bcoeff / (distances_ij ** 6)
+        energy_ij = ar - br
+        return NANSUM(energy_ij)
+
+    return calc_lennard_jones
+
+
+
+class EnergyFuncCalculator_ij:
+    def __init__(self, **kwargs):
+        #self.funcs = {}
+        self.funcs = []
+        self.args = []
+        self.kwargs = []
+        for key in kwargs:
+            #self.funcs[key] = {'func': kwargs[key].pop('func')}
+            #self.funcs[key]['args'] = kwargs[key]
+            self.funcs.append(kwargs[key]['func'])
+            self.args.append(kwargs[key]['args'])
+            self.kwargs.append(kwargs[key]['kwargs'])
+
+        self.num_funcs = list(range(len(self.funcs)))
+        return
+
+    def calculate(self, coordinates):
+        # dist_ij = calculate distances ij
+        energy = 0
+        #for efunc in self.funcs.values():
+        for i in self.num_funcs:
+            #energy += efunc['func'](dist_ij, **efuc['args'])
+            energy += self.funcs[i](dist_ij, *self.args[i], **self.kwargs[i])
+
+        return energy
+
+
 
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
 rrd10_njit = njit(round_radian_to_degree_bin_10)

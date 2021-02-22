@@ -268,3 +268,8 @@ def test_rrd10_njit(radians_to_degree_bins_data):
     x0, expected = radians_to_degree_bins_data
     result = libcalc.rrd10_njit(radians(x0))
     assert result == expected
+
+
+def test_lennard_jones_calculator():
+    c = libcalc.init_lennard_jones_calculator(np.arange(10), np.arange(10))
+    c(np.arange(1, 11))
