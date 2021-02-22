@@ -61,6 +61,9 @@ from idpconfgen.libs.libcalc import (
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     rrd10_njit,
+    energycalculator_ij,
+    init_lennard_jones_calculator,
+    init_coulomb_calculator,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
@@ -385,6 +388,8 @@ def conformer_generator(
         generative_function=None,
         disable_sidechains=True,
         sidechain_method='faspr',
+        lj_term=True,
+        coulomb_term=False,
         # TODO: these parameters must be discontinued
         # vdW_bonds_apart=3,
         # vdW_tolerance=0.4,
@@ -565,22 +570,21 @@ def conformer_generator(
 
 
     # /
-    # build dictionary for energy function
-    # by combining the different energy terms
-    energy_func_terms = {
-        'lj': {
-            'func': calc_LJ_energy_njit,
-            'acoeff': ap_acoeff,
-            'bcoeff': ap_bcoeff,
-            },
-        'coulomb' : {
-            'func': calc_coulomb_njit,
-            'charges_ij': ap_charges_ij,
-            },
-        }
+    # assemble energy function
+    energy_func_terms = []
+    if lj_term:
+        lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
+        energy_func_terms.append(lf_calc)
+        print('prepared lj')
 
-    ap_energy_calculator = EnergyCalculator_ij(energy_func_terms, CALC_DISTS)
-    calc_energy = ap_energy_calculator.calculate
+    if coulomb_term:
+        coulomb_calc = init_coulomb_calculator(charges_ij)
+        energy_func_term.append(coulomb_calc)
+        print('prepared c')
+
+    # in case there are iji terms, I need to add here another layer
+    calc_energy = energycalculator_ij(calc_all_vs_all_dists, energy_func_terms)
+    print('done preparing energy func')
     # ?
 
     ap_confmasks = init_confmasks(atom_labels)
@@ -864,19 +868,20 @@ def conformer_generator(
             # /
             # calc energy
             total_energy = calc_energy(coords)
+            print(total_energy)
             #TODO:
             # * separate create_energy_func_params
             # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
             # * homogeneizar energy function terms for ij.
 
 
-            total_energy = calc_energy(
-                coords,
-                ap_acoeff,
-                ap_bcoeff,
-                ap_charges_ij,
-                ap_bonds_ge_3_mask,
-                )
+            #total_energy = calc_energy(
+                #coords,
+                #ap_acoeff,
+                #ap_bcoeff,
+                #ap_charges_ij,
+                #ap_bonds_ge_3_mask,
+                #)
 
             if total_energy > 10:
                 # reset coordinates to the original value

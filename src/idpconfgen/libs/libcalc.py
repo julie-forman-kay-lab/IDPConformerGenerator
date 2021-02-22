@@ -940,11 +940,27 @@ def init_lennard_jones_calculator(acoeff, bcoeff):
         br = bcoeff / (distances_ij ** 6)
         energy_ij = ar - br
         return NANSUM(energy_ij)
-
     return calc_lennard_jones
 
 
+def init_coulomb_calculator(charges_ij):
+    @njit
+    def calculate(distances_ij, NANSUM=np.nansum):
+        return NANSUM(distances_ij / charges_ij)
+    return calculate
 
+
+def energycalculator_ij(distf, efuncs):
+    def calculate(coords):
+        dist_ij = distf(coords)
+        energy = 0
+        for func in efuncs:
+            energy += func(dist_ij)
+        return energy
+    return calculate
+
+
+# feio!!!
 class EnergyCalculator_ij:
     def __init__(self, efunc_terms, distance_calculator):
 

@@ -327,3 +327,26 @@ def test_EnergyCalculator_ij_2():
     energy = clcltr.calculate(coords)
 
     assert energy == 79
+
+
+def test_energy_calculator_ij():
+    """."""
+    def dist_calc(coords):
+        return coords - 1
+
+    def calc_dummy(arg1, arg2=5):
+        def calc(distances):
+            return sum(distances) + arg1 - arg2
+        return calc
+
+    def calc_dummy2(arg3, arg6=5):
+        def calc(distances):
+            return sum(distances + arg3 - arg6)
+        return calc
+
+    d1 = calc_dummy(2, 3)
+    d3 = calc_dummy2(2, arg6=1)
+    calc = libcalc.energycalculator_ij(dist_calc, (d1, d3))
+    coords = np.arange(10)
+    energy = calc(coords)
+    assert energy == 79
