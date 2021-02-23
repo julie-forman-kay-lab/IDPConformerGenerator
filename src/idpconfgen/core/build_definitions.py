@@ -52,7 +52,7 @@ def _read_labels(pdbs):
 atom_labels_pdb = _read_labels(_sidechain_template_files)
 atom_labels_amber = _read_labels(amber_pdbs)
 
-
+_ff14SB_params = None
 def read_ff14SB_params():
     """
     Read Amber protein.ff14SB.xml parameters to a dictionary.
@@ -101,17 +101,23 @@ def read_ff14SB_params():
     -------
     dict
     """
+
+    global _ff14SB_params
+
+    if _ff14SB_params:
+        return _ff14SB_params
+
     with open(_amber14sb, 'r') as fin:
         ff14sb = ET.fromstring(fin.read())
 
-    forcefield_params = defaultdict(dict)
+    _ff14SB_params = defaultdict(dict)
 
     for child in ff14sb:
         if child.tag == 'AtomTypes':
             for atomtype in child:
                 key = atomtype.attrib['name']
-                forcefield_params[key].update(atomtype.attrib)
-                forcefield_params[key].pop('name')
+                _ff14SB_params[key].update(atomtype.attrib)
+                _ff14SB_params[key].pop('name')
 
         elif child.tag == 'Residues':
             for residue in child:
@@ -119,19 +125,19 @@ def read_ff14SB_params():
                     key = residue.attrib['name']
                     atom_name = atom.attrib['name']
 
-                    atom_par = forcefield_params[key].setdefault(atom_name, {})
+                    atom_par = _ff14SB_params[key].setdefault(atom_name, {})
                     atom_par.update(atom.attrib)
-                    forcefield_params[key][atom_name].pop('name')
+                    _ff14SB_params[key][atom_name].pop('name')
 
         elif child.tag == 'NonbondedForce':
-            forcefield_params.update(child.attrib)
+            _ff14SB_params.update(child.attrib)
             for atom in child:
                 if atom.tag == 'Atom':
                     key = atom.attrib['type']
-                    forcefield_params[key].update(atom.attrib)
-                    forcefield_params[key].pop('type')
+                    _ff14SB_params[key].update(atom.attrib)
+                    _ff14SB_params[key].pop('type')
 
-    return forcefield_params
+    return _ff14SB_params
 
 
 def generate_residue_template_topology(
@@ -472,6 +478,44 @@ bonds_le_3_inter = {
 #    'O': CA_O_4_connectivities,
 #    #
 #    }
+
+
+class AmberTopology:
+    _state = None
+
+    def __new__(cls, *args, **kwargs):
+
+        if cls._state:
+            return cls._state
+
+        elif cls._state is None:
+            cls._state = super.__new__(cls)
+            return cls._state
+
+    def __init__(self, *args, **kwargs):
+
+        self.res_topology = generate_residue_template_topology(
+            amber_pdbs,
+            atom_labels_amber,
+            **kwargs)
+
+        self.bonds_eq3_intra = topology_3_bonds_apart(self.res_topology)
+        self.bonds_le2_intra = expand_topology_bonds_apart(self.res_topology, 2)
+
+
+#_amber_res_topology = None
+#def generate_amber_residue_topology(**kwargs):
+#    global _amber_res_topology
+#
+#    if not _amber_res_topology:
+#        _amber_res_topology = generate_residue_template_topology(
+#            amber_pdbs,
+#            atom_labels_amber,
+#            **kwargs)
+#
+#    return _amber_res_topology
+
+
 
 
 inter_residue_connectivities = {

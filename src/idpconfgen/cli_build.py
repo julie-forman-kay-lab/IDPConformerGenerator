@@ -26,6 +26,7 @@ import idpcpp
 #from idpconfgen.cpp.faspr import faspr_sidechains as fsc
 from idpconfgen import log, Path
 from idpconfgen.core.build_definitions import (
+    AmberTopology,
     amber_pdbs,
     atom_labels_amber,
     backbone_atoms,
@@ -568,16 +569,29 @@ def conformer_generator(
     ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
         create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-
     # /
     # assemble energy function
     energy_func_terms = []
     if lj_term:
+
+        ap_acoeff, ap_bcoeff = create_LJ_params(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            )
+
         lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
         energy_func_terms.append(lf_calc)
         print('prepared lj')
 
     if coulomb_term:
+
+        ap_charges_ij = create_Coulomb_params(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            )
+
         coulomb_calc = init_coulomb_calculator(charges_ij)
         energy_func_term.append(coulomb_calc)
         print('prepared c')
@@ -1733,14 +1747,15 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
     # TODO: parametrize this.
     # the user should be able to chose different forcefields
     ff14SB = read_ff14SB_params()
-    res_topology = generate_residue_template_topology(
-        amber_pdbs,
-        atom_labels_amber,
-        add_OXT=True,
-        add_Nterminal_H=True,
-        )
-    bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
-    bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
+    ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
+    #res_topology = generate_residue_template_topology(
+    #    amber_pdbs,
+    #    atom_labels_amber,
+    #    add_OXT=True,
+    #    add_Nterminal_H=True,
+    #    )
+    #bonds_equal_3_intra = topology_3_bonds_apart(res_topology)
+    #bonds_le_2_intra = expand_topology_bonds_apart(res_topology, 2)
 
     # units in:
     # nm, kJ/mol, proton units
@@ -1757,7 +1772,7 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
         atom_labels,
         residue_numbers,
         residue_labels,
-        bonds_le_2_intra,
+        ambertopology.bonds_le_2_intra,
         bonds_le_2_inter,
         base_bool=True,
         )
@@ -1801,7 +1816,7 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
         atom_labels,
         residue_numbers,
         residue_labels,
-        bonds_equal_3_intra,
+        ambertools.bonds_equal_3_intra,
         bonds_equal_3_inter,
         )
 
