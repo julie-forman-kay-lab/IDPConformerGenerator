@@ -489,7 +489,7 @@ class AmberTopology:
             return cls._state
 
         elif cls._state is None:
-            cls._state = super.__new__(cls)
+            cls._state = super().__new__(cls)
             return cls._state
 
     def __init__(self, *args, **kwargs):

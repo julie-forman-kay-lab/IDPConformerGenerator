@@ -566,19 +566,52 @@ def conformer_generator(
 
     num_atoms = len(atom_labels)
 
-    ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
-        create_energy_func_params(atom_labels, residue_numbers, residue_labels)
+    #ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
+    #    create_energy_func_params(atom_labels, residue_numbers, residue_labels)
+
+    # /
+    # Prepare Topology
+
+    ff14SB = read_ff14SB_params()
+    ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
+
+    # this mask will deactivate calculations in covalently bond atoms and
+    # atoms separated 2 bonds apart
+    bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ambertopology.bonds_le2_intra,
+        bonds_le_2_inter,
+        base_bool=False,
+        )
+
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ambertopology.bonds_eq3_intra,
+        bonds_equal_3_inter,
+        )
+    #
+
 
     # /
     # assemble energy function
     energy_func_terms = []
     if lj_term:
 
-        ap_acoeff, ap_bcoeff = create_LJ_params(
+        ap_acoeff, ap_bcoeff = create_LJ_params_raw(
             atom_labels,
             residue_numbers,
             residue_labels,
+            ff14SB,
             )
+
+        ap_acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+        ap_bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
+        ap_acoeff[bonds_le_2_mask] = np.nan
+        ap_bcoeff[bonds_le_2_mask] = np.nan
 
         lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
         energy_func_terms.append(lf_calc)
@@ -586,15 +619,19 @@ def conformer_generator(
 
     if coulomb_term:
 
-        ap_charges_ij = create_Coulomb_params(
+        ap_charges_ij = create_Coulomb_params_raw(
             atom_labels,
             residue_numbers,
             residue_labels,
+            ff14SB,
             )
+
+        ap_charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
+        ap_charges_ij[bonds_le_2_mask] = np.nan
 
         coulomb_calc = init_coulomb_calculator(charges_ij)
         energy_func_term.append(coulomb_calc)
-        print('prepared c')
+        print('prepared Coulomb')
 
     # in case there are iji terms, I need to add here another layer
     calc_energy = energycalculator_ij(calc_all_vs_all_dists, energy_func_terms)
@@ -882,7 +919,6 @@ def conformer_generator(
             # /
             # calc energy
             total_energy = calc_energy(coords)
-            print(total_energy)
             #TODO:
             # * separate create_energy_func_params
             # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
@@ -1012,6 +1048,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
+        print(total_energy)
         yield all_atoms_coords
         conf_n += 1
 
@@ -1740,6 +1777,136 @@ def calc_coulomb(distances_ij, charges_ij, NANSUM=np.nansum):
 calc_coulomb_njit = njit(calc_coulomb)
 
 
+
+def create_LJ_params_raw(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        ):
+    """Create ACOEFF and BCOEFF parameters."""
+    #ff14SB = read_ff14SB_params()
+    #ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
+    sigmas_ii = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'sigma',
+        )
+
+    epsilons_ii = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'epsilon',
+        )
+
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    # sigmas
+    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_sum_upper_diagonal_raw(np.array(sigmas_ii), sigmas_ij_pre)
+    #
+    # epsilons
+    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(
+        np.array(epsilons_ii),
+        epsilons_ij_pre)
+    #
+
+    # mixing rules
+    epsilons_ij = epsilons_ij_pre ** 0.5
+    # mixing + nm to Angstrom converstion
+    # / 2 and * 10
+    sigmas_ij = sigmas_ij_pre * 5
+
+    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
+    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
+
+    return acoeff, bcoeff
+
+
+def create_Coulomb_params_raw(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        ):
+    """."""
+    charges_i = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'charge',
+        )
+
+    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+    charges_ij *= 0.25  # dielectic constant
+
+    return charges_ij
+
+
+
+def extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        param):
+    """."""
+    params_l = []
+    params_append = params_l.append
+
+    zipit = zip(atom_labels, residue_numbers, residue_labels)
+    for atom_name, res_num, res_label in zipit:
+
+        # adds C to the terminal residues
+        if res_num == residue_numbers[-1]:
+            res = 'C' + res_label
+            was_in_C_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        elif res_num == residue_numbers[0]:
+            res = 'N' + res_label
+            was_in_N_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        else:
+            res = res_label
+
+        # TODO:
+        # define protonation state in parameters
+        if res_label.endswith('HIS'):
+            res_label = res_label[:-3] + 'HIP'
+
+        try:
+            # force field atom type
+            atype = force_field[res][atom_name]['type']
+
+        # TODO:
+        # try/catch is here to avoid problems with His...
+        # for this purpose we are only using side-chains
+        except KeyError:
+            raise KeyError(tuple(force_field[res].keys()))
+
+        params_append(float(force_field[atype][param]))
+
+    assert was_in_C_terminal, \
+        'The C terminal residue was never computed. It should have.'
+    assert was_in_N_terminal, \
+        'The N terminal residue was never computed. It should have.'
+
+    assert isinstance(params_l, list)
+    return params_l
+
+
+
+
+
+
 def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
     """Create parameters for energy function."""
     # /
@@ -1772,7 +1939,7 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
         atom_labels,
         residue_numbers,
         residue_labels,
-        ambertopology.bonds_le_2_intra,
+        ambertopology.bonds_le2_intra,
         bonds_le_2_inter,
         base_bool=True,
         )
@@ -1816,7 +1983,7 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
         atom_labels,
         residue_numbers,
         residue_labels,
-        ambertools.bonds_equal_3_intra,
+        ambertopology.bonds_eq3_intra,
         bonds_equal_3_inter,
         )
 
