@@ -569,74 +569,24 @@ def conformer_generator(
     #ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
     #    create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-    # /
-    # Prepare Topology
-
-    ff14SB = read_ff14SB_params()
-    ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
-
-    # this mask will deactivate calculations in covalently bond atoms and
-    # atoms separated 2 bonds apart
-    bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
+    ap_calc_energy = prepare_energy_function(
         atom_labels,
         residue_numbers,
         residue_labels,
-        ambertopology.bonds_le2_intra,
-        bonds_le_2_inter,
-        base_bool=False,
+        lj_term=lj_term,
+        coulomb_term=coulomb_term,
         )
-
-    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        ambertopology.bonds_eq3_intra,
-        bonds_equal_3_inter,
-        )
-    #
-
 
     # /
-    # assemble energy function
-    energy_func_terms = []
-    if lj_term:
+    # Energy function for all atom representation
 
-        ap_acoeff, ap_bcoeff = create_LJ_params_raw(
-            atom_labels,
-            residue_numbers,
-            residue_labels,
-            ff14SB,
-            )
-
-        ap_acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
-        ap_bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
-        ap_acoeff[bonds_le_2_mask] = np.nan
-        ap_bcoeff[bonds_le_2_mask] = np.nan
-
-        lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
-        energy_func_terms.append(lf_calc)
-        print('prepared lj')
-
-    if coulomb_term:
-
-        ap_charges_ij = create_Coulomb_params_raw(
-            atom_labels,
-            residue_numbers,
-            residue_labels,
-            ff14SB,
-            )
-
-        ap_charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
-        ap_charges_ij[bonds_le_2_mask] = np.nan
-
-        coulomb_calc = init_coulomb_calculator(charges_ij)
-        energy_func_term.append(coulomb_calc)
-        print('prepared Coulomb')
-
-    # in case there are iji terms, I need to add here another layer
-    calc_energy = energycalculator_ij(calc_all_vs_all_dists, energy_func_terms)
-    print('done preparing energy func')
-    # ?
+    all_atom_calc_energy = prepare_energy_function(
+        r_atom_labels,
+        r_residue_numbers,
+        r_residue_labels,
+        lj_term=lj_term,
+        coulomb_term=coulomb_term,
+        )
 
     ap_confmasks = init_confmasks(atom_labels)
     # create coordinates and views
@@ -918,7 +868,7 @@ def conformer_generator(
 
             # /
             # calc energy
-            total_energy = calc_energy(coords)
+            total_energy = ap_calc_energy(coords)
             #TODO:
             # * separate create_energy_func_params
             # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
@@ -1034,13 +984,7 @@ def conformer_generator(
                     coords[ap_confmasks.bb4],
                     )
 
-            total_energy = calc_energy(
-                all_atoms_coords,
-                r_acoeff,
-                r_bcoeff,
-                r_charges_ij,
-                r_bonds_ge_3_mask,
-                )
+            total_energy = all_atom_calc_energy(all_atoms_coords)
 
             if total_energy > 0:
                 print('Conformer with WORST energy', total_energy)
@@ -1048,7 +992,6 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
-        print(total_energy)
         yield all_atoms_coords
         conf_n += 1
 
@@ -2004,6 +1947,89 @@ def create_energy_func_params(atom_labels, residue_numbers, residue_labels):
 
     return acoeff, bcoeff, charges_ij, bonds_ge_3_mask
     # ?
+
+
+
+def prepare_energy_function(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        lj_term=True,
+        coulomb_term=False,
+        ):
+    # /
+    # Prepare Topology
+
+    ff14SB = read_ff14SB_params()
+    ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
+
+    # this mask will deactivate calculations in covalently bond atoms and
+    # atoms separated 2 bonds apart
+    bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ambertopology.bonds_le2_intra,
+        bonds_le_2_inter,
+        base_bool=False,
+        )
+
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        ambertopology.bonds_eq3_intra,
+        bonds_equal_3_inter,
+        )
+
+    # /
+    # assemble energy function
+    energy_func_terms = []
+    if lj_term:
+
+        ap_acoeff, ap_bcoeff = create_LJ_params_raw(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            ff14SB,
+            )
+
+        ap_acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+        ap_bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
+        ap_acoeff[bonds_le_2_mask] = np.nan
+        ap_bcoeff[bonds_le_2_mask] = np.nan
+
+        lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
+        energy_func_terms.append(lf_calc)
+        print('prepared lj')
+
+    if coulomb_term:
+
+        ap_charges_ij = create_Coulomb_params_raw(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            ff14SB,
+            )
+
+        ap_charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
+        ap_charges_ij[bonds_le_2_mask] = np.nan
+
+        coulomb_calc = init_coulomb_calculator(charges_ij)
+        energy_func_term.append(coulomb_calc)
+        print('prepared Coulomb')
+
+    # in case there are iji terms, I need to add here another layer
+    calc_energy = energycalculator_ij(
+        calc_all_vs_all_dists,
+        energy_func_terms,
+        )
+    print('done preparing energy func')
+    return calc_energy
+    # ?
+
+
+
 
 
 
