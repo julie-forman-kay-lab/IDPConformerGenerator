@@ -22,7 +22,6 @@ from time import time
 import numpy as np
 from numba import njit
 
-import idpcpp
 #from idpconfgen.cpp.faspr import faspr_sidechains as fsc
 from idpconfgen import log, Path
 from idpconfgen.core.build_definitions import (
@@ -50,7 +49,10 @@ from idpconfgen.core.build_definitions import (
 from idpconfgen.core.definitions import aa1to3  # , vdW_radii_dict
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libbuild import init_confmasks
+from idpconfgen.libs.libbuild import (
+    compute_sidechains,
+    init_confmasks,
+    )
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
     calc_all_vs_all_dists,
@@ -74,24 +76,34 @@ from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libtimer import timeme
 
 
-faspr_sc = idpcpp.faspr_sidechains
 _file = Path(__file__).myparents()
-dun2010bbdep_path = Path(
-    _file,
-    'core',
-    'data',
-    'dun2010bbdep.bin',
-    ).str()
 
+# Global variables needed to build conformers.
+# Why are global variables needed?
+# I use global variables to facilitate distributing conformer creation
+# processes across multiple cores. In this way cores can read global variables
+# fast and with non-significant overhead.
+
+# Bond Geometry library variables
 # these will be populated in main()
 BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
 BGEO_full = {}
 BGEO_trimer = {}
 BGEO_res = {}
 
+# The slice objects from there the builder will feed to extract torsion
+# chunks from ANGLES.
+SLICES = []
+# will be populated in main() with the torsion angles.
+ANGLES = None
+# keeps a record of the conformer numbers written to disk across the different
+# cores
+CONF_NUMBER = Queue()
+
+
+# CLI argument parser parameters
 _name = 'build'
 _help = 'Builds conformers from database.'
-
 
 _prog, _des, _us = libcli.parse_doc_params(__doc__)
 
@@ -140,33 +152,7 @@ ap.add_argument(
     action='store_true',
     )
 
-# TODO: these three parameters must be discontinued
-# libcli.add_argument_vdWb(ap)
-# libcli.add_argument_vdWr(ap)
-# libcli.add_argument_vdWt(ap)
 libcli.add_argument_ncores(ap)
-
-
-SLICES = []
-ANGLES = None
-CONF_NUMBER = Queue()
-
-# Other functions should have the same APIs:
-# parameters = input_seq
-def init_faspr_sidechains(input_seq):
-    """."""
-    dun2010db = dun2010bbdep_path
-    faspr_func = faspr_sc
-    def compute_faspr_sidechains(coords):
-        """Does calculation."""
-        return faspr_func(coords, input_seq, dun2010db)
-
-    return compute_faspr_sidechains
-
-
-compute_sidechains = {
-    'faspr': init_faspr_sidechains,
-    }
 
 
 def get_cycle_distances_backbone():
@@ -1718,7 +1704,6 @@ def calc_coulomb(distances_ij, charges_ij, NANSUM=np.nansum):
     return NANSUM(charges_ij / distances_ij)
 
 calc_coulomb_njit = njit(calc_coulomb)
-
 
 
 def create_LJ_params_raw(

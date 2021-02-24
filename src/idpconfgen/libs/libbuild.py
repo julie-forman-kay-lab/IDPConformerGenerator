@@ -4,6 +4,8 @@ from collections import namedtuple
 
 import numpy as np
 
+import idpcpp
+
 
 ConfMasks = namedtuple(
     'ConfMaks',
@@ -20,6 +22,17 @@ ConfMasks = namedtuple(
         'H1_N_CA_CB',
         ]
     )
+
+
+# Variables related to the sidechain building process.
+# # Variables for the FASPR algorithm.
+faspr_sc = idpcpp.faspr_sidechains
+faspr_dun2010bbdep_path = Path(
+    _file,
+    'core',
+    'data',
+    'dun2010bbdep.bin',
+    ).str()
 
 
 def init_confmasks(atom_labels):
@@ -106,4 +119,45 @@ def init_confmasks(atom_labels):
         )
 
     return conf_mask
+
+
+# Other functions should have the same APIs:
+# parameters = input_seq
+def init_faspr_sidechains(
+        input_seq,
+        faspr_dun2010db_spath=faspr_dun2010db_spath,
+        faspr_func=faspr_sc,
+        ):
+    """
+    Initiates dedicated function environment for FASPR sidehchain calculation.
+
+    Examples
+    --------
+    >>> calc_faspr = init_fastpr_sidechains('MASFRTPKKLCVAGG')
+    >>> # a (N, 3) array with the N,CA,C,O coordinates
+    >>> coords = np.array( ... )
+    >>> calc_faspr(coords)
+
+    Parameters
+    ----------
+    input_seq : str
+        The FASTA sequence of the protein for which this function will
+        be used.
+
+    Returns
+    -------
+    np.ndarray (M, 3)
+        Heavy atom coordinates of the protein sequence.
+    """
+    def compute_faspr_sidechains(coords):
+        """Does calculation."""
+        return faspr_func(coords, input_seq, faspr_dun2010db_spath)
+
+    return compute_faspr_sidechains
+
+
+compute_sidechains = {
+    'faspr': init_faspr_sidechains,
+    }
+
 
