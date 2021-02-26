@@ -250,6 +250,8 @@ def get_torsionsJ(
         decimals=5,
         degrees=False,
         hn_terminal=True,
+        hn_labels=('H', 'H1'),
+        proline_value=np.nan,
         ):
     """
     Calculate HN-CaHA torsion angles from a PDB/mmCIF file path.
@@ -289,11 +291,10 @@ def get_torsionsJ(
     # to adjust data to calc_torsion_angles(), we consider the CD of Prolines
     # later we will DELETE those entries
     protons_and_proline = np.logical_or(
-        np.isin(data[:, col_name], ('H', 'H1')),
+        np.isin(data[:, col_name], ('H', 'H1', 'HN')),
         np.logical_and(data[:, col_resName] == 'PRO', data[:, col_name] == 'CD')
         )
 
-    print(hn_terminal)
     hn_idx = 0 if hn_terminal else 1
 
     # some PDBs may not be sorted, this part sorts atoms properly before
@@ -332,7 +333,7 @@ def get_torsionsJ(
     pro_idx = [m.start() for m in re.finditer('P', fasta)]
 
     # assigns nan to proline positions
-    torsions[pro_idx] = np.nan
+    torsions[pro_idx] = proline_value
 
     if degrees:
         torsions = np.degrees(torsions)
