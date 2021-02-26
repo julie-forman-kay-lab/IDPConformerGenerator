@@ -291,7 +291,7 @@ def get_torsionsJ(
     # to adjust data to calc_torsion_angles(), we consider the CD of Prolines
     # later we will DELETE those entries
     protons_and_proline = np.logical_or(
-        np.isin(data[:, col_name], ('H', 'H1', 'HN')),
+        np.isin(data[:, col_name], hn_labels),
         np.logical_and(data[:, col_resName] == 'PRO', data[:, col_name] == 'CD')
         )
 
@@ -315,7 +315,7 @@ def get_torsionsJ(
 
     n_data = np.hstack([hs, n, ca, ha]).reshape(hs.shape[0] * 4, hs.shape[1])
 
-    coords = (n_data[:, cols_coords].astype(np.float64) * 1000).astype(int)
+    coords = n_data[:, cols_coords].astype(np.float64)
 
     # notice that calc_torsion_angles() is designed to accepted sequential
     # atoms for which torsions can be calculated. In this particular case
