@@ -50,9 +50,8 @@ def _read_labels(pdbs):
 # support figure, for the different histidine protonation states.
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
 atom_labels_pdb = _read_labels(_sidechain_template_files)
-atom_labels_amber = _read_labels(amber_pdbs)
+atom_names_amber = _read_labels(amber_pdbs)
 
-_ff14SB_params = None
 def read_ff14SB_params():
     """
     Read Amber protein.ff14SB.xml parameters to a dictionary.
@@ -102,22 +101,17 @@ def read_ff14SB_params():
     dict
     """
 
-    global _ff14SB_params
-
-    if _ff14SB_params:
-        return _ff14SB_params
-
     with open(_amber14sb, 'r') as fin:
         ff14sb = ET.fromstring(fin.read())
 
-    _ff14SB_params = defaultdict(dict)
+    ff14SB_params = defaultdict(dict)
 
     for child in ff14sb:
         if child.tag == 'AtomTypes':
             for atomtype in child:
                 key = atomtype.attrib['name']
-                _ff14SB_params[key].update(atomtype.attrib)
-                _ff14SB_params[key].pop('name')
+                ff14SB_params[key].update(atomtype.attrib)
+                ff14SB_params[key].pop('name')
 
         elif child.tag == 'Residues':
             for residue in child:
@@ -125,19 +119,19 @@ def read_ff14SB_params():
                     key = residue.attrib['name']
                     atom_name = atom.attrib['name']
 
-                    atom_par = _ff14SB_params[key].setdefault(atom_name, {})
+                    atom_par = ff14SB_params[key].setdefault(atom_name, {})
                     atom_par.update(atom.attrib)
-                    _ff14SB_params[key][atom_name].pop('name')
+                    ff14SB_params[key][atom_name].pop('name')
 
         elif child.tag == 'NonbondedForce':
-            _ff14SB_params.update(child.attrib)
+            ff14SB_params.update(child.attrib)
             for atom in child:
                 if atom.tag == 'Atom':
                     key = atom.attrib['type']
-                    _ff14SB_params[key].update(atom.attrib)
-                    _ff14SB_params[key].pop('type')
+                    ff14SB_params[key].update(atom.attrib)
+                    ff14SB_params[key].pop('type')
 
-    return _ff14SB_params
+    return ff14SB_params
 
 
 def generate_residue_template_topology(
@@ -480,7 +474,16 @@ bonds_le_3_inter = {
 #    }
 
 
-class AmberTopology:
+class Amber14SBTopology:
+
+    __slots__ = [
+        'forcefield',
+        'res_topology',
+        'bonds_eq3_intra',
+        'bonds_le2_intra',
+        'atom_labels',
+        ]
+
     _state = None
 
     def __new__(cls, *args, **kwargs):
@@ -494,9 +497,13 @@ class AmberTopology:
 
     def __init__(self, *args, **kwargs):
 
+        self.atom_names = atom_names_amber
+
+        self.forcefield = read_ff14SB_params()
+
         self.res_topology = generate_residue_template_topology(
             amber_pdbs,
-            atom_labels_amber,
+            atom_names_amber,
             **kwargs)
 
         self.bonds_eq3_intra = topology_3_bonds_apart(self.res_topology)
@@ -510,7 +517,7 @@ class AmberTopology:
 #    if not _amber_res_topology:
 #        _amber_res_topology = generate_residue_template_topology(
 #            amber_pdbs,
-#            atom_labels_amber,
+#            atom_names_amber,
 #            **kwargs)
 #
 #    return _amber_res_topology

@@ -25,11 +25,143 @@ ConfMasks = namedtuple(
         'Hterm',
         'OXT1',
         'OXT2',
+        'cterm',
         'non_Hs',
         'non_Hs_non_OXT',
         'H1_N_CA_CB',
         ]
     )
+
+
+ConfLabels = namedtuple(
+    'ConfLabels',
+    [
+        'atom_labels',
+        'res_nums',
+        'res_labels',
+        ]
+    )
+
+
+def init_conflabels(*args, **kwargs):
+    return ConfLabels(create_conformer_labels(*args, **kwargs))
+
+
+
+# This is a class because the moment of instantiation is thought to be
+# different from the moment on which the attributes are populated
+class ConformerLabels:
+
+    __slots__ = [
+        'atom_labels',
+        'res_nums',
+        'res_labels',
+        'atom_masks',
+        'num_atoms',
+        'energy_func',
+        '_al',
+        ]
+
+    def __init__(self, atom_names):
+
+        self.atom_labels = None
+        self.res_nums = None
+        self.res_labels = None
+        self.atom_masks = None
+        self.num_atoms = None
+        self._al = atom_names
+
+        return
+
+    def define_labels(self, input_seq):
+        self.atom_labels, self.res_nums, self.res_labels = \
+            create_conformer_labels(input_seq, topology.atom_labels)
+
+        self.num_atoms = len(self.atoms_labels)
+        self.atom_masks = init_confmasks(self.atom_labels)
+        del _al
+
+
+
+# TODO: correct for HIS/HIE/HID/HIP
+def translate_seq_to_3l(input_seq):
+    return [
+        'HIP' if _res == 'H' else aa1to3[_res]
+        for _res in input_seq
+        ]
+
+
+def create_conformer_labels(
+        input_seq,
+        atom_labels_definition,
+        transfunc=translate_seq_to_3l):
+    """
+    Create all atom labels model based on an input sequence.
+
+    The use of `input_seq_3_letters` is still experimental. Is likely
+    to be refactored.
+    """
+    input_seq_3_letters = transfunc(input_seq)
+    # /
+    # prepares data based on the input sequence
+    # considers sidechain all-atoms
+    atom_labels = np.array(
+        make_list_atom_labels(
+            input_seq,
+            atom_labels_definition,
+            )
+        )
+    num_atoms = len(atom_labels)
+
+    # /
+    # per atom labels
+    residue_numbers = np.empty(num_atoms, dtype=np.int)
+    residue_labels = np.empty(num_atoms, dtype='<U3')
+
+    # generators
+    _res_nums_gen = gen_residue_number_per_atom(atom_labels, start=1)
+    _res_labels_gen = \
+        gen_3l_residue_labels_per_atom(input_seq_3_letters, atom_labels)
+
+    # fills empty arrays from generators
+    _zipit = zip(range(num_atoms), _res_nums_gen, _res_labels_gen)
+    for _i, _num, _label in _zipit:
+        residue_numbers[_i] = _num
+        residue_labels[_i] = _label
+
+    # maniatic cleaning from pre-function isolation
+    del _res_labels_gen, _res_nums_gen, _zipit
+
+    # ensure
+    assert len(residue_numbers) == num_atoms
+    assert len(residue_labels) == num_atoms, (len(residue_labels), num_atoms)
+    # ?
+    return atom_labels, residue_numbers, residue_labels
+
+
+#def create_conf_labels(input_seq):
+#    """
+#    Populate the global variables for all-atom representation labels.
+#
+#    Parameters
+#    ----------
+#    input_seq : str
+#        The input sequence of the protein to be built.
+#
+#    Returns
+#    -------
+#    None
+#        Global variables as changed in place.
+#    """
+#    input_seq_3l = translate_seq_to_3l(input_seq)
+#    atom_labels, res_nums, res_labels = create_conformer_labels(
+#        input_seq,
+#        input_seq_3l,
+#        )
+#    atom_masks = init_confmasks(atom_labels)
+#
+#    return (atom_labels, res_nums, res_labels, atom_masks)
+
 
 
 # Variables related to the sidechain building process.
@@ -63,6 +195,7 @@ def init_confmasks(atom_labels):
     Hterm : N-terminal protons
     OXT1 : O atom of C-terminal carboxyl group
     OXT2 : OXT atom of the C-terminal carboxyl group
+    cterm : (OXT2, OXT1)
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
     H1_N_CA_CB : these four atoms from the first residue
@@ -83,6 +216,8 @@ def init_confmasks(atom_labels):
     OXT1 = np.where(atom_labels == 'O')[0][-1]
     # the actual OXT atom, this is only one O of the C-term carboxyl pair
     OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
+
+    cterm = [OXT2, OXT1]
 
     rr = re.compile(r'H+')
     hs_match = np.vectorize(lambda x: bool(rr.match(x)))
@@ -115,6 +250,7 @@ def init_confmasks(atom_labels):
         Hterm=Hterm,
         OXT1=OXT1,
         OXT2=OXT2,
+        cterm=cterm,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
         H1_N_CA_CB=H1_N_CA_CB,
@@ -188,6 +324,86 @@ def init_faspr_sidechains(
         return faspr_func(coords, input_seq, faspr_dun2010db_spath)
 
     return compute_faspr_sidechains
+
+
+def prepare_energy_function(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        topology,
+        lj_term=True,
+        coulomb_term=False,
+        **kwnull,
+        ):
+    # /
+    # Prepare Topology
+    #ff14SB = read_ff14SB_params()
+    #ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
+
+    # this mask will deactivate calculations in covalently bond atoms and
+    # atoms separated 2 bonds apart
+    bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        topology.bonds_le2_intra,
+        bonds_le_2_inter,
+        base_bool=False,
+        )
+
+    bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        topology.bonds_eq3_intra,
+        bonds_equal_3_inter,
+        )
+
+    # /
+    # assemble energy function
+    energy_func_terms = []
+    if lj_term:
+
+        ap_acoeff, ap_bcoeff = create_LJ_params_raw(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            topology.forcefield,
+            )
+
+        ap_acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
+        ap_bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
+        ap_acoeff[bonds_le_2_mask] = np.nan
+        ap_bcoeff[bonds_le_2_mask] = np.nan
+
+        lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
+        energy_func_terms.append(lf_calc)
+        print('prepared lj')
+
+    if coulomb_term:
+
+        ap_charges_ij = create_Coulomb_params_raw(
+            atom_labels,
+            residue_numbers,
+            residue_labels,
+            topology.forcefield,
+            )
+
+        ap_charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
+        ap_charges_ij[bonds_le_2_mask] = np.nan
+
+        coulomb_calc = init_coulomb_calculator(charges_ij)
+        energy_func_term.append(coulomb_calc)
+        print('prepared Coulomb')
+
+    # in case there are iji terms, I need to add here another layer
+    calc_energy = energycalculator_ij(
+        calc_all_vs_all_dists,
+        energy_func_terms,
+        )
+    print('done preparing energy func')
+    return calc_energy
+    # ?
 
 
 compute_sidechains = {
