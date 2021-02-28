@@ -12,7 +12,6 @@ import argparse
 import re
 from collections import Counter
 from functools import partial
-from itertools import cycle
 from multiprocessing import Pool, Queue
 # from numbers import Number
 from random import choice as randchoice
@@ -52,6 +51,8 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     compute_sidechains,
     init_confmasks,
+    get_cycle_distances_backbone,
+    get_cycle_bond_type,
     )
 from idpconfgen.libs.libcalc import (
     # calc_all_vs_all_dists_square,
@@ -99,6 +100,27 @@ ANGLES = None
 # keeps a record of the conformer numbers written to disk across the different
 # cores
 CONF_NUMBER = Queue()
+
+# The conformer building process needs data structures for two different
+# identities: the all-atom representation of the input sequence, and the
+# corresponding Ala/Gly/Pro template uppon which the coordinates will be built.
+# These variables are defined at the module level so they serve as global
+# variables to be read by the different process during multiprocessing. Reading
+# from global variables is performant in Python multiprocessing. This is the
+# same strategy as applied for SLICES and ANGLES.
+CONFORMER_ALL_ATOM_ATOM_LABELS = None
+CONFORMER_ALL_ATOM_RES_NUMS = None
+CONFORMER_ALL_ATOM_RES_LABELS = None
+CONFORMER_ALL_ATOM_MASKS = None
+CONFORMER_ALL_ATOM_NUM_ATOMS = None
+CONFORMER_ALL_ATOM_ENERGYFUNC = None
+
+CONFORMER_TEMPLATE_ATOM_LABELS = None
+CONFORMER_TEMPLATE_RES_NUMS = None
+CONFORMER_TEMPLATE_RES_LABELS = None
+CONFORMER_TEMPLATE_MASKS = None
+CONFORMER_TEMPLATE_NUM_ATOMS = None
+CONFORMER_TEMPLATE_ENERGYFUNC = None
 
 
 # CLI argument parser parameters
@@ -155,38 +177,6 @@ ap.add_argument(
 libcli.add_argument_ncores(ap)
 
 
-def get_cycle_distances_backbone():
-    """
-    Return an inifinite iterator of backbone atom distances.
-    """
-    return cycle((
-            distances_N_CA,  # used for OMEGA
-            distances_CA_C,  # used for PHI
-            distances_C_Np1,  # used for PSI
-            ))
-
-
-# deactivated after using bend library BGEO
-#def get_cycle_bend_angles():
-#    """
-#    Return an infinite iterator of the bend angles.
-#    """
-#    return cycle((
-#        build_bend_angles_Cm1_N_CA,  # used for OMEGA
-#        build_bend_angles_N_CA_C,  # used for PHI
-#        build_bend_angles_CA_C_Np1,  # used for PSI
-#        ))
-
-
-def get_cycle_bond_type():
-    """Return an infinite interator of the bond types."""
-    return cycle((
-        'Cm1_N_Ca',
-        'N_Ca_C',
-        'Ca_C_Np1',
-        ))
-
-
 def main(
         input_seq,
         database,
@@ -231,7 +221,14 @@ def main(
     # this asserts only the first layer of keys
     assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
-    # creates a list of reversed numbers to name the conformers
+    # populates the labels
+    populate_global_all_atom_labels(input_seq)
+    populate_global_template_labels(remap_sequence(input_seq))
+    populate_global_energy_function(**kwargs)
+
+
+    # creates a queue of numbers that will serve all subprocesses.
+    # Used to name the output files, conformer_1, conformer_2, ...
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
 
@@ -253,6 +250,99 @@ def main(
         execute(core_chunks * ncores, nconfs=remaining_chunks)
 
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
+
+
+def populate_global_all_atom_labels(input_seq):
+    """
+    Populate the global variables for all-atom representation labels.
+
+    Parameters
+    ----------
+    input_seq : str
+        The input sequence of the protein to be built.
+
+    Returns
+    -------
+    None
+        Global variables as changed in place.
+    """
+    global CONFORMER_ALL_ATOM_ATOM_LABELS
+    global CONFORMER_ALL_ATOM_RES_NUMS
+    global CONFORMER_ALL_ATOM_RES_LABELS
+    global CONFORMER_ALL_ATOM_NUM_ATOMS
+    global CONFORMER_ALL_ATOM_MASKS
+
+    r_input_seq_3_letters = translate_seq_to_3l(input_seq)
+    CONFORMER_ALL_ATOM_ATOM_LABELS, \
+    CONFORMER_ALL_ATOM_RES_NUMS, \
+    CONFORMER_ALL_ATOM_RES_LABELS = create_conformer_labels(
+        input_seq,
+        r_input_seq_3_letters,
+        )
+    CONFORMER_ALL_ATOM_NUM_ATOMS = len(CONFORMER_ALL_ATOM_ATOM_LABELS)
+    CONFORMER_ALL_ATOM_MASKS = init_confmasks(CONFORMER_ALL_ATOM_ATOM_LABELS)
+    return
+
+
+def populate_global_template_labels(template_seq):
+    """
+    Populate the global variables for template representation labels.
+
+    Parameters
+    ----------
+    template_seq : str
+        The input template sequence.
+
+    Returns
+    -------
+    None
+        Global variables as changed in place.
+    """
+    global CONFORMER_TEMPLATE_ATOM_LABELS
+    global CONFORMER_TEMPLATE_RES_NUMS
+    global CONFORMER_TEMPLATE_RES_LABELS
+    global CONFORMER_TEMPLATE_MASKS
+    global CONFORMER_TEMPLATE_NUM_ATOMS
+
+    template_seq_3l = translate_seq_to_3l(template_seq)
+    CONFORMER_TEMPLATE_ATOM_LABELS, \
+    CONFORMER_TEMPLATE_RES_NUMS, \
+    CONFORMER_TEMPLATE_RES_LABELS = create_conformer_labels(
+        template_seq,
+        template_seq_3l,
+        )
+    CONFORMER_TEMPLATE_NUM_ATOMS = len(CONFORMER_TEMPLATE_ATOM_LABELS)
+    CONFORMER_TEMPLATE_MASKS = init_confmasks(CONFORMER_TEMPLATE_ATOM_LABELS)
+    return
+
+
+def populate_global_energy_function(*args, **kwargs):
+    """
+    Populate global variables for energy function.
+
+    For both all-atom representation and template sequence.
+
+    Parameters
+    ----------
+    *args, **kwargs
+        As required by :func:`prepare_energy_function`.
+    """
+    global CONFORMER_ALL_ATOM_ENERGYFUNC
+    global CONFORMER_TEMPLATE_ENERGYFUNC
+
+    CONFORMER_ALL_ATOM_ENERGYFUNC = prepare_energy_function(
+        CONFORMER_ALL_ATOM_ATOM_LABELS,
+        CONFORMER_ALL_ATOM_RES_NUMS,
+        CONFORMER_ALL_ATOM_RES_LABELS,
+        **kwargs)  # should send lj_term, coulomb_term, etc.
+
+    CONFORMER_TEMPLATE_ENERGYFUNC = prepare_energy_function(
+        CONFORMER_TEMPLATE_ATOM_LABELS,
+        CONFORMER_TEMPLATE_RES_NUMS,
+        CONFORMER_TEMPLATE_RES_LABELS,
+        **kwargs)
+
+    return
 
 
 def read_db_to_slices(database, dssp_regexes, ncores=1):
@@ -375,12 +465,9 @@ def conformer_generator(
         generative_function=None,
         disable_sidechains=True,
         sidechain_method='faspr',
+        bgeo_path=None,
         lj_term=True,
         coulomb_term=False,
-        # TODO: these parameters must be discontinued
-        # vdW_bonds_apart=3,
-        # vdW_tolerance=0.4,
-        # vdW_radii='tsai1999',
         ):
     """
     Build conformers.
@@ -471,6 +558,12 @@ def conformer_generator(
         The number of conformers to build.
     """
     assert input_seq, f'`input_seq` must be given! {input_seq}'
+
+    all_atom_input_seq = input_seq
+    template_input_seq = remap_sequence(all_atom_input_seq)
+    template_seq_3l = translate_seq_to_3l(template_input_seq)
+    del input_seq
+
     BUILD_BEND_H_N_C = build_bend_H_N_C
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
@@ -494,15 +587,23 @@ def conformer_generator(
     angles = ANGLES
     slices = SLICES
 
-    r_input_seq = input_seq
-    r_input_seq_3_letters = translate_seq_to_3l(input_seq)
-    del input_seq
+    # these flags exist to populate the global variables in case they were not
+    # populated yet. Global variables are populated through the main() function
+    # if the script runs as CLI. Otherwise, if conformer_generator() is imported
+    # and used directly, the global variables need to be configured here.
+    if not BGEO_full:
+        populate_global_bgeo(bgeo_path or BGEO_PATH)
+
+    if not CONFORMER_ALL_ATOM_NUM_ATOMS:
+        populate_global_all_atom_labels(all_atom_input_seq)
+        populate_global_template_labels(template_seq)
+        populate_global_energy_function(lj_term, coulomb_term)
 
     # semantic exchange for speed al readibility
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        calc_sidechains = compute_sidechains[sidechain_method](r_input_seq)
+        calc_sidechains = compute_sidechains[sidechain_method](all_atom_input_seq)  # noqa: E501
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -516,84 +617,89 @@ def conformer_generator(
                 )
             raise IDPConfGenException(errmsg) from err
 
-    # Start building process
-    # the r_ prefix stands for `real`
-    # `real` is used to differentiate from the ALA/PRO template created later
-    r_atom_labels, r_residue_numbers, r_residue_labels = \
-        create_conformer_labels(r_input_seq, r_input_seq_3_letters)
-
     # yields atom labels
     # all conformers generated will share these labels
-    yield r_atom_labels, r_residue_numbers, r_residue_labels
-
-    r_num_atoms = len(r_atom_labels)
-
-    # these energy function parameters are created for the final func
-    # evaluation before yielding the conformer.
-    r_acoeff, r_bcoeff, \
-    r_charges_ij, r_bonds_ge_3_mask = create_energy_func_params(
-        r_atom_labels,
-        r_residue_numbers,
-        r_residue_labels,
+    yield (
+        CONFORMER_ALL_ATOM_ATOM_LABELS,
+        CONFORMER_ALL_ATOM_RES_NUMS,
+        CONFORMER_ALL_ATOM_RES_LABELS,
         )
 
-    all_atoms_coords = np.full((r_num_atoms, 3), NAN, dtype=np.float64)
-    all_atoms_masks = init_confmasks(r_atom_labels)
-
+    all_atoms_coords = np.full(
+        (CONFORMER_ALL_ATOM_NUM_ATOMS, 3),
+        NAN,
+        dtype=np.float64,
+        )
 
     # /
     # Prepares alanine/proline template backbone
     # Converts sequence to Ala/Pro/Gly
-    ala_pro_seq = remap_sequence(r_input_seq)
+    #ala_pro_seq = remap_sequence(r_input_seq)
 
-    ala_pro_seq_3l = translate_seq_to_3l(ala_pro_seq)
-    atom_labels, residue_numbers, residue_labels = \
-        create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
+    #ala_pro_seq_3l = translate_seq_to_3l(ala_pro_seq)
+    #atom_labels, residue_numbers, residue_labels = \
+    #    create_conformer_labels(ala_pro_seq, ala_pro_seq_3l)
 
-    num_atoms = len(atom_labels)
+    #num_atoms = len(atom_labels)
 
     #ap_acoeff, ap_bcoeff, ap_charges_ij, ap_bonds_ge_3_mask = \
     #    create_energy_func_params(atom_labels, residue_numbers, residue_labels)
 
-    ap_calc_energy = prepare_energy_function(
-        atom_labels,
-        residue_numbers,
-        residue_labels,
-        lj_term=lj_term,
-        coulomb_term=coulomb_term,
-        )
+    #ap_calc_energy = prepare_energy_function(
+    #    atom_labels,
+    #    residue_numbers,
+    #    residue_labels,
+    #    lj_term=lj_term,
+    #    coulomb_term=coulomb_term,
+    #    )
 
     # /
     # Energy function for all atom representation
 
-    all_atom_calc_energy = prepare_energy_function(
-        r_atom_labels,
-        r_residue_numbers,
-        r_residue_labels,
-        lj_term=lj_term,
-        coulomb_term=coulomb_term,
-        )
+    #all_atom_calc_energy = prepare_energy_function(
+    #    r_atom_labels,
+    #    r_residue_numbers,
+    #    r_residue_labels,
+    #    lj_term=lj_term,
+    #    coulomb_term=coulomb_term,
+    #    )
 
-    ap_confmasks = init_confmasks(atom_labels)
+    #ap_confmasks = init_confmasks(atom_labels)
     # create coordinates and views
-    coords = np.full((num_atoms, 3), NAN, dtype=np.float64)
+    coords = np.full(
+        (CONFORMER_TEMPLATE_NUM_ATOMS, 3),
+        NAN,
+        dtype=np.float64,
+        )
 
     # +2 because of the dummy coordinates required to start building.
     # see later adding dummy coordinates to the structure seed
-    bb = np.full((ap_confmasks.bb3.size + 2, 3), NAN, dtype=np.float64)
+    bb = np.full(
+        (CONFORMER_TEMPLATE_MASKS.bb3.size + 2, 3),
+        NAN,
+        dtype=np.float64,
+        )
     bb_real = bb[2:, :]  # backbone coordinates without the dummies
 
     # coordinates for the carbonyl oxigen atoms
-    bb_CO = np.full((ap_confmasks.COs.size, 3), NAN, dtype=np.float64)
+    bb_CO = np.full(
+        (CONFORMER_TEMPLATE_MASKS.COs.size, 3),
+        NAN,
+        dtype=np.float64,
+        )
 
     # notice that NHydrogen_mask does not see Prolines
-    bb_NH = np.full((ap_confmasks.NHs.size, 3), NAN, dtype=np.float64)
+    bb_NH = np.full(
+        (CONFORMER_TEMPLATE_MASKS.NHs.size, 3),
+        NAN,
+        dtype=np.float64,
+        )
     bb_NH_idx = np.arange(len(bb_NH))
     # creates masks and indexes for the `for` loop used to place NHs
     # the first residue has no NH, prolines have no NH
-    non_pro = np.array(list(ala_pro_seq)[1:]) != 'P'
+    non_pro = np.array(list(template_input_seq)[1:]) != 'P'
     # NHs index numbers in bb_real
-    bb_NH_nums = np.arange(3, (len(ala_pro_seq) - 1) * 3 + 1, 3)[non_pro]
+    bb_NH_nums = np.arange(3, (len(template_input_seq) - 1) * 3 + 1, 3)[non_pro]
     # CAs index numbers in bb_real
     bb_NH_nums_p1 = bb_NH_nums + 1
     assert bb_NH.shape[0] == bb_NH_nums.size == bb_NH_idx.size
@@ -602,8 +708,8 @@ def conformer_generator(
     # this is sidechain agnostic, works for every sidechain, yet here we
     # use only ALA, PRO, GLY - Mon Feb 15 17:29:20 2021
     ss_masks = create_sidechains_masks_per_residue(
-        residue_numbers,
-        atom_labels,
+        CONFORMER_TEMPLATE_RES_NUMS,
+        CONFORMER_TEMPLATE_ATOM_LABELS,
         backbone_atoms,
         )
     # ?
@@ -721,7 +827,7 @@ def conformer_generator(
 
                     current_res_number = calc_residue_num_from_index(bbi - 1)
                     curr_res, tpair = GET_TRIMER_SEQ(
-                        r_input_seq,
+                        all_atom_input_seq,
                         current_res_number,
                         )
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
@@ -777,7 +883,7 @@ def conformer_generator(
                 backbone_done = True
 
                 # add the carboxyls
-                coords[[ap_confmasks.OXT2, ap_confmasks.OXT1]] = \
+                coords[[CONFORMER_TEMPLATE_MASKS.OXT2, CONFORMER_TEMPLATE_MASKS.OXT1]] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
 
             # Adds N-H Hydrogens
@@ -799,7 +905,7 @@ def conformer_generator(
             for res_i in range(res_R[-1], current_res_number + 1):  # noqa: E501
 
                 _sstemplate, _sidechain_idxs = \
-                    SIDECHAIN_TEMPLATES[ala_pro_seq_3l[res_i]]
+                    SIDECHAIN_TEMPLATES[template_seq_3l[res_i]]
 
                 sscoords = PLACE_SIDECHAIN_TEMPLATE(
                     bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
@@ -815,9 +921,9 @@ def conformer_generator(
             # / Place coordinates for energy calculation
             #
             # use `bb_real` to do not consider the initial dummy atom
-            coords[ap_confmasks.bb3] = bb_real
-            coords[ap_confmasks.COs] = bb_CO
-            coords[ap_confmasks.NHs] = bb_NH
+            coords[CONFORMER_TEMPLATE_MASKS.bb3] = bb_real
+            coords[CONFORMER_TEMPLATE_MASKS.COs] = bb_CO
+            coords[CONFORMER_TEMPLATE_MASKS.NHs] = bb_NH
 
             if len(bbi0_register) == 1:
                 # places the N-terminal Hs only if it is the first
@@ -827,16 +933,16 @@ def conformer_generator(
                         N_TERMINAL_H,
                         )
 
-                coords[ap_confmasks.Hterm, :] = _[3:, :]
+                coords[CONFORMER_TEMPLATE_MASKS.Hterm, :] = _[3:, :]
                 current_Hterm_coords = _[3:, :]
 
-                if ala_pro_seq[0] != 'G':
+                if template_input_seq[0] != 'G':
                     # rotates only if the first residue is not an
                     # alanie
 
                     # measure torsion angle reference H1 - HA
                     _h1_ha_angle = \
-                        CALC_TORSION_ANGLES(coords[ap_confmasks.H1_N_CA_CB, :])[0]  # noqa: E501
+                        CALC_TORSION_ANGLES(coords[CONFORMER_TEMPLATE_MASKS.H1_N_CA_CB, :])[0]  # noqa: E501
 
                     ## given any angle calculated along an axis, calculate how
                     ## much to rotate along that axis to place the
@@ -844,17 +950,17 @@ def conformer_generator(
                     _rot_angle = _h1_ha_angle % PI2 - RAD_60
 
                     current_Hterm_coords = ROT_COORDINATES(
-                        coords[ap_confmasks.Hterm, :],
+                        coords[CONFORMER_TEMPLATE_MASKS.Hterm, :],
                         coords[1] / NORM(coords[1]),
                         _rot_angle,
                         )
 
-                    coords[ap_confmasks.Hterm, :] = current_Hterm_coords
+                    coords[CONFORMER_TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
             # ?
 
             # /
             # calc energy
-            total_energy = ap_calc_energy(coords)
+            total_energy = CONFORMER_TEMPLATE_ENERGYFUNC(coords)
             #TODO:
             # * separate create_energy_func_params
             # * cambiar la mask de connections a calcular para 0 en las que hay que evitar calcular
@@ -918,7 +1024,7 @@ def conformer_generator(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 coords[:, :] = NAN
-                coords[ap_confmasks.Hterm, :] = current_Hterm_coords
+                coords[CONFORMER_TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -957,20 +1063,20 @@ def conformer_generator(
             continue  # send back to the CHUNK while loop
 
         # we do not want sidechains at this point
-        all_atoms_coords[all_atoms_masks.bb4] = coords[ap_confmasks.bb4]
-        all_atoms_coords[all_atoms_masks.NHs] = coords[ap_confmasks.NHs]
-        all_atoms_coords[all_atoms_masks.Hterm] = coords[ap_confmasks.Hterm]
-        all_atoms_coords[[all_atoms_masks.OXT2, all_atoms_masks.OXT1], :] = \
-            coords[[ap_confmasks.OXT2, ap_confmasks.OXT1], :]
+        all_atoms_coords[CONFORMER_ALL_ATOM_MASKS.bb4] = coords[CONFORMER_TEMPLATE_MASKS.bb4]
+        all_atoms_coords[CONFORMER_ALL_ATOM_MASKS.NHs] = coords[CONFORMER_TEMPLATE_MASKS.NHs]
+        all_atoms_coords[CONFORMER_ALL_ATOM_MASKS.Hterm] = coords[CONFORMER_TEMPLATE_MASKS.Hterm]
+        all_atoms_coords[[CONFORMER_ALL_ATOM_MASKS.OXT2, CONFORMER_ALL_ATOM_MASKS.OXT1], :] = \
+            coords[[CONFORMER_TEMPLATE_MASKS.OXT2, CONFORMER_TEMPLATE_MASKS.OXT1], :]
 
         if with_sidechains:
 
-            all_atoms_coords[all_atoms_masks.non_Hs_non_OXT] = \
+            all_atoms_coords[CONFORMER_ALL_ATOM_MASKS.non_Hs_non_OXT] = \
                 calc_sidechains(
-                    coords[ap_confmasks.bb4],
+                    coords[CONFORMER_TEMPLATE_MASKS.bb4],
                     )
 
-            total_energy = all_atom_calc_energy(all_atoms_coords)
+            total_energy = CONFORMER_ALL_ATOM_ENERGYFUNC(all_atoms_coords)
 
             if total_energy > 0:
                 print('Conformer with WORST energy', total_energy)
@@ -1941,6 +2047,7 @@ def prepare_energy_function(
         residue_labels,
         lj_term=True,
         coulomb_term=False,
+        **kwnull,
         ):
     # /
     # Prepare Topology

@@ -291,7 +291,7 @@ def get_torsionsJ(
     # to adjust data to calc_torsion_angles(), we consider the CD of Prolines
     # later we will DELETE those entries
     protons_and_proline = np.logical_or(
-        np.isin(data[:, col_name], ('H', 'H1')),
+        np.isin(data[:, col_name], ('H', 'H1', 'HN')),
         np.logical_and(data[:, col_resName] == 'PRO', data[:, col_name] == 'CD')
         )
 

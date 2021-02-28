@@ -1,10 +1,18 @@
 """Tools for conformer building operations."""
 import re
 from collections import namedtuple
+from itertools import cycle
 
 import numpy as np
 
 import idpcpp
+
+from idpconfgen.core.definitions import faspr_dun2010bbdep_path
+from idpconfgen.core.build_definitions import (
+    distances_CA_C,
+    distances_C_Np1,
+    distances_N_CA,
+    )
 
 
 ConfMasks = namedtuple(
@@ -27,12 +35,6 @@ ConfMasks = namedtuple(
 # Variables related to the sidechain building process.
 # # Variables for the FASPR algorithm.
 faspr_sc = idpcpp.faspr_sidechains
-faspr_dun2010bbdep_path = Path(
-    _file,
-    'core',
-    'data',
-    'dun2010bbdep.bin',
-    ).str()
 
 
 def init_confmasks(atom_labels):
@@ -121,11 +123,43 @@ def init_confmasks(atom_labels):
     return conf_mask
 
 
+def get_cycle_distances_backbone():
+    """
+    Return an inifinite iterator of backbone atom distances.
+    """
+    return cycle((
+            distances_N_CA,  # used for OMEGA
+            distances_CA_C,  # used for PHI
+            distances_C_Np1,  # used for PSI
+            ))
+
+
+# deactivated after using bend library BGEO
+#def get_cycle_bend_angles():
+#    """
+#    Return an infinite iterator of the bend angles.
+#    """
+#    return cycle((
+#        build_bend_angles_Cm1_N_CA,  # used for OMEGA
+#        build_bend_angles_N_CA_C,  # used for PHI
+#        build_bend_angles_CA_C_Np1,  # used for PSI
+#        ))
+
+
+def get_cycle_bond_type():
+    """Return an infinite interator of the bond types."""
+    return cycle((
+        'Cm1_N_Ca',
+        'N_Ca_C',
+        'Ca_C_Np1',
+        ))
+
+
 # Other functions should have the same APIs:
 # parameters = input_seq
 def init_faspr_sidechains(
         input_seq,
-        faspr_dun2010db_spath=faspr_dun2010db_spath,
+        faspr_dun2010db_spath=str(faspr_dun2010bbdep_path),
         faspr_func=faspr_sc,
         ):
     """
