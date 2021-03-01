@@ -297,7 +297,7 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
     return ''.join(target if res not in group else res for res in seq)
 
 
-# njit
+# njit available
 def get_trimer_seq(seq, idx):
     pre = seq[idx - 1] if idx > 0 else 'G'
     curr_res = seq[idx]
@@ -307,6 +307,19 @@ def get_trimer_seq(seq, idx):
         pos = 'G'
 
     return curr_res, pre + pos
+
+
+# TODO: correct for HIS/HIE/HID/HIP
+def translate_seq_to_3l(input_seq):
+    """
+    Translate 1-letter sequence to 3-letter sequence.
+
+    Currently translates 'H' to 'HIP', to accommodate double protonation.
+    """
+    return [
+        'HIP' if _res == 'H' else aa1to3[_res]
+        for _res in input_seq
+        ]
 
 
 get_trimer_seq_njit = njit(get_trimer_seq)

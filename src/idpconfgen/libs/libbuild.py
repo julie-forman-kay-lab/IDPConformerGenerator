@@ -1,18 +1,42 @@
 """Tools for conformer building operations."""
 import re
-from collections import namedtuple
+from collections import Counter, namedtuple
+from functools import partial
 from itertools import cycle
 
 import numpy as np
 
 import idpcpp
-
-from idpconfgen.core.definitions import faspr_dun2010bbdep_path
+from idpconfgen import log
 from idpconfgen.core.build_definitions import (
-    distances_CA_C,
+    bgeo_CaCNp1,
+    bgeo_Cm1NCa,
+    bgeo_NCaC,
+    bonds_equal_3_inter,
+    bonds_le_2_inter,
     distances_C_Np1,
+    distances_CA_C,
     distances_N_CA,
+    faspr_dun2010bbdep_path,
     )
+from idpconfgen.libs.libcalc import (
+    calc_all_vs_all_dists_njit,
+    energycalculator_ij,
+    init_coulomb_calculator,
+    init_lennard_jones_calculator,
+    multiply_upper_diagional_raw_njit,
+    sum_upper_diagonal_raw_njit,
+    )
+from idpconfgen.libs.libfilter import aligndb, regex_search
+from idpconfgen.libs.libio import read_dictionary_from_disk
+from idpconfgen.libs.libparse import translate_seq_to_3l
+from idpconfgen.libs.libtimer import timeme
+
+
+# Variables related to the sidechain building process.
+# # Variables for the FASPR algorithm.
+faspr_sc = idpcpp.faspr_sidechains
+faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
 
 
 ConfMasks = namedtuple(
@@ -41,86 +65,162 @@ ConfLabels = namedtuple(
         'res_labels',
         ]
     )
+"""
+Contain label information for a protein/conformer.
+
+Named indexes
+-------------
+atom_labels
+res_nums
+res_labels
+"""
+
+
+def init_confmasks(atom_labels):
+    """
+    Create a ConfMask object (namedtuple).
+
+    ConfMask is a named tuple which attributes are integer masks for the
+    respective groups.
+
+    Parameters
+    ----------
+    atom_labels : array-like
+        The atom names of the protein.
+
+    Returns
+    -------
+    namedtuple
+        ConfMasks object.
+
+    Notes
+    -----
+    ConfMask attributes map to the following atom groups:
+
+    bb3 : N, CA, C
+    bb4 : N, CA, C, O
+    NHs : amide protons
+    Hterm : N-terminal protons
+    OXT1 : O atom of C-terminal carboxyl group
+    OXT2 : OXT atom of the C-terminal carboxyl group
+    cterm : (OXT2, OXT1)
+    non_Hs : all but hydrogens
+    non_Hs_non_OXT : all but hydrogens and the only OXT atom
+    H1_N_CA_CB : these four atoms from the first residue
+                 if Gly, uses HA3.
+    """
+    bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
+    assert len(bb3) % 3 == 0
+
+    bb4 = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
+    assert len(bb4) % 4 == 0
+
+    NHs = np.where(atom_labels == 'H')[0]
+
+    # last O belongs to the C-term carboxyl, we don't want it in the carbonyl
+    # mask
+    COs = np.where(atom_labels == 'O')[0][:-1]
+
+    OXT1 = np.where(atom_labels == 'O')[0][-1]
+    # the actual OXT atom, this is only one O of the C-term carboxyl pair
+    OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
+
+    cterm = [OXT2, OXT1]
+
+    rr = re.compile(r'H+')
+    hs_match = np.vectorize(lambda x: bool(rr.match(x)))
+    non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
+    non_Hs_non_OXT = non_Hs[:-1]
+
+    # used to rotate the N-terminal Hs to -60 degrees to  HA during
+    # the building process
+    _H1_idx = np.where(atom_labels == 'H1')[0]
+    assert len(_H1_idx) == 1
+
+    # of the first residue
+    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
+    assert len(_N_CA_idx) == 2, _N_CA_idx
+
+    _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
+    assert len(_final_idx) == 1
+
+    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
+    assert len(H1_N_CA_CB) == 4
+
+    Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
+    assert len(Hterm) == 3
+
+    conf_mask = ConfMasks(
+        bb3=bb3,
+        bb4=bb4,
+        NHs=NHs,
+        COs=COs,
+        Hterm=Hterm,
+        OXT1=OXT1,
+        OXT2=OXT2,
+        cterm=cterm,
+        non_Hs=non_Hs,
+        non_Hs_non_OXT=non_Hs_non_OXT,
+        H1_N_CA_CB=H1_N_CA_CB,
+        )
+
+    return conf_mask
 
 
 def init_conflabels(*args, **kwargs):
+    """
+    Create atom and residue labels from sequence.
+
+    Parameters
+    ----------
+    *args, **kwargs
+        Whichever `:func:create_conformer_labels` accepts.
+
+    Returns
+    -------
+    namedtuple
+        ConfLabels named tuple populated according to input sequence.
+
+    See Also
+    --------
+    create_conformer_labels()
+    ConfLabels
+    """
     return ConfLabels(create_conformer_labels(*args, **kwargs))
-
-
-
-# This is a class because the moment of instantiation is thought to be
-# different from the moment on which the attributes are populated
-#class ConformerLabels:
-#
-#    __slots__ = [
-#        'atom_labels',
-#        'res_nums',
-#        'res_labels',
-#        'atom_masks',
-#        'num_atoms',
-#        'energy_func',
-#        '_al',
-#        ]
-#
-#    def __init__(self, atom_names):
-#
-#        self.atom_labels = None
-#        self.res_nums = None
-#        self.res_labels = None
-#        self.atom_masks = None
-#        self.num_atoms = None
-#        self._al = atom_names
-#
-#        return
-#
-#    def define_labels(self, input_seq):
-#        self.atom_labels, self.res_nums, self.res_labels = \
-#            create_conformer_labels(input_seq, topology.atom_labels)
-#
-#        self.num_atoms = len(self.atoms_labels)
-#        self.atom_masks = init_confmasks(self.atom_labels)
-#        del _al
-#
-
-def read_db_to_slices(database, dssp_regexes, ncores=1):
-    """Create database base of slice and angles."""
-    # reads db dictionary from disk
-    db = read_dictionary_from_disk(database)
-    log.info(f'Read DB with {len(db)} entries')
-
-    # reads and prepares IDPConfGen data base
-    timed = partial(timeme, aligndb)
-    pdbs, angles, dssp, resseq = timed(db)
-
-    # searchs for slices in secondary structure, according to user requests
-    timed = partial(timeme, regex_search, ncores=ncores)
-    dssp_regexes = \
-        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
-    slices = []
-    for dssp_regex_string in dssp_regexes:
-        slices.extend(timed(dssp, dssp_regex_string))
-    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
-
-    return slices, angles
-
-
-# TODO: correct for HIS/HIE/HID/HIP
-def translate_seq_to_3l(input_seq):
-    return [
-        'HIP' if _res == 'H' else aa1to3[_res]
-        for _res in input_seq
-        ]
 
 
 def create_conformer_labels(
         input_seq,
         atom_names_definition,
-        transfunc=translate_seq_to_3l):
+        transfunc=translate_seq_to_3l
+        ):
     """
-    Create all atom labels model based on an input sequence.
+    Create all atom/residue labels model based on an input sequence.
 
-    The use of `input_seq_3_letters` is still experimental. Is likely
-    to be refactored.
+    The labels are those expected for a all atom model PDB file. Hence,
+    residue labels are repeated as needed in order to exist one residue
+    label/number per atom.
+
+    Parameters
+    ----------
+    input_seq : str
+        The protein input sequence in 1-letter code format.
+
+    atom_names_definition : dict
+        Keys are residue identity and values are list/tuple of strings
+        identifying atoms. Atom names should be sorted by the desired
+        order.
+
+    transfunc : func
+        Function used to translate 1-letter input sequence to 3-letter
+        sequence code.
+
+    Returns
+    -------
+    tuple (atom labels, residue numbers, residue labels)
+        Each is a np.ndarray of types: '<U4', np.int, and '<U3' and
+        shape (N,) where N is the number of atoms.
+        The three arrays have the same length.
     """
     input_seq_3_letters = transfunc(input_seq)
     # /
@@ -165,6 +265,7 @@ def make_list_atom_labels(input_seq, atom_labels_dictionary):
     Make a list of the atom labels for an `input_seq`.
 
     Considers the N-terminal to be protonated H1 to H3.
+    Adds also 'OXT' terminal label.
 
     Parameters
     ----------
@@ -259,143 +360,79 @@ def gen_3l_residue_labels_per_atom(
         yield input_seq_3letter[counter]
 
 
-
-# Variables related to the sidechain building process.
-# # Variables for the FASPR algorithm.
-faspr_sc = idpcpp.faspr_sidechains
-
-
-def init_confmasks(atom_labels):
-    """
-    Create a ConfMask object (namedtuple).
-
-    ConfMask is a named tuple which attributes are integer masks for the
-    respective groups.
-
-    Parameters
-    ----------
-    atom_labels : array-like
-        The atom names of the protein.
-
-    Returns
-    -------
-    namedtuple
-
-    Notes
-    -----
-    ConfMask attributes map to the following atom groups:
-
-    bb3 : N, CA, C
-    bb4 : N, CA, C, O
-    NHs : amide protons
-    Hterm : N-terminal protons
-    OXT1 : O atom of C-terminal carboxyl group
-    OXT2 : OXT atom of the C-terminal carboxyl group
-    cterm : (OXT2, OXT1)
-    non_Hs : all but hydrogens
-    non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    H1_N_CA_CB : these four atoms from the first residue
-                 if Gly, uses HA3.
-    """
-    bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
-    assert len(bb3) % 3 == 0
-
-    bb4 = np.where(np.isin(atom_labels, ('N', 'CA', 'C', 'O')))[0]
-    assert len(bb4) % 4 == 0
-
-    NHs = np.where(atom_labels == 'H')[0]
-
-    # last O belongs to the C-term carboxyl, we don't want it in the carbonyl
-    # mask
-    COs = np.where(atom_labels == 'O')[0][:-1]
-
-    OXT1 = np.where(atom_labels == 'O')[0][-1]
-    # the actual OXT atom, this is only one O of the C-term carboxyl pair
-    OXT2 = np.where(atom_labels == 'OXT')[0][0]  # int instead of list
-
-    cterm = [OXT2, OXT1]
-
-    rr = re.compile(r'H+')
-    hs_match = np.vectorize(lambda x: bool(rr.match(x)))
-    non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
-    non_Hs_non_OXT = non_Hs[:-1]
-
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
-    assert len(_H1_idx) == 1
-
-    # of the first residue
-    _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
-    assert len(_N_CA_idx) == 2, _N_CA_idx
-
-    _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
-    assert len(_final_idx) == 1
-
-    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
-    assert len(H1_N_CA_CB) == 4
-
-    Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
-    assert len(Hterm) == 3
-
-    conf_mask = ConfMasks(
-        bb3=bb3,
-        bb4=bb4,
-        NHs=NHs,
-        COs=COs,
-        Hterm=Hterm,
-        OXT1=OXT1,
-        OXT2=OXT2,
-        cterm=cterm,
-        non_Hs=non_Hs,
-        non_Hs_non_OXT=non_Hs_non_OXT,
-        H1_N_CA_CB=H1_N_CA_CB,
-        )
-
-    return conf_mask
-
-
 def get_cycle_distances_backbone():
     """
     Return an inifinite iterator of backbone atom distances.
+
+    Sampling, in order, distances between atom pairs:
+        - N - Ca, used for OMEGA
+        - Ca - C, used for PHI
+        - C - N(+1), used for PSI
     """
     return cycle((
-            distances_N_CA,  # used for OMEGA
-            distances_CA_C,  # used for PHI
-            distances_C_Np1,  # used for PSI
-            ))
-
-
-# deactivated after using bend library BGEO
-#def get_cycle_bend_angles():
-#    """
-#    Return an infinite iterator of the bend angles.
-#    """
-#    return cycle((
-#        build_bend_angles_Cm1_N_CA,  # used for OMEGA
-#        build_bend_angles_N_CA_C,  # used for PHI
-#        build_bend_angles_CA_C_Np1,  # used for PSI
-#        ))
-
-
-def get_cycle_bond_type():
-    """Return an infinite interator of the bond types."""
-    return cycle((
-        'Cm1_N_Ca',  # used for OMEGA
-        'N_Ca_C',  # used for PHI
-        'Ca_C_Np1',  # used for PSI
+        distances_N_CA,  # used for OMEGA
+        distances_CA_C,  # used for PHI
+        distances_C_Np1,  # used for PSI
         ))
 
 
-# Other functions should have the same APIs:
+# deactivated after using bend library BGEO
+# def get_cycle_bend_angles():
+#     """
+#     Return an infinite iterator of the bend angles.
+#     """
+#     return cycle((
+#         build_bend_angles_Cm1_N_CA,  # used for OMEGA
+#         build_bend_angles_N_CA_C,  # used for PHI
+#         build_bend_angles_CA_C_Np1,  # used for PSI
+#         ))
+
+
+def get_cycle_bond_type():
+    """
+    Return an infinite interator of the bond types.
+
+    Labels returns are synced with bgeo library.
+    See `core.definitions.bgeo_*`.
+    """
+    return cycle((
+        bgeo_Cm1NCa,  # used for OMEGA
+        bgeo_NCaC,  # used for PHI
+        bgeo_CaCNp1,  # used for PSI
+        ))
+
+
+def read_db_to_slices(database, dssp_regexes, ncores=1):
+    """Create database base of slice and angles."""
+    # reads db dictionary from disk
+    db = read_dictionary_from_disk(database)
+    log.info(f'Read DB with {len(db)} entries')
+
+    # reads and prepares IDPConfGen data base
+    timed = partial(timeme, aligndb)
+    pdbs, angles, dssp, resseq = timed(db)
+
+    # searchs for slices in secondary structure, according to user requests
+    timed = partial(timeme, regex_search, ncores=ncores)
+    dssp_regexes = \
+        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
+    slices = []
+    for dssp_regex_string in dssp_regexes:
+        slices.extend(timed(dssp, dssp_regex_string))
+    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
+
+    return slices, angles
+
+
+# Other functions should have the same API:
 # parameters = input_seq
 def init_faspr_sidechains(
         input_seq,
-        faspr_dun2010db_spath=str(faspr_dun2010bbdep_path),
+        faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
         faspr_func=faspr_sc,
         ):
     """
-    Initiates dedicated function environment for FASPR sidehchain calculation.
+    Instantiate dedicated function environment for FASPR sidehchain calculation.
 
     Examples
     --------
@@ -416,7 +453,7 @@ def init_faspr_sidechains(
         Heavy atom coordinates of the protein sequence.
     """
     def compute_faspr_sidechains(coords):
-        """Does calculation."""
+        """Do calculation."""
         return faspr_func(coords, input_seq, faspr_dun2010db_spath)
 
     return compute_faspr_sidechains
@@ -426,80 +463,78 @@ def prepare_energy_function(
         atom_labels,
         residue_numbers,
         residue_labels,
-        topology,
+        forcefield,
         lj_term=True,
         coulomb_term=False,
         **kwnull,
         ):
-    # /
-    # Prepare Topology
-    #ff14SB = read_ff14SB_params()
-    #ambertopology = AmberTopology(add_OXT=True, add_Nterminal_H=True)
-
-    # this mask will deactivate calculations in covalently bond atoms and
-    # atoms separated 2 bonds apart
+    """."""
+    # this mask identifies covalently bonded pairs and pairs two bonds apart
     bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
         atom_labels,
         residue_numbers,
         residue_labels,
-        topology.bonds_le2_intra,
+        forcefield.bonds_le2_intra,
         bonds_le_2_inter,
         base_bool=False,
         )
 
+    # this mask identifies pairs exactly 3 bonds apart
     bonds_exact_3_mask = create_bonds_apart_mask_for_ij_pairs(
         atom_labels,
         residue_numbers,
         residue_labels,
-        topology.bonds_eq3_intra,
+        forcefield.bonds_eq3_intra,
         bonds_equal_3_inter,
         )
 
     # /
     # assemble energy function
     energy_func_terms = []
+
     if lj_term:
 
-        ap_acoeff, ap_bcoeff = create_LJ_params_raw(
+        acoeff, bcoeff = create_LJ_params_raw(
             atom_labels,
             residue_numbers,
             residue_labels,
-            topology.forcefield,
+            forcefield.forcefield,
             )
 
-        ap_acoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2  # was 0.4
-        ap_bcoeff[bonds_exact_3_mask] *= float(ff14SB['lj14scale']) * 0.2
-        ap_acoeff[bonds_le_2_mask] = np.nan
-        ap_bcoeff[bonds_le_2_mask] = np.nan
+        # 0.2 as 0.4
+        _lj14scale = float(forcefield.forcefield['lj14scale'])
+        acoeff[bonds_exact_3_mask] *= _lj14scale * 0.2
+        bcoeff[bonds_exact_3_mask] *= _lj14scale * 0.2
+        acoeff[bonds_le_2_mask] = np.nan
+        bcoeff[bonds_le_2_mask] = np.nan
 
-        lf_calc = init_lennard_jones_calculator(ap_acoeff, ap_bcoeff)
+        lf_calc = init_lennard_jones_calculator(acoeff, bcoeff)
         energy_func_terms.append(lf_calc)
         print('prepared lj')
 
     if coulomb_term:
 
-        ap_charges_ij = create_Coulomb_params_raw(
+        charges_ij = create_Coulomb_params_raw(
             atom_labels,
             residue_numbers,
             residue_labels,
-            topology.forcefield,
+            forcefield.forcefield,
             )
 
-        ap_charges_ij[bonds_exact_3_mask] *= float(ff14SB['coulomb14scale'])
-        ap_charges_ij[bonds_le_2_mask] = np.nan
+        charges_ij[bonds_exact_3_mask] *= float(forcefield.forcefield['coulomb14scale'])  # noqa: E501
+        charges_ij[bonds_le_2_mask] = np.nan
 
         coulomb_calc = init_coulomb_calculator(charges_ij)
-        energy_func_term.append(coulomb_calc)
+        energy_func_terms.append(coulomb_calc)
         print('prepared Coulomb')
 
     # in case there are iji terms, I need to add here another layer
     calc_energy = energycalculator_ij(
-        calc_all_vs_all_dists,
+        calc_all_vs_all_dists_njit,
         energy_func_terms,
         )
     print('done preparing energy func')
     return calc_energy
-    # ?
 
 
 def create_bonds_apart_mask_for_ij_pairs(
@@ -574,6 +609,7 @@ def gen_ij_pairs_upper_diagonal(data):
         for j in range(i + 1, len(data)):
             yield (data[i], data[j])
 
+
 def gen_atom_pair_connectivity_masks(
         res_names_ij,
         res_num_ij,
@@ -623,6 +659,7 @@ def gen_atom_pair_connectivity_masks(
 
         counter += 1
 
+
 def create_LJ_params_raw(
         atom_labels,
         residue_numbers,
@@ -649,13 +686,14 @@ def create_LJ_params_raw(
     num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
     # sigmas
     sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_sum_upper_diagonal_raw(np.array(sigmas_ii), sigmas_ij_pre)
+    sum_upper_diagonal_raw_njit(np.array(sigmas_ii), sigmas_ij_pre)
     #
     # epsilons
     epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(
+    multiply_upper_diagional_raw_njit(
         np.array(epsilons_ii),
-        epsilons_ij_pre)
+        epsilons_ij_pre,
+        )
     #
 
     # mixing rules
@@ -685,8 +723,9 @@ def create_Coulomb_params_raw(
         'charge',
         )
 
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
     charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
-    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+    multiply_upper_diagional_raw_njit(charges_i, charges_ij)
     charges_ij *= 0.25  # dielectic constant
 
     return charges_ij
@@ -697,8 +736,25 @@ def extract_ff_params_for_seq(
         residue_numbers,
         residue_labels,
         force_field,
-        param):
-    """."""
+        param,
+        ):
+    """
+    Extract a parameter from forcefield dictionary for a given sequence.
+
+    See Also
+    --------
+    create_conformer_labels
+
+    Parameters
+    ----------
+    atom_labels, residue_numbers, residue_labels
+        As returned by `:func:create_conformer_labels`.
+
+    forcefield : dict
+
+    param : str
+        The param to extract from forcefield dictionary.
+    """
     params_l = []
     params_append = params_l.append
 
@@ -745,41 +801,6 @@ def extract_ff_params_for_seq(
     return params_l
 
 
-def calc_sum_upper_diagonal_raw(data, result):
-    """
-    Calculate outer sum for upper diagonal with for loops.
-
-    The use of for-loop based calculation avoids the creation of very
-    large arrays using numpy outer derivates. This function is thought
-    to be jut compiled.
-
-    Does not create new data structure. It requires the output structure
-    to be provided. Hence, modifies in place. This was decided so
-    because this function is thought to be jit compiled and errors with
-    the creation of very large arrays were rising. By passing the output
-    array as a function argument, errors related to memory freeing are
-    avoided.
-
-    Parameters
-    ----------
-    data : an interable of Numbers, of length N
-
-    result : a mutable sequence, either list of np.ndarray,
-             of length N*(N-1)//2
-    """
-    c = 0
-    len_ = len(data)
-    for i in range(len_ - 1):
-        for j in range(i + 1, len_):
-            result[c] = data[i] + data[j]
-            c += 1
-
-    #assert result.size == (data.size * data.size - data.size) // 2
-    #assert abs(result[0] - (data[0] + data[1])) < 0.0000001
-    #assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
-    return
-
-
 def are_connected(n1, n2, rn1, a1, a2, bonds_intra, bonds_inter):
     """
     Detect if a certain atom pair is bonded accordind to criteria.
@@ -806,7 +827,6 @@ def are_connected(n1, n2, rn1, a1, a2, bonds_intra, bonds_inter):
 
     assert isinstance(answer, bool)
     return answer
-
 
 
 def create_sidechains_masks_per_residue(
@@ -867,12 +887,7 @@ def create_sidechains_masks_per_residue(
 
     return ss
 
-njit_calc_sum_upper_diagonal_raw = njit(calc_sum_upper_diagonal_raw)
-
-
 
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
-
-

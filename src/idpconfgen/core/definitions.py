@@ -15,6 +15,13 @@ faspr_dun2010bbdep_path = Path(
     )
 
 
+# Bond Geometry definitions
+# Keys in library:
+bgeo_Cm1NCa = 'Cm1_N_Ca'
+bgeo_NCaC = 'N_Ca_N'
+bgeo_CaCNp1 = 'Ca_C_Np1'
+
+
 # Amino-acid 3 to 1 letter code dictionary
 aa3to1 = {
     'ALA': 'A',

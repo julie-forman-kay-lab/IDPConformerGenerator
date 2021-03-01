@@ -787,7 +787,7 @@ def calc_all_vs_all_dists_square(coords):
     return results
 
 
-@njit
+#njit
 def calc_all_vs_all_dists(coords):
     """
     Calculate the upper half of all vs. all distances.
@@ -960,35 +960,50 @@ def energycalculator_ij(distf, efuncs):
     return calculate
 
 
-# feio!!!
-class EnergyCalculator_ij:
-    def __init__(self, efunc_terms, distance_calculator):
-
-        self.funcs = []
-        self.distscalc = distance_calculator
-
-        for key in efunc_terms:
-            self.funcs.append((efunc_terms[key].pop('func'), efunc_terms[key]))
-
-        return
-
-    def calculate(self, coordinates):
-        dist_ij = self.distscalc(coordinates)
-        energy = 0
-
-        for efunc, kwargs in self.funcs:
-            energy += efunc(dist_ij, **kwargs)
-
-        return energy
-
-
-def calc_outer_multiplication_upper_diagonal_raw(data, result):
+# njit
+def sum_upper_diagonal_raw(data, result):
     """
-    Calculate the upper diagonal multiplication with for loops.
+    Calculate outer sum for upper diagonal with for loops.
 
     The use of for-loop based calculation avoids the creation of very
     large arrays using numpy outer derivates. This function is thought
     to be jut compiled.
+
+    Does not create new data structure. It requires the output structure
+    to be provided. Hence, modifies in place. This was decided so
+    because this function is thought to be jit compiled and errors with
+    the creation of very large arrays were rising. By passing the output
+    array as a function argument, errors related to memory freeing are
+    avoided.
+
+    Parameters
+    ----------
+    data : an interable of Numbers, of length N
+
+    result : a mutable sequence, either list of np.ndarray,
+             of length N*(N-1)//2
+    """
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] + data[j]
+            c += 1
+
+    #assert result.size == (data.size * data.size - data.size) // 2
+    #assert abs(result[0] - (data[0] + data[1])) < 0.0000001
+    #assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
+    return
+
+
+# njit available
+def multiply_upper_diagonal_raw(data, result):
+    """
+    Calculate the upper diagonal multiplication with for loops.
+
+    The use of for-loop based calculation avoids the creation of very
+    large arrays using numpy outer derivatives. This function is thought
+    to be njit compiled.
 
     Does not create new data structure. It requires the output structure
     to be provided. Hence, modifies in place. This was decided so
@@ -1017,7 +1032,9 @@ def calc_outer_multiplication_upper_diagonal_raw(data, result):
     return
 
 
-njit_calc_multiplication_upper_diagonal_raw = njit(calc_outer_multiplication_upper_diagonal_raw)
+calc_all_vs_all_dists_njit = njit(calc_all_vs_all_dists)
+multiply_upper_diagonal_raw_njit = njit(multiply_upper_diagonal_raw)
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
 rrd10_njit = njit(round_radian_to_degree_bin_10)
+sum_upper_diagonal_raw_njit = njit(sum_upper_diagonal_raw)
 unit_vec_njit = njit(unit_vector)
