@@ -285,9 +285,9 @@ def get_cycle_distances_backbone():
 def get_cycle_bond_type():
     """Return an infinite interator of the bond types."""
     return cycle((
-        'Cm1_N_Ca',
-        'N_Ca_C',
-        'Ca_C_Np1',
+        'Cm1_N_Ca',  # used for OMEGA
+        'N_Ca_C',  # used for PHI
+        'Ca_C_Np1',  # used for PSI
         ))
 
 

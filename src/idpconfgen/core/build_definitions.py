@@ -49,7 +49,7 @@ def _read_labels(pdbs):
 
 # support figure, for the different histidine protonation states.
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
-atom_labels_pdb = _read_labels(_sidechain_template_files)
+atom_names_pdb = _read_labels(_sidechain_template_files)
 atom_names_amber = _read_labels(amber_pdbs)
 
 def read_ff14SB_params():
@@ -474,7 +474,7 @@ bonds_le_3_inter = {
 #    }
 
 
-class Amber14SBTopology:
+class Amber14SBForceField:
 
     __slots__ = [
         'forcefield',
@@ -508,6 +508,12 @@ class Amber14SBTopology:
 
         self.bonds_eq3_intra = topology_3_bonds_apart(self.res_topology)
         self.bonds_le2_intra = expand_topology_bonds_apart(self.res_topology, 2)
+
+
+forcefields = {
+    'Amberff14SB': Amber14SBForceField,
+    }
+
 
 
 #_amber_res_topology = None
