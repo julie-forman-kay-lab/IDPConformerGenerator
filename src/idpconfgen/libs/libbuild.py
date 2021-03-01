@@ -50,37 +50,58 @@ def init_conflabels(*args, **kwargs):
 
 # This is a class because the moment of instantiation is thought to be
 # different from the moment on which the attributes are populated
-class ConformerLabels:
+#class ConformerLabels:
+#
+#    __slots__ = [
+#        'atom_labels',
+#        'res_nums',
+#        'res_labels',
+#        'atom_masks',
+#        'num_atoms',
+#        'energy_func',
+#        '_al',
+#        ]
+#
+#    def __init__(self, atom_names):
+#
+#        self.atom_labels = None
+#        self.res_nums = None
+#        self.res_labels = None
+#        self.atom_masks = None
+#        self.num_atoms = None
+#        self._al = atom_names
+#
+#        return
+#
+#    def define_labels(self, input_seq):
+#        self.atom_labels, self.res_nums, self.res_labels = \
+#            create_conformer_labels(input_seq, topology.atom_labels)
+#
+#        self.num_atoms = len(self.atoms_labels)
+#        self.atom_masks = init_confmasks(self.atom_labels)
+#        del _al
+#
 
-    __slots__ = [
-        'atom_labels',
-        'res_nums',
-        'res_labels',
-        'atom_masks',
-        'num_atoms',
-        'energy_func',
-        '_al',
-        ]
+def read_db_to_slices(database, dssp_regexes, ncores=1):
+    """Create database base of slice and angles."""
+    # reads db dictionary from disk
+    db = read_dictionary_from_disk(database)
+    log.info(f'Read DB with {len(db)} entries')
 
-    def __init__(self, atom_names):
+    # reads and prepares IDPConfGen data base
+    timed = partial(timeme, aligndb)
+    pdbs, angles, dssp, resseq = timed(db)
 
-        self.atom_labels = None
-        self.res_nums = None
-        self.res_labels = None
-        self.atom_masks = None
-        self.num_atoms = None
-        self._al = atom_names
+    # searchs for slices in secondary structure, according to user requests
+    timed = partial(timeme, regex_search, ncores=ncores)
+    dssp_regexes = \
+        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
+    slices = []
+    for dssp_regex_string in dssp_regexes:
+        slices.extend(timed(dssp, dssp_regex_string))
+    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
 
-        return
-
-    def define_labels(self, input_seq):
-        self.atom_labels, self.res_nums, self.res_labels = \
-            create_conformer_labels(input_seq, topology.atom_labels)
-
-        self.num_atoms = len(self.atoms_labels)
-        self.atom_masks = init_confmasks(self.atom_labels)
-        del _al
-
+    return slices, angles
 
 
 # TODO: correct for HIS/HIE/HID/HIP
@@ -93,7 +114,7 @@ def translate_seq_to_3l(input_seq):
 
 def create_conformer_labels(
         input_seq,
-        atom_labels_definition,
+        atom_names_definition,
         transfunc=translate_seq_to_3l):
     """
     Create all atom labels model based on an input sequence.
@@ -108,7 +129,7 @@ def create_conformer_labels(
     atom_labels = np.array(
         make_list_atom_labels(
             input_seq,
-            atom_labels_definition,
+            atom_names_definition,
             )
         )
     num_atoms = len(atom_labels)
@@ -139,28 +160,103 @@ def create_conformer_labels(
     return atom_labels, residue_numbers, residue_labels
 
 
-#def create_conf_labels(input_seq):
-#    """
-#    Populate the global variables for all-atom representation labels.
-#
-#    Parameters
-#    ----------
-#    input_seq : str
-#        The input sequence of the protein to be built.
-#
-#    Returns
-#    -------
-#    None
-#        Global variables as changed in place.
-#    """
-#    input_seq_3l = translate_seq_to_3l(input_seq)
-#    atom_labels, res_nums, res_labels = create_conformer_labels(
-#        input_seq,
-#        input_seq_3l,
-#        )
-#    atom_masks = init_confmasks(atom_labels)
-#
-#    return (atom_labels, res_nums, res_labels, atom_masks)
+def make_list_atom_labels(input_seq, atom_labels_dictionary):
+    """
+    Make a list of the atom labels for an `input_seq`.
+
+    Considers the N-terminal to be protonated H1 to H3.
+
+    Parameters
+    ----------
+    input_seq : str
+        1-letter amino-acid sequence.
+
+    atom_labels_dictionary : dict
+        The ORDERED atom labels per residue.
+
+    Returns
+    -------
+    list
+        List of consecutive atom labels for the protein.
+    """
+    labels = []
+    LE = labels.extend
+
+    first_residue_atoms = atom_labels_dictionary[input_seq[0]]
+
+    # the first residue is a special case, we add here the three protons
+    # for consistency with the forcefield
+    # TODO: parametrize? multiple forcefields?
+    for atom in first_residue_atoms:
+        if atom == 'H':
+            LE(('H1', 'H2', 'H3'))
+        else:
+            labels.append(atom)
+
+    for residue in input_seq[1:]:
+        LE(atom_labels_dictionary[residue])
+
+    labels.append('OXT')
+
+    assert Counter(labels)['N'] == len(input_seq)
+    assert labels[-1] == 'OXT'
+    assert 'H1' in labels
+    assert 'H2' in labels
+    assert 'H3' in labels
+    return labels
+
+
+def gen_residue_number_per_atom(atom_labels, start=1):
+    """
+    Create a list of residue numbers based on atom labels.
+
+    This is a contextualized function, not an abstracted one.
+    Considers `N` to be the first atom of the residue.
+
+    Yields
+    ------
+    ints
+        The integer residue number per atom label.
+    """
+    assert atom_labels[0] == 'N', atom_labels[0]
+
+    # creates a seamless interface between human and python 0-indexes
+    start -= 1
+    for al in atom_labels:
+        if al == 'N':
+            start += 1
+        yield start
+
+
+def gen_3l_residue_labels_per_atom(
+        input_seq_3letter,
+        atom_labels,
+        ):
+    """
+    Generate residue 3-letter labels per atom.
+
+    Parameters
+    ----------
+    input_seq_3letter : list of 3letter residue codes
+        Most not be a generator.
+
+    atom_labels : list or tuple of atom labels
+        Most not be a generator.
+
+    Yields
+    ------
+    String of length 3
+         The 3-letter residue code per atom.
+    """
+    _count_labels = Counter(atom_labels)['N']
+    _len = len(input_seq_3letter)
+    assert _count_labels == _len, (_count_labels, _len)
+
+    counter = -1
+    for atom in atom_labels:
+        if atom == 'N':
+            counter += 1
+        yield input_seq_3letter[counter]
 
 
 
@@ -404,6 +500,375 @@ def prepare_energy_function(
     print('done preparing energy func')
     return calc_energy
     # ?
+
+
+def create_bonds_apart_mask_for_ij_pairs(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        bonds_intra,
+        bonds_inter,
+        base_bool=False,
+        ):
+    """
+    Create bool mask array identifying the pairs X bonds apart in ij pairs.
+
+    Given `bonds_intra` and `bonds_inter` criteria, idenfities those ij
+    atom pairs in N*(N-1)/2 condition (upper all vs all diagonal) that
+    agree with the described bonds.
+
+    Inter residue bonds are only considered for consecutive residues.
+
+    Paramters
+    ---------
+    atom_labels : iterable, list or np.ndarray
+        The protein atom labels. Ex: ['N', 'CA, 'C', 'O', 'CB', ...]
+
+    residue_numbers : iterable, list or np.ndarray
+        The protein residue numbers per atom in `atom_labels`.
+        Ex: [1, 1, 1, 1, 1, 2, 2, 2, 2, ...]
+
+    residue_labels : iterable, list or np.ndarray
+        The protein residue labels per atom in `atom_labels`.
+        Ex: ['Met', 'Met', 'Met', ...]
+
+    Depends
+    -------
+    `gen_ij_pairs_upper_diagonal`
+    `gen_atom_pair_connectivity_masks`
+    """
+    atom_labels_ij_gen = gen_ij_pairs_upper_diagonal(atom_labels)
+    residue_numbers_ij_gen = gen_ij_pairs_upper_diagonal(residue_numbers)
+    residue_labels_ij_gen = gen_ij_pairs_upper_diagonal(residue_labels)
+
+    bonds_indexes_gen = gen_atom_pair_connectivity_masks(
+        residue_labels_ij_gen,
+        residue_numbers_ij_gen,
+        atom_labels_ij_gen,
+        bonds_intra,
+        bonds_inter,
+        )
+
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    other_bool = not base_bool
+    bonds_mask = np.full(num_ij_pairs, base_bool)
+
+    for idx in bonds_indexes_gen:
+        bonds_mask[idx] = other_bool
+
+    return bonds_mask
+
+
+def gen_ij_pairs_upper_diagonal(data):
+    """
+    Generate upper diagonal ij pairs in tuples.
+
+    The diagonal is not considered.
+
+    Yields
+    ------
+    tuple of length 2
+        IJ pairs in the form of N*(N-1) / 2.
+    """
+    for i in range(len(data) - 1):
+        for j in range(i + 1, len(data)):
+            yield (data[i], data[j])
+
+def gen_atom_pair_connectivity_masks(
+        res_names_ij,
+        res_num_ij,
+        atom_names_ij,
+        connectivity_intra,
+        connectivity_inter,
+        ):
+    """
+    Generate atom pair connectivity indexes.
+
+    Given atom information for the ij pairs and connectivity criteria,
+    yields the index of the ij pair if the pair is connected according
+    to the connectivity criteria.
+
+    For example, if the ij pair is covalently bonded, or 3 bonds apart,
+    etc.
+
+    Parameters
+    ----------
+    res_names_ij
+    res_num_ij,
+    atom_names_ij, iterables of the same length and synchronized information.
+
+    connectivity_intra,
+    connectivity_inter, dictionaries mapping atom labels connectivity
+
+    Depends
+    -------
+    `are_connected`
+    """
+    zipit = zip(res_names_ij, res_num_ij, atom_names_ij)
+    counter = 0
+    for (rn1, _), (n1, n2), (a1, a2) in zipit:
+
+        found_connectivity = are_connected(
+            int(n1),
+            int(n2),
+            rn1,
+            a1,
+            a2,
+            connectivity_intra,
+            connectivity_inter,
+            )
+
+        if found_connectivity:
+            yield counter
+
+        counter += 1
+
+def create_LJ_params_raw(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        ):
+    """Create ACOEFF and BCOEFF parameters."""
+    sigmas_ii = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'sigma',
+        )
+
+    epsilons_ii = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'epsilon',
+        )
+
+    num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
+    # sigmas
+    sigmas_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_sum_upper_diagonal_raw(np.array(sigmas_ii), sigmas_ij_pre)
+    #
+    # epsilons
+    epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(
+        np.array(epsilons_ii),
+        epsilons_ij_pre)
+    #
+
+    # mixing rules
+    epsilons_ij = epsilons_ij_pre ** 0.5
+    # mixing + nm to Angstrom converstion
+    # / 2 and * 10
+    sigmas_ij = sigmas_ij_pre * 5
+
+    acoeff = 4 * epsilons_ij * (sigmas_ij ** 12)
+    bcoeff = 4 * epsilons_ij * (sigmas_ij ** 6)
+
+    return acoeff, bcoeff
+
+
+def create_Coulomb_params_raw(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        ):
+    """."""
+    charges_i = extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        'charge',
+        )
+
+    charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
+    njit_calc_multiplication_upper_diagonal_raw(charges_i, charges_ij)
+    charges_ij *= 0.25  # dielectic constant
+
+    return charges_ij
+
+
+def extract_ff_params_for_seq(
+        atom_labels,
+        residue_numbers,
+        residue_labels,
+        force_field,
+        param):
+    """."""
+    params_l = []
+    params_append = params_l.append
+
+    zipit = zip(atom_labels, residue_numbers, residue_labels)
+    for atom_name, res_num, res_label in zipit:
+
+        # adds C to the terminal residues
+        if res_num == residue_numbers[-1]:
+            res = 'C' + res_label
+            was_in_C_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        elif res_num == residue_numbers[0]:
+            res = 'N' + res_label
+            was_in_N_terminal = True
+            assert res.isupper() and len(res) == 4, res
+
+        else:
+            res = res_label
+
+        # TODO:
+        # define protonation state in parameters
+        if res_label.endswith('HIS'):
+            res_label = res_label[:-3] + 'HIP'
+
+        try:
+            # force field atom type
+            atype = force_field[res][atom_name]['type']
+
+        # TODO:
+        # try/catch is here to avoid problems with His...
+        # for this purpose we are only using side-chains
+        except KeyError:
+            raise KeyError(tuple(force_field[res].keys()))
+
+        params_append(float(force_field[atype][param]))
+
+    assert was_in_C_terminal, \
+        'The C terminal residue was never computed. It should have.'
+    assert was_in_N_terminal, \
+        'The N terminal residue was never computed. It should have.'
+
+    assert isinstance(params_l, list)
+    return params_l
+
+
+def calc_sum_upper_diagonal_raw(data, result):
+    """
+    Calculate outer sum for upper diagonal with for loops.
+
+    The use of for-loop based calculation avoids the creation of very
+    large arrays using numpy outer derivates. This function is thought
+    to be jut compiled.
+
+    Does not create new data structure. It requires the output structure
+    to be provided. Hence, modifies in place. This was decided so
+    because this function is thought to be jit compiled and errors with
+    the creation of very large arrays were rising. By passing the output
+    array as a function argument, errors related to memory freeing are
+    avoided.
+
+    Parameters
+    ----------
+    data : an interable of Numbers, of length N
+
+    result : a mutable sequence, either list of np.ndarray,
+             of length N*(N-1)//2
+    """
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] + data[j]
+            c += 1
+
+    #assert result.size == (data.size * data.size - data.size) // 2
+    #assert abs(result[0] - (data[0] + data[1])) < 0.0000001
+    #assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
+    return
+
+
+def are_connected(n1, n2, rn1, a1, a2, bonds_intra, bonds_inter):
+    """
+    Detect if a certain atom pair is bonded accordind to criteria.
+
+    Considers only to the self residue and next residue
+    """
+    # requires
+    assert isinstance(n1, int) and isinstance(n2, int), (type(n1), type(n2))
+    assert all(isinstance(i, str) for i in (rn1, a1, a2)), \
+        (type(i) for i in (rn1, a1, a2))
+    assert all(isinstance(i, dict) for i in (bonds_intra, bonds_inter)), \
+        (type(i) for i in (bonds_intra, bonds_inter))
+
+    answer = (
+        (n1 == n2 and a2 in bonds_intra[rn1][a1])
+        or (
+            n1 + 1 == n2
+            and (
+                a1 in bonds_inter  # this void KeyError
+                and a2 in bonds_inter[a1]
+                )
+            )
+        )
+
+    assert isinstance(answer, bool)
+    return answer
+
+
+
+def create_sidechains_masks_per_residue(
+        residue_numbers,
+        atom_labels,
+        backbone_atoms,
+        ):
+    """
+    Create a map of numeric indexing masks pointing to side chains atoms.
+
+    Create separate masks per residue.
+
+    Parameters
+    ----------
+    residue_numbers : np.ndarray, shape (N,)
+        The atom residue numbers of the protein.
+
+    atom_labels : np.ndarray, shape (N,)
+        The atom labels of the protein.
+
+    backbone_atoms : list or tuple
+        The labels of all possible backbone atoms.
+
+    Returns
+    -------
+    list of tuples of length 2
+        List indexes refer to protein residues, index 0 is residue 1.
+        Per residue, a tuple of length 2 is given. Tuple index 0 are
+        the indexes of that residue sidechain atoms mapped to an array
+        of the `atom_labels` and `residue_numbers` characteristics.
+        The tuple index 1 is an array of length M, where M is the number
+        of sidechain atoms for that residue, defaults to np.nan.
+    """
+    assert residue_numbers.size == atom_labels.size
+    assert type(backbone_atoms) in (list, tuple, np.ndarray)
+
+    ss = []
+    ssa = ss.append
+
+    is_backbone = np.isin(atom_labels, backbone_atoms)
+    is_sidechain = np.logical_not(is_backbone)
+
+    float64 = np.float64
+    full = np.full
+    logical_and = np.logical_and
+    nan = np.nan
+    where = np.where
+
+    # sorted here is mandatory because ss indexes must follow the residue
+    # numbering
+    for resnum in sorted(list(set(residue_numbers))):
+        is_residue = residue_numbers == resnum
+        bool_result = logical_and(is_residue, is_sidechain)
+        ssa((
+            where(bool_result)[0],
+            full((np.sum(bool_result), 3), nan, dtype=float64)
+            ))
+
+    return ss
+
+njit_calc_sum_upper_diagonal_raw = njit(calc_sum_upper_diagonal_raw)
+
 
 
 compute_sidechains = {
