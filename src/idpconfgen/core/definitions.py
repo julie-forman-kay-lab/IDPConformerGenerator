@@ -8,6 +8,19 @@ from pathlib import Path
 
 
 core_folder = Path(__file__).parent
+faspr_dun2010bbdep_path = Path(
+    core_folder,
+    'data',
+    'dun2010bbdep.bin',
+    )
+
+
+# Bond Geometry definitions
+# Keys in library:
+bgeo_Cm1NCa = 'Cm1_N_Ca'
+bgeo_NCaC = 'N_Ca_C'
+bgeo_CaCNp1 = 'Ca_C_Np1'
+
 
 # Amino-acid 3 to 1 letter code dictionary
 aa3to1 = {

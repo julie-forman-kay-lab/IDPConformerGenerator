@@ -77,12 +77,12 @@ def test_aa_translate_dict_with_atom_labels():
     Test if the aa3to1 and aa1to3 dict match the atom labels dicts.
     """
     for key in aa3to1.keys():
-        assert key in BD.atom_labels_pdb
-        assert key in BD.atom_labels_amber
+        assert key in BD.atom_names_pdb
+        assert key in BD.atom_names_amber
 
     for key in aa1to3.keys():
-        assert key in BD.atom_labels_pdb
-        assert key in BD.atom_labels_amber
+        assert key in BD.atom_names_pdb
+        assert key in BD.atom_names_amber
 
 
 def test_all_atoms_are_mapped(ff14SB):
@@ -106,12 +106,12 @@ def test_ff14SB_residue_atoms_names(ff14SB):
                 try:
                     s1 = set(residue.keys())
                     k1 = aa3to1[key]
-                    s2 = set(BD.atom_labels_amber[k1])
+                    s2 = set(BD.atom_names_amber[k1])
 
                     diff = s1.difference(s2)
                     assert not diff, (key, diff)
 
-                    s2 = set(BD.atom_labels_amber[k1])
+                    s2 = set(BD.atom_names_amber[k1])
 
                     diff = s1.difference(s2)
                     assert not diff, (key, diff)
@@ -125,8 +125,8 @@ def test_residue_atoms_pdb_amber():
 
     Quantities should be the same for amber and pdb atom names.
     """
-    for key, value in BD.atom_labels_pdb.items():
-        assert len(value) == len(BD.atom_labels_amber[key]), \
+    for key, value in BD.atom_names_pdb.items():
+        assert len(value) == len(BD.atom_names_amber[key]), \
             f'There are different number of atoms for {key}'
 
 

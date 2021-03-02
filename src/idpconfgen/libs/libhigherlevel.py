@@ -11,7 +11,13 @@ from functools import partial, reduce
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import aa3to1, blocked_ids
+from idpconfgen.core.definitions import (
+    aa3to1,
+    bgeo_Cm1NCa,
+    bgeo_NCaC,
+    bgeo_CaCNp1,
+    blocked_ids,
+    )
 from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
 from idpconfgen.libs.libcalc import (
     calc_angle_njit,
@@ -528,13 +534,13 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
         N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
         Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
 
-        _ = bond_geometry[tuple_key].setdefault('Cm1_N_Ca', [])
+        _ = bond_geometry[tuple_key].setdefault(bgeo_Cm1NCa, [])
         _.append(Cm1_N_Ca)
 
-        _ = bond_geometry[tuple_key].setdefault('N_Ca_C', [])
+        _ = bond_geometry[tuple_key].setdefault(bgeo_NCaC, [])
         _.append(N_Ca_C)
 
-        _ = bond_geometry[tuple_key].setdefault('Ca_C_Np1', [])
+        _ = bond_geometry[tuple_key].setdefault(bgeo_CaCNp1, [])
         _.append(Ca_C_Np1)
 
         co_idx = np.array(idx) - 1

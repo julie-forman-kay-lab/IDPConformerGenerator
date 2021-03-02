@@ -1,14 +1,12 @@
 """Mathemical calculations."""
 import math
 from math import cos, sin
-from numba import njit
 
 import numpy as np
+from numba import njit
 
 from idpconfgen.core.build_definitions import (
-    build_bend_CA_C_O,
     build_bend_CA_C_OXT,
-    distance_C_O,
     distance_C_OXT,
     )
 
@@ -336,15 +334,15 @@ def calc_MSMV(data):
     return np.mean(data), np.std(data), np.median(data), np.var(data)
 
 
-#@njit
-#def xxhamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
-#    """Hamiltonian Multiplication."""
-#    return (
-#            (a1 * a2.T) - (b1 * b2.T) - (c1 * c2.T) - (d1 * d2.T),
-#            (a1 * b2.T) + (b1 * a2.T) + (c1 * d2.T) - (d1 * c2.T),
-#            (a1 * c2.T) - (b1 * d2.T) + (c1 * a2.T) + (d1 * b2.T),
-#            (a1 * d2.T) + (b1 * c2.T) - (c1 * b2.T) + (d1 * a2.T),
-#    )
+# @njit
+# def xxhamiltonian_multiplication_Q(a1, b1, c1, d1, a2, b2, c2, d2):
+#     """Hamiltonian Multiplication."""
+#     return (
+#             (a1 * a2.T) - (b1 * b2.T) - (c1 * c2.T) - (d1 * d2.T),
+#             (a1 * b2.T) + (b1 * a2.T) + (c1 * d2.T) - (d1 * c2.T),
+#             (a1 * c2.T) - (b1 * d2.T) + (c1 * a2.T) + (d1 * b2.T),
+#             (a1 * d2.T) + (b1 * c2.T) - (c1 * b2.T) + (d1 * a2.T),
+#     )
 
 
 @njit
@@ -368,8 +366,8 @@ def calc_angle(
         ):
     """Calculate the angle between two vectors."""
     # https://stackoverflow.com/questions/2827393/
-    #assert v1.shape == v2.shape, (v1.shape, v2.shape)
-    #assert v1.dtype == v2.dtype
+    # assert v1.shape == v2.shape, (v1.shape, v2.shape)
+    # assert v1.dtype == v2.dtype
     v1_u = v1 / NORM(v1)
     v2_u = v2 / NORM(v2)
     return ARCCOS(CLIP(DOT(v1_u, v2_u), -1.0, 1.0))
@@ -768,7 +766,6 @@ def calc_all_vs_all_dists_square(coords):
     -------
     np.ndarray, shape ((N * N - N) // 2,), dytpe=np.float64
     """
-
     len_ = coords.shape[0]
     shape = ((len_ * len_ - len_) // 2,)
     results = np.empty(shape, dtype=np.float64)
@@ -780,14 +777,14 @@ def calc_all_vs_all_dists_square(coords):
             x = b[0] - a[0]
             y = b[1] - a[1]
             z = b[2] - a[2]
-            results[i] = x*x + y*y + z*z
+            results[i] = x * x + y * y + z * z
             i += 1
         c += 1
 
     return results
 
 
-@njit
+# njit available
 def calc_all_vs_all_dists(coords):
     """
     Calculate the upper half of all vs. all distances.
@@ -802,7 +799,6 @@ def calc_all_vs_all_dists(coords):
     -------
     np.ndarray, shape ((N * N - N) // 2,), dytpe=np.float64
     """
-
     len_ = coords.shape[0]
     shape = ((len_ * len_ - len_) // 2,)
     results = np.empty(shape, dtype=np.float64)
@@ -814,61 +810,62 @@ def calc_all_vs_all_dists(coords):
             x = b[0] - a[0]
             y = b[1] - a[1]
             z = b[2] - a[2]
-            results[i] = (x*x + y*y + z*z) ** 0.5
+            results[i] = (x * x + y * y + z * z) ** 0.5
             i += 1
         c += 1
 
     return results
 
-def calc_vdW_AB(sigma_i, sigma_j, eps_i, eps_j, alpha=0.8):
-    """
-    non vectorized
-    """
-    rminA = (2 * sigma_i)**(1/6)
-    rminB = (2 * sigma_j)**(1/6)
-    rmin_pair = alpha * (rminA + rminB)
-    eps_pair = (eps_i * atomB_j)**0.5
-    A = eps_pair * rmin_pair**12
-    B = 2 * eps_pair * rmin_pair**6
-    return A, B
+
+# def calc_vdW_AB(sigma_i, sigma_j, eps_i, eps_j, alpha=0.8):
+#     """
+#     non vectorized
+#     """
+#     rminA = (2 * sigma_i)**(1/6)
+#     rminB = (2 * sigma_j)**(1/6)
+#     rmin_pair = alpha * (rminA + rminB)
+#     eps_pair = (eps_i * atomB_j)**0.5
+#     A = eps_pair * rmin_pair**12
+#     B = 2 * eps_pair * rmin_pair**6
+#     return A, B
 
 
-def calc_Coulomb_ij(qi, qj, rij):
-    return qi * qj / rij
+# def calc_Coulomb_ij(qi, qj, rij):
+#     return qi * qj / rij
 
 
-def calc_all_Coulom(partial_charges, r_pairs, ep=4):
-    """
-    al implementar rever que no se computa contra si mismo
-    i < j
-
-    Where ep is the dieletric constant
-    """
-    coulombs = partial_charges[1:] * partial_charges[:-1]
-    coef = coulombs / r_pairs
-    energy_pair = coef / ep
-    return sum(energy_pair)
-
-
-def calc_FGB(
-        const=-0.5 * (1 / 4 - 1 / 80),
-        ):
-    """."""
-
-    coulombs = partial_charges[1:] * partial_charges[:-1]
-    return const * sum(qi*qj/fGB(rij) for i in range(1))  #complete
+# def calc_all_Coulom(partial_charges, r_pairs, ep=4):
+#     """
+#     al implementar rever que no se computa contra si mismo
+#     i < j
+#
+#     Where ep is the dieletric constant
+#     """
+#     coulombs = partial_charges[1:] * partial_charges[:-1]
+#     coef = coulombs / r_pairs
+#     energy_pair = coef / ep
+#     return sum(energy_pair)
 
 
-def calc_fGB():
-    """."""
-    rij2 = rij**2
-    (rij2+Ri*Rj*math.exp(-rij2/4*Ri*Rj))**0.5
-    return
+# def calc_FGB(
+#         const=-0.5 * (1 / 4 - 1 / 80),
+#         ):
+#     """."""
+#
+#     coulombs = partial_charges[1:] * partial_charges[:-1]
+#     return const * sum(qi*qj/fGB(rij) for i in range(1))  #complete
+#
+#
+# def calc_fGB():
+#     """."""
+#     rij2 = rij**2
+#     (rij2+Ri*Rj*math.exp(-rij2/4*Ri*Rj))**0.5
+#     return
 
 
 @njit
 def calc_residue_num_from_index(i, step=3):
-    """Calculates residue number from index.
+    """Calculate residue number from index.
 
     Parameters
     ----------
@@ -923,8 +920,7 @@ def round_radian_to_degree_bin_10(x0):
         else:
             return x - 5
     else:
-        assert False, 'Code should not reach this point.'
-
+        raise Exception('Code should not reach this point.')
 
 
 def unit_vector(vector):
@@ -932,7 +928,196 @@ def unit_vector(vector):
     return vector / np.linalgn.norm(vector)
 
 
+def init_lennard_jones_calculator(acoeff, bcoeff):
+    """
+    Calculate Lennard-Jones full pontential.
 
+    The LJ potential is calculated fully and no approximations to
+    proximity of infinite distance are considered.
+
+    Parameters
+    ----------
+    acoeff, bcoeff : np.ndarray, shape (N, 3), dtype=np.float
+        The LJ coefficients prepared already for the ij-pairs upon which
+        the resulting function is expected to operate.
+        IMPORTANT: it is up to the user to define the coefficients such
+        that resulting energy is np.nan for non-relevant ij-pairs, for
+        example, covalently bonded pairs, or pairs 2 bonds apart.
+
+    Returns
+    -------
+    numba.njitted func
+        Function closure with registered `acoeff`s and `bcoeff`s that
+        expects an np.ndarray of distances with same shape as `acoeff`
+        and `bcoeff`: (N,).
+        `func` returns an integer.
+    """
+    @njit
+    def calc_lennard_jones(distances_ij, NANSUM=np.nansum):
+        ar = acoeff / (distances_ij ** 12)
+        br = bcoeff / (distances_ij ** 6)
+        energy_ij = ar - br
+        return NANSUM(energy_ij)
+    return calc_lennard_jones
+
+
+def init_coulomb_calculator(charges_ij):
+    """
+    Calculate Coulomb portential.
+
+    Parameters
+    ----------
+    charges_ij : np.ndarray, shape (N, 3), dtype=np.float
+        The `charges_ij` prepared already for the ij-pairs upon which
+        the resulting function is expected to operate.
+        IMPORTANT: it is up to the user to define the charge such
+        that resulting energy is np.nan for non-relevant ij-pairs, for
+        example, covalently bonded pairs, or pairs 2 bonds apart.
+
+    Returns
+    -------
+    numba.njitted func
+        Function closure with registered `charges_ij` that expects an
+        np.ndarray of distances with same shape as `acoeff` and `bcoeff`:
+        (N,).
+        `func` returns an integer.
+    """
+    @njit
+    def calculate(distances_ij, NANSUM=np.nansum):
+        return NANSUM(distances_ij / charges_ij)
+    return calculate
+
+
+def energycalculator_ij(distf, efuncs):
+    """
+    Calculate the sum of energy terms.
+
+    This function works as a closure.
+
+    Accepts only energy terms that compute for non-redundant ij-pairs.
+
+    Energy terms must have distances ij as unique positional parameter,
+    and should return an integer.
+
+    Example
+    -------
+    >>> ecalc = energycalculator_ij(calc_ij_pair_distances, [...])
+    >>> total_energy = ecalc(coords)
+
+    Where `[...]` is a list containing energy term functions.
+
+    See Also
+    --------
+    init_lennard_jones_calculator
+    init_coulomb_calculator
+
+    Parameters
+    ----------
+    distf : func
+        The function that will be used to calculate ij-pair distances
+        on each call. If performance is a must, this function should be
+        fast. `distf` function should receive `coords` as unique
+        argument where `coords` is a np.ndarray of shape (N, 3), where N
+        is the number of atoms, and 3 represents the XYZ coordinates.
+        This function should return a np.ndarray of shape
+        (N * (N - 1)) / 2,), dtype=np.float.
+
+    efuncs : list
+        A list containing the energy terms functions. Energy term
+        functions are prepared closures that accept the output of
+        `distf` function.
+
+    Returns
+    -------
+    func
+        A function that accepts coords in the form of (N, 3). The
+        coordinates sent to the resulting function MUST be aligned with
+        the labels used to prepare the `efuncs` closures.
+    """
+    def calculate(coords):
+        dist_ij = distf(coords)
+        energy = 0
+        for func in efuncs:
+            energy += func(dist_ij)
+        return energy
+    return calculate
+
+
+# njit
+def sum_upper_diagonal_raw(data, result):
+    """
+    Calculate outer sum for upper diagonal with for loops.
+
+    The use of for-loop based calculation avoids the creation of very
+    large arrays using numpy outer derivates. This function is thought
+    to be jut compiled.
+
+    Does not create new data structure. It requires the output structure
+    to be provided. Hence, modifies in place. This was decided so
+    because this function is thought to be jit compiled and errors with
+    the creation of very large arrays were rising. By passing the output
+    array as a function argument, errors related to memory freeing are
+    avoided.
+
+    Parameters
+    ----------
+    data : an interable of Numbers, of length N
+
+    result : a mutable sequence, either list of np.ndarray,
+             of length N*(N-1)//2
+    """
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] + data[j]
+            c += 1
+
+    # assert result.size == (data.size * data.size - data.size) // 2
+    # assert abs(result[0] - (data[0] + data[1])) < 0.0000001
+    # assert abs(result[-1] - (data[-2] + data[-1])) < 0.0000001
+    return
+
+
+# njit available
+def multiply_upper_diagonal_raw(data, result):
+    """
+    Calculate the upper diagonal multiplication with for loops.
+
+    The use of for-loop based calculation avoids the creation of very
+    large arrays using numpy outer derivatives. This function is thought
+    to be njit compiled.
+
+    Does not create new data structure. It requires the output structure
+    to be provided. Hence, modifies in place. This was decided so
+    because this function is thought to be jit compiled and errors with
+    the creation of very large arrays were rising. By passing the output
+    array as a function argument, errors related to memory freeing are
+    avoided.
+
+    Parameters
+    ----------
+    data : an interable of Numbers, of length N
+
+    result : a mutable sequence, either list of np.ndarray,
+             of length N*(N-1)//2
+    """
+    c = 0
+    len_ = len(data)
+    for i in range(len_ - 1):
+        for j in range(i + 1, len_):
+            result[c] = data[i] * data[j]
+            c += 1
+
+    # assert result.size == (data.size * data.size - data.size) // 2
+    # assert abs(result[0] - data[0] * data[1]) < 0.0000001
+    # assert abs(result[-1] - data[-2] * data[-1]) < 0.0000001
+    return
+
+
+calc_all_vs_all_dists_njit = njit(calc_all_vs_all_dists)
+multiply_upper_diagonal_raw_njit = njit(multiply_upper_diagonal_raw)
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)
 rrd10_njit = njit(round_radian_to_degree_bin_10)
+sum_upper_diagonal_raw_njit = njit(sum_upper_diagonal_raw)
 unit_vec_njit = njit(unit_vector)

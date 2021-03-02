@@ -13,7 +13,7 @@ from time import time
 import numpy as np
 
 from idpconfgen import log
-from idpconfgen.cli_build import generate_vdW_data
+#from idpconfgen.cli_build import generate_vdW_data
 from idpconfgen.core.definitions import (
     aa1to3,
     heavy_atoms,
@@ -229,6 +229,8 @@ def vdw2(pdb_files, vdwR):
     res_labels = s.data_array[:, 4]
     coords = s.coords
 
+    def generate_vdW_data():
+        raise NotImplementedError()
     vdW_sums, vdw_valid = generate_vdW_data(atoms, res_nums, res_labels, vdwR)
 
     del s
