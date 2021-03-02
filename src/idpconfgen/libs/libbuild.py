@@ -9,14 +9,16 @@ import numpy as np
 import idpcpp
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
-    bgeo_CaCNp1,
-    bgeo_Cm1NCa,
-    bgeo_NCaC,
     bonds_equal_3_inter,
     bonds_le_2_inter,
     distances_C_Np1,
     distances_CA_C,
     distances_N_CA,
+    )
+from idpconfgen.core.definitions import (
+    bgeo_CaCNp1,
+    bgeo_Cm1NCa,
+    bgeo_NCaC,
     faspr_dun2010bbdep_path,
     )
 from idpconfgen.libs.libcalc import (
@@ -24,7 +26,7 @@ from idpconfgen.libs.libcalc import (
     energycalculator_ij,
     init_coulomb_calculator,
     init_lennard_jones_calculator,
-    multiply_upper_diagional_raw_njit,
+    multiply_upper_diagonal_raw_njit,
     sum_upper_diagonal_raw_njit,
     )
 from idpconfgen.libs.libfilter import aligndb, regex_search
@@ -186,7 +188,7 @@ def init_conflabels(*args, **kwargs):
     create_conformer_labels()
     ConfLabels
     """
-    return ConfLabels(create_conformer_labels(*args, **kwargs))
+    return ConfLabels(*create_conformer_labels(*args, **kwargs))
 
 
 def create_conformer_labels(
@@ -690,7 +692,7 @@ def create_LJ_params_raw(
     #
     # epsilons
     epsilons_ij_pre = np.empty(num_ij_pairs, dtype=np.float64)
-    multiply_upper_diagional_raw_njit(
+    multiply_upper_diagonal_raw_njit(
         np.array(epsilons_ii),
         epsilons_ij_pre,
         )
@@ -725,7 +727,7 @@ def create_Coulomb_params_raw(
 
     num_ij_pairs = len(atom_labels) * (len(atom_labels) - 1) // 2
     charges_ij = np.empty(num_ij_pairs, dtype=np.float64)
-    multiply_upper_diagional_raw_njit(charges_i, charges_ij)
+    multiply_upper_diagonal_raw_njit(charges_i, charges_ij)
     charges_ij *= 0.25  # dielectic constant
 
     return charges_ij

@@ -477,11 +477,11 @@ bonds_le_3_inter = {
 class Amber14SBForceField:
 
     __slots__ = [
-        'forcefield',
-        'res_topology',
+        'atom_names',
         'bonds_eq3_intra',
         'bonds_le2_intra',
-        'atom_labels',
+        'forcefield',
+        'res_topology',
         ]
 
     _state = None

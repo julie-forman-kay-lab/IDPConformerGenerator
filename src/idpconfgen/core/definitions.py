@@ -18,7 +18,7 @@ faspr_dun2010bbdep_path = Path(
 # Bond Geometry definitions
 # Keys in library:
 bgeo_Cm1NCa = 'Cm1_N_Ca'
-bgeo_NCaC = 'N_Ca_N'
+bgeo_NCaC = 'N_Ca_C'
 bgeo_CaCNp1 = 'Ca_C_Np1'
 
 

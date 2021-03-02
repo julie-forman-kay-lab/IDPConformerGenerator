@@ -11,7 +11,7 @@ from pathlib import Path as Path_
 from numba import njit
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import dssp_trans_bytes, jsonparameters
+from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters
 from idpconfgen.core.exceptions import DSSPParserError
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
