@@ -10,7 +10,9 @@ from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
 
-if 'TOX_ENV_NAME' not in os.environ:
+if 'TOX_ENV_NAME' not in os.environ \
+        or 'TOX_ENV_NAME' in os.environ and 'TOXTESTING' in os.environ:
+
     from pybind11.setup_helpers import Pybind11Extension, build_ext
 
     ext_modules = [

@@ -275,60 +275,6 @@ def test_lennard_jones_calculator():
     c(np.arange(1, 11))
 
 
-def test_EnergyCalculator_ij():
-    """."""
-    def dist_calc(coords):
-        return coords - 1
-
-    def calc_dummy(distances, arg1, arg2=5):
-        return sum(distances) + arg1 - arg2
-
-    d = {
-        'lj': {
-            'func': calc_dummy,
-            'arg1': 2,
-            'arg2': 3,
-            },
-        }
-
-    clcltr = libcalc.EnergyCalculator_ij(d, dist_calc)
-    coords = np.arange(10)
-    energy = clcltr.calculate(coords)
-
-    assert energy == 34
-
-
-def test_EnergyCalculator_ij_2():
-    """."""
-    def dist_calc(coords):
-        return coords - 1
-
-    def calc_dummy(distances, arg1, arg2=5):
-        return sum(distances) + arg1 - arg2
-
-    def calc_dummy2(distances, arg3, arg6=5):
-        return sum(distances + arg3 - arg6)
-
-    d = {
-        'lj': {
-            'func': calc_dummy,
-            'arg1': 2,
-            'arg2': 3,
-            },
-        'du': {
-            'func': calc_dummy2,
-            'arg3': 2,
-            'arg6': 1,
-            }
-        }
-
-    clcltr = libcalc.EnergyCalculator_ij(d, dist_calc)
-    coords = np.arange(10)
-    energy = clcltr.calculate(coords)
-
-    assert energy == 79
-
-
 def test_energy_calculator_ij():
     """."""
     def dist_calc(coords):
