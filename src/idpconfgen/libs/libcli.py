@@ -311,7 +311,11 @@ def add_argument_ncores(parser):
     parser.add_argument(
         '-n',
         '--ncores',
-        help='Number of cores to use.',
+        help=(
+            'Number of cores to use. If `-n` uses all available '
+            'cores except one. To select the exact number of cores '
+            'use -n #, where # is the desired number.'
+            ),
         type=int,
         default=1,
         const=ncpus,
