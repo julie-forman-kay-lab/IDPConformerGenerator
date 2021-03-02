@@ -411,9 +411,9 @@ def add_argument_source(parser):
         '-sc',
         '--source',
         help=(
-            'Builds the output on top of the source, '
-            'instead of starting from scratch. '
-            'Replaces prexisting entries'
+            'Updates source with the ouput generated in this CLI. '
+            'Replaces prexisting entries. '
+            'If None given, saves results to a new file.'
             ),
         type=Path,
         default=None,
