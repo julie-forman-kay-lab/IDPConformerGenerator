@@ -272,62 +272,6 @@ def calc_torsion_angles(
     return -ARCTAN2(sin_theta, cos_theta)
 
 
-def get_separate_torsions(torsions_array):
-    """
-    Separate torsion angles according to the protein backbone concept.
-
-    Considers torsion angles for bonds in between atom pairs:
-        - CA - C
-        - C - N
-        - N - CA
-
-    Backbone obeys the order: N-CA-C-N-CA-C(...)
-
-    And the first value corresponds to a CA-C pair, because the
-    first N-CA pair of the protein backbone has no torsion angle.
-    """
-    assert torsions_array.ndim == 1
-    assert torsions_array.size % 3 == 0
-
-    CA_C = torsions_array[::3].tolist()
-    C_N = torsions_array[1::3].tolist()
-    N_CA = torsions_array[2::3].tolist()
-
-    assert len(CA_C) == len(C_N) == len(N_CA)
-    return CA_C, C_N, N_CA
-
-
-def validate_backbone_labels_for_torsion(labels, minimum=2):
-    """
-    Validate labels for torsion angle calculation.
-
-    Assumes labels are aligned with their corresponding coordinates.
-    Yet, coordinates have no scope in this function.
-
-    Excepts only the mininal backbone labels, these are: N, CA, and C.
-
-    Parameters
-    ----------
-    labels : np.array of shape (N,) or alike
-        Where N % 3 equals 0.
-
-    minimum : int
-        The minimum number of residues to consider valid.
-    """
-    if len(labels) / 3 < minimum:
-        return 'Too small segment'
-
-    if labels[0] != 'N':
-        return 'The first atom is not N, it should be!'
-
-    if len(labels) % 3:
-        return 'Number of backbone atoms is not module of 3.'
-
-    if set(labels) != {'N', 'C', 'CA'}:
-        return 'There are atoms other than N, C and CA.'
-
-    return ''
-
 
 def calc_MSMV(data):
     """Calculate Mean, STD, Median, and Variance."""

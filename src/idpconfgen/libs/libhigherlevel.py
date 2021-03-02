@@ -13,18 +13,16 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import (
     aa3to1,
+    bgeo_CaCNp1,
     bgeo_Cm1NCa,
     bgeo_NCaC,
-    bgeo_CaCNp1,
     blocked_ids,
     )
 from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
 from idpconfgen.libs.libcalc import (
     calc_angle_njit,
     calc_torsion_angles,
-    get_separate_torsions,
     rrd10_njit,
-    validate_backbone_labels_for_torsion,
     )
 from idpconfgen.libs.libio import (
     concatenate_entries,
@@ -349,15 +347,22 @@ def get_torsionsJ(
     return np.round(torsions, decimals)
 
 
-def get_torsions(fdata, degrees=False, decimals=3):
+def get_torsions(fdata, degrees=False, decimals=3, validate=True):
     """
     Calculate torsion angles from structure.
+
+    Corrects for labels not sorted according to (N, CA, C). But does not
+    correct for non-sorted residues (do these exist?).
+
+    Calculates torsion angles with `:func:libcalc.calc_torsion_angles`.
 
     Parameters
     ----------
     fdata : str, bytes or Path
         A path to the structure file, or the string representing
-        the file. Actually, Any type acceptable by :class:`libstructure.Structure`.
+        the file.
+        In fact, accepts any type `:class:libstructure.Structure` would
+        accept.
 
     degrees : bool, optional
         Whether to return torsion angles in degrees or radians.
@@ -366,36 +371,107 @@ def get_torsions(fdata, degrees=False, decimals=3):
         The number of decimals to return.
         Defaults to 3.
 
-    Returns
-    -------
-    dict
-        key: `fname`
-        value: -> dict, `phi`, `phi`, `omega` -> list of floats
+    validate : bool
+        Validates coordinates and labels according to general
+        expectations. Expectations are as described by functions:
+        - :func:libhigherlevel.validate_backbone_labels_for_torsion
+        - :func:libhigherlevel.validate_coords_for_backbone_torsions
+
+        If `False`, does not perform validation. Be sure to provide PDBs
+        what will output meaningful results.
+
+    Return
+    ------
+    np.ndarray
+        As described in `:func:libcalc.calc_torsion_angles()` but with
+        `decimals` and `degrees` applied.
+
+    See Also
+    --------
+    libhigherlevel.validate_backbone_labels_for_torsion
+    libhigherlevel.validate_coords_for_backbone_torsions
+    libcalc.calc_torsion_angles
     """
     structure = Structure(fdata)
     structure.build()
     structure.add_filter_backbone(minimal=True)
 
     data = structure.filtered_atoms
+    names = data[:, col_name]
+    coords_raw = structure.coords
 
-    # validates structure data
-    # rare are the PDBs that produce errors, still they exist.
-    # errors can be from a panoply of sources, that is why I decided
-    # not to attempt correcting them and instead ignore and report.
-    validation_error = validate_backbone_labels_for_torsion(data[:, col_name])
-    if validation_error:
+    n_mask = names == 'N'
+    ca_mask = names == 'CA'
+    c_mask = names == 'C'
+
+    n = coords_raw[n_mask, :]
+    ca = coords_raw[ca_mask, :]
+    c = coords_raw[c_mask, :]
+
+    n_names = names[n_mask]
+    ca_names = names[ca_mask]
+    c_names = names[c_mask]
+
+    try:
+        # https://stackoverflow.com/questions/5347065
+        labels = np.empty((n_names.size * 3), dtype=ca_names.dtype)
+        labels[0::3] = n_names
+        labels[1::3] = ca_names
+        labels[2::3] = c_names
+    except ValueError as err:
         errmsg = (
-            'Found errors on backbone label consistency: '
-            f'{validation_error}\n'
+            'Labels do not match expectation. '
+            'Some labels possibly missing.'
             )
-        err = IDPConfGenException(errmsg)
-        # if running through cli_torsions, `err` will be catched and reported
-        # by logger.report_on_crash
-        raise err
+        raise IDPConfGenException(errmsg) from err
 
-    #coords = (data[:, cols_coords].astype(np.float64) * 1000).astype(int)
-    coords = structure.coords
-    #print(coords)
+    try:
+        coords = np.empty((n.shape[0] * 3, 3), dtype=np.float64)
+        coords[0::3, :] = n
+        coords[1::3, :] = ca
+        coords[2::3, :] = c
+    except ValueError as err:
+        errmsg = (
+            'Coordinates do not match expectation. '
+            'Some possibly missing.'
+            )
+        raise IDPConfGenException(errmsg) from err
+
+    coords_distances = np.linalg.norm(coords[:-1, :] - coords[1:, :], axis=1)
+    assert coords_distances.size == coords.shape[0] - 1
+    if np.any(coords_distances > 2.1):
+        errmsg = (
+            'Chain is broken. Found distance above 2.1A for '
+            'consecutive atoms.'
+            )
+        raise IDPConfGenException(errmsg)
+
+    # DEPRECATE / REMOVE
+    # if validate:
+    #    # validates structure data
+    #    # rare are the PDBs that produce errors, still they exist.
+    #    # errors can be from a panoply of sources, that is why I decided
+    #    # not to attempt correcting them further and instead ignore and report.
+    #    validation_labels = validate_backbone_labels_for_torsion(labels)
+    #    if not validation_labels:
+    #        errmsg = (
+    #            'Found errors on backbone label consistency: '
+    #            f'{validation_error}\n'
+    #            )
+    #        err = IDPConfGenException(errmsg)
+    #        # if running through cli_torsions, `err` will be catched and
+    #        # reported by logger.report_on_crash
+    #        raise err
+
+    #    validation_coords = validate_coords_for_backbone_torsions(coords)
+    #    if not validation_coords:
+    #        errmsg = (
+    #            'Found errors on coords consistency: '
+    #            f'{validation_error}\n'
+    #            )
+    #        err = IDPConfGenException(errmsg)
+    #        raise err
+
     torsions = calc_torsion_angles(coords)
 
     if degrees:
@@ -405,7 +481,15 @@ def get_torsions(fdata, degrees=False, decimals=3):
 
 
 def cli_helper_calc_torsions(fname, fdata, **kwargs):
-    """Help `cli_torsion` to operate."""
+    """
+    Help `cli_torsion` to operate.
+
+    Returns
+    -------
+    dict
+        key: `fname`
+        value: -> dict, `phi`, `phi`, `omega` -> list of floats
+    """
     torsions = get_torsions(fdata, **kwargs)
     CA_C, C_N, N_CA = get_separate_torsions(torsions)
     return fname, {'phi': N_CA, 'psi': CA_C, 'omega': C_N}
@@ -414,6 +498,103 @@ def cli_helper_calc_torsions(fname, fdata, **kwargs):
 def cli_helper_calc_torsionsJ(fdata_tuple, **kwargs):
     """Help cli_torsionsJ.py."""
     return fdata_tuple[0], get_torsionsJ(fdata_tuple[1], **kwargs)
+
+
+def get_separate_torsions(torsions_array):
+    """
+    Separate torsion angles according to the protein backbone concept.
+
+    Considers torsion angles for bonds in between atom pairs:
+        - CA - C
+        - C - N
+        - N - CA
+
+    Backbone obeys the order: N-CA-C-N-CA-C(...)
+
+    And the first value corresponds to a CA-C pair, because the
+    first N-CA pair of the protein backbone has no torsion angle.
+    """
+    assert torsions_array.ndim == 1
+    assert torsions_array.size % 3 == 0
+
+    CA_C = torsions_array[::3].tolist()
+    C_N = torsions_array[1::3].tolist()
+    N_CA = torsions_array[2::3].tolist()
+
+    assert len(CA_C) == len(C_N) == len(N_CA)
+    return CA_C, C_N, N_CA
+
+
+# DEPRECATE / REMOVE
+def validate_coords_for_backbone_torsions(coords, minimum=2):
+    """
+    Validate coords for torsions.
+
+    Does NOT validate with values have physical sense. Validates only
+    valid input for `:func:libcalc.calc_torsion_angles`.
+
+    Validations
+    -----------
+
+        * coords are two-dimensional arrays
+        * coords have 3 values in the first dimension (XYZ) (shape[1])
+        * number of coords is multiple of 3.
+
+    Returns
+    -------
+    str
+        A string explaining the error if an error is found.
+        An empty string if no error is found.
+    """
+    if len(coords.shape) != 2:
+        return 'Expected two dimensions {len(coords.shape)} found.'
+
+    if coords.shape[1] != 3:
+        return (
+            'Expected 3 values for XYZ coordinates. '
+            f'Found {coords.shape[1]}'
+            )
+
+    if coords.shape[0] % 3:
+        return (
+            'Expected multiple of 3 (N, CA, C), some coordinates are '
+            'missing.'
+            )
+
+    return ''
+
+
+# DEPRECATE / REMOVE
+def validate_backbone_labels_for_torsion(labels, minimum=2):
+    """
+    Validate labels for torsion angle calculation.
+
+    Assumes labels are aligned with their corresponding coordinates.
+    Yet, coordinates have no scope in this function.
+
+    Excepts only the mininal backbone labels, these are: N, CA, and C.
+
+    Parameters
+    ----------
+    labels : np.array of shape (N,) or alike
+        Where N % 3 equals 0.
+
+    minimum : int
+        The minimum number of residues to consider valid.
+    """
+    if len(labels) / 3 < minimum:
+        return 'Segment too short.'
+
+    if labels[0] != 'N':
+        return 'The first atom is not N, it should be!'
+
+    if len(labels) % 3:
+        return 'Number of backbone atoms is not module of 3.'
+
+    if set(labels) != {'N', 'C', 'CA'}:
+        return 'There are atoms other than N, C and CA.'
+
+    return ''
 
 
 def read_trimer_torsion_planar_angles(pdb, bond_geometry):
@@ -596,10 +777,9 @@ def convert_bond_geo_lib(bond_geo_db):
 
     return converted
 
+
 def bgeo_reduce(bgeo):
-    """
-    Reduce BGEO DB to trimer and residue scopes.
-    """
+    """Reduce BGEO DB to trimer and residue scopes."""
     dres = {}
     dpairs = {}
     for btype in bgeo.keys():
@@ -618,4 +798,3 @@ def bgeo_reduce(bgeo):
                     respairs.extend(bgeo[btype][res][pairs][tor])
 
     return dpairs, dres
-

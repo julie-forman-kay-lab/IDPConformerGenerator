@@ -90,3 +90,26 @@ def test_bgeo_database_reduce():
                     )
 
 
+def test_separate_torsions():
+    """Test separate torsions."""
+    a = np.array([1, 2, 3] * 10)
+    q, w, e = get_separate_torsions(a)
+    assert set(q) == {1}
+    assert set(w) == {2}
+    assert set(e) == {3}
+
+
+@pytest.mark.parametrize(
+    'labels,expected',
+    [
+        (['N', 'CA', 'C'], True),
+        (np.array(['N', 'CA', 'C'] * 10), False),
+        (np.array(['CA', 'N', 'C'] + ['N', 'CA', 'C'] * 9), True),
+        (np.array(['N', 'CA', 'C', 'N'] * 10), True),
+        (np.array(['N', 'CA', 'O'] * 10), True),
+        ]
+    )
+def test_validate_backbone_labels_for_torsions(labels, expected):
+    """Validate Backbone labels for torsions."""
+    assert bool(validate_backbone_labels_for_torsion(labels)) == expected  # noqa: E501
+
