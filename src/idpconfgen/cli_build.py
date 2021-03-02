@@ -122,13 +122,13 @@ def are_globals():
 _name = 'build'
 _help = 'Builds conformers from database.'
 
-_prog, _des, _us = libcli.parse_doc_params(__doc__)
+_prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
 
 ap = libcli.CustomParser(
     prog=_prog,
     description=libcli.detailed.format(_des),
-    usage=_us,
+    usage=_usage,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 # https://stackoverflow.com/questions/24180527

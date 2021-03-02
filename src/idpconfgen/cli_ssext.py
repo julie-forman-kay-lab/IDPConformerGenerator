@@ -31,12 +31,12 @@ LOGFILESNAME = '.idpconfgen_ssext'
 
 _name = 'ssext'
 _help = 'Extract secondary structure elements from PDBs.'
-_prog, _des, _us = libcli.parse_doc_params(__doc__)
+_prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
 ap = libcli.CustomParser(
     prog=_prog,
     description=libcli.detailed.format(_des),
-    usage=_us,
+    usage=_usage,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

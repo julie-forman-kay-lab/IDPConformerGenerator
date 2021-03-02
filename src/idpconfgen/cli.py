@@ -22,10 +22,10 @@ from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
 
-prog_, description_, usage_ = libcli.parse_doc_params(__doc__)
+_prog, _description, _usageage = libcli.parse_doc_params(__doc__)
 
 description = f"""
-{description_}
+{_description}
 
 Individual routines for DB creation:
 
@@ -45,9 +45,9 @@ Other useful routines:
 """
 
 ap = libcli.CustomParser(
-    prog='idpconfgen',  # prog_,
+    prog='idpconfgen',  # _prog,
     description=libcli.detailed.format(description),
-    usage=usage_,
+    usage=_usageage,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 

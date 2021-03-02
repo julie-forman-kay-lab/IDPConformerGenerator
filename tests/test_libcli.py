@@ -115,8 +115,10 @@ def test_add_subparse():
     """Test add subparser."""
     ap = argparse.ArgumentParser(description='description')
     nspace = argparse.Namespace()
+    nspace._prog = 'somecli'
     nspace._name = 'mycli'
     nspace._help = 'cli help message'
+    nspace._usage = 'myusage'
     nspace.main = lambda x: True
     nspace.ap = ap
 
@@ -205,7 +207,7 @@ USAGE:
     def test_usage(self):
         """Test usage string description."""
         expected = (
-            '\n'
+            '\n\n'
             '    $ use the program this way\n'
             '    $ you can also use it like this.\n'
             )
