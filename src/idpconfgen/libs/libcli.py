@@ -124,7 +124,7 @@ def parse_doc_params(docstring):
     doclines = docstring.lstrip().split('\n')
     prog = doclines[0]
     description = '\n'.join(doclines[2:doclines.index('USAGE:')])
-    usage = '\n'.join(doclines[doclines.index('USAGE:') + 1:])
+    usage = '\n' + '\n'.join(doclines[doclines.index('USAGE:') + 1:])
 
     return prog, description, usage
 
@@ -149,7 +149,9 @@ def add_subparser(parser, module):
     """  # noqa: E501
     new_ap = parser.add_parser(
         module._name,
-        description=module.ap.description,
+        usage=module._usage,
+        #prog=module._prog,
+        description=module._prog + '\n\n' + module.ap.description,
         help=module._help,
         parents=[module.ap],
         add_help=False,

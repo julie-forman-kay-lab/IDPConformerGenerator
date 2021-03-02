@@ -56,13 +56,13 @@ VALIDATION_PROTOCOLS = ('vdw2', 'vdw', 'bbl', 'bbd')
 _name = 'validate'
 _help = 'Validate IDP conformers according to criteria.'
 
-_prog, _des, _us = libcli.parse_doc_params(__doc__)
+_prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
 # CLI parameters receive parameters for all the validation tests.
 ap = libcli.CustomParser(
     prog=_prog,
     description=libcli.detailed.format(_des),
-    usage=_us,
+    usage=_usage,
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
