@@ -3978,7 +3978,8 @@ py::array faspr_sidechains( \
     std::vector<double> coords_with_sidechains = main_faspr(xyz, reslabel);
 
     ssize_t              ndim    = 2;
-    std::vector<ssize_t> shape   = {coords_with_sidechains.size() / 3, 3};
+    const int            scsize  = coords_with_sidechains.size();
+    std::vector<ssize_t> shape   = {scsize / 3, 3};
     std::vector<ssize_t> strides = {sizeof(double) * 3 ,sizeof(double)};
 
     // return 2-D NumPy array
