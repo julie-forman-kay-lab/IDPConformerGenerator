@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+import sys
 from functools import partial
 from multiprocessing import Pool, Queue
 # from numbers import Number
@@ -31,6 +32,8 @@ from idpconfgen.core.build_definitions import (
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
+    prepare_slice_dict,
+    read_db_to_slices_single_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -82,7 +85,8 @@ BGEO_res = {}
 # The slice objects from where the builder will feed to extract torsion
 # chunks from ANGLES.
 SLICES = []
-ANGLES = None
+SLICEDICT = None
+ANGLESS = None
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -198,7 +202,7 @@ libcli.add_argument_ncores(ap)
 def main(
         input_seq,
         database,
-        dssp_regexes=r'(?=(L{2,6}))',
+        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -223,9 +227,17 @@ def main(
         remaining_chunks = nconfs % ncores
 
     # populates globals
-    global ANGLES, SLICES
-    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
-    SLICES.extend(_slices)
+    if False:
+        global ANGLES, SLICES
+        _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
+        SLICES.extend(_slices)
+    # #
+
+    # if it is the exact, you need a dictionary
+    global ANGLESS, SLICEDICT
+    primary, ANGLESS = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
+    SLICEDICT = prepare_slice_dict(primary, input_seq)
+    sys.exit(SLICEDICT.keys())
 
     populate_globals(
         input_seq=input_seq,

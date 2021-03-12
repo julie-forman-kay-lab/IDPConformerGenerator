@@ -1,5 +1,6 @@
 """Tools for conformer building operations."""
 import re
+import itertools as it
 from collections import Counter, namedtuple
 from functools import partial
 from itertools import cycle
@@ -29,9 +30,9 @@ from idpconfgen.libs.libcalc import (
     multiply_upper_diagonal_raw_njit,
     sum_upper_diagonal_raw_njit,
     )
-from idpconfgen.libs.libfilter import aligndb, regex_search
+from idpconfgen.libs.libfilter import aligndb, regex_search, regex_forward_with_overlap
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import translate_seq_to_3l
+from idpconfgen.libs.libparse import translate_seq_to_3l, get_mers
 from idpconfgen.libs.libtimer import timeme
 
 
@@ -424,6 +425,78 @@ def read_db_to_slices(database, dssp_regexes, ncores=1):
     log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
 
     return slices, angles
+
+
+def read_db_to_slices_single_secondary_structure(database, ss_regex):
+    """
+    Read slices in the DB that belong to a single secondary structure.o
+
+    Concatenates primary sequences accordingly.
+    """
+    print('ss_regex, ', ss_regex)
+    db = read_dictionary_from_disk(database)
+    timed = partial(timeme, aligndb)
+    pdbs, angles, dssp, resseq = timed(db)
+
+    loop_slices = regex_search(dssp, ss_regex[0])
+    loop_seqs = []
+    lsa = loop_seqs.append
+    for slc in loop_slices:
+        lsa(resseq[slc])
+
+    primary = '|'.join(loop_seqs)
+
+    omega = []
+    phi = []
+    psi = []
+
+    oe = omega.extend
+    he = phi.extend
+    se = psi.extend
+    oa = omega.append
+    ha = phi.append
+    sa = psi.append
+
+    for s in loop_slices:
+        oe(angles[s, 0])
+        he(angles[s, 1])
+        se(angles[s, 2])
+        oa(np.nan)
+        ha(np.nan)
+        sa(np.nan)
+
+    omega.pop()
+    phi.pop()
+    psi.pop()
+
+    _omega = np.array(omega)
+    _phi = np.array(phi)
+    _psi = np.array(psi)
+
+    seq_angles = np.array([_omega, _phi, _psi]).T
+
+    assert seq_angles.shape[0] == len(primary)
+
+    del omega, phi, psi
+    return primary, seq_angles
+
+
+def prepare_slice_dict(primary, inseq):
+    """."""
+    monomers = get_mers(inseq, 1)
+    dimers = get_mers(inseq, 2)
+    trimers = get_mers(inseq, 3)
+    quadmers = get_mers(inseq, 4)
+    pentamers = get_mers(inseq, 5)
+
+    slice_dict = {}
+    mers = (i for i in it.chain(monomers, dimers, trimers, quadmers, pentamers))
+    for mer in mers:
+        print(mer, type(mer))
+        merregex = f'(?=({mer}))'
+        slice_dict[mer] = regex_forward_with_overlap(inseq, merregex)
+
+    return slice_dict
 
 
 # Other functions should have the same API:

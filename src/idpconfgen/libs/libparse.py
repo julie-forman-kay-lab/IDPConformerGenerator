@@ -298,6 +298,7 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
 
 
 # njit available
+# domain specific
 def get_trimer_seq(seq, idx):
     pre = seq[idx - 1] if idx > 0 else 'G'
     curr_res = seq[idx]
@@ -307,6 +308,23 @@ def get_trimer_seq(seq, idx):
         pos = 'G'
 
     return curr_res, pre + pos
+
+
+def get_mers(seq, size):
+    """
+    Get X-mers from seq.
+
+    Example
+    -------
+    >>> get_mers('MEAIKHD', 3)
+    {'MEA', 'EAI', 'AIK', 'KHD'}
+
+    """
+    mers = []
+    mersa = mers.append
+    for i in range(len(seq) - (size - 1)):
+        mersa(seq[i:i + size])
+    return set(mers)
 
 
 # TODO: correct for HIS/HIE/HID/HIP
