@@ -1,11 +1,12 @@
 """Tools for conformer building operations."""
 import re
 import itertools as it
-from collections import Counter, namedtuple
+from collections import Counter, defaultdict, namedtuple
 from functools import partial
 from itertools import cycle
 
 import numpy as np
+from numba import njit
 
 import idpcpp
 from idpconfgen import log
@@ -441,10 +442,13 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     loop_slices = regex_search(dssp, ss_regex[0])
     loop_seqs = []
     lsa = loop_seqs.append
+    LS = []
     for slc in loop_slices:
         lsa(resseq[slc])
+        LS.append(dssp[slc])
 
     primary = '|'.join(loop_seqs)
+    assert set(''.join(LS)) == set(['L'])
 
     omega = []
     phi = []
@@ -456,14 +460,15 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     oa = omega.append
     ha = phi.append
     sa = psi.append
+    nan = np.nan
 
     for s in loop_slices:
         oe(angles[s, 0])
         he(angles[s, 1])
         se(angles[s, 2])
-        oa(np.nan)
-        ha(np.nan)
-        sa(np.nan)
+        oa(nan)
+        ha(nan)
+        sa(nan)
 
     omega.pop()
     phi.pop()
@@ -478,6 +483,8 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     assert seq_angles.shape[0] == len(primary)
 
     del omega, phi, psi
+    with open('ARRAY', 'w') as fout:
+        np.savetxt(fout, seq_angles)
     return primary, seq_angles
 
 
@@ -486,15 +493,21 @@ def prepare_slice_dict(primary, inseq):
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
     trimers = get_mers(inseq, 3)
-    quadmers = get_mers(inseq, 4)
+    tetramers = get_mers(inseq, 4)
     pentamers = get_mers(inseq, 5)
 
-    slice_dict = {}
-    mers = (i for i in it.chain(monomers, dimers, trimers, quadmers, pentamers))
+    slice_dict = defaultdict(dict)
+    mers = (i for i in it.chain(monomers, dimers, trimers, tetramers, pentamers))
     for mer in mers:
-        print(mer, type(mer))
+        lmer = len(mer)
         merregex = f'(?=({mer}))'
-        slice_dict[mer] = regex_forward_with_overlap(inseq, merregex)
+        print(merregex)
+        slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
+        if not slice_dict[lmer][mer]:
+            print('EMPTY, ', mer)
+            slice_dict[lmer].pop(mer)
+        #for _s in slice_dict[lmer][mer]:
+            #assert '|' not in inseq[_s]
 
     return slice_dict
 
@@ -963,6 +976,34 @@ def create_sidechains_masks_per_residue(
     return ss
 
 
+# njit available
+def get_indexes_from_primer_length(
+        sequence,
+        plen,
+        current_residue):
+    """
+    """
+    if plen == 1:
+        return current_residue
+    elif plen == 2:
+        return sequence[current_residue: current_residue + 2]
+    elif plen == 3:
+        return sequence[current_residue - 1: current_residue + 3]
+    elif plen == 4:
+        return sequence[current_residue - 1: current_residue + 4]
+    elif plen == 5:
+        return sequence[current_residue - 2: current_residue + 5]
+    elif plen == 6:
+        return sequence[current_residue - 2: current_residue + 6]
+    elif plen == 7:
+        return sequence[current_residue - 3: current_residue + 7]
+
+
+
+
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
+
+
+get_idx_primer_njit = njit(get_indexes_from_primer_length)

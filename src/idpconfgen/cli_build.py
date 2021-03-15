@@ -13,7 +13,7 @@ import sys
 from functools import partial
 from multiprocessing import Pool, Queue
 # from numbers import Number
-from random import choice as randchoice
+#from random import choice as randchoice
 from random import randint
 from time import time
 
@@ -49,6 +49,7 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q,
     make_coord_Q_COO,
     make_coord_Q_planar,
+    make_seq_probabilities,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     rrd10_njit,
@@ -84,9 +85,10 @@ BGEO_res = {}
 # it is not expected SLICES or ANGLES to be populated anywhere else.
 # The slice objects from where the builder will feed to extract torsion
 # chunks from ANGLES.
+ANGLES = None
 SLICES = []
 SLICEDICT = None
-ANGLESS = None
+XMERPROBS = None
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -227,17 +229,17 @@ def main(
         remaining_chunks = nconfs % ncores
 
     # populates globals
-    if False:
-        global ANGLES, SLICES
-        _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
-        SLICES.extend(_slices)
+    #if False:
+    #    global ANGLES, SLICES
+    #    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
+    #    SLICES.extend(_slices)
     # #
 
     # if it is the exact, you need a dictionary
-    global ANGLESS, SLICEDICT
-    primary, ANGLESS = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
+    global ANGLES, SLICEDICT, XMERPROBS
+    primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
     SLICEDICT = prepare_slice_dict(primary, input_seq)
-    sys.exit(SLICEDICT.keys())
+    XMERPROBS = make_seq_probabilities(list(SLICEDICT.keys()), reverse=True)
 
     populate_globals(
         input_seq=input_seq,
@@ -524,7 +526,7 @@ def conformer_generator(
     PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RAD_60 = np.radians(60)
-    RC = randchoice
+    RC = np.random.choice
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
     RRD10 = rrd10_njit
@@ -540,6 +542,9 @@ def conformer_generator(
     global TEMPLATE_LABELS
     global TEMPLATE_MASKS
     global TEMPLATE_EFUNC
+    global XMERPROBS
+    global SLICEDICT
+    slices_dict_keys = list(SLICEDICT.keys())
 
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function
@@ -708,6 +713,7 @@ def conformer_generator(
         number_of_trials3 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
+            print(bbi)
 
             # I decided to use an if-statement here instead of polymorph
             # the else clause to a `generative_function` variable because
@@ -724,14 +730,40 @@ def conformer_generator(
                 # following `aligndb` function,
                 # `angls` will always be cyclic with:
                 # omega - phi - psi - omega - phi - psi - (...)
-                agls = angles[RC(slices), :].ravel()
+                #agls = angles[RC(slices), :].ravel()
                 # agls = angles[:, :].ravel()
 
+                #primer_template = get_idx_primer_njit(
+                #    all_atom_input_seq,
+                #    RC(slices_dict_keys, p=XMERPROBS),
+                #    calc_residue_num_from_index(bbi - 1),
+                #    )
+
+                # algorithm for adjacent building
+                _cr = calc_residue_num_from_index(bbi - 1)
+                plen = RC(slices_dict_keys, p=XMERPROBS)
+                primer_template = all_atom_input_seq[_cr: _cr + plen]
+                plen = len(primer_template)
+                while 1:
+                    try:
+                        agls = angles[RC(SLICEDICT[plen][primer_template]), :].ravel()
+                    except KeyError as err:
+                        print('key error, decreasing')
+                        plen -= 1
+                        primer_template = primer_template[:-1]
+                        continue
+                    break
+
+                assert not np.any(np.isnan(agls))
+
             # index at the start of the current cycle
+            from itertools import cycle
+            PRIMER = cycle(primer_template)
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
                     current_res_number = calc_residue_num_from_index(bbi - 1)
+                    assert all_atom_input_seq[current_res_number] == next(PRIMER)
                     curr_res, tpair = GET_TRIMER_SEQ(
                         all_atom_input_seq,
                         current_res_number,
@@ -971,6 +1003,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
+        print(all_atom_coords)
         yield all_atom_coords
         conf_n += 1
 
