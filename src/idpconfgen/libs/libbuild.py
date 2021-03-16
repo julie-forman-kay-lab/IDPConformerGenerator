@@ -488,7 +488,14 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     return primary, seq_angles
 
 
-def prepare_slice_dict(primary, inseq):
+#def _get_slices(slen):
+#    xmer = get_mers(inque, slen)
+#    slices = {}
+#    for mer in xmer:
+#        slices[ 
+
+
+def prepare_slice_dict(primary, inseq, ncores=1):
     """."""
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
