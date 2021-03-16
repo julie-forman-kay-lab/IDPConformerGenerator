@@ -497,6 +497,7 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
 
 def prepare_slice_dict(primary, inseq, ncores=1):
     """."""
+    print('preparing regex xmers')
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
     trimers = get_mers(inseq, 3)
@@ -508,10 +509,8 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     for mer in mers:
         lmer = len(mer)
         merregex = f'(?=({mer}))'
-        print(merregex)
         slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
         if not slice_dict[lmer][mer]:
-            print('EMPTY, ', mer)
             slice_dict[lmer].pop(mer)
         #for _s in slice_dict[lmer][mer]:
             #assert '|' not in inseq[_s]

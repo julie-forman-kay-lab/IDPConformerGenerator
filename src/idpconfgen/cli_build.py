@@ -731,7 +731,7 @@ def conformer_generator(
         number_of_trials3 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
-            print(bbi)
+            #print(bbi)
 
             # I decided to use an if-statement here instead of polymorph
             # the else clause to a `generative_function` variable because
@@ -1025,7 +1025,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
-        print(all_atom_coords)
+        #print(all_atom_coords)
         yield all_atom_coords
         conf_n += 1
 
@@ -1101,21 +1101,48 @@ def get_adjacent_angles(
         RC=np.random.choice,
         ):
 
+    max_opt = max(options)
+    min_opt = min(options)
+    all_proline = 'P' * (max_opt - min_opt + 1)
+    max_opt_p1 = max_opt + 1
+
     def func(aidx):
         cr = calc_residue_num_from_index(aidx)
         plen = RC(options, p=probs)
         primer_template = seq[cr: cr + plen]
-        plen = len(primer_template)
+        plen = len(primer_template)  # needed because of the end of the protein
+
+        if seq[cr: cr + max_opt_p1] == all_proline:
+            print('ALL PROLINES')
+            pass
+
+        else:
+            while seq[cr + plen: cr + plen + 1] == 'P':
+                print('ENTERED PROLINE!', primer_template, seq[cr: cr+plen+1])
+                if plen == max_opt:
+                    plen = min_opt
+                    #primer_template = seq[cr: cr + plen]
+
+                #elif plen == min_opt:
+                else:
+                    plen += 1
+                    primer_template = seq[cr: cr + plen]
+
+        count = 1
+        while not seq[cr + plen: cr + plen + 1] == 'P' and count < max_opt:
+            plen = plen + 1 if plen < max_opt else min_opt
+            count += 1
+
         while plen > 1:
-            try:
-                agls = db[RC(slice_dict[plen][primer_template]), :].ravel()
-            except KeyError as err:
-                plen -= 1
-                primer_template = primer_template[:-1]
-                continue
+            if not primer_template[-1] == 'P':
+                try:
+                    agls = db[RC(slice_dict[plen][primer_template[:-1]]), :].ravel()
+                except KeyError as err:
+                    plen -= 1
+                    primer_template = primer_template[:-1]
+                    continue
             break
         else:
-            print('finishing with, ', primer_template)
             agls = db[RC(slicemonomers[primer_template])].ravel()
 
         assert primer_template
