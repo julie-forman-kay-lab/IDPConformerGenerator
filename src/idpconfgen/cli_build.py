@@ -1107,9 +1107,6 @@ def get_adjacent_angles(
         ):
 
     max_opt = max(options)
-    min_opt = min(options)
-    all_proline = 'P' * (max_opt - min_opt + 1)
-    max_opt_p1 = max_opt + 1
 
     def func(aidx):
         print('Entering new angle collection ----------------------------', aidx)
