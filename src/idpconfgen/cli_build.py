@@ -776,6 +776,8 @@ def conformer_generator(
                 #assert not np.any(np.isnan(agls))
                 primer_template, agls = GET_ADJ(bbi - 1)
 
+
+            #print(primer_template)
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
             try:
@@ -1107,43 +1109,88 @@ def get_adjacent_angles(
     max_opt_p1 = max_opt + 1
 
     def func(aidx):
+        print('Entering new angle collection ----------------------------')
+        # calculates the current residue number from the atom index
         cr = calc_residue_num_from_index(aidx)
+
+        # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
+
+        # defines the chunk identity accordingly
         primer_template = seq[cr: cr + plen]
-        plen = len(primer_template)  # needed because of the end of the protein
+        next_residue = seq[cr + plen]
 
-        if seq[cr: cr + max_opt_p1] == all_proline:
-            print('ALL PROLINES')
-            pass
+        # recalculates the plen to avoid plen/template inconsistencies that
+        # occur if the plen is higher then the number of
+        # residues until the end of the protein.
+        plen = len(primer_template)
+        print('L/PT/NR: ', plen, primer_template, next_residue)
 
-        else:
-            while seq[cr + plen: cr + plen + 1] == 'P':
-                print('ENTERED PROLINE!', primer_template, seq[cr: cr+plen+1])
-                if plen == max_opt:
-                    plen = min_opt
-                    #primer_template = seq[cr: cr + plen]
-
-                #elif plen == min_opt:
-                else:
-                    plen += 1
-                    primer_template = seq[cr: cr + plen]
-
-        count = 1
-        while not seq[cr + plen: cr + plen + 1] == 'P' and count < max_opt:
-            plen = plen + 1 if plen < max_opt else min_opt
-            count += 1
-
-        while plen > 1:
-            if not primer_template[-1] == 'P':
+        # Now the tricky loop to accommodate the very special case of prolines.
+        template_not_found_once = False
+        while 1 < plen <= max_opt:
+            cr_plen = cr + plen
+            # Confirms the next residue to the template is NOT a proline
+            if seq[cr_plen: cr_plen + 1] != 'P':
                 try:
-                    agls = db[RC(slice_dict[plen][primer_template[:-1]]), :].ravel()
+                    # attempts to retrieve angles to the template, exact sequence
+                    # match
+                    agls = db[RC(slice_dict[plen][primer_template]), :].ravel()
+
+                # in case the template is not present in the database. It may
+                # occur for pentamers, perhaps some tetramers.
                 except KeyError as err:
+                    # reduces the size of the template by 1
+                   # if primer_template[-1] == 'P':
+                   #     plen -= 2
+                   #     primer_template = primer_template[:-2]
+                   # else:
+                    plen -= 1
+                    primer_template = primer_template[:1]
+                    # if a certain primer template was not found, that means
+                    # no larger primer will be found. Therefore, any change in
+                    # plen or primer_template has to go towards reducing the
+                    # length.
+                    template_not_found_once = True
+                    continue
+                else:
+                    # if the angles are found, there is nothing more to do
+                    break
+            else:
+                # if the template was not found, makes no sense to increase its
+                # size, hence, we reduce it.
+                print('it has a proline', plen, primer_template, seq[cr: cr_plen + 1])
+                if template_not_found_once:
                     plen -= 1
                     primer_template = primer_template[:-1]
-                    continue
-            break
+                # if we never actually attempted retrieving angles, so we
+                # increase template size.
+                else:
+                    plen += 1
+                    primer_template = seq[cr:cr + plen]
+        # beautiful while/else.
+        # only executes if the template grew to large or too short.
         else:
-            agls = db[RC(slicemonomers[primer_template])].ravel()
+            print('entered the while else')
+            # template grew too large, most likely because of the presence of
+            # many consecutive prolines. Reduce the template to two residues
+            # search for the pair considering the consecutive residue, but build
+            # only the first residue in the pair. That is, the current residue
+            if plen > max_opt:
+                plen = 2
+                primer_template = seq[cr:cr + plen]
+                agls = db[RC(slice_dict[plen][primer_template]), :].ravel()[:3]
+                print('sending just one')
+
+            elif plen == 1:
+                primer_template = seq[cr]
+                # this should only happen at the end of the chain
+                agls = db[RC(slicemonomers[primer_template]), :].ravel()
+                print('the conformer ended')
+            else:
+                log.debug(plen, primer_template, seq[cr:cr + plen])
+                # raise AssertionError to avoid `python -o` silencing
+                raise AssertionError('The code should not arrive here')
 
         assert primer_template
         assert not np.any(np.isnan(agls))

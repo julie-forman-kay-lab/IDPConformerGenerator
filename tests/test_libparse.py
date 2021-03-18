@@ -236,3 +236,19 @@ def test_pop_dict_differece_2():
     d2 = dict.fromkeys(range(10))
     libparse.pop_difference_with_log(d1, d2)
     assert d1.keys() == d2.keys()
+
+
+@pytest.mark.parametrize(
+    'seq,i1,i2,expected',
+    [
+        ('QWERTY', 1, 3, 'WER'),
+        ('QWERTY', 1, 10, 'WERTY'),
+        ('QWERTY', 1, 1, 'W'),
+        ('QWERTY', 0, 1, 'Q'),
+        ('QWERTY', 0, 4, 'QWER'),
+        ]
+    )
+def test_get_last_residue(seq, i1, i2, expected):
+    """."""
+    result = get_seq_chunk(seq, i1, i2)
+    assert result == expected

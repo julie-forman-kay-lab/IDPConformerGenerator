@@ -34,7 +34,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libfilter import aligndb, regex_search, regex_forward_with_overlap
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import translate_seq_to_3l, get_mers
-from idpconfgen.libs.libtimer import timeme
+from idpconfgen.libs.libtimer import ProgressWatcher, timeme
 
 
 # Variables related to the sidechain building process.
@@ -506,14 +506,16 @@ def prepare_slice_dict(primary, inseq, ncores=1):
 
     slice_dict = defaultdict(dict)
     mers = (i for i in it.chain(monomers, dimers, trimers, tetramers, pentamers))
-    for mer in mers:
-        lmer = len(mer)
-        merregex = f'(?=({mer}))'
-        slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
-        if not slice_dict[lmer][mer]:
-            slice_dict[lmer].pop(mer)
-        #for _s in slice_dict[lmer][mer]:
-            #assert '|' not in inseq[_s]
+    with ProgressWatcher(mers) as PW:
+        for mer in mers:
+            lmer = len(mer)
+            merregex = f'(?=({mer}))'
+            slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
+            if not slice_dict[lmer][mer]:
+                slice_dict[lmer].pop(mer)
+            #for _s in slice_dict[lmer][mer]:
+                #assert '|' not in inseq[_s]
+            PW.increment()
 
     return slice_dict
 
