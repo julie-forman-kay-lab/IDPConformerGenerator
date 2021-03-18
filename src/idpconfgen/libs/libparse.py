@@ -326,10 +326,17 @@ def get_mers(seq, size):
         mersa(seq[i:i + size])
     return set(mers)
 
+
 # njit available
 def get_seq_chunk(seq, idx, size):
     """Get a chunk from sequence at start at `idx` with `size`."""
     return seq[idx: idx + size]
+
+
+# njit available
+def get_seq_next_residue(seq, idx, size):
+    """Get the next residue after the chunk."""
+    return seq[idx + size: idx + size + 1]
 
 
 # TODO: correct for HIS/HIE/HID/HIP
@@ -347,3 +354,4 @@ def translate_seq_to_3l(input_seq):
 
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
+get_seq_next_residue_njit = njit(get_seq_next_residue)

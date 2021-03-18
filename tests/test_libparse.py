@@ -246,9 +246,35 @@ def test_pop_dict_differece_2():
         ('QWERTY', 1, 1, 'W'),
         ('QWERTY', 0, 1, 'Q'),
         ('QWERTY', 0, 4, 'QWER'),
+        ('QWERTY', 5, 1, 'Y'),
+        ('QWERTY', 5, 2, 'Y'),
+        ('QWERTY', 5, 3, 'Y'),
+        ('QWERTY', 5, 4, 'Y'),
+        ('QWERTY', 5, 30, 'Y'),
         ]
     )
-def test_get_last_residue(seq, i1, i2, expected):
+def test_get_chunk(seq, i1, i2, expected):
     """."""
-    result = get_seq_chunk(seq, i1, i2)
+    result = libparse.get_seq_chunk_njit(seq, i1, i2)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'seq,i1,i2,expected',
+    [
+        ('QWERTY', 1, 3, 'T'),
+        ('QWERTY', 1, 10, ''),
+        ('QWERTY', 1, 1, 'E'),
+        ('QWERTY', 0, 1, 'W'),
+        ('QWERTY', 0, 4, 'T'),
+        ('QWERTY', 5, 1, ''),
+        ('QWERTY', 5, 2, ''),
+        ('QWERTY', 5, 3, ''),
+        ('QWERTY', 5, 4, ''),
+        ('QWERTY', 5, 30, ''),
+        ]
+    )
+def test_get_next_residue(seq, i1, i2, expected):
+    """."""
+    result = libparse.get_seq_next_residue_njit(seq, i1, i2)
     assert result == expected
