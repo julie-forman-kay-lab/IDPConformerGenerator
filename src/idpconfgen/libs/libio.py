@@ -374,6 +374,24 @@ def read_dict_from_tar(path):
 
 
 # USED OKAY
+def read_FASTAS_from_file(fpath):
+    """Read FASTA sequence from file."""
+    fastas = defaultdict(list)
+    key = 1
+    with open(fpath, 'r') as fout:
+        for line in fout:
+            if line.startswith('>'):
+                key = line
+            else:
+                seq = line.strip().replace(' ', '')
+                assert ' ' not in seq
+                assert seq.isupper()
+                fastas[key].extend(seq)
+
+    return fastas
+
+
+# USED OKAY
 def read_PDBID_from_folder(folder):
     """
     Read PDBIDs from folder.

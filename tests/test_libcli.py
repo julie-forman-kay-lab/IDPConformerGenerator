@@ -90,6 +90,9 @@ def test_checkext(ext, args):
     assert result.e == args
 
 
+def test_SeqOrFasta(in1, expected):
+
+
 def test_checkext_error():
     """Check Ext with error."""
     ap = argparse.ArgumentParser()
