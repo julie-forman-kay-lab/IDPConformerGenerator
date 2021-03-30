@@ -67,7 +67,6 @@ from idpconfgen.libs.libparse import (
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
 
-
 _file = Path(__file__).myparents()
 
 # Global variables needed to build conformers.
@@ -202,6 +201,14 @@ ap.add_argument(
         'Defaults to `None`, uses the internal library.'
         ),
     default=None,
+    )
+
+ap.add_argument(
+    '-et',
+    '--energy-threshold',
+    help='The energy threshold after which conformers/chunks will be rejected',
+    default=10.0,
+    type=float,
     )
 
 libcli.add_argument_ncores(ap)
@@ -408,6 +415,7 @@ def conformer_generator(
         generative_function=None,
         disable_sidechains=True,
         sidechain_method='faspr',
+        energy_threshold=10,
         bgeo_path=None,
         forcefield=None,
         lj_term=True,
@@ -777,6 +785,7 @@ def conformer_generator(
                 #assert primer_template
                 #assert not np.any(np.isnan(agls))
                 primer_template, agls = GET_ADJ(bbi - 1)
+                #print('received primer: ', primer_template)
 
 
             #print(primer_template)
@@ -921,9 +930,10 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
+            #print(total_energy)
 
-            if total_energy > 10:
-                print('---------- energy positive')
+            if total_energy > energy_threshold:
+                #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1109,7 +1119,7 @@ def get_adjacent_angles(
     max_opt = max(options)
 
     def func(aidx):
-        print('Entering new angle collection ----------------------------', aidx)
+        #print('Entering new angle collection ----------------------------', aidx)
         # calculates the current residue number from the atom index
         cr = calc_residue_num_from_index(aidx)
 
@@ -1128,7 +1138,7 @@ def get_adjacent_angles(
         # Now the tricky loop to accommodate the very special case of prolines.
         template_not_found_once = False
         while 1 < plen <= max_opt:
-            print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
+            #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
             # Confirms the next residue to the template is NOT a proline
             if next_residue != 'P':
                 try:
@@ -1146,7 +1156,7 @@ def get_adjacent_angles(
                     #     plen -= 2
                     #     primer_template = primer_template[:-2]
                     # else:
-                    print('KeyError found, decreasing plen')
+                    #print('KeyError found, decreasing plen')
                     plen -= 1
                     next_residue = primer_template[-1]
                     primer_template = primer_template[:-1]
@@ -1159,7 +1169,7 @@ def get_adjacent_angles(
             else:
                 # if the template was not found, makes no sense to increase its
                 # size, hence, we reduce it.
-                print('it has a proline')
+                #print('it has a proline')
                 if template_not_found_once:
                     plen -= 1
                     next_residue = primer_template[-1]
@@ -1173,7 +1183,7 @@ def get_adjacent_angles(
         # beautiful while/else.
         # only executes if the template grew to large or too short.
         else:
-            print('entered the while else')
+            #print('entered the while else')
             # template grew too large, most likely because of the presence of
             # many consecutive prolines. Reduce the template to two residues
             # search for the pair considering the consecutive residue, but build
@@ -1182,13 +1192,13 @@ def get_adjacent_angles(
                 plen = 2
                 primer_template = get_seq_chunk_njit(seq, cr, plen)
                 agls = db[RC(slice_dict[plen][primer_template]), :].ravel()[:3]
-                print('sending just one', plen, primer_template)
+                #print('sending just one', plen, primer_template)
 
             elif plen == 1:
                 primer_template = seq[cr]
                 # this should only happen at the end of the chain
                 agls = db[RC(slicemonomers[primer_template]), :].ravel()
-                print('the conformer ended', cr)
+                #print('the conformer ended', cr)
             else:
                 log.debug(plen, primer_template, seq[cr:cr + plen])
                 # raise AssertionError to avoid `python -o` silencing
