@@ -248,7 +248,7 @@ def main(
     #    SLICES.extend(_slices)
     # #
 
-    # if it is the exact, you need a dictionary
+    # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_MONOMERS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
     SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq)
@@ -568,11 +568,7 @@ def conformer_generator(
     global XMERPROBS
     global SLICEDICT_MONOMERS
     global SLICEDICT_XMERS
-    #slices_dict_keys = list(SLICEDICT_XMERS.keys())
     global GET_ADJ
-    #get_adj = get_adjacent_angles(slices_dict_keys, XMERPROBS, all_atom_input_seq)
-    #assert get_adj
-    #print(get_adj)
 
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function
@@ -768,27 +764,11 @@ def conformer_generator(
                 #    )
 
                 # algorithm for adjacent building
-                #_cr = calc_residue_num_from_index(bbi - 1)
-                #plen = RC(slices_dict_keys, p=XMERPROBS)
-                #primer_template = all_atom_input_seq[_cr: _cr + plen]
-                #plen = len(primer_template)
-                #while 1:
-                #    try:
-                #        agls = angles[RC(SLICEDICT_XMERS[plen][primer_template]), :].ravel()
-                #    except KeyError as err:
-                #        print('key error, decreasing')
-                #        plen -= 1
-                #        primer_template = primer_template[:-1]
-                #        continue
-                #    break
-
-                #assert primer_template
-                #assert not np.any(np.isnan(agls))
+                # TODO
+                # primer_template here is used temporarily, and needs to be
+                # removed when get_adj becomes an option
                 primer_template, agls = GET_ADJ(bbi - 1)
-                #print('received primer: ', primer_template)
 
-
-            #print(primer_template)
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
             try:
@@ -797,6 +777,7 @@ def conformer_generator(
                     current_res_number = calc_residue_num_from_index(bbi - 1)
 
                     # assert the residue being built is of the same nature as the one in the angles
+                    # TODO: remove this assert
                     assert all_atom_input_seq[current_res_number] == next(PRIMER)
 
                     curr_res, tpair = GET_TRIMER_SEQ(
@@ -1115,6 +1096,31 @@ def get_adjacent_angles(
         slicemonomers,
         RC=np.random.choice,
         ):
+    """
+    Get angles to build the next adjacent protein chunk.
+
+    Parameters
+    ----------
+    options : list
+        The length of the possible chunk sizes.
+
+    probs : list
+        A list with the relative probabilites to select from `options`.
+
+    seq : str
+        The conformer sequence.
+
+    db : dict-like
+        The angle omega/phi/psi database.
+
+    slice_dict : dict-like
+        A dictionary containing the chunks strings as keys and as values
+        lists with slice objects.
+
+    slicemonomers : dict-like
+        The same as `slice_dict` but containing information only for
+        monomers.
+    """
 
     max_opt = max(options)
 
