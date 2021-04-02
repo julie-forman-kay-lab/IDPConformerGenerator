@@ -3,13 +3,12 @@ channels:
     - conda-forge
     - defaults
 dependencies:
-    - python=3.7
-    - matplotlib=3
+    - python>=3.7,<3.10
     - numpy=1
-    - numba
-    - pybind11
-    - scipy
+    - numba>=0.53.0
+    - pybind11=2
+    - scipy=1
     - pip
-    - tox
+    - tox=3
     - pip:
         - tox-conda
