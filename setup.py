@@ -84,10 +84,10 @@ setup(
         ],
     python_requires='>=3.7.*,<4',
     install_requires=[
-        'numpy>=1,<2',
-        'numba>=0.53.0',
-        'scipy>=1,<2',
-        'pybind11>=2,<3',
+        #'numpy>=1,<2',
+        #'numba>=0.53.0',
+        #'scipy>=1,<2',
+        #'pybind11>=2,<3',
         ],
     extras_require={
         # eg:
