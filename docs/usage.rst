@@ -19,6 +19,6 @@ both will output the help menu.
 IDP Conf Gen Library
 --------------------
 
-To use IDP Conformer Generator in a project::
+To use IDP Conformer Generator in your project, import it as a library::
 
     import idpconfgen

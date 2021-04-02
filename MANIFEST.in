@@ -17,7 +17,7 @@ include CONTRIBUTING.rst
 include LICENSE
 include README.rst
 
-include tox.ini .travis.yml
+include tox.ini
 
 exclude PULLREQUEST.rst
 exclude REQUIREMENTS.md
