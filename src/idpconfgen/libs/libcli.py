@@ -199,6 +199,7 @@ def add_version(parser):
 # --replace               : replace (whatever shalls replace)
 # -rd, --reduced          : reduces secondary structure representation
 # -rn, --record-name      : PDB RECORD name
+# -rs, --random-seed      : define a random seed
 # -u, --update            : update (whatever shalls update)
 # -vdWt --vdW-tolerance   : vdW tolerance (vdW_A + vdW_B - tolerance)
 # -vdWr --vdW-radii       : the vdW radii set
@@ -404,6 +405,20 @@ def add_argument_record(parser):
         default=('ATOM', 'HETATM'),
         action=ArgsToTuple,
         nargs='+',
+        )
+
+
+def add_argument_random_seed(parser):
+    """Add argument to select a random seed number."""
+    parser.add_argument(
+        '-rs',
+        '--random-seed',
+        help=(
+            'Define a random seed number for reproducibility. '
+            'Defaults to 0.'
+            ),
+        default=0,
+        type=int,
         )
 
 
