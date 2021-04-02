@@ -1,4 +1,5 @@
 """Test libparse module."""
+import shutil
 from pathlib import Path as Path_
 
 import pytest
@@ -207,17 +208,14 @@ def test_split_pdb_by_dssp_minimum():
         next(sgen)
 
 
+@pytest.mark.skipif(not shutil.which('mkdssp'), reason="requires mkdssp")
 def test_mkdssp_w_split(BTE_A_results):
     """."""
-    try:
-        sgen = libparse.mkdssp_w_split(
-            Path(tcommons.data_folder, '1BTE_A.pdb'),
-            'mkdssp',
-            reduced=True,
-            )
-    except FileNotFoundError:
-        # in case mkdssp is not installed in the running machine
-        return
+    sgen = libparse.mkdssp_w_split(
+        Path(tcommons.data_folder, '1BTE_A.pdb'),
+        'mkdssp',
+        reduced=True,
+        )
 
     _perform_dssp_split(sgen, BTE_A_results)
 
