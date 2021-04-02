@@ -98,6 +98,7 @@ GET_ADJ = None
 # keeps a record of the conformer numbers written to disk across the different
 # cores
 CONF_NUMBER = Queue()
+RANDOMSEEDS = Queue()
 
 # The conformer building process needs data structures for two different
 # identities: the all-atom representation of the input sequence, and the
@@ -211,6 +212,7 @@ ap.add_argument(
     type=float,
     )
 
+libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
 
@@ -223,6 +225,7 @@ def main(
         bgeo_path=None,
         nconfs=1,
         ncores=1,
+        random_seed=0,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -233,13 +236,13 @@ def main(
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
-        core_chunks = nconfs
+        conformers_per_core = nconfs
         remaining_chunks = 0
     else:
-        core_chunks = nconfs // ncores
+        conformers_per_core = nconfs // ncores
         # in case nconfs is not multiple of ncores, builds the remaining confs
         # at the end
-        remaining_chunks = nconfs % ncores
+        remaining_confs = nconfs % ncores
 
     # populates globals
     #if False:
@@ -269,6 +272,11 @@ def main(
         forcefield=forcefields[forcefield],
         **kwargs)
 
+    # create different random seeds for the different cores
+    # seeds created to the cores based on main seed are predictable
+    for i in range(ncores + bool(remaining_confs)):
+        RANDOMSEEDS.put(random_seed + i)
+
     # creates a queue of numbers that will serve all subprocesses.
     # Used to name the output files, conformer_1, conformer_2, ...
     for i in range(1, nconfs + 1):
@@ -278,7 +286,7 @@ def main(
     execute = partial(
         _build_conformers,
         input_seq=input_seq,  # string
-        nconfs=core_chunks,  # int
+        nconfs=conformers_per_core,  # int
         **kwargs,
         )
 
@@ -288,8 +296,8 @@ def main(
         for _ in imap:
             pass
 
-    if remaining_chunks:
-        execute(core_chunks * ncores, nconfs=remaining_chunks)
+    if remaining_confs:
+        execute(conformers_per_core * ncores, nconfs=remaining_confs)
 
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
 
@@ -384,7 +392,10 @@ def _build_conformers(
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
 
-    builder = conformer_generator(input_seq=input_seq, **kwargs)
+    builder = conformer_generator(
+        input_seq=input_seq,
+        random_seed=RANDOMSEEDS.get(),
+        **kwargs)
 
     atom_labels, residue_numbers, residue_labels = next(builder)
 
@@ -420,6 +431,7 @@ def conformer_generator(
         forcefield=None,
         lj_term=True,
         coulomb_term=False,
+        random_seed=0,
         ):
     """
     Build conformers.
@@ -529,6 +541,9 @@ def conformer_generator(
             f'Expected {list(compute_sidechains.keys())}.'
             )
 
+    np.random.seed(random_seed)
+
+    # prepares protein sequences
     all_atom_input_seq = input_seq
     template_input_seq = remap_sequence(all_atom_input_seq)
     template_seq_3l = translate_seq_to_3l(template_input_seq)
