@@ -8,7 +8,7 @@ from itertools import cycle
 import numpy as np
 from numba import njit
 
-import idpcpp
+# import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     bonds_equal_3_inter,
@@ -37,10 +37,11 @@ from idpconfgen.libs.libparse import translate_seq_to_3l, get_mers
 from idpconfgen.libs.libtimer import ProgressBar, timeme
 
 
+# See TODO at init_faspr_sidechains
 # Variables related to the sidechain building process.
 # # Variables for the FASPR algorithm.
-faspr_sc = idpcpp.faspr_sidechains
-faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
+#faspr_sc = idpcpp.faspr_sidechains
+#faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
 
 
 ConfMasks = namedtuple(
@@ -525,8 +526,8 @@ def prepare_slice_dict(primary, inseq, ncores=1):
 # parameters = input_seq
 def init_faspr_sidechains(
         input_seq,
-        faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
-        faspr_func=faspr_sc,
+        #faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
+        #faspr_func=faspr_sc,
         ):
     """
     Instantiate dedicated function environment for FASPR sidehchain calculation.
@@ -549,6 +550,14 @@ def init_faspr_sidechains(
     np.ndarray (M, 3)
         Heavy atom coordinates of the protein sequence.
     """
+    # TODO:
+    # this is here because tox is not able to detect idpcpp module.
+    # this is a turnaround to allow tests to pass.
+    # currently tests to not test this function.
+    import idpcpp
+    faspr_func = idpcpp.faspr_sidechains
+    faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
+
     def compute_faspr_sidechains(coords):
         """Do calculation."""
         return faspr_func(coords, input_seq, faspr_dun2010db_spath)
