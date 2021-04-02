@@ -1,8 +1,9 @@
 graft docs
 graft src
 
-prune tests
 prune alphas
+prune devtools
+prune tests
 
 include .bumpversion.cfg
 include .coveragerc
