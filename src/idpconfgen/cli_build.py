@@ -9,14 +9,17 @@ USAGE:
 
 """
 import argparse
+import sys
 from functools import partial
+from itertools import cycle
 from multiprocessing import Pool, Queue
 # from numbers import Number
-from random import choice as randchoice
+#from random import choice as randchoice
 from random import randint
 from time import time
 
 import numpy as np
+from numba import njit
 
 from idpconfgen import Path, log
 from idpconfgen.core.build_definitions import (
@@ -31,6 +34,8 @@ from idpconfgen.core.build_definitions import (
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
+    prepare_slice_dict,
+    read_db_to_slices_single_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -46,6 +51,7 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q,
     make_coord_Q_COO,
     make_coord_Q_planar,
+    make_seq_probabilities,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     rrd10_njit,
@@ -53,12 +59,13 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
+    get_seq_chunk_njit,
+    get_seq_next_residue_njit,
     get_trimer_seq_njit,
     remap_sequence,
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
-
 
 _file = Path(__file__).myparents()
 
@@ -81,8 +88,12 @@ BGEO_res = {}
 # it is not expected SLICES or ANGLES to be populated anywhere else.
 # The slice objects from where the builder will feed to extract torsion
 # chunks from ANGLES.
-SLICES = []
 ANGLES = None
+SLICES = []
+SLICEDICT_MONOMERS = None
+SLICEDICT_XMERS = None
+XMERPROBS = None
+GET_ADJ = None
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -192,13 +203,21 @@ ap.add_argument(
     default=None,
     )
 
+ap.add_argument(
+    '-et',
+    '--energy-threshold',
+    help='The energy threshold after which conformers/chunks will be rejected',
+    default=10.0,
+    type=float,
+    )
+
 libcli.add_argument_ncores(ap)
 
 
 def main(
         input_seq,
         database,
-        dssp_regexes=r'(?=(L{2,6}))',
+        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -223,9 +242,26 @@ def main(
         remaining_chunks = nconfs % ncores
 
     # populates globals
-    global ANGLES, SLICES
-    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
-    SLICES.extend(_slices)
+    #if False:
+    #    global ANGLES, SLICES
+    #    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
+    #    SLICES.extend(_slices)
+    # #
+
+    # we use a dictionary because chunks will be evaluated to exact match
+    global ANGLES, SLICEDICT_MONOMERS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
+    SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq)
+    SLICEDICT_MONOMERS = SLICEDICT_XMERS.pop(1)
+    XMERPROBS = make_seq_probabilities(list(SLICEDICT_XMERS.keys()), reverse=True)
+    GET_ADJ = get_adjacent_angles(
+        list(SLICEDICT_XMERS.keys()),
+        XMERPROBS,
+        input_seq,
+        ANGLES,
+        SLICEDICT_XMERS,
+        SLICEDICT_MONOMERS,
+        )
 
     populate_globals(
         input_seq=input_seq,
@@ -379,6 +415,7 @@ def conformer_generator(
         generative_function=None,
         disable_sidechains=True,
         sidechain_method='faspr',
+        energy_threshold=10,
         bgeo_path=None,
         forcefield=None,
         lj_term=True,
@@ -512,7 +549,7 @@ def conformer_generator(
     PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RAD_60 = np.radians(60)
-    RC = randchoice
+    RC = np.random.choice
     RINT = randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
     RRD10 = rrd10_njit
@@ -528,6 +565,10 @@ def conformer_generator(
     global TEMPLATE_LABELS
     global TEMPLATE_MASKS
     global TEMPLATE_EFUNC
+    global XMERPROBS
+    global SLICEDICT_MONOMERS
+    global SLICEDICT_XMERS
+    global GET_ADJ
 
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function
@@ -696,6 +737,7 @@ def conformer_generator(
         number_of_trials3 = 0
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
+            #print(bbi)
 
             # I decided to use an if-statement here instead of polymorph
             # the else clause to a `generative_function` variable because
@@ -712,14 +754,32 @@ def conformer_generator(
                 # following `aligndb` function,
                 # `angls` will always be cyclic with:
                 # omega - phi - psi - omega - phi - psi - (...)
-                agls = angles[RC(slices), :].ravel()
+                #agls = angles[RC(slices), :].ravel()
                 # agls = angles[:, :].ravel()
 
+                #primer_template = get_idx_primer_njit(
+                #    all_atom_input_seq,
+                #    RC(slices_dict_keys, p=XMERPROBS),
+                #    calc_residue_num_from_index(bbi - 1),
+                #    )
+
+                # algorithm for adjacent building
+                # TODO
+                # primer_template here is used temporarily, and needs to be
+                # removed when get_adj becomes an option
+                primer_template, agls = GET_ADJ(bbi - 1)
+
             # index at the start of the current cycle
+            PRIMER = cycle(primer_template)
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
                     current_res_number = calc_residue_num_from_index(bbi - 1)
+
+                    # assert the residue being built is of the same nature as the one in the angles
+                    # TODO: remove this assert
+                    assert all_atom_input_seq[current_res_number] == next(PRIMER)
+
                     curr_res, tpair = GET_TRIMER_SEQ(
                         all_atom_input_seq,
                         current_res_number,
@@ -851,8 +911,10 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
+            #print(total_energy)
 
-            if total_energy > 10:
+            if total_energy > energy_threshold:
+                #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -959,6 +1021,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
+        #print(all_atom_coords)
         yield all_atom_coords
         conf_n += 1
 
@@ -1021,6 +1084,139 @@ def gen_PDB_from_conformer(
         atom_i += 1
 
     return '\n'.join(lines)
+
+
+
+def get_adjacent_angles(
+        options,
+        probs,
+        seq,
+        db,
+        slice_dict,
+        slicemonomers,
+        RC=np.random.choice,
+        ):
+    """
+    Get angles to build the next adjacent protein chunk.
+
+    Parameters
+    ----------
+    options : list
+        The length of the possible chunk sizes.
+
+    probs : list
+        A list with the relative probabilites to select from `options`.
+
+    seq : str
+        The conformer sequence.
+
+    db : dict-like
+        The angle omega/phi/psi database.
+
+    slice_dict : dict-like
+        A dictionary containing the chunks strings as keys and as values
+        lists with slice objects.
+
+    slicemonomers : dict-like
+        The same as `slice_dict` but containing information only for
+        monomers.
+    """
+
+    max_opt = max(options)
+
+    def func(aidx):
+        #print('Entering new angle collection ----------------------------', aidx)
+        # calculates the current residue number from the atom index
+        cr = calc_residue_num_from_index(aidx)
+
+        # chooses the size of the chunk from pre-configured range of sizes
+        plen = RC(options, p=probs)
+
+        # defines the chunk identity accordingly
+        primer_template = get_seq_chunk_njit(seq, cr, plen)
+        next_residue = get_seq_next_residue_njit(seq, cr, plen)
+
+        # recalculates the plen to avoid plen/template inconsistencies that
+        # occur if the plen is higher then the number of
+        # residues until the end of the protein.
+        plen = len(primer_template)
+
+        # Now the tricky loop to accommodate the very special case of prolines.
+        template_not_found_once = False
+        while 1 < plen <= max_opt:
+            #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
+            # Confirms the next residue to the template is NOT a proline
+            if next_residue != 'P':
+                try:
+                    # attempts to retrieve angles to the template, exact sequence
+                    # match
+                    agls = db[RC(slice_dict[plen][primer_template]), :].ravel()
+                    # if the angles are found, there is nothing more to do
+                    break
+
+                # in case the template is not present in the database. It may
+                # occur for pentamers, perhaps some tetramers.
+                except KeyError as err:
+                    # reduces the size of the template by 1
+                    # if primer_template[-1] == 'P':
+                    #     plen -= 2
+                    #     primer_template = primer_template[:-2]
+                    # else:
+                    #print('KeyError found, decreasing plen')
+                    plen -= 1
+                    next_residue = primer_template[-1]
+                    primer_template = primer_template[:-1]
+                    # if a certain primer template was not found, that means
+                    # no larger primer will be found. Therefore, any change in
+                    # plen or primer_template has to go towards reducing the
+                    # length.
+                    template_not_found_once = True
+                    continue
+            else:
+                # if the template was not found, makes no sense to increase its
+                # size, hence, we reduce it.
+                #print('it has a proline')
+                if template_not_found_once:
+                    plen -= 1
+                    next_residue = primer_template[-1]
+                    primer_template = primer_template[:-1]
+                # if we never actually attempted retrieving angles, so we
+                # increase template size.
+                else:
+                    plen += 1
+                    primer_template = get_seq_chunk_njit(seq, cr, plen)
+                    next_residue = get_seq_next_residue_njit(seq, cr, plen)
+        # beautiful while/else.
+        # only executes if the template grew to large or too short.
+        else:
+            #print('entered the while else')
+            # template grew too large, most likely because of the presence of
+            # many consecutive prolines. Reduce the template to two residues
+            # search for the pair considering the consecutive residue, but build
+            # only the first residue in the pair. That is, the current residue
+            if plen > max_opt:
+                plen = 2
+                primer_template = get_seq_chunk_njit(seq, cr, plen)
+                agls = db[RC(slice_dict[plen][primer_template]), :].ravel()[:3]
+                #print('sending just one', plen, primer_template)
+
+            elif plen == 1:
+                primer_template = seq[cr]
+                # this should only happen at the end of the chain
+                agls = db[RC(slicemonomers[primer_template]), :].ravel()
+                #print('the conformer ended', cr)
+            else:
+                log.debug(plen, primer_template, seq[cr:cr + plen])
+                # raise AssertionError to avoid `python -o` silencing
+                raise AssertionError('The code should not arrive here')
+
+        assert primer_template
+        assert not np.any(np.isnan(agls))
+        return primer_template, agls
+
+    return func
+
+
 
 
 if __name__ == "__main__":

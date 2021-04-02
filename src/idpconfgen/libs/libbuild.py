@@ -1,10 +1,12 @@
 """Tools for conformer building operations."""
 import re
-from collections import Counter, namedtuple
+import itertools as it
+from collections import Counter, defaultdict, namedtuple
 from functools import partial
 from itertools import cycle
 
 import numpy as np
+from numba import njit
 
 import idpcpp
 from idpconfgen import log
@@ -29,10 +31,10 @@ from idpconfgen.libs.libcalc import (
     multiply_upper_diagonal_raw_njit,
     sum_upper_diagonal_raw_njit,
     )
-from idpconfgen.libs.libfilter import aligndb, regex_search
+from idpconfgen.libs.libfilter import aligndb, regex_search, regex_forward_with_overlap
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import translate_seq_to_3l
-from idpconfgen.libs.libtimer import timeme
+from idpconfgen.libs.libparse import translate_seq_to_3l, get_mers
+from idpconfgen.libs.libtimer import ProgressBar, timeme
 
 
 # Variables related to the sidechain building process.
@@ -424,6 +426,99 @@ def read_db_to_slices(database, dssp_regexes, ncores=1):
     log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
 
     return slices, angles
+
+
+def read_db_to_slices_single_secondary_structure(database, ss_regex):
+    """
+    Read slices in the DB that belong to a single secondary structure.o
+
+    Concatenates primary sequences accordingly.
+    """
+    print('ss_regex, ', ss_regex)
+    db = read_dictionary_from_disk(database)
+    timed = partial(timeme, aligndb)
+    pdbs, angles, dssp, resseq = timed(db)
+
+    loop_slices = regex_search(dssp, ss_regex[0])
+    loop_seqs = []
+    lsa = loop_seqs.append
+    LS = []
+    for slc in loop_slices:
+        lsa(resseq[slc])
+        LS.append(dssp[slc])
+
+    primary = '|'.join(loop_seqs)
+    assert set(''.join(LS)) == set(['L'])
+
+    omega = []
+    phi = []
+    psi = []
+
+    oe = omega.extend
+    he = phi.extend
+    se = psi.extend
+    oa = omega.append
+    ha = phi.append
+    sa = psi.append
+    nan = np.nan
+
+    for s in loop_slices:
+        oe(angles[s, 0])
+        he(angles[s, 1])
+        se(angles[s, 2])
+        oa(nan)
+        ha(nan)
+        sa(nan)
+
+    omega.pop()
+    phi.pop()
+    psi.pop()
+
+    _omega = np.array(omega)
+    _phi = np.array(phi)
+    _psi = np.array(psi)
+
+    seq_angles = np.array([_omega, _phi, _psi]).T
+
+    assert seq_angles.shape[0] == len(primary)
+
+    del omega, phi, psi
+    with open('ARRAY', 'w') as fout:
+        np.savetxt(fout, seq_angles)
+    return primary, seq_angles
+
+
+#def _get_slices(slen):
+#    xmer = get_mers(inque, slen)
+#    slices = {}
+#    for mer in xmer:
+#        slices[ 
+
+
+def prepare_slice_dict(primary, inseq, ncores=1):
+    """."""
+    print('preparing regex xmers')
+    monomers = get_mers(inseq, 1)
+    dimers = get_mers(inseq, 2)
+    trimers = get_mers(inseq, 3)
+    tetramers = get_mers(inseq, 4)
+    pentamers = get_mers(inseq, 5)
+
+    slice_dict = defaultdict(dict)
+    mers = (i for i in it.chain(monomers, dimers, trimers, tetramers, pentamers))
+    _l = len(monomers) + len(dimers) + len(trimers) + len(tetramers) + len(pentamers)
+    with ProgressBar(_l) as PW:
+        for mer in mers:
+            lmer = len(mer)
+            merregex = f'(?=({mer}))'
+            slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
+            if not slice_dict[lmer][mer]:
+                slice_dict[lmer].pop(mer)
+            #for _s in slice_dict[lmer][mer]:
+                #assert '|' not in inseq[_s]
+            PW.increment()
+
+    return slice_dict
 
 
 # Other functions should have the same API:
@@ -890,6 +985,34 @@ def create_sidechains_masks_per_residue(
     return ss
 
 
+# njit available
+def get_indexes_from_primer_length(
+        sequence,
+        plen,
+        current_residue):
+    """
+    """
+    if plen == 1:
+        return current_residue
+    elif plen == 2:
+        return sequence[current_residue: current_residue + 2]
+    elif plen == 3:
+        return sequence[current_residue - 1: current_residue + 3]
+    elif plen == 4:
+        return sequence[current_residue - 1: current_residue + 4]
+    elif plen == 5:
+        return sequence[current_residue - 2: current_residue + 5]
+    elif plen == 6:
+        return sequence[current_residue - 2: current_residue + 6]
+    elif plen == 7:
+        return sequence[current_residue - 3: current_residue + 7]
+
+
+
+
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
+
+
+get_idx_primer_njit = njit(get_indexes_from_primer_length)
