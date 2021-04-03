@@ -560,7 +560,7 @@ def init_faspr_sidechains(
 
     def compute_faspr_sidechains(coords):
         """Do calculation."""
-        return faspr_func(coords, input_seq, faspr_dun2010db_spath)
+        return faspr_func(coords, input_seq, faspr_dun2010_bbdep_str)
 
     return compute_faspr_sidechains
 
