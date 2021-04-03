@@ -24,6 +24,7 @@ from numba import njit
 from idpconfgen import Path, log
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
+    bend_angles_CA_C_Np1,
     build_bend_H_N_C,
     distance_C_O,
     distance_H_N,
@@ -66,6 +67,8 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
+from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs.libfoldedtemplate import calc_dist_threshold_against_template
 
 _file = Path(__file__).myparents()
 
@@ -212,6 +215,13 @@ ap.add_argument(
     type=float,
     )
 
+ap.add_argument(
+    '-ft',
+    '--folded-template',
+    help='Folded template',
+    type=Path,
+    )
+
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
@@ -237,7 +247,7 @@ def main(
     if nconfs < ncores:
         ncores = 1
         conformers_per_core = nconfs
-        remaining_chunks = 0
+        remaining_confs = 0
     else:
         conformers_per_core = nconfs // ncores
         # in case nconfs is not multiple of ncores, builds the remaining confs
@@ -433,6 +443,7 @@ def conformer_generator(
         coulomb_term=False,
         random_seed=0,
         folded_template=None,
+        build_term='C',
         ):
     """
     Build conformers.
@@ -680,16 +691,6 @@ def conformer_generator(
     # ?
 
     # /
-    # creates seed coordinates:
-    # because the first torsion angle of a residue is the omega, we need
-    # to prepare 2 dummy atoms to simulate the residue -1, so that the
-    # first omega can be placed. There is no need to setup specific
-    # positions, just to create a place upon which the build atom
-    # routine can create a new atom from a torsion.
-    dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
-    dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
-    n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-
     # seed coordinates array
     if folded_template and build_term == 'C':
         _pair = folded_fasta[-1] + all_atom_input_seq[0]
@@ -710,6 +711,16 @@ def conformer_generator(
             ))
 
     else:
+        # creates seed coordinates:
+        # because the first torsion angle of a residue is the omega, we need
+        # to prepare 2 dummy atoms to simulate the residue -1, so that the
+        # first omega can be placed. There is no need to setup specific
+        # positions, just to create a place upon which the build atom
+        # routine can create a new atom from a torsion.
+        dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
+        dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
+        n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
+
         seed_coords = np.array((
             dummy_CA_m1_coord,
             dummy_C_m1_coord,
@@ -959,14 +970,10 @@ def conformer_generator(
 
                     template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
             # ?
-
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #if folded_template:
-                #total_energy += folded_efunc(template_coords)
-            #print(total_energy)
 
-            if total_energy > energy_threshold or (folded_template and calc_folded_energy(template_coords)):
-                #print('---------- energy positive')
+            if total_energy > energy_threshold or (folded_template and folded_efunc(template_coords)):
+                # print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
 
@@ -1073,7 +1080,7 @@ def conformer_generator(
             else:
                 print(conf_n, total_energy)
 
-        #print(all_atom_coords)
+        # print(all_atom_coords)
         yield all_atom_coords
         conf_n += 1
 
@@ -1138,7 +1145,6 @@ def gen_PDB_from_conformer(
     return '\n'.join(lines)
 
 
-
 def get_adjacent_angles(
         options,
         probs,
@@ -1173,11 +1179,10 @@ def get_adjacent_angles(
         The same as `slice_dict` but containing information only for
         monomers.
     """
-
     max_opt = max(options)
 
     def func(aidx):
-        # print('Entering new angle collection ----------------------------', aidx)
+        # print('Entering new angle collection ------------------------', aidx)
         # calculates the current residue number from the atom index
         cr = calc_residue_num_from_index(aidx)
 
@@ -1196,12 +1201,13 @@ def get_adjacent_angles(
         # Now the tricky loop to accommodate the very special case of prolines.
         template_not_found_once = False
         while 1 < plen <= max_opt:
-            #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
+            # print('L/PT/NR/Bool: ', plen, primer_template,
+            # next_residue, template_not_found_once)
             # Confirms the next residue to the template is NOT a proline
             if next_residue != 'P':
                 try:
-                    # attempts to retrieve angles to the template, exact sequence
-                    # match
+                    # attempts to retrieve angles to the template,
+                    # exact sequence match
                     agls = db[RC(slice_dict[plen][primer_template]), :].ravel()
                     # if the angles are found, there is nothing more to do
                     break

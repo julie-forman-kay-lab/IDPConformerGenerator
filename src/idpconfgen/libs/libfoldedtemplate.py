@@ -1,5 +1,5 @@
 """Store functions for using folded domains as templates."""
-
+from numba import njit
 #def calc_energy(conf_coords):
 #    for coord in conf_coords:
 #        dist = np.sum(template_coords - coord)**2, axis=1)
