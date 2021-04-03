@@ -46,4 +46,4 @@ def assert_type(obj, typ):
     assert isinstance(obj, typ), f"Expected {typ} got {type(obj)}"
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
