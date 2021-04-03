@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* corrects variable name in ``libbuild`` that was breaking sidechain
+    construction.
+
 v0.0.1 (2021-04-02)
 ------------------------------------------------------------
 
@@ -17,4 +20,4 @@ v0.0.1 (2021-04-02)
 v0.0.0
 ------
 
-* Any development previous to version 0.1.0 is registered in PRs up to #102.
+* Any development previous to version 0.0.1 is registered in PRs up to #102.
