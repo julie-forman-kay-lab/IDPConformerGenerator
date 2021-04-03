@@ -606,6 +606,7 @@ def conformer_generator(
         folded_strct.add_filter_backbone(minimal=True)
         if build_term == 'C':
             folded_seed = folded_strct.coords[-3:, :]
+            raise TypeError(folded_seed)
         elif build_term == 'N':
             folded_seed = folded_strct.coords[:3, :]
         folded_fasta = list(folded_strct.fasta.values())[0]
