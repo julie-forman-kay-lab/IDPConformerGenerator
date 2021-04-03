@@ -21,6 +21,7 @@ def calc_dist_threshold_against_template(folded_coords):
                 z = coord[2] - tcoord[2]
                 dist = (x * x + y * y + z * z)
                 if dist < 12.96:
+                    print('dist, ', dist)
                     return True
         return False
     return calc_dist_threshold

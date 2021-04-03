@@ -694,7 +694,10 @@ def conformer_generator(
     # seed coordinates array
     if folded_template and build_term == 'C':
         _pair = folded_fasta[-1] + all_atom_input_seq[0]
-        _psi = ANGLES[RC(SLICEDICT_XMERS[2][_pair]), :].ravel()[2]
+        try:
+            _psi = ANGLES[RC(SLICEDICT_XMERS[2][_pair]), :].ravel()[2]
+        except KeyError:
+            _psi = ANGLES[RC(SLICEDICT_MONOMERS[_pair[0]]), :].ravel()[2]
         _N_seed = MAKE_COORD_Q_LOCAL(
             folded_seed[0],
             folded_seed[1],
@@ -971,8 +974,12 @@ def conformer_generator(
                     template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
             # ?
             total_energy = TEMPLATE_EFUNC(template_coords)
+            total_energy = -4
 
-            if total_energy > energy_threshold or (folded_template and folded_efunc(template_coords)):
+            foldedefunc = folded_efunc(template_coords[2:, :])
+            #print(foldedefunc)
+
+            if False:#total_energy > energy_threshold or (folded_template and foldedefunc):
                 # print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
