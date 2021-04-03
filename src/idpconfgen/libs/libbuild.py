@@ -1,6 +1,6 @@
 """Tools for conformer building operations."""
-import re
 import itertools as it
+import re
 from collections import Counter, defaultdict, namedtuple
 from functools import partial
 from itertools import cycle
@@ -31,17 +31,21 @@ from idpconfgen.libs.libcalc import (
     multiply_upper_diagonal_raw_njit,
     sum_upper_diagonal_raw_njit,
     )
-from idpconfgen.libs.libfilter import aligndb, regex_search, regex_forward_with_overlap
+from idpconfgen.libs.libfilter import (
+    aligndb,
+    regex_forward_with_overlap,
+    regex_search,
+    )
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import translate_seq_to_3l, get_mers
+from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
 from idpconfgen.libs.libtimer import ProgressBar, timeme
 
 
 # See TODO at init_faspr_sidechains
 # Variables related to the sidechain building process.
 # # Variables for the FASPR algorithm.
-#faspr_sc = idpcpp.faspr_sidechains
-#faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
+# faspr_sc = idpcpp.faspr_sidechains
+# faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
 
 
 ConfMasks = namedtuple(
@@ -431,7 +435,7 @@ def read_db_to_slices(database, dssp_regexes, ncores=1):
 
 def read_db_to_slices_single_secondary_structure(database, ss_regex):
     """
-    Read slices in the DB that belong to a single secondary structure.o
+    Read slices in the DB that belong to a single secondary structure.
 
     Concatenates primary sequences accordingly.
     """
@@ -489,13 +493,6 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     return primary, seq_angles
 
 
-#def _get_slices(slen):
-#    xmer = get_mers(inque, slen)
-#    slices = {}
-#    for mer in xmer:
-#        slices[ 
-
-
 def prepare_slice_dict(primary, inseq, ncores=1):
     """."""
     print('preparing regex xmers')
@@ -506,17 +503,20 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     pentamers = get_mers(inseq, 5)
 
     slice_dict = defaultdict(dict)
-    mers = (i for i in it.chain(monomers, dimers, trimers, tetramers, pentamers))
-    _l = len(monomers) + len(dimers) + len(trimers) + len(tetramers) + len(pentamers)
+    _chainit = it.chain(monomers, dimers, trimers, tetramers, pentamers)
+    mers = (i for i in _chainit)
+    _l = len(monomers) + len(dimers) + len(trimers) \
+        + len(tetramers) + len(pentamers)
     with ProgressBar(_l) as PW:
         for mer in mers:
             lmer = len(mer)
             merregex = f'(?=({mer}))'
-            slice_dict[lmer][mer] = regex_forward_with_overlap(primary, merregex)
+            slice_dict[lmer][mer] = \
+                regex_forward_with_overlap(primary, merregex)
             if not slice_dict[lmer][mer]:
                 slice_dict[lmer].pop(mer)
-            #for _s in slice_dict[lmer][mer]:
-                #assert '|' not in inseq[_s]
+            # for _s in slice_dict[lmer][mer]:
+                # assert '|' not in inseq[_s]
             PW.increment()
 
     return slice_dict
@@ -526,8 +526,8 @@ def prepare_slice_dict(primary, inseq, ncores=1):
 # parameters = input_seq
 def init_faspr_sidechains(
         input_seq,
-        #faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
-        #faspr_func=faspr_sc,
+        # faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
+        # faspr_func=faspr_sc,
         ):
     """
     Instantiate dedicated function environment for FASPR sidehchain calculation.
@@ -998,9 +998,9 @@ def create_sidechains_masks_per_residue(
 def get_indexes_from_primer_length(
         sequence,
         plen,
-        current_residue):
-    """
-    """
+        current_residue,
+        ):
+    """Get sequence chunk based on position and length."""
     if plen == 1:
         return current_residue
     elif plen == 2:
@@ -1017,11 +1017,8 @@ def get_indexes_from_primer_length(
         return sequence[current_residue - 3: current_residue + 7]
 
 
-
-
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
-
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
