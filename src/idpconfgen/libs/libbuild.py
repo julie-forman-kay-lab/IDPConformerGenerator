@@ -11,6 +11,7 @@ from numba import njit
 # import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
+    bend_angles_CA_C_Np1,
     bonds_equal_3_inter,
     bonds_le_2_inter,
     distances_C_Np1,

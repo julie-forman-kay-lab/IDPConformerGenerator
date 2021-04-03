@@ -432,6 +432,7 @@ def conformer_generator(
         lj_term=True,
         coulomb_term=False,
         random_seed=0,
+        folded_template=None,
         ):
     """
     Build conformers.
@@ -585,6 +586,20 @@ def conformer_generator(
     global SLICEDICT_XMERS
     global GET_ADJ
 
+
+    # defines folded domain energy function
+    if folded_template:
+        folded_strct = Structure(folded_template)
+        folded_strct.build()
+        folded_efunc = calc_dist_threshold_against_template(folded_strct.coords)
+        folded_strct.add_filter_backbone(minimal=True)
+        if build_term == 'C':
+            folded_seed = folded_strct.coords[-3:, :]
+        elif build_term == 'N':
+            folded_seed = folded_strct.coords[:3, :]
+        folded_fasta = list(folded_strct.fasta.values())[0]
+
+
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function
     # if the script runs as CLI. Otherwise, if conformer_generator() is imported
@@ -676,12 +691,32 @@ def conformer_generator(
     n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
 
     # seed coordinates array
-    seed_coords = np.array((
-        dummy_CA_m1_coord,
-        dummy_C_m1_coord,
-        n_terminal_N_coord,
-        ))
+    if folded_template and build_term == 'C':
+        _pair = folded_fasta[-1] + all_atom_input_seq[0]
+        _psi = ANGLES[RC(SLICEDICT_XMERS[2][_pair]), :].ravel()[2]
+        _N_seed = MAKE_COORD_Q_LOCAL(
+            folded_seed[0],
+            folded_seed[1],
+            folded_seed[2],
+            1.331, # C-Np1 distance
+            bend_angles_CA_C_Np1[_pair[1]],
+            _psi,
+            )
+
+        seed_coords = np.array((
+            folded_seed[1],
+            folded_seed[2],
+            _N_seed,
+            ))
+
+    else:
+        seed_coords = np.array((
+            dummy_CA_m1_coord,
+            dummy_C_m1_coord,
+            n_terminal_N_coord,
+            ))
     # ?
+
 
     # /
     # prepares method binding
@@ -883,7 +918,7 @@ def conformer_generator(
 
                 ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
 
-            # Transfers coords to the main coord array
+            # Transfers sidechain coords to the main coord array
             for _smask, _sidecoords in ss_masks[:current_res_number + 1]:
                 template_coords[_smask] = _sidecoords
 
@@ -926,9 +961,11 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
+            #if folded_template:
+                #total_energy += folded_efunc(template_coords)
             #print(total_energy)
 
-            if total_energy > energy_threshold:
+            if total_energy > energy_threshold or (folded_template and calc_folded_energy(template_coords)):
                 #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
@@ -1140,7 +1177,7 @@ def get_adjacent_angles(
     max_opt = max(options)
 
     def func(aidx):
-        #print('Entering new angle collection ----------------------------', aidx)
+        # print('Entering new angle collection ----------------------------', aidx)
         # calculates the current residue number from the atom index
         cr = calc_residue_num_from_index(aidx)
 
@@ -1171,13 +1208,12 @@ def get_adjacent_angles(
 
                 # in case the template is not present in the database. It may
                 # occur for pentamers, perhaps some tetramers.
-                except KeyError as err:
+                except KeyError:
                     # reduces the size of the template by 1
                     # if primer_template[-1] == 'P':
                     #     plen -= 2
                     #     primer_template = primer_template[:-2]
                     # else:
-                    #print('KeyError found, decreasing plen')
                     plen -= 1
                     next_residue = primer_template[-1]
                     primer_template = primer_template[:-1]
@@ -1190,7 +1226,6 @@ def get_adjacent_angles(
             else:
                 # if the template was not found, makes no sense to increase its
                 # size, hence, we reduce it.
-                #print('it has a proline')
                 if template_not_found_once:
                     plen -= 1
                     next_residue = primer_template[-1]
@@ -1204,7 +1239,6 @@ def get_adjacent_angles(
         # beautiful while/else.
         # only executes if the template grew to large or too short.
         else:
-            #print('entered the while else')
             # template grew too large, most likely because of the presence of
             # many consecutive prolines. Reduce the template to two residues
             # search for the pair considering the consecutive residue, but build
@@ -1213,13 +1247,11 @@ def get_adjacent_angles(
                 plen = 2
                 primer_template = get_seq_chunk_njit(seq, cr, plen)
                 agls = db[RC(slice_dict[plen][primer_template]), :].ravel()[:3]
-                #print('sending just one', plen, primer_template)
 
             elif plen == 1:
                 primer_template = seq[cr]
                 # this should only happen at the end of the chain
                 agls = db[RC(slicemonomers[primer_template]), :].ravel()
-                #print('the conformer ended', cr)
             else:
                 log.debug(plen, primer_template, seq[cr:cr + plen])
                 # raise AssertionError to avoid `python -o` silencing
@@ -1230,8 +1262,6 @@ def get_adjacent_angles(
         return primer_template, agls
 
     return func
-
-
 
 
 if __name__ == "__main__":
