@@ -24,7 +24,7 @@ from numba import njit
 from idpconfgen import Path, log
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
-    bend_angles_CA_C_Np1,
+    build_bend_angles_CA_C_Np1,
     build_bend_H_N_C,
     distance_C_O,
     distance_H_N,
@@ -703,7 +703,7 @@ def conformer_generator(
             folded_seed[1],
             folded_seed[2],
             1.331, # C-Np1 distance
-            bend_angles_CA_C_Np1[_pair[1]],
+            build_bend_angles_CA_C_Np1[_pair[1]],
             _psi,
             )
 

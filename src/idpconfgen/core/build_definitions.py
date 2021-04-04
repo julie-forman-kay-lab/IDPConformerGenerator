@@ -570,6 +570,7 @@ build_bend_angles_N_CA_C = {
     for key, v in bend_angles_N_CA_C.items()
     }
 
+# original angles as registered from the PDB database.
 bend_angles_CA_C_Np1 = {
     'A': 4588994859787807 / 2251799813685248,  # 2.038 0.022
     'R': 4588049090836895 / 2251799813685248,  # 2.038 0.022
@@ -593,6 +594,7 @@ bend_angles_CA_C_Np1 = {
     'V': 4584841207534447 / 2251799813685248,  # 2.036 0.021
     }
 
+# use these angles in the building engine
 build_bend_angles_CA_C_Np1 = {
     key: (pi - v) / 2
     for key, v in bend_angles_CA_C_Np1.items()
