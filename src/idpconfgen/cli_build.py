@@ -690,46 +690,6 @@ def conformer_generator(
         )
     # ?
 
-    # /
-    # seed coordinates array
-    if folded_template and build_term == 'C':
-        _pair = folded_fasta[-1] + all_atom_input_seq[0]
-        try:
-            _psi = ANGLES[RC(SLICEDICT_XMERS[2][_pair]), :].ravel()[2]
-        except KeyError:
-            _psi = ANGLES[RC(SLICEDICT_MONOMERS[_pair[0]]), :].ravel()[2]
-        _N_seed = MAKE_COORD_Q_LOCAL(
-            folded_seed[0],
-            folded_seed[1],
-            folded_seed[2],
-            1.331, # C-Np1 distance
-            build_bend_angles_CA_C_Np1[_pair[1]],
-            _psi,
-            )
-
-        seed_coords = np.array((
-            folded_seed[1],
-            folded_seed[2],
-            _N_seed,
-            ))
-
-    else:
-        # creates seed coordinates:
-        # because the first torsion angle of a residue is the omega, we need
-        # to prepare 2 dummy atoms to simulate the residue -1, so that the
-        # first omega can be placed. There is no need to setup specific
-        # positions, just to create a place upon which the build atom
-        # routine can create a new atom from a torsion.
-        dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
-        dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
-        n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
-
-        seed_coords = np.array((
-            dummy_CA_m1_coord,
-            dummy_C_m1_coord,
-            n_terminal_N_coord,
-            ))
-    # ?
 
 
     # /
@@ -767,6 +727,36 @@ def conformer_generator(
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
         bond_type = get_cycle_bond_type()
+
+        # /
+        # seed coordinates array
+        if folded_template and build_term == 'C':
+            _pair = folded_fasta[-1] + all_atom_input_seq[0]
+            try:
+                _psi = ANGLES[RC(SLICEDICT_XMERS[2][_pair]), :].ravel()[2]
+            except KeyError:
+                _psi = ANGLES[RC(SLICEDICT_MONOMERS[_pair[0]]), :].ravel()[2]
+            _N_seed = MAKE_COORD_Q_LOCAL(
+                folded_seed[0],
+                folded_seed[1],
+                folded_seed[2],
+                1.331, # C-Np1 distance
+                build_bend_angles_CA_C_Np1[_pair[1]],
+                _psi,
+                )
+
+            seed_coords = np.array((folded_seed[1], folded_seed[2], _N_seed))
+            del _pair, _psi, _N_seed
+
+        else:
+            # creates seed coordinates:
+            # because the first torsion angle of a residue is the omega, we need
+            # to prepare 2 dummy atoms to simulate the residue -1, so that the
+            # first omega can be placed. There is no need to setup specific
+            # positions, just to create a place upon which the build atom
+            # routine can create a new atom from a torsion.
+            seed_coords = make_origin_seed_coords()
+        # ?
 
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
@@ -874,6 +864,7 @@ def conformer_generator(
                             torsion_angle,
                             )
                         bbi += 1
+                        assert not np.any(np.isclose(bb_real[:3, :], 0.0))
 
                     try:
                         co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
@@ -904,6 +895,21 @@ def conformer_generator(
                 # add the carboxyls
                 template_coords[TEMPLATE_MASKS.cterm] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
+
+            if folded_template and len(bbi0_register) == 1:
+                folded_template_H = MAKE_COORD_Q_PLANAR(
+                    bb_real[1, :],
+                    bb_real[0, :],
+                    folded_seed[1],
+                    distance=DISTANCE_NH,
+                    bend=BUILD_BEND_H_N_C,
+                    )
+                current_Hterm_coords = np.array((
+                    folded_template_H,
+                    (NAN, NAN, NAN),
+                    (NAN, NAN, NAN),
+                    ))
+                template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
 
             # Adds N-H Hydrogens
             # Not a perfect loop. It repeats for Hs already placed.
@@ -1072,8 +1078,9 @@ def conformer_generator(
         # we do not want sidechains at this point
         all_atom_coords[ALL_ATOM_MASKS.bb4] = template_coords[TEMPLATE_MASKS.bb4]  # noqa: E501
         all_atom_coords[ALL_ATOM_MASKS.NHs] = template_coords[TEMPLATE_MASKS.NHs]  # noqa: E501
-        if not folded_template:
-            all_atom_coords[ALL_ATOM_MASKS.Hterm] = template_coords[TEMPLATE_MASKS.Hterm]  # noqa: E501
+        #if not folded_template:
+        all_atom_coords[ALL_ATOM_MASKS.Hterm] = template_coords[TEMPLATE_MASKS.Hterm]  # noqa: E501
+        print(all_atom_coords[ALL_ATOM_MASKS.Hterm])
         all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
 
         if with_sidechains:

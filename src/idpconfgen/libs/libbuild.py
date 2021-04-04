@@ -1017,6 +1017,25 @@ def get_indexes_from_primer_length(
         return sequence[current_residue - 3: current_residue + 7]
 
 
+
+def make_origin_seed_coords():
+    """
+    Give the seed coords for the builder.
+
+    Seed coords contain two dummy atoms at the axes and the Nitrogen
+    terminal at 0,0,0.
+    """
+    dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
+    dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
+    n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
+
+    return np.array((
+        dummy_CA_m1_coord,
+        dummy_C_m1_coord,
+        n_terminal_N_coord,
+        ))
+
+
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
     }
