@@ -944,7 +944,7 @@ def conformer_generator(
             template_coords[TEMPLATE_MASKS.COs] = bb_CO
             template_coords[TEMPLATE_MASKS.NHs] = bb_NH
 
-            if len(bbi0_register) == 1:
+            if len(bbi0_register) == 1 and not folded_template:
                 # places the N-terminal Hs only if it is the first
                 # chunk being built
                 _ = PLACE_SIDECHAIN_TEMPLATE(bb_real[0:3, :], N_TERMINAL_H)
@@ -1030,7 +1030,8 @@ def conformer_generator(
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal
                 template_coords[:, :] = NAN
-                template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
+                if not folded_template:
+                    template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
                 # this is required because the last chunk created may have been
@@ -1071,7 +1072,8 @@ def conformer_generator(
         # we do not want sidechains at this point
         all_atom_coords[ALL_ATOM_MASKS.bb4] = template_coords[TEMPLATE_MASKS.bb4]  # noqa: E501
         all_atom_coords[ALL_ATOM_MASKS.NHs] = template_coords[TEMPLATE_MASKS.NHs]  # noqa: E501
-        all_atom_coords[ALL_ATOM_MASKS.Hterm] = template_coords[TEMPLATE_MASKS.Hterm]  # noqa: E501
+        if not folded_template:
+            all_atom_coords[ALL_ATOM_MASKS.Hterm] = template_coords[TEMPLATE_MASKS.Hterm]  # noqa: E501
         all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
 
         if with_sidechains:
