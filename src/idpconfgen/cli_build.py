@@ -606,7 +606,6 @@ def conformer_generator(
         folded_strct.add_filter_backbone(minimal=True)
         if build_term == 'C':
             folded_seed = folded_strct.coords[-3:, :]
-            raise TypeError(folded_seed)
         elif build_term == 'N':
             folded_seed = folded_strct.coords[:3, :]
         folded_fasta = list(folded_strct.fasta.values())[0]
@@ -779,6 +778,7 @@ def conformer_generator(
             _coords[:, :] = NAN
 
         bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
+        assert not np.any(np.isclose(bb[:3, :], 0.0))
 
         # add N-terminal hydrogens to the origin
 
@@ -977,7 +977,7 @@ def conformer_generator(
             total_energy = TEMPLATE_EFUNC(template_coords)
             total_energy = -4
 
-            foldedefunc = folded_efunc(template_coords[2:, :])
+            foldedefunc = folded_efunc(template_coords[5:, :])
             #print(foldedefunc)
 
             if False:#total_energy > energy_threshold or (folded_template and foldedefunc):
