@@ -5,6 +5,7 @@ from os import cpu_count
 
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import vdW_radii_dict
+from idpconfgen.libpure import parse_number_ranges
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -22,13 +23,14 @@ def maincli(ap, main):
     main(**vars(cmd))
 
 
-class FolderOrTar(argparse.Action):
-    """Controls if input is folder, files or tar."""
+class AllParam(argparse.Action):
+    """Parse list or `all` option."""
 
     def __call__(self, parser, namespace, values, option_string=None):
-        """Hello."""
-        if values[0].endswith('.tar'):
-            setattr(namespace, self.dest, values[0])
+        """Call it."""
+        if values == ['all']:
+            setattr(namespace, self.dest, 'all')
+
         else:
             setattr(namespace, self.dest, values)
 
@@ -41,16 +43,12 @@ class ArgsToTuple(argparse.Action):
         setattr(namespace, self.dest, tuple(values))
 
 
-class AllParam(argparse.Action):
-    """Convert list of arguments in tuple."""
+class ConvertToPaths(argparse.Action):
+    """Convert list of strings to Paths."""
 
     def __call__(self, parser, namespace, values, option_string=None):
-        """Call it."""
-        if values == ['all']:
-            setattr(namespace, self.dest, 'all')
-
-        else:
-            setattr(namespace, self.dest, values)
+        """Call on me."""
+        setattr(namespace, self.dest, [Path(i) for i in values])
 
 
 class CSV2Tuple(argparse.Action):
@@ -59,6 +57,25 @@ class CSV2Tuple(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """Call it."""
         setattr(namespace, self.dest, tuple(values.split(',')))
+
+
+class FolderOrTar(argparse.Action):
+    """Controls if input is folder, files or tar."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Hello."""
+        if values[0].endswith('.tar'):
+            setattr(namespace, self.dest, values[0])
+        else:
+            setattr(namespace, self.dest, values)
+
+
+class ParseRanges(argparse.Action):
+    """Parse number ranges."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Parse me."""
+        setattr(namespace, self.dest, parse_number_ranges(values))
 
 
 def minimum_value(minimum):
@@ -150,7 +167,7 @@ def add_subparser(parser, module):
     new_ap = parser.add_parser(
         module._name,
         usage=module._usage,
-        #prog=module._prog,
+        # prog=module._prog,
         description=module._prog + '\n\n' + module.ap.description,
         help=module._help,
         parents=[module.ap],

@@ -155,8 +155,37 @@ ap.add_argument(
 ap.add_argument(
     '-seq',
     '--input_seq',
-    help='The Conformer residue sequence.',
+    help=(
+        'The conformer residue sequence. '
+        'Sequence should contain all residues that will be built, '
+        'including those corresponding to folded templates.'
+        ),
     required=True
+    )
+
+ap.add_argument(
+    '-tr',
+    '--template-residues',
+    help=(
+        'Detail a range of residues in case you want to use folded '
+        'domains as templates upon which to build the linker conformers. '
+        'Example: 1-59,80-102,150-170'
+        ),
+    type=str,
+    action=libcli.ParseRanges,
+    default=None,
+    )
+
+ap.add_argument(
+    '-tt',
+    '--folded-templates',
+    help=(
+        'A list of PDB/mmCIF files which coordinates will template the'
+        'creation of the IDRs'
+        ),
+    nargs='+',
+    action=libcli.ConvertToPaths,
+    default=None,
     )
 
 ap.add_argument(
