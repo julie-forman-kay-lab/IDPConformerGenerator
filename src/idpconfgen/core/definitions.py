@@ -51,6 +51,9 @@ aa3to1 = {
 # Amino-acid 1 to 3 letter code dictionary
 aa1to3 = {v: k for k, v in aa3to1.items()}
 
+aa1set = set(aa1to3.keys())
+aa3set = set(aa3to1.keys())
+
 # heavy atoms
 heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 

@@ -4,7 +4,12 @@ import sys
 from os import cpu_count
 
 from idpconfgen import Path, __version__
-from idpconfgen.core.definitions import vdW_radii_dict
+from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
+from idpconfgen.libs.libparse import is_valid_fasta
+from idpconfgen.libs.libio import (
+    is_valid_fasta_file,
+    read_FASTAS_from_file_to_strings,
+    )
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -59,6 +64,22 @@ class CSV2Tuple(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """Call it."""
         setattr(namespace, self.dest, tuple(values.split(',')))
+
+
+class SeqOrFasta(argparse.Action):
+    """Read sequence of FASTA file."""
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        """Call it."""
+        if is_valid_fasta(value):
+            seq = value
+        elif is_valid_fasta_file(value):
+            seqdict = read_FASTAS_from_file_to_strings(value)
+            seq = list(seqdict.values())[0]
+        else:
+            raise parser.error('Input sequence not valid.')
+
+        setattr(namespace, self.dest, seq)
 
 
 def minimum_value(minimum):

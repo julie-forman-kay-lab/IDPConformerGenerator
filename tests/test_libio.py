@@ -529,3 +529,8 @@ def test_file_reader_iterator_tar(Iterator):
     assert fi
     for n, data in fi:
         assert data.decode() == pairs[n]
+
+
+def test_is_valid_fasta_file():
+    """Test is valid fasta file."""
+    assert libio.is_valid_fasta_file(tcommons.fasta1)

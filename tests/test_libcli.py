@@ -7,6 +7,7 @@ import pytest
 
 from idpconfgen import Path
 from idpconfgen.libs import libcli
+from . import tcommons
 
 
 def test_load_args():
@@ -88,6 +89,21 @@ def test_checkext(ext, args):
     ap.add_argument('-e', action=libcli.CheckExt(ext))
     result = ap.parse_args(['-e'] + [args])
     assert result.e == args
+
+
+@pytest.mark.parametrize(
+    'arg,expected',
+    (
+        ['ASDERTGYI', 'ASDERTGYI'],
+        [os.fspath(tcommons.fasta1.resolve()), 'ASDFGHKLQWERTYIP'],
+        ),
+    )
+def test_SeqOrFasta(arg, expected):
+    """Test can read FASTA files."""
+    ap = argparse.ArgumentParser()
+    ap.add_argument('-f', action=libcli.SeqOrFasta)
+    result = ap.parse_args(['-f', arg])
+    assert result.f == expected
 
 
 def test_checkext_error():

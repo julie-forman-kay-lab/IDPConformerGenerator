@@ -6,12 +6,13 @@ parse the information inside and return/yield the parsed information.
 """
 import subprocess
 from itertools import product
+from functools import partial
 from pathlib import Path as Path_
 
 from numba import njit
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters
+from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters, aa1set, aa3set
 from idpconfgen.core.exceptions import DSSPParserError
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
@@ -31,6 +32,28 @@ type2string = {
     str: lambda x: x,
     }
 
+
+def get_diff_between_groups(group1, group2):
+    """
+    Get difference between groups as a set.
+    """
+    return set(group1).difference(set(group2))
+
+
+get_diff_between_aa1l = partial(get_diff_between_groups, group2=aa1set)
+
+
+def is_valid_fasta(fasta):  # str -> bool
+    """
+    Confirm string is a valid FASTA primary sequence.
+
+    Does not accept headers, just the protein sequence in a single string.
+    """
+    is_valid = \
+        fasta.isupper() \
+        and not get_diff_between_aa1l(fasta)
+
+    return is_valid
 
 # USED OKAY
 def group_by(data):

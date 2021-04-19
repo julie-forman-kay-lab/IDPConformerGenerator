@@ -155,8 +155,10 @@ ap.add_argument(
 ap.add_argument(
     '-seq',
     '--input_seq',
-    help='The Conformer residue sequence.',
-    required=True
+    help='The Conformer residue sequence. String or FASTA file.',
+    required=True,
+    nargs='?',
+    action=libcli.SeqOrFasta,
     )
 
 ap.add_argument(
