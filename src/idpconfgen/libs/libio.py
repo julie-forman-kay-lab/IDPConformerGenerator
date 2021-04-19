@@ -5,12 +5,14 @@ import json
 import os
 import pickle
 import tarfile
+from collections import defaultdict
 from functools import partial
 from io import BytesIO
 from os import SEEK_END
 from pprint import pprint
 
 from idpconfgen import Path, log
+from idpconfgen.libs import get_false
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 
@@ -125,7 +127,7 @@ def glob_folder(folder, ext):
     list of Path objects
         SORTED list of matching results.
     """
-    ext = f'*{period_suffix(ext)}'
+    ext = f'*{parse_suffix(ext)}'
     files = glob.glob(str(Path(folder, ext)))
     return list(map(Path, files))
 
@@ -153,8 +155,10 @@ def has_suffix(path, ext=None):
         False
             Otherwise
     """
-    PS = period_suffix
-    return ext is None or Path(path).suffix == PS(ext)
+    return ext is None or Path(path).suffix == parse_suffix(ext)
+
+
+has_suffix_fasta = partial(has_suffix, ext='.fasta')
 
 
 def list_files_recursively(folder, ext=None):
@@ -181,6 +185,27 @@ def list_files_recursively(folder, ext=None):
         only_ext = filter(phassuff, files)
         for file_ in only_ext:
             yield Path(root, file_).resolve()
+
+
+def file_exists(path, ifdir=get_false, doelse=get_false):
+    """
+    Confirm file exists.
+
+    Parameters
+    ----------
+    path: path-object or str
+
+    Returns
+    -------
+    bool
+    """
+    p = Path(path)
+    if p.is_dir():
+        ifdir()
+    elif p.exists():
+        return True
+    else:
+        doelse()
 
 
 def log_nonexistent(files):
@@ -237,16 +262,16 @@ def paths_from_flist(path):
     return list(map(Path, no_comments))
 
 
-def period_suffix(ext):
+def parse_suffix(ext):
     """
     Represent a suffix of a file.
 
     Example
     -------
-    period_suffix('.pdf')
+    parse_suffix('.pdf')
     '.pdf'
 
-    period_suffix('pdf')
+    parse_suffix('pdf')
     '.pdf'
 
     Parameters
@@ -376,19 +401,26 @@ def read_dict_from_tar(path):
 # USED OKAY
 def read_FASTAS_from_file(fpath):
     """Read FASTA sequence from file."""
-    fastas = defaultdict(list)
+    fastas = defaultdict(str)
     key = 1
     with open(fpath, 'r') as fout:
         for line in fout:
             if line.startswith('>'):
-                key = line
+                key = line.strip()
             else:
                 seq = line.strip().replace(' ', '')
                 assert ' ' not in seq
                 assert seq.isupper()
-                fastas[key].extend(seq)
+                fastas[key] = fastas[key] + seq
 
     return fastas
+
+
+def is_valid_fasta_file(path):
+    is_valid = \
+        file_exists(path) \
+        and has_suffix_fasta(path)
+    return is_valid
 
 
 # USED OKAY

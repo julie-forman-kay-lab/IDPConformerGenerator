@@ -144,8 +144,9 @@ ap.add_argument(
     '-seq',
     '--input_seq',
     help='The Conformer residue sequence. String or FASTA file.',
-    required=True
-    action=libcli.ParseSeq,
+    required=True,
+    nargs='?',
+    action=libcli.SeqOrFasta,
     )
 
 ap.add_argument(

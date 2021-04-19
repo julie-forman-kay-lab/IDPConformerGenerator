@@ -236,3 +236,48 @@ def test_pop_dict_differece_2():
     d2 = dict.fromkeys(range(10))
     libparse.pop_difference_with_log(d1, d2)
     assert d1.keys() == d2.keys()
+
+
+@pytest.mark.parametrize(
+    'in1,in2,expected',
+    [
+        ('ABCD', 'ABC', set('D')),
+        ('ACD', 'ABCD', set()),
+        (list('ACD'), list('ABCD'), set()),
+        (list('ACDZ'), list('ABCD'), set('Z')),
+        ]
+    )
+def test_get_diff_between_groups(in1, in2, expected):
+    """Test diff between set groups."""
+    result = libparse.get_diff_between_groups(in1, in2)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'in1,expected',
+    [
+        ('ASDFRE', set()),
+        ('ASDCZ', set('Z')),
+        ('ASDER45%', set('45%')),
+        ]
+    )
+def test_get_diff_between_aa1l(in1, expected):
+    """Test difference with amino acids 1 letter codes in database."""
+    result = libparse.get_diff_between_aa1l(in1)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'in1,expected',
+    [
+        ('ASDWERPYI', True),
+        ('ASD5ERPYI', False),
+        ('ASDWErPYI', False),
+        ('ASDWERPYI_', False),
+        (' ASDWERPYI_', False),
+        ]
+    )
+def test_is_valid_upper_fasta(in1, expected):
+    """Test if fasta is valid upper."""
+    result = libparse.is_valid_fasta(in1)
+    assert result is expected

@@ -5,6 +5,8 @@ from os import cpu_count
 
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
+from idpconfgen.libs.libparse import is_valid_fasta
+from idpconfgen.libs.libio import is_valid_fasta_file, read_FASTAS_from_file
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -64,16 +66,15 @@ class CSV2Tuple(argparse.Action):
 class SeqOrFasta(argparse.Action):
     """Read sequence of FASTA file."""
 
-    def __call__(self, parser, namespace, values, option_string=None):
+    def __call__(self, parser, namespace, value, option_string=None):
         """Call it."""
-        if Path(values[0]).exist():
-            seq = read_FASTAS_from_file(values[0])
-        elif \
-                values[0].isupper() \
-                and not set(values[0]).difference(set(aa1to3.keys())):
-            seq = values[0]
+        if is_valid_fasta(value):
+            seq = value
+        elif is_valid_fasta_file(value):
+            seqdict = read_FASTAS_from_file(value)
+            seq = list(seqdict.values())[0]
         else:
-            raise ValueError('Input sequence not valid.')
+            raise parser.error('Input sequence not valid.')
 
         setattr(namespace, self.dest, seq)
 
