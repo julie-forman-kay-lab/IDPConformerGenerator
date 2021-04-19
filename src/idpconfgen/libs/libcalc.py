@@ -1059,6 +1059,16 @@ def multiply_upper_diagonal_raw(data, result):
     return
 
 
+def make_seq_probabilities(seq, reverse=True):
+    """Make probabilites from a sequence of numbers."""
+    sum_ = sum(seq)
+    probs = np.array(seq) / sum_
+    if reverse:
+        return probs
+    else:
+        return probs[::-1]
+
+
 calc_all_vs_all_dists_njit = njit(calc_all_vs_all_dists)
 multiply_upper_diagonal_raw_njit = njit(multiply_upper_diagonal_raw)
 rotate_coordinates_Q_njit = njit(rotate_coordinates_Q)

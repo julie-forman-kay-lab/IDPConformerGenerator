@@ -6,23 +6,21 @@ This project follows strictly `Semantic Versioning 2.0 <https://semver.org/#sema
 All additions to the ``master`` branch are done by PR followed by its respective version increment.
 While in version ``0``, minor and patch upgrades converge in the ``patch`` number while major upgrades are reflected in the ``minor`` number.
 
-Change Log
-==========
+Changelog
+=========
 
+v0.0.2 (2021-04-03)
+------------------------------------------------------------
 
-v0.1.1 (2020-xx-xx)
--------------------
+* corrects variable name in ``libbuild`` that was breaking sidechain
+    construction.
 
-* updated ``tox.ini``, PR #35
-* improved Exception engine, PR #34
-* implemented `make coordinate library`, PR #28
+v0.0.1 (2021-04-02)
+------------------------------------------------------------
 
-v0.1.0
+* added CI integration files
+
+v0.0.0
 ------
 
-* added PDB Downloader client interface
-
-0.0.4 (2019-10-10)
-------------------
-
-* Added Documentation skeleton (2019-10-10)
+* Any development previous to version 0.0.1 is registered in PRs up to #102.

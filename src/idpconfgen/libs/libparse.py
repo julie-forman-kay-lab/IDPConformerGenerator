@@ -321,6 +321,7 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
 
 
 # njit available
+# domain specific
 def get_trimer_seq(seq, idx):
     pre = seq[idx - 1] if idx > 0 else 'G'
     curr_res = seq[idx]
@@ -330,6 +331,35 @@ def get_trimer_seq(seq, idx):
         pos = 'G'
 
     return curr_res, pre + pos
+
+
+def get_mers(seq, size):
+    """
+    Get X-mers from seq.
+
+    Example
+    -------
+    >>> get_mers('MEAIKHD', 3)
+    {'MEA', 'EAI', 'AIK', 'KHD'}
+
+    """
+    mers = []
+    mersa = mers.append
+    for i in range(len(seq) - (size - 1)):
+        mersa(seq[i:i + size])
+    return set(mers)
+
+
+# njit available
+def get_seq_chunk(seq, idx, size):
+    """Get a chunk from sequence at start at `idx` with `size`."""
+    return seq[idx: idx + size]
+
+
+# njit available
+def get_seq_next_residue(seq, idx, size):
+    """Get the next residue after the chunk."""
+    return seq[idx + size: idx + size + 1]
 
 
 # TODO: correct for HIS/HIE/HID/HIP
@@ -346,3 +376,5 @@ def translate_seq_to_3l(input_seq):
 
 
 get_trimer_seq_njit = njit(get_trimer_seq)
+get_seq_chunk_njit = njit(get_seq_chunk)
+get_seq_next_residue_njit = njit(get_seq_next_residue)

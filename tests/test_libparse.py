@@ -1,4 +1,5 @@
 """Test libparse module."""
+import shutil
 from pathlib import Path as Path_
 
 import pytest
@@ -207,17 +208,14 @@ def test_split_pdb_by_dssp_minimum():
         next(sgen)
 
 
+@pytest.mark.skipif(not shutil.which('mkdssp'), reason="requires mkdssp")
 def test_mkdssp_w_split(BTE_A_results):
     """."""
-    try:
-        sgen = libparse.mkdssp_w_split(
-            Path(tcommons.data_folder, '1BTE_A.pdb'),
-            'mkdssp',
-            reduced=True,
-            )
-    except FileNotFoundError:
-        # in case mkdssp is not installed in the running machine
-        return
+    sgen = libparse.mkdssp_w_split(
+        Path(tcommons.data_folder, '1BTE_A.pdb'),
+        'mkdssp',
+        reduced=True,
+        )
 
     _perform_dssp_split(sgen, BTE_A_results)
 
@@ -268,6 +266,27 @@ def test_get_diff_between_aa1l(in1, expected):
 
 
 @pytest.mark.parametrize(
+    'seq,i1,i2,expected',
+    [
+        ('QWERTY', 1, 3, 'WER'),
+        ('QWERTY', 1, 10, 'WERTY'),
+        ('QWERTY', 1, 1, 'W'),
+        ('QWERTY', 0, 1, 'Q'),
+        ('QWERTY', 0, 4, 'QWER'),
+        ('QWERTY', 5, 1, 'Y'),
+        ('QWERTY', 5, 2, 'Y'),
+        ('QWERTY', 5, 3, 'Y'),
+        ('QWERTY', 5, 4, 'Y'),
+        ('QWERTY', 5, 30, 'Y'),
+        ]
+    )
+def test_get_chunk(seq, i1, i2, expected):
+    """."""
+    result = libparse.get_seq_chunk_njit(seq, i1, i2)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
     'in1,expected',
     [
         ('ASDWERPYI', True),
@@ -281,3 +300,24 @@ def test_is_valid_upper_fasta(in1, expected):
     """Test if fasta is valid upper."""
     result = libparse.is_valid_fasta(in1)
     assert result is expected
+
+
+@pytest.mark.parametrize(
+    'seq,i1,i2,expected',
+    [
+        ('QWERTY', 1, 3, 'T'),
+        ('QWERTY', 1, 10, ''),
+        ('QWERTY', 1, 1, 'E'),
+        ('QWERTY', 0, 1, 'W'),
+        ('QWERTY', 0, 4, 'T'),
+        ('QWERTY', 5, 1, ''),
+        ('QWERTY', 5, 2, ''),
+        ('QWERTY', 5, 3, ''),
+        ('QWERTY', 5, 4, ''),
+        ('QWERTY', 5, 30, ''),
+        ]
+    )
+def test_get_next_residue(seq, i1, i2, expected):
+    """."""
+    result = libparse.get_seq_next_residue_njit(seq, i1, i2)
+    assert result == expected

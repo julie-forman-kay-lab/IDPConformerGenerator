@@ -49,7 +49,7 @@ long_description = '{}\n{}'.format(
 
 setup(
     name='idpconfgen',
-    version='0.1.0',
+    version='0.0.2',
     description='Generates IDP conformers.',
     long_description=long_description,
     author='Julie Forman-Kay Lab',
@@ -69,10 +69,12 @@ setup(
         'Natural Language :: English',
         'Operating System :: POSIX',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
     project_urls={
-        'webpage': 'https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader',
+        'webpage': 'https://github.com/julie-forman-kay-lab/IDPConformerGenerator',
         # 'Documentation': 'https://python-project-skeleton.readthedocs.io/',
         # 'Changelog': 'https://python-project-skeleton.readthedocs.io/en/latest/changelog.html',
         # 'Issue Tracker': 'https://github.com/joaomcteixeira/python-project-skeleton/issues',
@@ -80,14 +82,12 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
         ],
-    python_requires='==3.7.*',
+    python_requires='>=3.7.*,<4',
     install_requires=[
-        'matplotlib>=3',
-        'numpy>=1.19',
-        'numba>=0.50.1',
-        #'scipy',
-        # 'click',
-        # eg: 'aspectlib==1.1.1', 'six>=1.7',
+        #'numpy>=1,<2',
+        #'numba>=0.53.0',
+        #'scipy>=1,<2',
+        #'pybind11>=2,<3',
         ],
     extras_require={
         # eg:
@@ -101,8 +101,6 @@ setup(
     entry_points={
         'console_scripts': [
             'idpconfgen = idpconfgen.cli:maincli',
-            'icgpdbdl = idpconfgen.cli_pdbdownloader:maincli',
-            'icgsscalc = idpconfgen.cli_sscalc:maincli',
             ]
         },
     cmdclass=cmdclass,

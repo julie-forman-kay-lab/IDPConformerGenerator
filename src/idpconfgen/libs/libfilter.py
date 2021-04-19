@@ -81,7 +81,7 @@ def aligndb(db):
             ]
 
         if any(len(i) != len_segment for i in lists_to_compare):
-            log.error(
+            log.debug(
                 'number of residues, SS chars and angles do not match, '
                 f'ignoring... {pdb}'
                 )
@@ -124,7 +124,7 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
     list of slices
     """
     assert isinstance(sequence, str)
-    assert isinstance(regex_string, str)
+    assert isinstance(regex_string, str), type(regex_string)
     # if a range exists in regex_string
     # range is defined by default by: L{1}, L{1,5} situations
     # the following functions ensures searchs goes both directions

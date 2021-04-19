@@ -1,8 +1,9 @@
 graft docs
 graft src
 
-prune tests
 prune alphas
+prune devtools
+prune tests
 
 include .bumpversion.cfg
 include .coveragerc
@@ -17,7 +18,7 @@ include CONTRIBUTING.rst
 include LICENSE
 include README.rst
 
-include tox.ini .travis.yml
+include tox.ini
 
 exclude PULLREQUEST.rst
 exclude REQUIREMENTS.md
