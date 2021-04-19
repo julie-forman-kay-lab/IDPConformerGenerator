@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.4 (2021-04-19)
+------------------------------------------------------------
+
 * ``builder`` CLI now accepts ``.fasta`` files.
 
 v0.0.3 (2021-04-19)
