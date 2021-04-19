@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* added ``--energy-threshold`` flag to control energy threshold after sidechain addition
+
 v0.0.4 (2021-04-19)
 ------------------------------------------------------------
 
