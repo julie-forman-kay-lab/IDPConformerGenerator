@@ -787,6 +787,7 @@ def conformer_generator(
                 primer_template, agls = GET_ADJ(bbi - 1)
 
             # index at the start of the current cycle
+            #print(primer_template)
             PRIMER = cycle(primer_template)
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
@@ -928,7 +929,7 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #print(total_energy)
+            #print(bbi, total_energy)
 
             if total_energy > energy_threshold:
                 #print('---------- energy positive')
@@ -1032,7 +1033,7 @@ def conformer_generator(
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if total_energy > 0:
+            if total_energy > energy_threshold:
                 print('Conformer with WORST energy', total_energy)
                 continue
             else:
