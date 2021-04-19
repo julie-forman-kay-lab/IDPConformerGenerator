@@ -401,7 +401,7 @@ def read_dict_from_tar(path):
 # USED OKAY
 def read_FASTAS_from_file(fpath):
     """Read FASTA sequence from file."""
-    fastas = defaultdict(str)
+    fastas = defaultdict(list)
     key = 1
     with open(fpath, 'r') as fout:
         for line in fout:
@@ -411,9 +411,19 @@ def read_FASTAS_from_file(fpath):
                 seq = line.strip().replace(' ', '')
                 assert ' ' not in seq
                 assert seq.isupper()
-                fastas[key] = fastas[key] + seq
+                fastas[key].extend(seq)
 
     return fastas
+
+
+def read_FASTAS_from_file_to_strings(fpath):
+    """
+    Read FASTA sequences from file.
+
+    FASTA is output as string.
+    """
+    fastad = read_FASTAS_from_file(fpath)
+    return {key: ''.join(value) for key, value in fastad.items()}
 
 
 def is_valid_fasta_file(path):

@@ -6,7 +6,10 @@ from os import cpu_count
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
 from idpconfgen.libs.libparse import is_valid_fasta
-from idpconfgen.libs.libio import is_valid_fasta_file, read_FASTAS_from_file
+from idpconfgen.libs.libio import (
+    is_valid_fasta_file,
+    read_FASTAS_from_file_to_strings,
+    )
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -71,7 +74,7 @@ class SeqOrFasta(argparse.Action):
         if is_valid_fasta(value):
             seq = value
         elif is_valid_fasta_file(value):
-            seqdict = read_FASTAS_from_file(value)
+            seqdict = read_FASTAS_from_file_to_strings(value)
             seq = list(seqdict.values())[0]
         else:
             raise parser.error('Input sequence not valid.')
