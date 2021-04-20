@@ -60,4 +60,5 @@ def assert_subclass(objs, subclass):
             return True
     return False
 
-__version__ = '0.0.4'
+
+__version__ = '0.0.5'
