@@ -4,7 +4,7 @@ import os
 import sys
 from time import time
 
-from idpconfgen import log
+from idpconfgen import log, assert_subclass
 from idpconfgen.logger import S
 
 
@@ -69,8 +69,11 @@ class ProgressWatcher:
         items : iterable
             Items to represent.
         """
+        if assert_subclass(log.handlers, logging.StreamHandler):
+            return ProgressFake()
+
         try:
-            _cols, _rows = os.get_terminal_size()
+            os.get_terminal_size()
         except OSError:
             log.warning(
                 'WARNING: Could not retrieve size from terminal window. '

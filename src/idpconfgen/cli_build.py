@@ -66,8 +66,11 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
+from idpconfgen.logger import S, T, init_clean_files, pre_msg
+
 
 _file = Path(__file__).myparents()
+LOGFILESNAME = 'idpconfgen_build'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -235,16 +238,24 @@ def main(
 
     Distributes over processors.
     """
+    init_clean_files(log, LOGFILESNAME)
+    log.info(f'input sequence: {input_seq}')
+
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
         conformers_per_core = nconfs
-        remaining_chunks = 0
+        remaining_confs = 0
     else:
         conformers_per_core = nconfs // ncores
         # in case nconfs is not multiple of ncores, builds the remaining confs
         # at the end
         remaining_confs = nconfs % ncores
+
+    log.info(
+        f'running in {ncores} cores with '
+        f'{remaining_confs} remaining confs'
+        )
 
     # populates globals
     #if False:
@@ -543,7 +554,9 @@ def conformer_generator(
             f'Expected {list(compute_sidechains.keys())}.'
             )
 
+    log.info(f'random seed: {random_seed}')
     np.random.seed(random_seed)
+    seed_report = pre_msg(f'seed {random_seed}')
 
     # prepares protein sequences
     all_atom_input_seq = input_seq
@@ -787,6 +800,7 @@ def conformer_generator(
                 primer_template, agls = GET_ADJ(bbi - 1)
 
             # index at the start of the current cycle
+            #print(primer_template)
             PRIMER = cycle(primer_template)
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
@@ -928,7 +942,7 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #print(total_energy)
+            #print(bbi, total_energy)
 
             if total_energy > energy_threshold:
                 #print('---------- energy positive')
@@ -1032,11 +1046,13 @@ def conformer_generator(
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if total_energy > 0:
-                print('Conformer with WORST energy', total_energy)
+            if total_energy > energy_threshold:
+                log.info(seed_report(
+                    f'Conformer with WORST energy {total_energy}'))
                 continue
             else:
-                print(conf_n, total_energy)
+                log.info(seed_report(
+                    f'finished conf: {conf_n} with energy {total_energy}'))
 
         #print(all_atom_coords)
         yield all_atom_coords

@@ -1,6 +1,7 @@
 """Manages operations with logging."""
 import logging
 import traceback
+from functools import partial
 from inspect import signature
 from pathlib import Path
 from time import time_ns
@@ -22,9 +23,10 @@ def subline(msg, *args, spacer=' ', indent=4):
 
 T = titlelog
 S = subline
+Snull = partial(subline, spacer='', indent=0)
 
 
-def init_files(log, logfilesname):
+def init_files(log, logfilesname, clear=False):
     """
     Initiate log files.
 
@@ -38,22 +40,29 @@ def init_files(log, logfilesname):
     the user wants to save for future reference; finally, .error
     stores errors in runtime that compromise the scientific output.
     """
+    if clear:
+        log.handlers.clear()
+
     debugfile = logging.FileHandler(f'{logfilesname}.debug', mode='w')
     debugfile.setLevel(logging.DEBUG)
     debugfile.setFormatter(logging.Formatter(
-        "%(filename)s:%(name)s:%(funcName)s:%(lineno)d: %(message)s"
+        "[%(asctime)s]%(filename)s:%(name)s:%(funcName)s:%(lineno)d: "
+        "%(message)s"
         ))
     log.addHandler(debugfile)
 
     infolog = logging.FileHandler(f'{logfilesname}.log', mode='w')
     infolog.setLevel(logging.INFO)
     log.addHandler(infolog)
-    infolog.setFormatter(logging.Formatter('%(message)s'))
+    infolog.setFormatter(logging.Formatter('[%(asctime)s]%(message)s'))
 
     errorlog = logging.FileHandler(f'{logfilesname}.error', mode='w')
     errorlog.setLevel(logging.ERROR)
-    errorlog.setFormatter(logging.Formatter('%(message)s'))
+    errorlog.setFormatter(logging.Formatter('[%(asctime)s]%(message)s'))
     log.addHandler(errorlog)
+
+
+init_clean_files = partial(init_files, clear=True)
 
 
 def report_on_crash(
@@ -130,3 +139,9 @@ def report_on_crash(
 
         roc_error = ReportOnCrashError(fout_path)
         raise roc_error from err
+
+
+def pre_msg(msg, sep=']'):
+    def func(logmsg):
+        return f'{msg}{sep}{logmsg}'
+    return func
