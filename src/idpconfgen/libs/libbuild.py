@@ -38,7 +38,7 @@ from idpconfgen.libs.libfilter import (
     )
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
-from idpconfgen.libs.libtimer import ProgressBar, timeme
+from idpconfgen.libs.libtimer import ProgressWatcher, timeme
 
 
 # See TODO at init_faspr_sidechains
@@ -439,7 +439,7 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
 
     Concatenates primary sequences accordingly.
     """
-    print('ss_regex, ', ss_regex)
+    log.info(f'ss_regex, {ss_regex}')
     db = read_dictionary_from_disk(database)
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
@@ -488,14 +488,14 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     assert seq_angles.shape[0] == len(primary)
 
     del omega, phi, psi
-    with open('ARRAY', 'w') as fout:
-        np.savetxt(fout, seq_angles)
+    # TODO:
+    # save table to a file
     return primary, seq_angles
 
 
 def prepare_slice_dict(primary, inseq, ncores=1):
     """."""
-    print('preparing regex xmers')
+    log.info('preparing regex xmers')
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
     trimers = get_mers(inseq, 3)
@@ -507,7 +507,7 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     mers = (i for i in _chainit)
     _l = len(monomers) + len(dimers) + len(trimers) \
         + len(tetramers) + len(pentamers)
-    with ProgressBar(_l) as PW:
+    with ProgressWatcher(_l) as PW:
         for mer in mers:
             lmer = len(mer)
             merregex = f'(?=({mer}))'
@@ -616,7 +616,7 @@ def prepare_energy_function(
 
         lf_calc = init_lennard_jones_calculator(acoeff, bcoeff)
         energy_func_terms.append(lf_calc)
-        print('prepared lj')
+        log.info('prepared lj')
 
     if coulomb_term:
 
@@ -632,14 +632,14 @@ def prepare_energy_function(
 
         coulomb_calc = init_coulomb_calculator(charges_ij)
         energy_func_terms.append(coulomb_calc)
-        print('prepared Coulomb')
+        log.info('prepared Coulomb')
 
     # in case there are iji terms, I need to add here another layer
     calc_energy = energycalculator_ij(
         calc_all_vs_all_dists_njit,
         energy_func_terms,
         )
-    print('done preparing energy func')
+    log.info('done preparing energy func')
     return calc_energy
 
 
