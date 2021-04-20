@@ -1,5 +1,6 @@
 """Manages time."""
 import functools
+import logging
 import os
 import sys
 from time import time
@@ -69,7 +70,7 @@ class ProgressWatcher:
         items : iterable
             Items to represent.
         """
-        if assert_subclass(log.handlers, logging.StreamHandler):
+        if not assert_subclass(log.handlers, logging.StreamHandler):
             return ProgressFake()
 
         try:

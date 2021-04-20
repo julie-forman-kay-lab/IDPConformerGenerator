@@ -66,7 +66,7 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
-from idpconfgen.logger import S, T, init_clean_files, pre_msg
+from idpconfgen.logger import S, T, init_clean_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
@@ -296,11 +296,18 @@ def main(
         CONF_NUMBER.put(i)
 
     # prepars execution function
-    execute = partial(
+    consume = partial(
         _build_conformers,
         input_seq=input_seq,  # string
         nconfs=conformers_per_core,  # int
         **kwargs,
+        )
+
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
         )
 
     start = time()

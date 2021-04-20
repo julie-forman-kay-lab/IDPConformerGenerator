@@ -38,7 +38,7 @@ from idpconfgen.libs.libfilter import (
     )
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
-from idpconfgen.libs.libtimer import ProgressBar, timeme
+from idpconfgen.libs.libtimer import ProgressWatcher, timeme
 
 
 # See TODO at init_faspr_sidechains
@@ -439,7 +439,7 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
 
     Concatenates primary sequences accordingly.
     """
-    log.info('ss_regex, {ss_regex}')
+    log.info(f'ss_regex, {ss_regex}')
     db = read_dictionary_from_disk(database)
     timed = partial(timeme, aligndb)
     pdbs, angles, dssp, resseq = timed(db)
@@ -507,7 +507,7 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     mers = (i for i in _chainit)
     _l = len(monomers) + len(dimers) + len(trimers) \
         + len(tetramers) + len(pentamers)
-    with ProgressBar(_l) as PW:
+    with ProgressWatcher(_l) as PW:
         for mer in mers:
             lmer = len(mer)
             merregex = f'(?=({mer}))'
