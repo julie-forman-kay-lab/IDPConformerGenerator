@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.6 (2021-04-20)
+------------------------------------------------------------
+
 * additional functions for logging
 * add logging to build and other parts
 
