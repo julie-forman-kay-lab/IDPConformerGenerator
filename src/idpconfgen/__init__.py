@@ -61,4 +61,8 @@ def assert_subclass(objs, subclass):
     return False
 
 
+class Unpackable:
+    pass
+
+
 __version__ = '0.0.6'

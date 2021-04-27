@@ -321,3 +321,17 @@ def test_get_next_residue(seq, i1, i2, expected):
     """."""
     result = libparse.get_seq_next_residue_njit(seq, i1, i2)
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    'in1,expected',
+    [
+        ({1: 'a'}, 'a'),
+        ({1: 'a', 2: 'b'}, {1: 'a', 2: 'b'}),
+        ({0: ['a']}, ['a']),
+        ],
+    )
+def test_dictfirst(in1, expected):
+    """Test dict first."""
+    result = libparse.get_dict_first_or_all(in1)
+    assert result == expected

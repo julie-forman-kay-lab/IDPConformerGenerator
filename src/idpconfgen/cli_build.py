@@ -66,7 +66,13 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
-from idpconfgen.logger import S, T, init_clean_files, pre_msg, report_on_crash
+from idpconfgen.logger import (
+    S,
+    T,
+    init_clean_files,
+    pre_msg,
+    report_on_crash,
+    )
 
 
 _file = Path(__file__).myparents()
@@ -221,18 +227,7 @@ libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
 
-def main(
-        input_seq,
-        database,
-        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
-        func=None,
-        forcefield=None,
-        bgeo_path=None,
-        nconfs=1,
-        ncores=1,
-        random_seed=0,
-        **kwargs,  # other kwargs target energy function, for example.
-        ):
+def main(input_seq, *args, **kwargs):
     """
     Execute main client logic.
 
@@ -241,6 +236,77 @@ def main(
     init_clean_files(log, LOGFILESNAME)
     log.info(f'input sequence: {input_seq}')
 
+    options = {
+        dict: main_multiple_seqs,
+        str: main_single_seq,
+        }
+
+    try:
+        options[type(input_seq)](input_seq, *args, **kwargs)
+    except KeyError:
+        log.debug(input_seq)
+        log.error('Wrong sequence format, see debug file.')
+        sys.exit(1)
+
+
+def main_multiple_seqs(
+        input_seq,
+        database,
+        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        forcefield=None,
+        bgeo_path=None,
+        nconfs=1,
+        ncores=1,
+        random_seed=0,
+        **kwargs,  # other kwargs target energy function, for example.
+        ):
+    """
+    Run builder for multiple sequences.
+    """
+    make_folders(input_seq.keys())
+    ncores = len(input_seq)
+
+    consume = starunpack_kwargs(
+        build_conformers,
+        nconfs=nconfs,
+        )
+
+    consumables = [
+        {
+            'output_folder': seq_name,
+            'input_seq': inseq,
+            'random_seed': random_seed,
+            'forcefield': forcefield,
+            'bgeo_path': bgeo_path,
+            'dssp_regexes': dssp_regexes,
+            }
+        for seq_name, inseq in input_seq.items()
+        ]
+
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
+        )
+
+    pool_function(execute, consumables, ncores=ncores)
+    log.info(S('Process finished.'))
+
+    return
+
+
+def main_single_seq(
+        input_seq,
+        database,
+        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        forcefield=None,
+        bgeo_path=None,
+        nconfs=1,
+        ncores=1,
+        random_seed=0,
+        **kwargs,  # other kwargs target energy function, for example.
+        ):
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -404,10 +470,13 @@ def _build_conformers(
         input_seq=None,
         conformer_name='conformer',
         nconfs=1,
+        output_folder=None,
         **kwargs,
         ):
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
+    output_folder = output_folder or Path.cwd().resolve()
+    with_fname_base = pre_msg(os.fspath(output_folder), sep='_')
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
@@ -430,7 +499,7 @@ def _build_conformers(
             ROUND(coords, decimals=3),
             )
 
-        fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
+        fname = with_fname_base(f'{conformer_name}_{CONF_NUMBER.get()}.pdb')
 
         with open(fname, 'w') as fout:
             fout.write(pdb_string)
@@ -561,16 +630,13 @@ def conformer_generator(
             f'Expected {list(compute_sidechains.keys())}.'
             )
 
-    log.info(f'random seed: {random_seed}')
-    np.random.seed(random_seed)
-    seed_report = pre_msg(f'seed {random_seed}')
-
     # prepares protein sequences
     all_atom_input_seq = input_seq
     template_input_seq = remap_sequence(all_atom_input_seq)
     template_seq_3l = translate_seq_to_3l(template_input_seq)
     del input_seq
 
+    # general global variables referenced here for performance
     BUILD_BEND_H_N_C = build_bend_H_N_C
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
@@ -591,6 +657,8 @@ def conformer_generator(
     ROT_COORDINATES = rotate_coordinates_Q_njit
     RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
+
+    # sequence specific
     angles = ANGLES
     slices = SLICES
     global BGEO_full
@@ -606,6 +674,46 @@ def conformer_generator(
     global SLICEDICT_MONOMERS
     global SLICEDICT_XMERS
     global GET_ADJ
+
+    log.info(f'random seed: {random_seed}')
+    np.random.seed(random_seed)
+    seed_report = pre_msg(f'seed {random_seed}')
+
+
+
+
+def create_conformer_model(input_seq, forcefield_card, efunc_card):
+
+    forcefield_defs = forcefields[forcefield_card.pop('forcefield')]
+    #topology_obj = forcefield_defs(add_OXT=True, add_Nterminal_H=True)
+    topology_obj = forcefield_defs(**forcefield_card)
+
+    labels = init_conflabels(input_seq, topology_obj.atom_names)
+    masks = init_confmasks(labels.atom_labels)
+    efunc = prepare_energy_function(
+        labels.atom_labels,)
+        labels.res_nums,
+        labels.res_labels,
+        topology_obj,
+        **efunc_card,
+        )
+
+    return labels, masks, efunc
+
+    all_atom_labels, all_atom_masks, all_atom_efunc = \
+        create_conformer_model(all_atom_input_seq, forcefield)
+
+    template_labels, template_masks, template_efunc = \
+        create_conformer_model(template_input_seq, forcefield)
+
+
+
+
+
+
+
+
+
 
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function

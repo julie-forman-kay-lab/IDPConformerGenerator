@@ -375,6 +375,16 @@ def translate_seq_to_3l(input_seq):
         ]
 
 
+def get_dict_first_or_all(d):
+    """Get value of dict if dict has only in item.
+    Else return the whole dict.
+    """
+    if len(d) == 1:
+        return list(d.values())[0]
+    else:
+        return d
+
+
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)

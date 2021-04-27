@@ -12,6 +12,13 @@ def starunpack(func, *args, **kwargs):
     return func(*args[0], **kwargs)
 
 
+def starunpack_kwargs(func, **kwargs):
+    def funcexec(kdict):
+        kwargs.update(kdict)
+        func(**kwargs)
+    return funcexec
+
+
 # USED OKAY
 # here can't use closures because those can't be pickled
 def consume_iterable_in_list(func, *args, **kwargs):
