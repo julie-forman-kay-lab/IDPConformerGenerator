@@ -958,27 +958,27 @@ def conformer_generator(
 
                 # reset the same chunk maximum 5 times,
                 # after that reset also the chunk before
-                if number_of_trials > 50:
-                    bbi0_R_POP()
-                    COi0_R_POP()
-                    res_R_POP()
-                    number_of_trials = 0
-                    number_of_trials2 += 1
-
-                if number_of_trials2 > 5:
-                    bbi0_R_POP()
-                    COi0_R_POP()
-                    res_R_POP()
-                    number_of_trials2 = 0
-                    number_of_trials3 += 1
-
-                if number_of_trials3 > 5:
-                    bbi0_R_POP()
-                    COi0_R_POP()
-                    res_R_POP()
-                    number_of_trials3 = 0
-
                 try:
+                    if number_of_trials > 30:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials = 0
+                        number_of_trials2 += 1
+
+                    if number_of_trials2 > 5:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials2 = 0
+                        number_of_trials3 += 1
+
+                    if number_of_trials3 > 5:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials3 = 0
+
                     _bbi0 = bbi0_register[-1]
                     _COi0 = COi0_register[-1]
                     _resi0 = res_R[-1]

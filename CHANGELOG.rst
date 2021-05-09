@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Expands try:catch to avoid index error when restarting conformer
+
 v0.0.7 (2021-05-09)
 ------------------------------------------------------------
 
