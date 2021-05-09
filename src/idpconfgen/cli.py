@@ -15,6 +15,7 @@ USAGE:
 import argparse
 import sys
 
+from idpconfgen import __version__
 from idpconfgen import cli_bgeo, cli_build, cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_torsionsJ, cli_validate, log
@@ -92,6 +93,10 @@ def maincli():
         ap.exit()
 
     cmd = load_args()
+
+    with open('idpconfgen.version', 'w') as fout:
+        fout.write(f'version: {__version__}')
+
     cmd.func(**vars(cmd))
     log.info(S('finished properly'))
 
