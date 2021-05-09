@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.7 (2021-05-09)
+------------------------------------------------------------
+
 * saves version number to file before running a client
 
 v0.0.6 (2021-04-20)
