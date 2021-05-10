@@ -66,6 +66,17 @@ class CSV2Tuple(argparse.Action):
         setattr(namespace, self.dest, tuple(values.split(',')))
 
 
+class ListOfInts(argparse.Action):
+    """Convert list of str to list of ints."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Call it."""
+        if values is False:
+            setattr(namespace, self.dest, values)
+        else:
+            setattr(namespace, self.dest, [int(i) for i in values])
+
+
 class SeqOrFasta(argparse.Action):
     """Read sequence of FASTA file."""
 
