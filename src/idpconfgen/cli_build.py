@@ -241,7 +241,7 @@ def main(
         nconfs=1,
         ncores=1,
         random_seed=0,
-        xmers_probs,
+        xmers_probs=False,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -283,7 +283,7 @@ def main(
 
     XMERPROBS = make_seq_probabilities(
         xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
-        reverse=True,
+        reverse=False if xmers_probs else True,
         )
 
     GET_ADJ = get_adjacent_angles(
