@@ -1064,9 +1064,9 @@ def make_seq_probabilities(seq, reverse=True):
     sum_ = sum(seq)
     probs = np.array(seq) / sum_
     if reverse:
-        return probs
-    else:
         return probs[::-1]
+    else:
+        return probs
 
 
 calc_all_vs_all_dists_njit = njit(calc_all_vs_all_dists)
