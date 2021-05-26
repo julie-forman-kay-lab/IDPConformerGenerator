@@ -85,6 +85,24 @@ res_labels
 """
 
 
+def build_regex_substitutions(
+        s,  # str
+        options,  # dict
+        ):  # -> str
+    """
+    Build character replacements in regex string.
+
+    Example
+    -------
+    >>> build_regex_substitutions('ASD', {'S': 'SE'})
+    'A[SE]D'
+    """
+    for key, value in options.items():
+        s = s.replace(key, f'[{value}]')
+
+    return s
+
+
 def init_confmasks(atom_labels):
     """
     Create a ConfMask object (namedtuple).
@@ -507,6 +525,7 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     mers = (i for i in _chainit)
     _l = len(monomers) + len(dimers) + len(trimers) \
         + len(tetramers) + len(pentamers)
+
     with ProgressWatcher(_l) as PW:
         for mer in mers:
             lmer = len(mer)

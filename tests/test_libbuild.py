@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from idpconfgen.libs.libbuild import init_confmasks
+from idpconfgen.libs.libbuild import init_confmasks, build_regex_substitutions
 
 
 def test_conf_masks():
@@ -36,3 +36,19 @@ def test_conf_masks():
     assert np.array_equal(confmask.non_Hs, [3, 4, 5, 6, 7, 12, 13, 14, 15, 19])
     assert np.array_equal(confmask.non_Hs_non_OXT, [3, 4, 5, 6, 7, 12, 13, 14, 15])
     assert np.array_equal(confmask.H1_N_CA_CB, [0, 3, 4, 7])
+
+
+
+@pytest.mark.parametrize(
+    'in1,options,expected',
+    [
+        ('ASD', {'S': 'SE'}, 'A[SE]D'),
+        ('ASDS', {'S': 'SE'}, 'A[SE]D[SE]'),
+        ('ASD', {'D': 'DEWQ'}, 'AS[DEWQ]'),
+        ('ASD', {'R': 'REWQ'}, 'ASD'),
+        ]
+    )
+def test_add_regex_substitutions(in1, options, expected):
+    """Test add regex substitutions."""
+    result = build_regex_substitutions(in1, options)
+    assert result == expected
