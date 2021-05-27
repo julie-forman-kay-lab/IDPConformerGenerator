@@ -88,6 +88,8 @@ res_labels
 def build_regex_substitutions(
         s,  # str
         options,  # dict
+        pre_treatment=list,
+        post_treatment=''.join,
         ):  # -> str
     """
     Build character replacements in regex string.
@@ -102,13 +104,30 @@ def build_regex_substitutions(
 
     >>> build_regex_substitutions('ASDS', {})
     'ASDS'
-    """
-    s_list = list(s)
-    for i, char in enumerate(s_list):
-        if char in options:
-            s_list[i] = f'[{options[char]}]'
 
-    return ''.join(s_list)
+    Parameters
+    ----------
+    s : regex string
+
+    options : dict
+        Dictionary of char to multichar substitutions
+
+    pre_treatment : callable, optional
+        A treatment to apply in `s` before substitution.
+        `pre_treatment` must return a list-like object.
+        Default: list because it expects s to be a string.
+
+    post_treatment : callable, optional
+        A function to apply on the resulting list-like object
+        before returning.
+        Default: ''.join, to return a string.
+    """
+    s_treat = pre_treatment(s)
+    for i, char in enumerate(s_treat):
+        if char in options:
+            s_treat[i] = f'[{options[char]}]'
+
+    return post_treatment(s_treat)
 
 
 def init_confmasks(atom_labels):
@@ -531,8 +550,8 @@ def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
     pentamers = get_mers(inseq, 5)
 
     slice_dict = defaultdict(dict)
-    _chainit = it.chain(monomers, dimers, trimers, tetramers, pentamers)
-    mers = (i for i in _chainit)
+    mers = it.chain(monomers, dimers, trimers, tetramers, pentamers)
+
     _l = len(monomers) + len(dimers) + len(trimers) \
         + len(tetramers) + len(pentamers)
 

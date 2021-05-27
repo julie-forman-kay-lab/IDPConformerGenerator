@@ -79,7 +79,7 @@ class ReadDictionary(argparse.Action):
         except FileNotFoundError:
             valuedict = json.loads(value)
 
-        setattr(namespace, self.dest, jdict)
+        setattr(namespace, self.dest, valuedict)
 
 
 class SeqOrFasta(argparse.Action):

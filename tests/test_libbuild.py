@@ -43,6 +43,7 @@ def test_conf_masks():
     'in1,options,expected',
     [
         ('ASD', {'S': 'SE'}, 'A[SE]D'),
+        ('S', {'S': 'SE'}, '[SE]'),
         ('ASDS', {'S': 'SE'}, 'A[SE]D[SE]'),
         ('ASDSE', {'S': 'SE', 'E': 'DE'}, 'A[SE]D[SE][DE]'),
         ('ASD', {'D': 'DEWQ'}, 'AS[DEWQ]'),
