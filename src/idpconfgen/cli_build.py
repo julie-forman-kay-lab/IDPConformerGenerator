@@ -226,6 +226,15 @@ ap.add_argument(
     action=libcli.ReadDictionary,
     )
 
+ap.add_argument(
+    '-xp',
+    '--xmers-probs',
+    help='The Xmers relative probabilities for selection',
+    default=False,
+    nargs='+',
+    action=libcli.ListOfInts,
+    )
+
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
@@ -241,6 +250,7 @@ def main(
         nconfs=1,
         ncores=1,
         random_seed=0,
+        xmers_probs=False,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -279,7 +289,12 @@ def main(
     primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
     SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
     SLICEDICT_MONOMERS = SLICEDICT_XMERS.pop(1)
-    XMERPROBS = make_seq_probabilities(list(SLICEDICT_XMERS.keys()), reverse=True)
+
+    XMERPROBS = make_seq_probabilities(
+        xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
+        reverse=False if xmers_probs else True,
+        )
+
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
         XMERPROBS,
