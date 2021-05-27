@@ -272,3 +272,18 @@ def test_energy_calculator_ij():
     coords = np.arange(10)
     energy = calc(coords)
     assert energy == 79
+
+
+@pytest.mark.parametrize(
+    "in1,reverse,expected",
+    [
+        ([2, 3, 4, 5], False, [2/14, 3/14, 4/14, 5/14]),
+        ([2, 3, 4, 5], True, [5/14, 4/14, 3/14, 2/14]),
+        ([1, 0], False, [1, 0]),
+        ([1, 0], True, [0, 1]),
+        ]
+    )
+def test_make_seq_probs(in1, reverse, expected):
+    """Test make probs."""
+    result = libcalc.make_seq_probabilities(in1, reverse=reverse)
+    assert np.all(np.isclose(np.array(result), np.array(expected)))
