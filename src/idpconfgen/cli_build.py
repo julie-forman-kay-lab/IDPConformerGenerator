@@ -32,6 +32,7 @@ from idpconfgen.core.build_definitions import (
     sidechain_templates,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
@@ -221,7 +222,7 @@ ap.add_argument(
 ap.add_argument(
     '-subs',
     '--residue-substitutions',
-    help='Mapping allowed residue replacements.',
+    help=help_docs.residue_substitutions_cli_help,
     default=None,
     action=libcli.ReadDictionary,
     )
