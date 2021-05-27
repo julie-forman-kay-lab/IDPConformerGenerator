@@ -47,6 +47,7 @@ def test_conf_masks():
         ('ASDSE', {'S': 'SE', 'E': 'DE'}, 'A[SE]D[SE][DE]'),
         ('ASD', {'D': 'DEWQ'}, 'AS[DEWQ]'),
         ('ASD', {'R': 'REWQ'}, 'ASD'),
+        ('ASD', {}, 'ASD'),
         ]
     )
 def test_add_regex_substitutions(in1, options, expected):

@@ -99,6 +99,9 @@ def build_regex_substitutions(
 
     >>> build_regex_substitutions('ASDS', {'S': 'SE'})
     'A[SE]D[SE]'
+
+    >>> build_regex_substitutions('ASDS', {})
+    'ASDS'
     """
     s_list = list(s)
     for i, char in enumerate(s_list):
@@ -516,8 +519,10 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     return primary, seq_angles
 
 
-def prepare_slice_dict(primary, inseq, ncores=1):
+def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
     """."""
+    res_tolerance = res_tolerance or {}
+
     log.info('preparing regex xmers')
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
@@ -534,11 +539,15 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     with ProgressWatcher(_l) as PW:
         for mer in mers:
             lmer = len(mer)
-            merregex = f'(?=({mer}))'
-            slice_dict[lmer][mer] = \
+            altered_mer = build_regex_substitutions(mer, res_tolerance)
+
+            merregex = f'(?=({altered_mer}))'
+
+            slice_dict[lmer][altered_mer] = \
                 regex_forward_with_overlap(primary, merregex)
-            if not slice_dict[lmer][mer]:
-                slice_dict[lmer].pop(mer)
+
+            if not slice_dict[lmer][altered_mer]:
+                slice_dict[lmer].pop(altered_mer)
             # for _s in slice_dict[lmer][mer]:
                 # assert '|' not in inseq[_s]
             PW.increment()
