@@ -32,8 +32,10 @@ from idpconfgen.core.build_definitions import (
     sidechain_templates,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
+    build_regex_substitutions,
     prepare_slice_dict,
     read_db_to_slices_single_secondary_structure,
     compute_sidechains,
@@ -218,6 +220,14 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-subs',
+    '--residue-substitutions',
+    help=help_docs.residue_substitutions_cli_help,
+    default=None,
+    action=libcli.ReadDictionary,
+    )
+
+ap.add_argument(
     '-xp',
     '--xmers-probs',
     help='The Xmers relative probabilities for selection',
@@ -225,7 +235,6 @@ ap.add_argument(
     nargs='+',
     action=libcli.ListOfInts,
     )
-
 
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
@@ -238,6 +247,7 @@ def main(
         func=None,
         forcefield=None,
         bgeo_path=None,
+        residue_substitutions=None,
         nconfs=1,
         ncores=1,
         random_seed=0,
@@ -278,7 +288,7 @@ def main(
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_MONOMERS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
-    SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq)
+    SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
     SLICEDICT_MONOMERS = SLICEDICT_XMERS.pop(1)
 
     XMERPROBS = make_seq_probabilities(
@@ -293,6 +303,7 @@ def main(
         ANGLES,
         SLICEDICT_XMERS,
         SLICEDICT_MONOMERS,
+        residue_replacements=residue_substitutions,
         )
 
     populate_globals(
@@ -1150,6 +1161,7 @@ def get_adjacent_angles(
         db,
         slice_dict,
         slicemonomers,
+        residue_replacements=None,
         RC=np.random.choice,
         ):
     """
@@ -1179,6 +1191,7 @@ def get_adjacent_angles(
     """
 
     max_opt = max(options)
+    residue_replacements = residue_replacements or {}
 
     def func(aidx):
         #print('Entering new angle collection ----------------------------', aidx)
@@ -1206,7 +1219,8 @@ def get_adjacent_angles(
                 try:
                     # attempts to retrieve angles to the template, exact sequence
                     # match
-                    agls = db[RC(slice_dict[plen][primer_template]), :].ravel()
+                    pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+                    agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()
                     # if the angles are found, there is nothing more to do
                     break
 
@@ -1253,13 +1267,15 @@ def get_adjacent_angles(
             if plen > max_opt:
                 plen = 2
                 primer_template = get_seq_chunk_njit(seq, cr, plen)
-                agls = db[RC(slice_dict[plen][primer_template]), :].ravel()[:3]
+                pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+                agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()[:3]
                 #print('sending just one', plen, primer_template)
 
             elif plen == 1:
                 primer_template = seq[cr]
                 # this should only happen at the end of the chain
-                agls = db[RC(slicemonomers[primer_template]), :].ravel()
+                pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+                agls = db[RC(slicemonomers[pt_sub]), :].ravel()
                 #print('the conformer ended', cr)
             else:
                 log.debug(plen, primer_template, seq[cr:cr + plen])

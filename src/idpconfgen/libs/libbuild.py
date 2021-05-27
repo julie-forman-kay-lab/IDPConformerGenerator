@@ -85,6 +85,51 @@ res_labels
 """
 
 
+def build_regex_substitutions(
+        s,  # str
+        options,  # dict
+        pre_treatment=list,
+        post_treatment=''.join,
+        ):  # -> str
+    """
+    Build character replacements in regex string.
+
+    Example
+    -------
+    >>> build_regex_substitutions('ASD', {'S': 'SE'})
+    'A[SE]D'
+
+    >>> build_regex_substitutions('ASDS', {'S': 'SE'})
+    'A[SE]D[SE]'
+
+    >>> build_regex_substitutions('ASDS', {})
+    'ASDS'
+
+    Parameters
+    ----------
+    s : regex string
+
+    options : dict
+        Dictionary of char to multichar substitutions
+
+    pre_treatment : callable, optional
+        A treatment to apply in `s` before substitution.
+        `pre_treatment` must return a list-like object.
+        Default: list because it expects s to be a string.
+
+    post_treatment : callable, optional
+        A function to apply on the resulting list-like object
+        before returning.
+        Default: ''.join, to return a string.
+    """
+    s_treat = pre_treatment(s)
+    for i, char in enumerate(s_treat):
+        if char in options:
+            s_treat[i] = f'[{options[char]}]'
+
+    return post_treatment(s_treat)
+
+
 def init_confmasks(atom_labels):
     """
     Create a ConfMask object (namedtuple).
@@ -493,8 +538,10 @@ def read_db_to_slices_single_secondary_structure(database, ss_regex):
     return primary, seq_angles
 
 
-def prepare_slice_dict(primary, inseq, ncores=1):
+def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
     """."""
+    res_tolerance = res_tolerance or {}
+
     log.info('preparing regex xmers')
     monomers = get_mers(inseq, 1)
     dimers = get_mers(inseq, 2)
@@ -503,18 +550,23 @@ def prepare_slice_dict(primary, inseq, ncores=1):
     pentamers = get_mers(inseq, 5)
 
     slice_dict = defaultdict(dict)
-    _chainit = it.chain(monomers, dimers, trimers, tetramers, pentamers)
-    mers = (i for i in _chainit)
+    mers = it.chain(monomers, dimers, trimers, tetramers, pentamers)
+
     _l = len(monomers) + len(dimers) + len(trimers) \
         + len(tetramers) + len(pentamers)
+
     with ProgressWatcher(_l) as PW:
         for mer in mers:
             lmer = len(mer)
-            merregex = f'(?=({mer}))'
-            slice_dict[lmer][mer] = \
+            altered_mer = build_regex_substitutions(mer, res_tolerance)
+
+            merregex = f'(?=({altered_mer}))'
+
+            slice_dict[lmer][altered_mer] = \
                 regex_forward_with_overlap(primary, merregex)
-            if not slice_dict[lmer][mer]:
-                slice_dict[lmer].pop(mer)
+
+            if not slice_dict[lmer][altered_mer]:
+                slice_dict[lmer].pop(altered_mer)
             # for _s in slice_dict[lmer][mer]:
                 # assert '|' not in inseq[_s]
             PW.increment()

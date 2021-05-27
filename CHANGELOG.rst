@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Implements residue substitution/tolerance during conformer build
+
 v0.0.9 (2021-05-27)
 ------------------------------------------------------------
 
