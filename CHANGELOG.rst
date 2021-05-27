@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.9 (2021-05-27)
+------------------------------------------------------------
+
 * user can now define the chunk size selection probabilities
 
 v0.0.8 (2021-05-09)
