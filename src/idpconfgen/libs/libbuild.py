@@ -96,11 +96,16 @@ def build_regex_substitutions(
     -------
     >>> build_regex_substitutions('ASD', {'S': 'SE'})
     'A[SE]D'
-    """
-    for key, value in options.items():
-        s = s.replace(key, f'[{value}]')
 
-    return s
+    >>> build_regex_substitutions('ASDS', {'S': 'SE'})
+    'A[SE]D[SE]'
+    """
+    s_list = list(s)
+    for i, char in enumerate(s_list):
+        if char in options:
+            s_list[i] = f'[{options[char]}]'
+
+    return ''.join(s_list)
 
 
 def init_confmasks(atom_labels):

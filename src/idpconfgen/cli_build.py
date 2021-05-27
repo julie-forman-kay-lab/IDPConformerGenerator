@@ -217,6 +217,14 @@ ap.add_argument(
     type=float,
     )
 
+ap.add_argument(
+    '-subs',
+    '--residue-substitutions',
+    help='Mapping allowed residue replacements.',
+    default=None,
+    action=libcli.ReadDictionary,
+    )
+
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
@@ -228,6 +236,7 @@ def main(
         func=None,
         forcefield=None,
         bgeo_path=None,
+        residue_substitutions=None,
         nconfs=1,
         ncores=1,
         random_seed=0,

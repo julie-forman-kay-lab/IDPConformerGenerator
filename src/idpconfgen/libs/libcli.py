@@ -1,5 +1,6 @@
 """Operations shared by client interfaces."""
 import argparse
+import json
 import sys
 from os import cpu_count
 
@@ -64,6 +65,21 @@ class CSV2Tuple(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """Call it."""
         setattr(namespace, self.dest, tuple(values.split(',')))
+
+
+class ReadDictionary(argparse.Action):
+    """Read to a dictionary."""
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        """Execute."""
+        pvalue = Path(value)
+        try:
+            with pvalue.open('r') as fin:
+                valuedict = json.load(fin)
+        except FileNotFoundError:
+            valuedict = json.loads(value)
+
+        setattr(namespace, self.dest, jdict)
 
 
 class SeqOrFasta(argparse.Action):
