@@ -74,7 +74,8 @@ class ProgressWatcher:
             return ProgressFake()
 
         try:
-            os.get_terminal_size()
+            # need cols later
+            cols, lines = os.get_terminal_size()
         except OSError:
             log.warning(
                 'WARNING: Could not retrieve size from terminal window. '
@@ -87,7 +88,7 @@ class ProgressWatcher:
         except TypeError:
             return ProgressCounter(**kwargs)
         else:
-            return ProgressBar(litems, *args, bar_length=_cols // 2, **kwargs)
+            return ProgressBar(litems, *args, bar_length=cols // 2, **kwargs)
 
 
 class ProgressBar:

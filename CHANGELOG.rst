@@ -9,6 +9,11 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.11 (2021-05-28)
+------------------------------------------------------------
+
+* corrects var name bug in ProgressBar
+
 v0.0.10 (2021-05-27)
 ------------------------------------------------------------
 
