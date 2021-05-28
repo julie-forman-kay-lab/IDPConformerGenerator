@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.13 (2021-05-28)
+------------------------------------------------------------
+
 * Added usage example and documentation.
 
 v0.0.12 (2021-05-28)
