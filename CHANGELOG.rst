@@ -9,8 +9,12 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Added usage example and documentation.
+
 v0.0.12 (2021-05-28)
 ------------------------------------------------------------
+
+* Corrects path suffix evaluation in ``cli_torsions.py``
 
 v0.0.11 (2021-05-28)
 ------------------------------------------------------------
