@@ -4,6 +4,7 @@ graft src
 prune alphas
 prune devtools
 prune tests
+prune example
 
 include .bumpversion.cfg
 include .coveragerc
