@@ -76,7 +76,7 @@ def main(
         ):
     """Perform main script logic."""
     # validates before performing time consuming calculations
-    if source and not source.endswith('.json'):
+    if source and not source.suffix == '.json':
         raise ValueError('Source file should have `.json` extension.')
 
     output = output or 'torsions.json'
