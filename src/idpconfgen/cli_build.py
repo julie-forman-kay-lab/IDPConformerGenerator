@@ -95,7 +95,6 @@ BGEO_res = {}
 # chunks from ANGLES.
 ANGLES = None
 SLICES = []
-SLICEDICT_MONOMERS = None
 SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
@@ -286,23 +285,20 @@ def main(
     # #
 
     # we use a dictionary because chunks will be evaluated to exact match
-    global ANGLES, SLICEDICT_MONOMERS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
     SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
-    #SLICEDICT_MONOMERS = SLICEDICT_XMERS[1]
 
     XMERPROBS = make_seq_probabilities(
         xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
         reverse=False if xmers_probs else True,
         )
-    print('XMERPROBS', XMERPROBS)
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
         SLICEDICT_XMERS,
-        #SLICEDICT_MONOMERS,
         residue_replacements=residue_substitutions,
         )
 
@@ -1154,14 +1150,12 @@ def gen_PDB_from_conformer(
     return '\n'.join(lines)
 
 
-
 def get_adjacent_angles(
         options,
         probs,
         seq,
         db,
         slice_dict,
-        #slicemonomers,
         residue_replacements=None,
         RC=np.random.choice,
         ):
@@ -1185,10 +1179,6 @@ def get_adjacent_angles(
     slice_dict : dict-like
         A dictionary containing the chunks strings as keys and as values
         lists with slice objects.
-
-    slicemonomers : dict-like
-        The same as `slice_dict` but containing information only for
-        monomers.
     """
 
     max_opt = max(options)
@@ -1237,85 +1227,10 @@ def get_adjacent_angles(
             raise AssertionError('The code should not arrive here')
 
         if next_residue == 'P':
-            return primer_template + 'P', angles # because angles have the proline information
+            # because angles have the proline information
+            return primer_template + 'P', angles
         else:
             return primer_template, angles
-
-        ## Now the tricky loop to accommodate the very special case of prolines.
-        #template_not_found_once = False
-        #while 1 < plen <= max_opt:
-        #    #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
-        #    # Confirms the next residue to the template is NOT a proline
-        #    if next_residue != 'P':
-        #        try:
-        #            # attempts to retrieve angles to the template, exact sequence
-        #            # match
-        #            pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-        #            agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()
-        #            # if the angles are found, there is nothing more to do
-        #            break
-
-        #        # in case the template is not present in the database. It may
-        #        # occur for pentamers, perhaps some tetramers.
-        #        except KeyError as err:
-        #            # reduces the size of the template by 1
-        #            # if primer_template[-1] == 'P':
-        #            #     plen -= 2
-        #            #     primer_template = primer_template[:-2]
-        #            # else:
-        #            #print('KeyError found, decreasing plen')
-        #            plen -= 1
-        #            next_residue = primer_template[-1]
-        #            primer_template = primer_template[:-1]
-        #            # if a certain primer template was not found, that means
-        #            # no larger primer will be found. Therefore, any change in
-        #            # plen or primer_template has to go towards reducing the
-        #            # length.
-        #            template_not_found_once = True
-        #            continue
-        #    else:
-        #        # if the template was not found, makes no sense to increase its
-        #        # size, hence, we reduce it.
-        #        #print('it has a proline')
-        #        if template_not_found_once:
-        #            plen -= 1
-        #            next_residue = primer_template[-1]
-        #            primer_template = primer_template[:-1]
-        #        # if we never actually attempted retrieving angles, so we
-        #        # increase template size.
-        #        else:
-        #            plen += 1
-        #            primer_template = get_seq_chunk_njit(seq, cr, plen)
-        #            next_residue = get_seq_next_residue_njit(seq, cr, plen)
-        ## beautiful while/else.
-        ## only executes if the template grew to large or too short.
-        #else:
-        #    #print('entered the while else')
-        #    # template grew too large, most likely because of the presence of
-        #    # many consecutive prolines. Reduce the template to two residues
-        #    # search for the pair considering the consecutive residue, but build
-        #    # only the first residue in the pair. That is, the current residue
-        #    if plen > max_opt:
-        #        plen = 2
-        #        primer_template = get_seq_chunk_njit(seq, cr, plen)
-        #        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-        #        agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()[:3]
-        #        #print('sending just one', plen, primer_template)
-
-        #    elif plen == 1:
-        #        primer_template = seq[cr]
-        #        # this should only happen at the end of the chain
-        #        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-        #        agls = db[RC(slice_dict[1][pt_sub]), :].ravel()
-        #        #print('the conformer ended', cr)
-        #    else:
-        #        log.debug(plen, primer_template, seq[cr:cr + plen])
-        #        # raise AssertionError to avoid `python -o` silencing
-        #        raise AssertionError('The code should not arrive here')
-
-        #assert primer_template
-        #assert not np.any(np.isnan(agls))
-        #return primer_template, agls
 
     return func
 
