@@ -229,7 +229,7 @@ ap.add_argument(
 ap.add_argument(
     '-xp',
     '--xmers-probs',
-    help='The Xmers relative probabilities for selection',
+    help=help_docs.xmers_prob_help,
     default=False,
     nargs='+',
     action=libcli.ListOfInts,
@@ -291,7 +291,7 @@ def main(
 
     XMERPROBS = make_seq_probabilities(
         xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
-        reverse=False if xmers_probs else True,
+        reverse=False,
         )
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
