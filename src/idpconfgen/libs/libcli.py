@@ -82,7 +82,7 @@ class ReadDictionary(argparse.Action):
         setattr(namespace, self.dest, valuedict)
 
 
-class ListOfInts(argparse.Action):
+class ListOfIntsPositiveSum(argparse.Action):
     """Convert list of str to list of ints."""
 
     def __call__(self, parser, namespace, values, option_string=None):
@@ -90,6 +90,23 @@ class ListOfInts(argparse.Action):
         if values is False:
             setattr(namespace, self.dest, values)
         else:
+            try:
+                value_int = [int(i) for i in values]
+            except ValueError:
+                raise parser.error(
+                    f'{option_string!r} must be a list of integer numbers.'
+                    )
+
+            if sum(value_int) < 1:
+                raise parser.error(
+                    f'Sum of {option_string!r} probabilities cannot '
+                    'be less than 1'
+                    )
+
+            if len(value_int) > 5:
+                raise parser.error(
+                    f'{option_string!r} takes a maximum of 5 digits'
+                    )
             setattr(namespace, self.dest, [int(i) for i in values])
 
 

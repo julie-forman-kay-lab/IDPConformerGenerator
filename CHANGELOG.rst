@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Users can now select single residue chunk size
+* ``-xp`` parameter was updated with checks and completion
+
 v0.0.13 (2021-05-28)
 ------------------------------------------------------------
 

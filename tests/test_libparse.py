@@ -3,6 +3,7 @@ import shutil
 from pathlib import Path as Path_
 
 import pytest
+import numpy as np
 
 from idpconfgen import Path
 from idpconfgen.core.exceptions import DSSPParserError
@@ -278,6 +279,9 @@ def test_get_diff_between_aa1l(in1, expected):
         ('QWERTY', 5, 3, 'Y'),
         ('QWERTY', 5, 4, 'Y'),
         ('QWERTY', 5, 30, 'Y'),
+        ('QWERTY', 0, 6, 'QWERTY'),
+        ('QWERTY', 0 + 6, 1, ''),
+        ('QWERTY', 4 + 5, 1, ''),
         ]
     )
 def test_get_chunk(seq, i1, i2, expected):
@@ -321,3 +325,31 @@ def test_get_next_residue(seq, i1, i2, expected):
     """."""
     result = libparse.get_seq_next_residue_njit(seq, i1, i2)
     assert result == expected
+
+
+@pytest.mark.parametrize(
+    'in1,fill,size,expected',
+    [
+        ([1, 2], 5, 5, [1, 2, 5, 5, 5]),
+        ([], 'a', 2, ['a', 'a']),
+        (np.array([1,2]), 5, 5, [1, 2, 5, 5 , 5]),
+        ('aaa', 'b', 5, ['a', 'a', 'a', 'b', 'b']),
+        ]
+    )
+def test_fill_list(in1, fill, size, expected):
+    """Test fill list."""
+    result = libparse.fill_list(in1, fill, size)
+    assert expected == result
+
+
+@pytest.mark.parametrize(
+    'in1,fill,size,expected',
+    [
+        ([1, 2], 4, 5, [1, 2, 5, 5, 5]),
+        ([], 'b', 2, ['a', 'a']),
+        ]
+    )
+def test_fill_list_bad(in1, fill, size, expected):
+    """Test fill list."""
+    result = libparse.fill_list(in1, fill, size)
+    assert result != expected
