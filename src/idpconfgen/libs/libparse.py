@@ -5,7 +5,7 @@ All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
 import subprocess
-from itertools import product
+from itertools import product, repeat
 from functools import partial
 from pathlib import Path as Path_
 
@@ -374,6 +374,19 @@ def translate_seq_to_3l(input_seq):
         for _res in input_seq
         ]
 
+
+def fill_list(seq, fill, size):
+    """
+    Fill list with `fill` to `size`.
+
+    If seq is not a list, converts it to a list.
+
+    Returns
+    -------
+    list
+        The original with fill values.
+    """
+    return list(seq) + list(repeat(fill, size - len(seq)))
 
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)

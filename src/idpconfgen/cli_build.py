@@ -61,6 +61,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
+    fill_list,
     get_seq_chunk_njit,
     get_seq_next_residue_njit,
     get_trimer_seq_njit,
@@ -232,7 +233,7 @@ ap.add_argument(
     help=help_docs.xmers_prob_help,
     default=False,
     nargs='+',
-    action=libcli.ListOfInts,
+    action=libcli.ListOfIntsPositiveSum,
     )
 
 libcli.add_argument_random_seed(ap)
@@ -293,6 +294,7 @@ def main(
         xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
         reverse=False,
         )
+
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
         XMERPROBS,
@@ -1180,9 +1182,9 @@ def get_adjacent_angles(
         A dictionary containing the chunks strings as keys and as values
         lists with slice objects.
     """
-
-    max_opt = max(options)
     residue_replacements = residue_replacements or {}
+    probs = fill_list(probs, 0, len(options))
+    print(probs)
 
     def func(aidx):
 

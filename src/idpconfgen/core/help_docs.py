@@ -27,4 +27,6 @@ You can also normalize relative probilities to 100, for example: 10 20
 30 30 10. Numbers should be integers, do not give fractional numbers. If
 a Proline residue follows the chunk being built, the additional Proline
 angles will also be consider regardless of the selected chunk size.
+Missing digits are filled with 0, that is, -xp 1 1 is equal to -xp 1 1 0
+0 0.
 """
