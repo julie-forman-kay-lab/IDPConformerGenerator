@@ -15,7 +15,7 @@ Usage instructions are described in the file ``docs/usage.rst``.
 
 Version
 -------
-v0.0.13
+v0.0.14
 
 .. _Dr. Julie Forman-Kay Lab: http://abragam.med.utoronto.ca/~JFKlab/
 
