@@ -278,6 +278,9 @@ def test_get_diff_between_aa1l(in1, expected):
         ('QWERTY', 5, 3, 'Y'),
         ('QWERTY', 5, 4, 'Y'),
         ('QWERTY', 5, 30, 'Y'),
+        ('QWERTY', 0, 6, 'QWERTY'),
+        ('QWERTY', 0 + 6, 1, ''),
+        ('QWERTY', 4 + 5, 1, ''),
         ]
     )
 def test_get_chunk(seq, i1, i2, expected):

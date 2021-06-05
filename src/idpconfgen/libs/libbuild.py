@@ -565,8 +565,22 @@ def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
             slice_dict[lmer][altered_mer] = \
                 regex_forward_with_overlap(primary, merregex)
 
+            # if no entrey was found
             if not slice_dict[lmer][altered_mer]:
                 slice_dict[lmer].pop(altered_mer)
+
+            # this is a trick to find the sequence that are proceeded
+            # by Proline. Still, these are registered in the "lmer" size
+            # without consider the proline addition.
+            # this is a combo with get_adjancent_angles
+            merregex_P = f'(?=({altered_mer}P))'
+            altered_mer_P = f'{altered_mer}_P'
+            slice_dict[lmer][altered_mer_P] = \
+                regex_forward_with_overlap(primary, merregex_P)
+
+            # if no entrey was found
+            if not slice_dict[lmer][altered_mer_P]:
+                slice_dict[lmer].pop(altered_mer_P)
             # for _s in slice_dict[lmer][mer]:
                 # assert '|' not in inseq[_s]
             PW.increment()

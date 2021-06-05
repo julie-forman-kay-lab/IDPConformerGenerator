@@ -289,20 +289,20 @@ def main(
     global ANGLES, SLICEDICT_MONOMERS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
     SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
-    SLICEDICT_MONOMERS = SLICEDICT_XMERS.pop(1)
+    #SLICEDICT_MONOMERS = SLICEDICT_XMERS[1]
 
     XMERPROBS = make_seq_probabilities(
         xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
         reverse=False if xmers_probs else True,
         )
-
+    print('XMERPROBS', XMERPROBS)
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
         SLICEDICT_XMERS,
-        SLICEDICT_MONOMERS,
+        #SLICEDICT_MONOMERS,
         residue_replacements=residue_substitutions,
         )
 
@@ -834,7 +834,6 @@ def conformer_generator(
                 primer_template, agls = GET_ADJ(bbi - 1)
 
             # index at the start of the current cycle
-            #print(primer_template)
             PRIMER = cycle(primer_template)
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
@@ -843,7 +842,8 @@ def conformer_generator(
 
                     # assert the residue being built is of the same nature as the one in the angles
                     # TODO: remove this assert
-                    assert all_atom_input_seq[current_res_number] == next(PRIMER)
+                    n_ = next(PRIMER)
+                    assert all_atom_input_seq[current_res_number] == n_, (all_atom_input_seq[current_res_number], n_)
 
                     curr_res, tpair = GET_TRIMER_SEQ(
                         all_atom_input_seq,
@@ -1079,6 +1079,7 @@ def conformer_generator(
                 )
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
+            print(total_energy)
 
             if total_energy > energy_threshold:
                 log.info(seed_report(
@@ -1160,7 +1161,7 @@ def get_adjacent_angles(
         seq,
         db,
         slice_dict,
-        slicemonomers,
+        #slicemonomers,
         residue_replacements=None,
         RC=np.random.choice,
         ):
@@ -1194,7 +1195,7 @@ def get_adjacent_angles(
     residue_replacements = residue_replacements or {}
 
     def func(aidx):
-        #print('Entering new angle collection ----------------------------', aidx)
+
         # calculates the current residue number from the atom index
         cr = calc_residue_num_from_index(aidx)
 
@@ -1203,88 +1204,118 @@ def get_adjacent_angles(
 
         # defines the chunk identity accordingly
         primer_template = get_seq_chunk_njit(seq, cr, plen)
-        next_residue = get_seq_next_residue_njit(seq, cr, plen)
+        next_residue = get_seq_chunk_njit(seq, cr + plen, 1)
 
         # recalculates the plen to avoid plen/template inconsistencies that
         # occur if the plen is higher then the number of
         # residues until the end of the protein.
         plen = len(primer_template)
 
-        # Now the tricky loop to accommodate the very special case of prolines.
-        template_not_found_once = False
-        while 1 < plen <= max_opt:
-            #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
-            # Confirms the next residue to the template is NOT a proline
-            if next_residue != 'P':
-                try:
-                    # attempts to retrieve angles to the template, exact sequence
-                    # match
-                    pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-                    agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()
-                    # if the angles are found, there is nothing more to do
-                    break
+        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
 
-                # in case the template is not present in the database. It may
-                # occur for pentamers, perhaps some tetramers.
-                except KeyError as err:
-                    # reduces the size of the template by 1
-                    # if primer_template[-1] == 'P':
-                    #     plen -= 2
-                    #     primer_template = primer_template[:-2]
-                    # else:
-                    #print('KeyError found, decreasing plen')
-                    plen -= 1
-                    next_residue = primer_template[-1]
-                    primer_template = primer_template[:-1]
-                    # if a certain primer template was not found, that means
-                    # no larger primer will be found. Therefore, any change in
-                    # plen or primer_template has to go towards reducing the
-                    # length.
-                    template_not_found_once = True
-                    continue
+        while plen > 0:
+            if next_residue == 'P':
+                pt_sub = f'{pt_sub}_P'
+            try:
+                #print('pt_sub', pt_sub)
+                angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
+            except KeyError:
+                plen -= 1
+                next_residue = primer_template[-1]
+                primer_template = primer_template[:-1]
+                pt_sub = build_regex_substitutions(
+                    primer_template,
+                    residue_replacements,
+                    )
+                if next_residue == 'P':
+                    pt_sub = f'{pt_sub}_P'
             else:
-                # if the template was not found, makes no sense to increase its
-                # size, hence, we reduce it.
-                #print('it has a proline')
-                if template_not_found_once:
-                    plen -= 1
-                    next_residue = primer_template[-1]
-                    primer_template = primer_template[:-1]
-                # if we never actually attempted retrieving angles, so we
-                # increase template size.
-                else:
-                    plen += 1
-                    primer_template = get_seq_chunk_njit(seq, cr, plen)
-                    next_residue = get_seq_next_residue_njit(seq, cr, plen)
-        # beautiful while/else.
-        # only executes if the template grew to large or too short.
+                break
         else:
-            #print('entered the while else')
-            # template grew too large, most likely because of the presence of
-            # many consecutive prolines. Reduce the template to two residues
-            # search for the pair considering the consecutive residue, but build
-            # only the first residue in the pair. That is, the current residue
-            if plen > max_opt:
-                plen = 2
-                primer_template = get_seq_chunk_njit(seq, cr, plen)
-                pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-                agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()[:3]
-                #print('sending just one', plen, primer_template)
+            log.debug(plen, primer_template, seq[cr:cr + plen])
+            # raise AssertionError to avoid `python -o` silencing
+            raise AssertionError('The code should not arrive here')
 
-            elif plen == 1:
-                primer_template = seq[cr]
-                # this should only happen at the end of the chain
-                pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-                agls = db[RC(slicemonomers[pt_sub]), :].ravel()
-                #print('the conformer ended', cr)
-            else:
-                log.debug(plen, primer_template, seq[cr:cr + plen])
-                # raise AssertionError to avoid `python -o` silencing
-                raise AssertionError('The code should not arrive here')
+        if next_residue == 'P':
+            return primer_template + 'P', angles # because angles have the proline information
+        else:
+            return primer_template, angles
 
-        assert primer_template
-        assert not np.any(np.isnan(agls))
-        return primer_template, agls
+        ## Now the tricky loop to accommodate the very special case of prolines.
+        #template_not_found_once = False
+        #while 1 < plen <= max_opt:
+        #    #print('L/PT/NR/Bool: ', plen, primer_template, next_residue, template_not_found_once)
+        #    # Confirms the next residue to the template is NOT a proline
+        #    if next_residue != 'P':
+        #        try:
+        #            # attempts to retrieve angles to the template, exact sequence
+        #            # match
+        #            pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+        #            agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()
+        #            # if the angles are found, there is nothing more to do
+        #            break
+
+        #        # in case the template is not present in the database. It may
+        #        # occur for pentamers, perhaps some tetramers.
+        #        except KeyError as err:
+        #            # reduces the size of the template by 1
+        #            # if primer_template[-1] == 'P':
+        #            #     plen -= 2
+        #            #     primer_template = primer_template[:-2]
+        #            # else:
+        #            #print('KeyError found, decreasing plen')
+        #            plen -= 1
+        #            next_residue = primer_template[-1]
+        #            primer_template = primer_template[:-1]
+        #            # if a certain primer template was not found, that means
+        #            # no larger primer will be found. Therefore, any change in
+        #            # plen or primer_template has to go towards reducing the
+        #            # length.
+        #            template_not_found_once = True
+        #            continue
+        #    else:
+        #        # if the template was not found, makes no sense to increase its
+        #        # size, hence, we reduce it.
+        #        #print('it has a proline')
+        #        if template_not_found_once:
+        #            plen -= 1
+        #            next_residue = primer_template[-1]
+        #            primer_template = primer_template[:-1]
+        #        # if we never actually attempted retrieving angles, so we
+        #        # increase template size.
+        #        else:
+        #            plen += 1
+        #            primer_template = get_seq_chunk_njit(seq, cr, plen)
+        #            next_residue = get_seq_next_residue_njit(seq, cr, plen)
+        ## beautiful while/else.
+        ## only executes if the template grew to large or too short.
+        #else:
+        #    #print('entered the while else')
+        #    # template grew too large, most likely because of the presence of
+        #    # many consecutive prolines. Reduce the template to two residues
+        #    # search for the pair considering the consecutive residue, but build
+        #    # only the first residue in the pair. That is, the current residue
+        #    if plen > max_opt:
+        #        plen = 2
+        #        primer_template = get_seq_chunk_njit(seq, cr, plen)
+        #        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+        #        agls = db[RC(slice_dict[plen][pt_sub]), :].ravel()[:3]
+        #        #print('sending just one', plen, primer_template)
+
+        #    elif plen == 1:
+        #        primer_template = seq[cr]
+        #        # this should only happen at the end of the chain
+        #        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+        #        agls = db[RC(slice_dict[1][pt_sub]), :].ravel()
+        #        #print('the conformer ended', cr)
+        #    else:
+        #        log.debug(plen, primer_template, seq[cr:cr + plen])
+        #        # raise AssertionError to avoid `python -o` silencing
+        #        raise AssertionError('The code should not arrive here')
+
+        #assert primer_template
+        #assert not np.any(np.isnan(agls))
+        #return primer_template, agls
 
     return func
 
