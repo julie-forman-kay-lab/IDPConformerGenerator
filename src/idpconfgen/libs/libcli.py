@@ -102,6 +102,11 @@ class ListOfIntsPositiveSum(argparse.Action):
                     f'Sum of {option_string!r} probabilities cannot '
                     'be less than 1'
                     )
+
+            if len(value_int) > 5:
+                raise parser.error(
+                    f'{option_string!r} takes a maximum of 5 digits'
+                    )
             setattr(namespace, self.dest, [int(i) for i in values])
 
 
