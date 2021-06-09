@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* corrected typo in example/ commands
+
 v0.0.14 (2021-06-05)
 ------------------------------------------------------------
 

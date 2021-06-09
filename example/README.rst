@@ -53,7 +53,7 @@ chains split into continuous chains.
 Now we need to calculate the torsion angles. There are several options available
 in the command line but these are good defaults::
 
-    idpconfgen torsions sscalc_splittled.tar -sc sscalc.json -o idpconfgen_database.json
+    idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -o idpconfgen_database.json
 
 This will create the final file :code:`idpconfgen_database.json`. This is the
 file IDPConfGen needs to generate conformers. This is the torsion angle database
