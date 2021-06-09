@@ -236,6 +236,8 @@ ap.add_argument(
     action=libcli.ListOfIntsPositiveSum,
     )
 
+
+libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
@@ -252,6 +254,7 @@ def main(
         ncores=1,
         random_seed=0,
         xmers_probs=False,
+        output_folder=None,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -324,6 +327,7 @@ def main(
     consume = partial(
         _build_conformers,
         input_seq=input_seq,  # string
+        output_folder=output_folder,
         nconfs=conformers_per_core,  # int
         **kwargs,
         )
@@ -428,11 +432,16 @@ def _build_conformers(
         *args,
         input_seq=None,
         conformer_name='conformer',
+        output_folder=None,
         nconfs=1,
         **kwargs,
         ):
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
+
+    output_folder = \
+        Path(output_folder) if output_folder is not None else Path.cwd()
+    output_folder.mkdir(parents=True, exist_ok=True)
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
@@ -457,7 +466,7 @@ def _build_conformers(
 
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
-        with open(fname, 'w') as fout:
+        with open(Path(output_folder, fname), 'w') as fout:
             fout.write(pdb_string)
 
     del builder
