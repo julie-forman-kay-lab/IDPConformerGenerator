@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add output-folder option for the ``build`` interface
+
 v0.0.15 (2021-06-09)
 ------------------------------------------------------------
 

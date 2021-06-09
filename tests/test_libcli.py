@@ -163,6 +163,8 @@ def test_add_version():
         (libcli.add_argument_output, [], ['output', None]),
         (libcli.add_argument_output, ['-o', 'out.log'], ['output', 'out.log']),
         (libcli.add_argument_output, ['--output', 'out.log'], ['output', 'out.log']),
+        (libcli.add_argument_output_folder, ['--output-folder', 'myfolder'], ['output_folder', 'myfolder']),
+        (libcli.add_argument_output_folder, ['-of', 'folder'], ['output_folder', 'folder']),
         (libcli.add_argument_pdb_files, ['myfolder'], ['pdb_files', ['myfolder']]),  # noqa: E501
         (libcli.add_argument_pdb_files, ['my.tar'], ['pdb_files', 'my.tar']),
         (libcli.add_argument_pdbids, ['12AS_A'], ['pdbids', ['12AS_A']]),

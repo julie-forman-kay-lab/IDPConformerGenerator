@@ -261,6 +261,7 @@ def add_version(parser):
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # -o, --ouput             : general output string
+# -of, --output-folder    : output folder
 # --replace               : replace (whatever shalls replace)
 # -rd, --reduced          : reduces secondary structure representation
 # -rn, --record-name      : PDB RECORD name
@@ -399,6 +400,21 @@ def add_argument_output(parser):
         help=(
             'Output file. Defaults to `None`. '
             'Read CLI instructions for `None` behaviour.'
+            ),
+        type=str,
+        default=None,
+        )
+
+
+def add_argument_output_folder(parser):
+    """Add argument for general output string."""
+    parser.add_argument(
+        '-of',
+        '--output-folder',
+        help=(
+            "The folder where to save the output. "
+            "NOTE: if new files have the same name of old files in the "
+            "folder, new files will replace old files."
             ),
         type=str,
         default=None,
