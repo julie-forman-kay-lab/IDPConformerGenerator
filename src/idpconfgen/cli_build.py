@@ -37,7 +37,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    read_db_to_slices_single_secondary_structure,
+    read_db_to_slices_given_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -45,7 +45,7 @@ from idpconfgen.libs.libbuild import (
     init_conflabels,
     init_confmasks,
     prepare_energy_function,
-    read_db_to_slices,
+    #read_db_to_slices,
     )
 from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
@@ -290,7 +290,7 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-    primary, ANGLES = read_db_to_slices_single_secondary_structure(database, dssp_regexes)
+    primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
     SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
 
     XMERPROBS = make_seq_probabilities(
