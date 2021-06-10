@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.18 (2021-06-10)
+------------------------------------------------------------
+
 * Improves sampling of multiple secondary structure regexes.
     Now, when given multiple regex, angle sampling will be biased towards
     the number of occurrences in each regex.
