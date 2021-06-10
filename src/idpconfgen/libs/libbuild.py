@@ -456,63 +456,52 @@ def get_cycle_bond_type():
         ))
 
 
-def read_db_to_slices(database, dssp_regexes, ncores=1):
-    """Create database base of slice and angles."""
-    # reads db dictionary from disk
-    db = read_dictionary_from_disk(database)
-    log.info(f'Read DB with {len(db)} entries')
+#def read_db_to_slices(database, dssp_regexes, ncores=1):
+#    """Create database base of slice and angles."""
+#    # reads db dictionary from disk
+#    db = read_dictionary_from_disk(database)
+#    log.info(f'Read DB with {len(db)} entries')
+#
+#    # reads and prepares IDPConfGen data base
+#    timed = partial(timeme, aligndb)
+#    pdbs, angles, dssp, resseq = timed(db)
+#
+#    # searchs for slices in secondary structure, according to user requests
+#    timed = partial(timeme, regex_search, ncores=ncores)
+#    dssp_regexes = \
+#        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
+#    slices = []
+#    for dssp_regex_string in dssp_regexes:
+#        slices.extend(timed(dssp, dssp_regex_string))
+#    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
+#
+#    return slices, angles
 
-    # reads and prepares IDPConfGen data base
-    timed = partial(timeme, aligndb)
-    pdbs, angles, dssp, resseq = timed(db)
 
-    # searchs for slices in secondary structure, according to user requests
-    timed = partial(timeme, regex_search, ncores=ncores)
-    dssp_regexes = \
-        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
-    slices = []
-    for dssp_regex_string in dssp_regexes:
-        slices.extend(timed(dssp, dssp_regex_string))
-    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
-
-    return slices, angles
-
-
-def read_db_to_slices_single_secondary_structure(database, ss_regex):
+def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     """
     Read slices in the DB that belong to a single secondary structure.
 
     Concatenates primary sequences accordingly.
     """
-    log.info(f'ss_regex, {ss_regex}')
+    log.info(f'ss_regexes, {ss_regexes}')
     db = read_dictionary_from_disk(database)
     timed = partial(timeme, aligndb)
-    pdbs, angles, dssp, resseq = timed(db)
+    _, angles, dssp, resseq = timed(db)
 
-    loop_slices = regex_search(dssp, ss_regex[0])
-    loop_seqs = []
-    lsa = loop_seqs.append
-    LS = []
-    for slc in loop_slices:
-        lsa(resseq[slc])
-        LS.append(dssp[slc])
+    _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
+    slices = list(it.chain.from_iterable(_))
+    seqs = [resseq[slc] for slc in slices]
 
-    primary = '|'.join(loop_seqs)
-    assert set(''.join(LS)) == set(['L'])
+    primary = '|'.join(seqs)
 
-    omega = []
-    phi = []
-    psi = []
+    omega, phi, psi = [], [], []
 
-    oe = omega.extend
-    he = phi.extend
-    se = psi.extend
-    oa = omega.append
-    ha = phi.append
-    sa = psi.append
+    oe, he, se = omega.extend, phi.extend, psi.extend
+    oa, ha, sa = omega.append, phi.append, psi.append
     nan = np.nan
 
-    for s in loop_slices:
+    for s in slices:
         oe(angles[s, 0])
         he(angles[s, 1])
         se(angles[s, 2])
