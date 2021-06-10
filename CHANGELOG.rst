@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Corrects bug in Coulomb formula
+
 v0.0.16 (2021-06-09)
 ------------------------------------------------------------
 

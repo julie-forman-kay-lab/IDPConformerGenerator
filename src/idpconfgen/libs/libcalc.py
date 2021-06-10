@@ -928,7 +928,7 @@ def init_coulomb_calculator(charges_ij):
     """
     @njit
     def calculate(distances_ij, NANSUM=np.nansum):
-        return NANSUM(distances_ij / charges_ij)
+        return NANSUM(charges_ij / distances_ij)
     return calculate
 
 
