@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Saves a table with energy values per conformer.
+* Crash reports now saved in execution folder (CLI build).
+
 v0.0.18 (2021-06-10)
 ------------------------------------------------------------
 
