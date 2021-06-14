@@ -237,9 +237,39 @@ ap.add_argument(
     )
 
 
+ap.add_argument(
+    '-el',
+    '--energy-log',
+    help='File where to save the energy value of each conformer.',
+    type=Path,
+    default='energies.log',
+    )
+
+
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
+
+
+class EnergyLogSaver:
+    """
+    Save conformer energies to a log file.
+
+    This object is intended to be used by the client only.
+    It can accommodate calls from different processors, but it is not
+    sent to the different processors, it is managed by the main()
+    function.
+    """
+    def start(self, path):
+        self.dest = open(path, 'w')
+    def save(self, confname, energy):
+        self.dest.write(f'{confname},{energy}\n')
+        self.dest.flush()
+    def close(self):
+        self.dest.close()
+
+
+ENERGYLOGSAVER = EnergyLogSaver()
 
 
 def main(
@@ -255,6 +285,7 @@ def main(
         random_seed=0,
         xmers_probs=False,
         output_folder=None,
+        energy_log='energies.log',
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -323,6 +354,11 @@ def main(
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
 
+    output_folder = \
+        Path(output_folder) if output_folder is not None else Path.cwd()
+    output_folder.mkdir(parents=True, exist_ok=True)
+    ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
+
     # prepars execution function
     consume = partial(
         _build_conformers,
@@ -336,6 +372,7 @@ def main(
         report_on_crash,
         consume,
         ROC_exception=Exception,
+        ROC_folder=output_folder,
         ROC_prefix=_name,
         )
 
@@ -349,6 +386,7 @@ def main(
         execute(conformers_per_core * ncores, nconfs=remaining_confs)
 
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
+    ENERGYLOGSAVER.close()
 
 
 def populate_globals(
@@ -439,9 +477,6 @@ def _build_conformers(
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
 
-    output_folder = \
-        Path(output_folder) if output_folder is not None else Path.cwd()
-    output_folder.mkdir(parents=True, exist_ok=True)
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
@@ -455,7 +490,7 @@ def _build_conformers(
 
     for _ in range(nconfs):
 
-        coords = next(builder)
+        energy, coords = next(builder)
 
         pdb_string = gen_PDB_from_conformer(
             input_seq_3_letters,
@@ -468,6 +503,8 @@ def _build_conformers(
 
         with open(Path(output_folder, fname), 'w') as fout:
             fout.write(pdb_string)
+
+        ENERGYLOGSAVER.save(fname, energy)
 
     del builder
     return
@@ -586,6 +623,14 @@ def conformer_generator(
     lj_term : bool
         Whether to compute the Lennard-Jones term during building and
         validation. If false, expect a physically meaningless result.
+
+    Yields
+    ------
+    First yield: tuple (np.ndarray, np.ndarray, np.ndarray)
+        The conformer label arrays.
+
+    Other yields: tuple (float, np.ndarray)
+        Energy of the conformer, conformer coordinates.
     """
     if not isinstance(input_seq, str):
         raise ValueError(f'`input_seq` must be given! {input_seq}')
@@ -1097,7 +1142,7 @@ def conformer_generator(
                     f'finished conf: {conf_n} with energy {total_energy}'))
 
         #print(all_atom_coords)
-        yield all_atom_coords
+        yield total_energy, all_atom_coords
         conf_n += 1
 
 
