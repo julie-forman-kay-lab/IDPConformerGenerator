@@ -388,6 +388,11 @@ def fill_list(seq, fill, size):
     """
     return list(seq) + list(repeat(fill, size - len(seq)))
 
+
+def get_first_value_from_dict(seqdict):
+    return list(seqdict.values())[0]
+
+
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)

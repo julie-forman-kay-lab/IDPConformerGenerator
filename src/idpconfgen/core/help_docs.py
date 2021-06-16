@@ -30,3 +30,12 @@ angles will also be consider regardless of the selected chunk size.
 Missing digits are filled with 0, that is, -xp 1 1 is equal to -xp 1 1 0
 0 0.
 """
+
+forced_helical_help = \
+"""Forces helical secondary propensity in specific regions. Provide a
+string of the size of `-seq` with characters from 0-9 and *, where 0 is
+0%, 1 comprises 10-19%, 9 is 90-99%, and * is 100%. Regions of `0%` will
+be populated with the definitions from `-dr` flag. If `-dr` also
+comprises helices, these will be taken into account as well. You can
+provide a string in the argument or a path to a FASTA-file like.
+Defaults to FALSE, no forced propensity will be used."""

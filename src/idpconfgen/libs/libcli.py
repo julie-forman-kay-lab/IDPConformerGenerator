@@ -5,11 +5,14 @@ import sys
 from os import cpu_count
 
 from idpconfgen import Path, __version__
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
-from idpconfgen.libs.libparse import is_valid_fasta
+from idpconfgen.libs.libparse import is_valid_fasta, get_first_value_from_dict
 from idpconfgen.libs.libio import (
     is_valid_fasta_file,
-    read_FASTAS_from_file_to_strings,
+    is_valid_propensity_file,
+    read_FASTAS_from_file,
+    read_FASTA_like,
     )
 
 
@@ -110,20 +113,41 @@ class ListOfIntsPositiveSum(argparse.Action):
             setattr(namespace, self.dest, [int(i) for i in values])
 
 
-class SeqOrFasta(argparse.Action):
-    """Read sequence of FASTA file."""
+def sequences_or_file(
+        is_valid_sequence,
+        read_sequences_from_file,
+        parse_sequences,
+        ):
 
-    def __call__(self, parser, namespace, value, option_string=None):
-        """Call it."""
-        if is_valid_fasta(value):
-            seq = value
-        elif is_valid_fasta_file(value):
-            seqdict = read_FASTAS_from_file_to_strings(value)
-            seq = list(seqdict.values())[0]
-        else:
-            raise parser.error('Input sequence not valid.')
+    class SeqOrFile(argparse.Action):
+        """Read sequence of FASTA file."""
 
-        setattr(namespace, self.dest, seq)
+        def __call__(self, parser, namespace, value, option_string=None):
+            """Call it."""
+            if is_valid_sequence(value):
+                seq = value
+
+            else:
+                try:
+                    seqdict = read_sequences_from_file(value)
+                    seq = parse_sequences(seqdict)
+                except IDPConfGenException as err:
+                    raise parser.error(f'{self.dest!r} Input sequence not valid.') from None
+
+            #elif is_valid_fasta_file(value):
+            #    seqdict = read_FASTAS_from_file_to_strings(value)
+            #    seq = list(seqdict.values())[0]
+
+            #else:
+            #    raise parser.error('Input sequence not valid.')
+
+            setattr(namespace, self.dest, seq)
+
+    return SeqOrFile
+
+
+SeqOrFasta = sequences_or_file(is_valid_fasta, read_FASTAS_from_file, get_first_value_from_dict)  # noqa: E501
+SeqOrPropensity = sequences_or_file(is_valid_propensity_file, read_FASTA_like, get_first_value_from_dict)  # noqa: E501
 
 
 def minimum_value(minimum):

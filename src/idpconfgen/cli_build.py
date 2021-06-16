@@ -167,6 +167,14 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-forced-helical',
+    help=help_docs.forced_helical_help,
+    required=False,
+    nargs='?',
+    action=libcli.SeqOrFasta,
+    )
+
+ap.add_argument(
     '-nc',
     '--nconfs',
     help='Number of conformers to build.',
