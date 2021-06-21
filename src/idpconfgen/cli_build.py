@@ -212,10 +212,25 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-et',
-    '--energy-threshold',
-    help='The energy threshold after which conformers/chunks will be rejected',
+    '-etbb',
+    '--energy-threshold-backbone',
+    help=(
+        'The energy threshold above which chunks will be rejected '
+        'when building the BACKBONE atoms. Defaults to 10.'
+        ),
     default=10.0,
+    type=float,
+    )
+
+ap.add_argument(
+    '-etss',
+    '--energy-threshold-sidechains',
+    help=(
+        'The energy threshold above which conformers will be rejected '
+        'after packing the sidechains (ignored if `-dsd`). '
+        'Defaults to 1000.'
+        ),
+    default=1000.0,
     type=float,
     )
 
@@ -517,7 +532,8 @@ def conformer_generator(
         generative_function=None,
         disable_sidechains=True,
         sidechain_method='faspr',
-        energy_threshold=10,
+        energy_threshold_backbone=10,
+        energy_threshold_sidechains=1000,
         bgeo_path=None,
         forcefield=None,
         lj_term=True,
@@ -1030,7 +1046,7 @@ def conformer_generator(
             total_energy = TEMPLATE_EFUNC(template_coords)
             #print(bbi, total_energy)
 
-            if total_energy > energy_threshold:
+            if total_energy > energy_threshold_backbone:
                 #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
@@ -1133,7 +1149,7 @@ def conformer_generator(
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
             print(total_energy)
 
-            if total_energy > energy_threshold:
+            if total_energy > energy_threshold_sidechains:
                 log.info(seed_report(
                     f'Conformer with WORST energy {total_energy}'))
                 continue
