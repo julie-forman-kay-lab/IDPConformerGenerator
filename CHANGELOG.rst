@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.20 (2021-06-21)
+------------------------------------------------------------
+
 * Decoupled ``energy-threshold`` parameters. Now Backbone and sidechains,
     can be configured separately.
 
