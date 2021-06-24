@@ -14,6 +14,7 @@ from pprint import pprint
 from idpconfgen import Path, log
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import get_false
+from idpconfgen.libs.libfunc import are_all_valid, vartial
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 
@@ -22,7 +23,8 @@ from idpconfgen.logger import S, T
 # consider reducing the lengths of the FileIterators as progression
 #  along the generation happens
 
-# Dispachers are at the bottom
+# Partials are at the bottom of the file
+# Dispachers are at the bottom of the file
 
 
 # NOT USED ANYWHERE
@@ -159,8 +161,6 @@ def has_suffix(path, ext=None):
     return ext is None or Path(path).suffix == parse_suffix(ext)
 
 
-has_suffix_fasta = partial(has_suffix, ext='.fasta')
-has_suffix_prop = partial(has_suffix, ext='.prop')
 
 
 def list_files_recursively(folder, ext=None):
@@ -400,36 +400,12 @@ def read_dict_from_tar(path):
     return d
 
 
-# USED OKAY
-def read_FASTAS_from_file(fpath):
-    """Read FASTA sequence from file."""
-    #fastas = defaultdict(list)
-    #key = 1
-    #with open(fpath, 'r') as fout:
-    #    for line in fout:
-    #        if line.startswith('>'):
-    #            key = line.strip()
-    #        else:
-    #            seq = line.strip().replace(' ', '')
-    #            assert ' ' not in seq
-    #            assert seq.isupper()
-    #            fastas[key].extend(seq)
-
-    fastas = read_FASTA_like(fpath)
-    for key, value in fastas.items():
-        if value.isupper() and ' ' not in value:
-            pass
-        else:
-            raise IDPConfGenException('FASTA sequence not valid')
-    return fastas
-
-
 def read_FASTA_like(fpath):
     """Read a FASTA like file without asserting characters."""
     tmp = defaultdict(list)
     key = 1
-    with open(fpath, 'r') as fout:
-        for line in fout:
+    with open(fpath, 'r') as fin:
+        for line in fin:
             if line.startswith('>'):
                 key = line.strip()
             else:
@@ -439,29 +415,15 @@ def read_FASTA_like(fpath):
     return {k: ''.join(v) for k, v in tmp.items()}
 
 
-#deprecate
-def read_FASTAS_from_file_to_strings(fpath):
-    """
-    Read FASTA sequences from file.
-
-    FASTA is output as string.
-    """
-    return read_FASTAS_from_file(fpath)
-    #return {key: ''.join(value) for key, value in fastad.items()}
-
-
-def is_valid_fasta_file(path):
-    is_valid = \
-        file_exists(path) \
-        and has_suffix_fasta(path)
-    return is_valid
-
-
-def is_valid_propensity_file(path):
-    is_valid = \
-        file_exists(path) \
-        and has_suffix_prop(path)
-    return is_valid
+# USED OKAY
+def read_FASTAS_from_file(fpath):
+    """Read FASTA sequence from file."""
+    fastas = read_FASTA_like(fpath)
+    for key, value in fastas.items():
+        if not is_valid_fasta(value):
+            _msg = f'FASTA sequence not valid for {key} in {fpath}'
+            raise IDPConfGenException(_msg)
+    return fastas
 
 
 # USED OKAY
@@ -794,6 +756,15 @@ class TarFileIterator(FileIteratorBase):
         txt = f.read()
         f.close()
         return member.name, txt
+
+
+# partials
+has_suffix_fasta = partial(has_suffix, ext='.fasta')
+has_suffix_prop = partial(has_suffix, ext='.prop')
+
+is_valid_file = vartial(are_all_valid, file_exists)
+is_valid_fasta_file = vartial(is_valid_file, has_suffix_fasta)
+is_valid_prop_file = vartial(is_valid_file, has_suffix_prop)
 
 
 # dispachers

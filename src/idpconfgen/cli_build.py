@@ -175,6 +175,14 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-forced-loops',
+    help=help_docs.forced_loop_help,
+    required=False,
+    nargs='?',
+    action=libcli.SeqOrFasta,
+    )
+
+ap.add_argument(
     '-nc',
     '--nconfs',
     help='Number of conformers to build.',

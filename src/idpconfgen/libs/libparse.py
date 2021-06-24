@@ -14,6 +14,7 @@ from numba import njit
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters, aa1set, aa3set
 from idpconfgen.core.exceptions import DSSPParserError
+from idpconfgen.libs.libfunc import are_all_valid, vartial, negate, post_func
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
 
@@ -41,19 +42,14 @@ def get_diff_between_groups(group1, group2):
 
 
 get_diff_between_aa1l = partial(get_diff_between_groups, group2=aa1set)
+get_diff_propensity = partial(get_diff_between_groups, group2="0123456789*")
 
+is_empty_diff_aa1l = partial(post_func, negate, get_diff_between_aa1l)
+is_empty_diff_propensity = partial(post_func, negate, get_diff_propensity)
 
-def is_valid_fasta(fasta):  # str -> bool
-    """
-    Confirm string is a valid FASTA primary sequence.
+is_valid_fasta = vartial(are_all_valid, is_empty_diff_aa1l)
+is_valid_propensity = vartial(are_all_valid, is_empty_diff_propensity)
 
-    Does not accept headers, just the protein sequence in a single string.
-    """
-    is_valid = \
-        fasta.isupper() \
-        and not get_diff_between_aa1l(fasta)
-
-    return is_valid
 
 # USED OKAY
 def group_by(data):
