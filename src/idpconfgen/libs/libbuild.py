@@ -527,25 +527,56 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     return primary, seq_angles
 
 
-def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
-    """."""
+def prepare_slice_dict(
+        primary,
+        input_seq,
+        mers_size=(1, 2, 3, 4, 5),
+        res_tolerance=None,
+        ncores=1,
+        ):
+    """
+    Prepare a dictionary mapping chunks to slices in `primary`.
+
+    Parameters
+    ----------
+    primary : str
+        A concatenated version of all primary sequences in the database.
+        In the form of "QWERY|IPASDF", etc.
+
+    input_seq : str
+        The 1-letter code amino-acid sequence of the conformer to construct.
+
+    mers_size : iterable
+        A iterable of integers denoting the size of the chunks to search
+        for. Defaults from 1 to 5.
+
+    res_tolerance : dict
+        A dictionary mapping residue tolerances, for example:
+        {"A": "AIL"}, noting Ala can be replaced by Ile and Leu in the
+        search (this is a dummy example).
+
+    ncores : int
+        The number of processors to use.
+
+    Return
+    ------
+    dict
+        A dict with the given mapping. First key-leve of the dict
+        is the length of the chunks, hence, integers.
+        The second key level are the residue chunks found in the `primary`.
+        A chunk in input_seq but not in `primary` is removed from the
+        dict.
+    """
     res_tolerance = res_tolerance or {}
 
     log.info('preparing regex xmers')
-    monomers = get_mers(inseq, 1)
-    dimers = get_mers(inseq, 2)
-    trimers = get_mers(inseq, 3)
-    tetramers = get_mers(inseq, 4)
-    pentamers = get_mers(inseq, 5)
 
+    xmers = (get_mers(input_seq, i) for i in mers_size)
+    xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
-    mers = it.chain(monomers, dimers, trimers, tetramers, pentamers)
 
-    _l = len(monomers) + len(dimers) + len(trimers) \
-        + len(tetramers) + len(pentamers)
-
-    with ProgressWatcher(_l) as PW:
-        for mer in mers:
+    with ProgressCounter(suffix='Searching for xmers: ') as PW:
+        for mer in xmers_flat:
             lmer = len(mer)
             altered_mer = build_regex_substitutions(mer, res_tolerance)
 
@@ -571,7 +602,7 @@ def prepare_slice_dict(primary, inseq, res_tolerance=None, ncores=1):
             if not slice_dict[lmer][altered_mer_P]:
                 slice_dict[lmer].pop(altered_mer_P)
             # for _s in slice_dict[lmer][mer]:
-                # assert '|' not in inseq[_s]
+                # assert '|' not in input_seq[_s]
             PW.increment()
 
     return slice_dict
