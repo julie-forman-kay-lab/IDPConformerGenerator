@@ -31,8 +31,8 @@ def init_files(log, logfilesname, clear=False):
     Initiate log files.
 
     Three log files are created:
+        - .info
         - .debug
-        - .log
         - .error
 
     where, .debug stores all technical details related to debugging
