@@ -36,9 +36,10 @@ from idpconfgen.libs.libfilter import (
     regex_forward_with_overlap,
     regex_search,
     )
+from idpconfgen.libs.libfunc import flatlist
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
-from idpconfgen.libs.libtimer import ProgressWatcher, timeme
+from idpconfgen.libs.libtimer import ProgressCounter, timeme
 
 
 # See TODO at init_faspr_sidechains
