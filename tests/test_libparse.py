@@ -363,7 +363,7 @@ def test_fill_list_bad(in1, fill, size, expected):
         ([], {}),
         ]
     )
-def test_read_lines_to_xmer_prob(in1, expected):
+def test_convert_int_float_lines(in1, expected):
     """."""
-    result = libparse.lines_to_xmer_probs(in1)
+    result = libparse.convert_int_float_lines_to_dict(in1)
     assert result == expected

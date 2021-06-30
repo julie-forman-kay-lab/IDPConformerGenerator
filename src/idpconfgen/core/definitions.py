@@ -179,9 +179,6 @@ blocked_ids = [
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
-XmerProbs = namedtuple('XmerProbs', ['size', 'probs'])
-default_xmer_sizes = (1, 2, 3, 4, 5)
-default_xmer_probs = (0, 0, 2, 2, 1)
 
 # Builder Definitions  ###
 # average values of the backbone angles calculated from

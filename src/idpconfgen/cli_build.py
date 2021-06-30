@@ -20,9 +20,9 @@ from time import time
 
 import numpy as np
 from numba import njit
-from libfuncpy import ITE, is_not_none
 
 from idpconfgen import Path, log
+from idpconfgen.components.xmer_probs import add_xmer_arg, prepare_xmer_probs
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -32,7 +32,6 @@ from idpconfgen.core.build_definitions import (
     n_terminal_h_coords_at_origin,
     sidechain_templates,
     )
-from idpconfgen.core.definitions import XmerProbs
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
@@ -61,10 +60,7 @@ from idpconfgen.libs.libcalc import (
     rrd10_njit,
     )
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
-from idpconfgen.libs.libio import (
-    read_dictionary_from_disk,
-    read_xmer_probs_from_file,
-    )
+from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     fill_list,
     get_seq_chunk_njit,
@@ -248,19 +244,7 @@ ap.add_argument(
     )
 
 
-xmer_probs_action = libcli.change_dest(
-    'xmer_probs_fpath',
-    func=read_xmer_probs_from_file,
-    errmsg='{} is not a compatible `xmer-probs` format.'
-    )
-ap.add_argument(
-    '-xp',
-    '--xmer-probs',
-    help=help_docs.xmers_prob_help,
-    type=Path,
-    default=None,
-    action=xmer_probs_action,
-    )
+add_xmer_arg(ap)
 
 
 ap.add_argument(
@@ -349,15 +333,7 @@ def main(
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
-    xmer_probs = ITE(
-        partial(read_xmer_probs_from_file, xmer_probs_fpath),
-        partial(is_not_none, xmer_probs_fpath),
-        partial(
-            chainf,
-            partial(make_seq_probabilities, default_xmer_sizes),
-            partial(XmerProbs, default_xmer_sizes),
-            ),
-        )
+    xmer_probs = prepare_xmer_probs(xmer_probs_fpath)
 
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
@@ -366,7 +342,7 @@ def main(
         residue_substitutions,
         )
 
-    XMERPROBS = np.array(xmers_probs.probs)
+    XMERPROBS = np.array(xmer_probs.probs)
 
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),

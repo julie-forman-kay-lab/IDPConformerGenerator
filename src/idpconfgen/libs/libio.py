@@ -15,10 +15,8 @@ from pprint import pprint
 from libfuncpy import chainf
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import XmerProbs
 from idpconfgen.libs import get_false
 from idpconfgen.libs.libpdb import PDBList
-from idpconfgen.libs.libparse import lines_to_xmer_probs
 from idpconfgen.logger import S, T
 
 
@@ -445,12 +443,6 @@ def read_text(fpath):
 def read_lines(fpath):
     text = read_text(fpath)
     return text.strip().split('\n')
-
-
-def read_xmer_probs_from_file(fpath):
-    """Read xmer probs from formatted file."""
-    _ = chainf(fpath, read_lines, lines_to_xmer_probs)
-    return XmerProbs(list(_.keys()), list(_.values()))
 
 
 # USED OKAY

@@ -390,7 +390,19 @@ def fill_list(seq, fill, size):
     return list(seq) + list(repeat(fill, size - len(seq)))
 
 
-def lines_to_xmer_probs(lines):
+def convert_int_float_lines_to_dict(lines):
+    """
+    Convert string lines composed of putative int and float to dict.
+
+    Example
+    -------
+    >>> convert_int_float_lines_to_dict(['1 2'])
+    {1: 2.0}
+
+    >>> convert_int_float_lines_to_dict(['1 2\n', '3 45.5\n'])
+    {1: 2.0, 3: 45.5}
+
+    """
     pairs = {}
 
     operations = [
