@@ -69,7 +69,7 @@ class XmerProbsAction(Action):
     def __call__(self, parser, namespace, value, option_string=None):
         """Call on me :-)."""
         try:
-            result = read_xmer_probs_file_or_default(value)
+            result = read_xmer_probs_from_file(value)
         except (ValueError, TypeError):
             parser.error(f'Not a compatible {self.dest!r} format.')
         except FileNotFoundError:
@@ -99,7 +99,7 @@ xmer_probs_args = ['-xp', '--xmer-probs']
 xmer_probs_kwargs = {
     "help": xmers_prob_help,
     "type": Path,
-    "default": default_XmerProbs,
+    "default": None,
     "action": XmerProbsAction,
     }
 

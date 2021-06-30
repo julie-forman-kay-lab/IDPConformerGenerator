@@ -75,7 +75,7 @@ def test_Actions1():
     ap = argparse.ArgumentParser()
     add_xmer_arg(ap)
     cmd = vars(ap.parse_args([]))
-    assert cmd['xmer_probs'] is default_XmerProbs
+    assert cmd['xmer_probs'] is None
 
 
 def test_Actions2():
