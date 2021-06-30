@@ -60,7 +60,7 @@ from idpconfgen.libs.libcalc import (
     rrd10_njit,
     )
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
-from idpconfgen.libs.libio import read_dictionary_from_disk
+from idpconfgen.libs.libio import make_folder, read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     fill_list,
     get_seq_chunk_njit,
@@ -70,7 +70,7 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
-from idpconfgen.logger import S, T, init_clean_files, pre_msg, report_on_crash
+from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
@@ -303,7 +303,8 @@ def main(
 
     Distributes over processors.
     """
-    init_clean_files(log, LOGFILESNAME)
+    output_folder = make_folder(output_folder)
+    init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
 
     # Calculates how many conformers are built per core
@@ -369,9 +370,6 @@ def main(
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
 
-    output_folder = \
-        Path(output_folder) if output_folder is not None else Path.cwd()
-    output_folder.mkdir(parents=True, exist_ok=True)
     ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
     # prepars execution function
@@ -658,7 +656,7 @@ def conformer_generator(
 
     log.info(f'random seed: {random_seed}')
     np.random.seed(random_seed)
-    seed_report = pre_msg(f'seed {random_seed}')
+    seed_report = pre_msg(f'seed {random_seed}', sep=' - ')
 
     # prepares protein sequences
     all_atom_input_seq = input_seq
@@ -1147,15 +1145,14 @@ def conformer_generator(
                 )
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
-            print(total_energy)
 
             if total_energy > energy_threshold_sidechains:
-                log.info(seed_report(
-                    f'Conformer with WORST energy {total_energy}'))
+                _msg = f'Conformer with WORST energy {total_energy}'
+                log.info(seed_report(_msg))
                 continue
-            else:
-                log.info(seed_report(
-                    f'finished conf: {conf_n} with energy {total_energy}'))
+
+        _msg = f'finished conf: {conf_n} with energy {total_energy}'
+        log.info( seed_report(_msg))
 
         #print(all_atom_coords)
         yield total_energy, all_atom_coords

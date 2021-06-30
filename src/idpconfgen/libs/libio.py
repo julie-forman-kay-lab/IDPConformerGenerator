@@ -27,6 +27,23 @@ from idpconfgen.logger import S, T
 # Dispachers are at the bottom
 
 
+def make_folder(folder):
+    try:
+        output_folder = Path(folder)
+    except ValueError:
+        log.info('Could not create {folder} using CWD instead.')
+        return Path.cwd()
+
+    try:
+        output_folder.mkdir(parents=True, exist_ok=False)
+    except FileExistsError:
+        log.info(f'Folder {os.fspath(output_folder)!r} already exists.')
+    else:
+        log.info(f'Created folder {os.fspath(output_folder)!r}')
+    finally:
+        return output_folder
+
+
 # NOT USED ANYWHERE
 def add_existent_files(storage, source):
     """

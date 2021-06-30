@@ -9,6 +9,12 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.21 (2021-06-28)
+------------------------------------------------------------
+
+* Now build prints log to terminal.
+* improved other minor logging issues
+
 v0.0.20 (2021-06-21)
 ------------------------------------------------------------
 

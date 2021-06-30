@@ -36,7 +36,7 @@ project = 'IDP Conformer Generator'
 year = '2019'
 author = 'Julie Forman-Kay Lab'
 copyright = '{0}, {1}'.format(year, author)
-version = release = '0.0.20'
+version = release = '0.0.21'
 
 pygments_style = 'trac'
 templates_path = ['.']
