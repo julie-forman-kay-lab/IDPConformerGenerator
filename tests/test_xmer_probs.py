@@ -1,4 +1,6 @@
 """Test xmer_probs component."""
+import argparse
+import os
 from pathlib import Path
 from math import isclose
 
@@ -65,3 +67,19 @@ def test_isXmer():
     """."""
     a = make_xmerprobs([1, 2], [3, 4])
     assert is_XmerProbs(a)
+
+
+def test_Actions1():
+    """."""
+    ap = argparse.ArgumentParser()
+    add_xmer_arg(ap)
+    cmd = vars(ap.parse_args([]))
+    assert cmd['xmer_probs'] is None
+
+
+def test_Actions2():
+    """."""
+    ap = argparse.ArgumentParser()
+    add_xmer_arg(ap)
+    cmd = vars(ap.parse_args(f'-xp {os.fspath(xmer_probs)}'.split()))
+    assert is_XmerProbs(cmd['xmer_probs'])

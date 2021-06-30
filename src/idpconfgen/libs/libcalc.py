@@ -1059,7 +1059,7 @@ def multiply_upper_diagonal_raw(data, result):
     return
 
 
-def make_seq_probabilities(seq, reverse=True):
+def make_seq_probabilities(seq, reverse=False):
     """
     Make probabilites from a sequence of numbers.
 

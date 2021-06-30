@@ -334,6 +334,7 @@ def main(
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs = prepare_xmer_probs(xmer_probs)
+    XMERPROBS = xmer_probs.probs
 
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
@@ -342,7 +343,6 @@ def main(
         residue_substitutions,
         )
 
-    XMERPROBS = np.array(xmer_probs.probs)
 
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
@@ -1254,7 +1254,6 @@ def get_adjacent_angles(
     """
     residue_replacements = residue_replacements or {}
     probs = fill_list(probs, 0, len(options))
-    print(probs)
 
     def func(aidx):
 
