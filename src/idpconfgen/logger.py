@@ -13,7 +13,7 @@ from idpconfgen.core.exceptions import ReportOnCrashError
 def titlelog(msg, *args):
     """Format a message to a title."""
     msg = msg.title()
-    return f'\n* {msg.format(*args)} ...'
+    return f'{msg.format(*args)}:'
 
 
 def subline(msg, *args, spacer=' ', indent=4):

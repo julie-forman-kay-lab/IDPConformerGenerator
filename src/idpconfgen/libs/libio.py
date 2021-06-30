@@ -8,8 +8,11 @@ import tarfile
 from collections import defaultdict
 from functools import partial
 from io import BytesIO
+from operator import setitem
 from os import SEEK_END
 from pprint import pprint
+
+from libfuncpy import chainf
 
 from idpconfgen import Path, log
 from idpconfgen.libs import get_false
@@ -448,6 +451,15 @@ def is_valid_fasta_file(path):
         file_exists(path) \
         and has_suffix_fasta(path)
     return is_valid
+
+
+def read_text(fpath):
+    return Path(fpath).read_text()
+
+
+def read_lines(fpath):
+    text = read_text(fpath)
+    return text.strip().split('\n')
 
 
 # USED OKAY

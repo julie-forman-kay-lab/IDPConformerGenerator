@@ -8,8 +8,10 @@ import subprocess
 from itertools import product, repeat
 from functools import partial
 from pathlib import Path as Path_
+from operator import setitem
 
 from numba import njit
+from libfuncpy import chainfs, consume
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters, aa1set, aa3set
@@ -261,7 +263,11 @@ def parse_dssp(data, reduced=False):
         yield dssp_, bjoin(fasta), residues
 
 
-def pop_difference_with_log(dict1, dict2):
+def pop_difference_with_log(
+        dict1,
+        dict2,
+        logmsg='Removing {} from the dictionary.\n',
+        ):
     """
     Pop keys in `dict1` that are not present in `dict2`.
 
@@ -282,13 +288,8 @@ def pop_difference_with_log(dict1, dict2):
 
     diff = d1k.difference(d2k)
     if diff:
-        log.info(S(
-            'The following keys will be removed from the dictionary: {}\n',
-            diff
-            ))
-
-        for key in diff:
-            dict1.pop(key)
+        log.info(S(logmsg, diff))
+        consume(map(dict1.pop, diff))
 
 
 def remap_sequence(seq, target='A', group=('P', 'G')):
@@ -387,6 +388,40 @@ def fill_list(seq, fill, size):
         The original with fill values.
     """
     return list(seq) + list(repeat(fill, size - len(seq)))
+
+
+def convert_int_float_lines_to_dict(lines):
+    """
+    Convert string lines composed of putative int and float to dict.
+
+    Example
+    -------
+    >>> convert_int_float_lines_to_dict(['1 2'])
+    {1: 2.0}
+
+    >>> convert_int_float_lines_to_dict(['1 2\n', '3 45.5\n'])
+    {1: 2.0, 3: 45.5}
+
+    """
+    pairs = {}
+
+    operations = [
+        str.strip,
+        str.split,
+        lambda t: (int(t[0]), float(t[1])),
+        lambda t: setitem(pairs, *t),
+        ]
+
+    do_with_line = chainfs(*operations)
+
+    consume(map(do_with_line, lines))
+    return pairs
+
+
+def remove_empty_keys(ddict):
+    empty_keys = [k for k, v in ddict.items() if not v]
+    consume(map(ddict.pop, empty_keys))
+
 
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)

@@ -178,7 +178,7 @@ class ProgressBar:
 class ProgressCounter:
     """Represent progression via a counter."""
 
-    def __init__(self, suffix='', **kwargs):
+    def __init__(self, suffix='Running operations', **kwargs):
         """
         Represent a progress counter.
 
@@ -188,7 +188,7 @@ class ProgressCounter:
         self.suffix = suffix
 
     def __enter__(self, *args, **kwargs):
-        sys.stdout.write(f'\rRunning operations {self.suffix}: 0')
+        sys.stdout.write(f'\r{self.suffix}: 0')
         return self
 
     def __exit__(self, *args):

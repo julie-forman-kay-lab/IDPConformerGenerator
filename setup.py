@@ -84,6 +84,7 @@ setup(
         ],
     python_requires='>=3.7.*,<4',
     install_requires=[
+        'libfuncpy>=0.0.3',
         #'numpy>=1,<2',
         #'numba>=0.53.0',
         #'scipy>=1,<2',

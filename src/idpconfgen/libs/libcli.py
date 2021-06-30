@@ -4,6 +4,8 @@ import json
 import sys
 from os import cpu_count
 
+from libfuncpy import pass_
+
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
 from idpconfgen.libs.libparse import is_valid_fasta
@@ -270,6 +272,11 @@ def add_version(parser):
 # -vdWt --vdW-tolerance   : vdW tolerance (vdW_A + vdW_B - tolerance)
 # -vdWr --vdW-radii       : the vdW radii set
 # -vdWb --vdW-bonds-apart : Maximum bond connective to ignore in vdW validation
+
+
+def add_general_arg(parser, *args, **kwargs):
+    """Add a general argument with args and kwargs."""
+    parser.add_argument(*args, **kwargs)
 
 
 def add_argument_chunks(parser):

@@ -2,7 +2,7 @@
 import numpy as np
 import pytest
 
-from idpconfgen.libs.libbuild import init_confmasks, build_regex_substitutions
+from idpconfgen.libs.libbuild import *
 
 
 def test_conf_masks():
@@ -54,4 +54,28 @@ def test_conf_masks():
 def test_add_regex_substitutions(in1, options, expected):
     """Test add regex substitutions."""
     result = build_regex_substitutions(in1, options)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'primary,input_seq,mers_size,res_tolerance,expected',
+    [
+        (
+            'AADDAADDAADD',
+            'AD',
+            (2,),
+            None,
+            {2: {"AD": [slice(1, 3), slice(5, 7), slice(9, 11)]}},
+            ),
+        ],
+    )
+def test_prepare_slice_dict(
+        primary,
+        input_seq,
+        mers_size,
+        res_tolerance,
+        expected):
+    """Test prepare slice dict."""
+    result = prepare_slice_dict(primary, input_seq, mers_size, res_tolerance)
+    assert result.keys() == expected.keys()
     assert result == expected

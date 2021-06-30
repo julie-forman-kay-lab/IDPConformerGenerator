@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Users are now able to fully configure the size of chunks and probabilities,
+    via the flag `-xp` that expects a two column file.
+
 v0.0.21 (2021-06-28)
 ------------------------------------------------------------
 

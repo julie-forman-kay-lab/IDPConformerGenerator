@@ -22,6 +22,11 @@ import numpy as np
 from numba import njit
 
 from idpconfgen import Path, log
+from idpconfgen.components.xmer_probs import (
+    add_xmer_arg,
+    compress_xmer_to_key,
+    prepare_xmer_probs,
+    )
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -66,6 +71,7 @@ from idpconfgen.libs.libparse import (
     get_seq_next_residue_njit,
     get_trimer_seq_njit,
     remap_sequence,
+    remove_empty_keys,
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
@@ -242,14 +248,8 @@ ap.add_argument(
     action=libcli.ReadDictionary,
     )
 
-ap.add_argument(
-    '-xp',
-    '--xmers-probs',
-    help=help_docs.xmers_prob_help,
-    default=False,
-    nargs='+',
-    action=libcli.ListOfIntsPositiveSum,
-    )
+
+add_xmer_arg(ap)
 
 
 ap.add_argument(
@@ -298,7 +298,7 @@ def main(
         nconfs=1,
         ncores=1,
         random_seed=0,
-        xmers_probs=False,
+        xmer_probs=None,
         output_folder=None,
         energy_log='energies.log',
         **kwargs,  # other kwargs target energy function, for example.
@@ -338,12 +338,17 @@ def main(
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
-    SLICEDICT_XMERS = prepare_slice_dict(primary, input_seq, residue_substitutions)
 
-    XMERPROBS = make_seq_probabilities(
-        xmers_probs if xmers_probs else list(SLICEDICT_XMERS.keys()),
-        reverse=False,
+    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+    SLICEDICT_XMERS = prepare_slice_dict(
+        primary,
+        input_seq,
+        xmer_probs_tmp.sizes,
+        residue_substitutions,
         )
+    remove_empty_keys(SLICEDICT_XMERS)
+    _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
+    XMERPROBS = _.probs
 
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
@@ -1251,7 +1256,6 @@ def get_adjacent_angles(
     """
     residue_replacements = residue_replacements or {}
     probs = fill_list(probs, 0, len(options))
-    print(probs)
 
     def func(aidx):
 
