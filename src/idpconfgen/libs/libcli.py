@@ -4,6 +4,8 @@ import json
 import sys
 from os import cpu_count
 
+from libfuncpy import pass_
+
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
 from idpconfgen.libs.libparse import is_valid_fasta
@@ -156,6 +158,24 @@ def CheckExt(extensions):
                 parser.error(f'Wrong extension {suffix}, expected {extensions}')
             else:
                 setattr(namespace, self.dest, path)
+    return Act
+
+
+def change_dest(
+        dest,
+        func=pass_,
+        errmsg='An error occurred for {} at `change_dest` function.',
+        ):
+    """Change destination of argument."""
+    class Act(argparse.Action):
+        def __call__(self, parser, namespace, value, option_string=None):
+            """Call on me :-)."""
+            try:
+                func(value)
+            except:
+                parser.error(errmsg.format(value))
+            else:
+                setattr(namespace, dest, path)
     return Act
 
 

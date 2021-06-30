@@ -8,12 +8,17 @@ import tarfile
 from collections import defaultdict
 from functools import partial
 from io import BytesIO
+from operator import setitem
 from os import SEEK_END
 from pprint import pprint
 
+from libfuncpy import chainf
+
 from idpconfgen import Path, log
+from idpconfgen.core.definitions import XmerProbs
 from idpconfgen.libs import get_false
 from idpconfgen.libs.libpdb import PDBList
+from idpconfgen.libs.libparse import lines_to_xmer_probs
 from idpconfgen.logger import S, T
 
 
@@ -431,6 +436,21 @@ def is_valid_fasta_file(path):
         file_exists(path) \
         and has_suffix_fasta(path)
     return is_valid
+
+
+def read_text(fpath):
+    return Path(fpath).read_text()
+
+
+def read_lines(fpath):
+    text = read_text(fpath)
+    return text.strip().split('\n')
+
+
+def read_xmer_probs_from_file(fpath):
+    """Read xmer probs from formatted file."""
+    _ = chainf(fpath, read_lines, lines_to_xmer_probs)
+    return XmerProbs(list(_.keys()), list(_.values()))
 
 
 # USED OKAY

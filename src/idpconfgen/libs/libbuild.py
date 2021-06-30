@@ -6,6 +6,7 @@ from functools import partial
 from itertools import cycle
 
 import numpy as np
+from libfuncpy import flatlist, make_iterable
 from numba import njit
 
 # import idpcpp, imported locally at init_faspr_sidechains
@@ -36,7 +37,6 @@ from idpconfgen.libs.libfilter import (
     regex_forward_with_overlap,
     regex_search,
     )
-from idpconfgen.libs.libfunc import flatlist
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
@@ -569,6 +569,7 @@ def prepare_slice_dict(
         dict.
     """
     res_tolerance = res_tolerance or {}
+    mers_size = make_iterable(mers_size)
 
     log.info('preparing regex xmers')
 

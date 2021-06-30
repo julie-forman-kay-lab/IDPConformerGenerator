@@ -353,3 +353,17 @@ def test_fill_list_bad(in1, fill, size, expected):
     """Test fill list."""
     result = libparse.fill_list(in1, fill, size)
     assert result != expected
+
+
+@pytest.mark.parametrize(
+    'in1,expected',
+    [
+        (['1 2\n', '2 3\n'], {1: 2, 2: 3}),
+        (['1 2'], {1: 2}),
+        ([], {}),
+        ]
+    )
+def test_read_lines_to_xmer_prob(in1, expected):
+    """."""
+    result = libparse.lines_to_xmer_probs(in1)
+    assert result == expected

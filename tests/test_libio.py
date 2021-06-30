@@ -8,6 +8,7 @@ from multiprocessing import Manager
 import pytest
 
 from idpconfgen import Path
+from idpconfgen.core.definitions import XmerProbs
 from idpconfgen.libs import libio
 from idpconfgen.libs.libpdb import PDBList
 
@@ -534,3 +535,11 @@ def test_file_reader_iterator_tar(Iterator):
 def test_is_valid_fasta_file():
     """Test is valid fasta file."""
     assert libio.is_valid_fasta_file(tcommons.fasta1)
+
+
+def test_read_xmer_prob():
+    """."""
+    result = libio.read_xmer_probs_from_file(tcommons.xmer_probs)
+    expected = XmerProbs([1, 2, 5], [2, 4, 6])
+    assert result.size == expected.size
+    assert result.probs == expected.probs
