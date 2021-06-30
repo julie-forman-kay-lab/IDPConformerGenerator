@@ -8,7 +8,6 @@ from multiprocessing import Manager
 import pytest
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import XmerProbs
 from idpconfgen.libs import libio
 from idpconfgen.libs.libpdb import PDBList
 

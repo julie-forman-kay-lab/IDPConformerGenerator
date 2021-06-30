@@ -19,7 +19,7 @@ def test_init_files():
 def test_T():
     """Test T formatter."""
     logmsg = T('my title {}', 'IDP')
-    assert str(logmsg) == '\n* My Title IDP ...'
+    assert str(logmsg) == 'My Title IDP:'
 
 
 @pytest.mark.parametrize(
