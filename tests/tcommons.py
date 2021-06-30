@@ -71,7 +71,6 @@ expl_a_bgeo = Path(data_folder, 'EXPL_A_bgeo.json')
 expl_a_bgeo_converted = Path(data_folder, 'EXPL_A_bgeo_converted.json')
 expl_a_bgeo_trimer = Path(data_folder, 'EXPL_A_bgeo_trimer.json')
 expl_a_bgeo_res = Path(data_folder, 'EXPL_A_bgeo_res.json')
-xmer_probs = Path(data_folder, 'xmer_prob.col')
 
 
 cif_example_headers = [

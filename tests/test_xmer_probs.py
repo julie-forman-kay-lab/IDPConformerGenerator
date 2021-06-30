@@ -1,9 +1,11 @@
 """Test xmer_probs component."""
 from pathlib import Path
+from math import isclose
 
 import pytest
 
 from idpconfgen.components.xmer_probs import *
+from idpconfgen.libs.libcalc import make_seq_probabilities
 
 from . import tcommons
 
@@ -13,18 +15,20 @@ xmer_probs = Path(tcommons.data_folder, 'xmer_prob.col')
 
 def test_read_xmer_prob():
     """."""
-    result = read_xmer_probs_from_file(tcommons.xmer_probs)
-    expected = XmerProbs([1, 2, 5], [2, 4, 6])
+    result = read_xmer_probs_from_file(xmer_probs)
+    expected = make_xmerprobs([1, 2, 5], [2, 4, 6])
     assert result.size == expected.size
-    assert result.probs == expected.probs
+    for i, j in zip(result.probs, expected.probs):
+        assert isclose(i, j)
 
 
 def test_prepare_xmerprob():
     """."""
     result = prepare_xmer_probs(xmer_probs)
-    expected = XmerProbs([1, 2, 5], [2, 4, 6])
+    expected = make_xmerprobs([1, 2, 5], [2, 4, 6])
     assert result.size == expected.size
-    assert result.probs == expected.probs
+    for i, j in zip(result.probs, expected.probs):
+        assert isclose(i, j)
 
 
 def test_prepare_xmerprob2():
@@ -59,5 +63,5 @@ def test_prepare_xmerprob_error(value, error):
 
 def test_isXmer():
     """."""
-    a = XmerProbs([1, 2], [3, 4])
+    a = make_xmerprobs([1, 2], [3, 4])
     assert is_XmerProbs(a)

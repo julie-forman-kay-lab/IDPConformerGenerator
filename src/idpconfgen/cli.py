@@ -97,6 +97,7 @@ def maincli():
     with open('idpconfgen.version', 'w') as fout:
         fout.write(f'version: {__version__}')
 
+    print(cmd)
     cmd.func(**vars(cmd))
     log.info(S('finished properly'))
 

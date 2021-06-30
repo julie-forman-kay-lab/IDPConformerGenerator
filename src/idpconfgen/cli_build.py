@@ -293,7 +293,7 @@ def main(
         nconfs=1,
         ncores=1,
         random_seed=0,
-        xmer_probs_fpath=None,
+        xmer_probs=None,
         output_folder=None,
         energy_log='energies.log',
         **kwargs,  # other kwargs target energy function, for example.
@@ -333,7 +333,7 @@ def main(
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
-    xmer_probs = prepare_xmer_probs(xmer_probs_fpath)
+    xmer_probs = prepare_xmer_probs(xmer_probs)
 
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
