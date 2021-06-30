@@ -161,24 +161,6 @@ def CheckExt(extensions):
     return Act
 
 
-def change_dest(
-        dest,
-        func=pass_,
-        errmsg='An error occurred for {} at `change_dest` function.',
-        ):
-    """Change destination of argument."""
-    class Act(argparse.Action):
-        def __call__(self, parser, namespace, value, option_string=None):
-            """Call on me :-)."""
-            try:
-                func(value)
-            except:
-                parser.error(errmsg.format(value))
-            else:
-                setattr(namespace, dest, value)
-    return Act
-
-
 # https://stackoverflow.com/questions/4042452
 class CustomParser(argparse.ArgumentParser):
     """Custom Parser class."""

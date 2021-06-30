@@ -44,6 +44,11 @@ def test_prepare_xmerprob3():
     [
         ('', IsADirectoryError),
         ('filedoesnotexistnevereverbefore', FileNotFoundError),
+        (1, (ValueError, TypeError)),
+        (1.1, (ValueError, TypeError)),
+        ({1: 2}, (ValueError, TypeError)),
+        ({}, (ValueError, TypeError)),
+        ([], (ValueError, TypeError)),
         ],
     )
 def test_prepare_xmerprob_error(value, error):
