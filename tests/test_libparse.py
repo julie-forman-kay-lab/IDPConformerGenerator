@@ -367,3 +367,10 @@ def test_convert_int_float_lines(in1, expected):
     """."""
     result = libparse.convert_int_float_lines_to_dict(in1)
     assert result == expected
+
+
+def test_remove_empty_keys():
+    """."""
+    d = {'1': 1, 1: '1', 'a': '', 'b': [], 'c': {}}
+    libparse.remove_empty_keys(d)
+    assert list(d.keys()) == ['1', 1]

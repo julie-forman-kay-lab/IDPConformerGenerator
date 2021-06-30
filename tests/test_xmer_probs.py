@@ -5,6 +5,7 @@ from pathlib import Path
 from math import isclose
 
 import pytest
+import numpy as np
 
 from idpconfgen.components.xmer_probs import *
 from idpconfgen.libs.libcalc import make_seq_probabilities
@@ -19,7 +20,7 @@ def test_read_xmer_prob():
     """."""
     result = read_xmer_probs_from_file(xmer_probs)
     expected = make_xmerprobs([1, 2, 5], [2, 4, 6])
-    assert result.size == expected.size
+    assert result.sizes == expected.sizes
     for i, j in zip(result.probs, expected.probs):
         assert isclose(i, j)
 
@@ -28,7 +29,7 @@ def test_prepare_xmerprob():
     """."""
     result = prepare_xmer_probs(xmer_probs)
     expected = make_xmerprobs([1, 2, 5], [2, 4, 6])
-    assert result.size == expected.size
+    assert result.sizes == expected.sizes
     for i, j in zip(result.probs, expected.probs):
         assert isclose(i, j)
 
@@ -74,7 +75,7 @@ def test_Actions1():
     ap = argparse.ArgumentParser()
     add_xmer_arg(ap)
     cmd = vars(ap.parse_args([]))
-    assert cmd['xmer_probs'] is None
+    assert cmd['xmer_probs'] is default_XmerProbs
 
 
 def test_Actions2():
@@ -83,3 +84,23 @@ def test_Actions2():
     add_xmer_arg(ap)
     cmd = vars(ap.parse_args(f'-xp {os.fspath(xmer_probs)}'.split()))
     assert is_XmerProbs(cmd['xmer_probs'])
+
+
+def test_correction_by_bool():
+    """."""
+    xm = compress_xmer_to_bool(
+        default_XmerProbs,
+        [False, False, True, True, True])
+
+    assert xm.sizes == [3, 4, 5]
+    assert np.allclose(xm.probs, np.array([0.375, 0.375, 0.25]))
+    assert not isclose(10, 9)
+
+
+def test_correction_by_key():
+    """."""
+    xm = compress_xmer_to_key(default_XmerProbs, [3, 4, 5])
+
+    assert xm.sizes == [3, 4, 5]
+    assert np.allclose(xm.probs, np.array([0.375, 0.375, 0.25]))
+    assert not isclose(10, 9)

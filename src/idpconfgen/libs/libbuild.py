@@ -38,7 +38,11 @@ from idpconfgen.libs.libfilter import (
     regex_search,
     )
 from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
+from idpconfgen.libs.libparse import (
+    get_mers,
+    translate_seq_to_3l,
+    remove_empty_keys,
+    )
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
 
 
@@ -587,7 +591,7 @@ def prepare_slice_dict(
             slice_dict[lmer][altered_mer] = \
                 regex_forward_with_overlap(primary, merregex)
 
-            # if no entrey was found
+            # if no slices were found
             if not slice_dict[lmer][altered_mer]:
                 slice_dict[lmer].pop(altered_mer)
 

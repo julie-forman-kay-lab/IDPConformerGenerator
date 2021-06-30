@@ -1,6 +1,9 @@
 """Define chunk probability distribution for CLI and building."""
 from argparse import Action
 from collections import namedtuple
+from functools import partial
+from itertools import compress
+from operator import contains
 from pathlib import Path
 
 from libfuncpy import ITEX, chainf, is_not_none, pass_, vartial
@@ -13,7 +16,7 @@ from idpconfgen.libs.libparse import convert_int_float_lines_to_dict
 from idpconfgen.logger import S, T
 
 
-_XmerProbs = namedtuple('XmerProbs', ['size', 'probs'])
+_XmerProbs = namedtuple('XmerProbs', ['sizes', 'probs'])
 
 
 def make_xmerprobs(sizes, probs):
@@ -36,10 +39,14 @@ def read_xmer_probs_from_file(fpath):
     return xmerprobs
 
 
-def logxmerprobs(xmerprobs, func=log.info):
+def logxmerprobs(
+        xmerprobs,
+        func=log.info,
+        title='Chunk size and probabilities selected',
+        ):
     """Log XmerProbs object properties."""
-    func(T('Chunk size and probabilities selected'))
-    func(S('sizes of: {}', tuple(xmerprobs.size)))
+    func(T(title))
+    func(S('sizes of: {}', tuple(xmerprobs.sizes)))
     func(S('probs of: {}', tuple(xmerprobs.probs)))
 
 
@@ -84,13 +91,15 @@ provide any value, the default is chunk sizes: 1 to 5 with relative
 probabilities (1, 1, 3, 3, 2). You can give any integer to define relative
 probabilities: 10 and 90 will results 10/(10+90) and 90/(10+90) percent.
 If a Proline residue follows the chunk being built, the additional Proline
-angles will also be consider regardless of the selected chunk size."""
+angles will also be consider regardless of the selected chunk size.
+Chunk sizes will be ignored if no matches are found in the database and the
+probabilities renormalized."""
 
 xmer_probs_args = ['-xp', '--xmer-probs']
 xmer_probs_kwargs = {
     "help": xmers_prob_help,
     "type": Path,
-    "default": None,
+    "default": default_XmerProbs,
     "action": XmerProbsAction,
     }
 
@@ -107,3 +116,19 @@ prepare_xmer_probs = vartial(
     is_XmerProbs,
     read_xmer_probs_file_or_default,
     )
+
+
+def compress_xmer_to_bool(xmobj, blist):
+    """Compress a given XmerProbs object according to a boolean list."""
+    _ = make_xmerprobs(
+        compress(xmobj.sizes, blist),
+        compress(xmobj.probs, blist),
+        )
+    logxmerprobs(_, title='corrected chunk selection probabilities')
+    return _
+
+
+def compress_xmer_to_key(xmobj, klist):
+    """Compress a given XmerProbs object according to a key-size list."""
+    blist = list(map(partial(contains, klist), xmobj.sizes))
+    return compress_xmer_to_bool(xmobj, blist)

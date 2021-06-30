@@ -418,6 +418,11 @@ def convert_int_float_lines_to_dict(lines):
     return pairs
 
 
+def remove_empty_keys(ddict):
+    empty_keys = [k for k, v in ddict.items() if not v]
+    consume(map(ddict.pop, empty_keys))
+
+
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)
