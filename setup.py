@@ -49,7 +49,7 @@ long_description = '{}\n{}'.format(
 
 setup(
     name='idpconfgen',
-    version='0.0.22',
+    version='0.0.23',
     description='Generates IDP conformers.',
     long_description=long_description,
     author='Julie Forman-Kay Lab',
@@ -84,7 +84,7 @@ setup(
         ],
     python_requires='>=3.7.*,<4',
     install_requires=[
-        'libfuncpy>=0.0.3',
+        #'libfuncpy>=0.0.3',
         #'numpy>=1,<2',
         #'numba>=0.53.0',
         #'scipy>=1,<2',
