@@ -12,7 +12,7 @@ from operator import setitem
 from os import SEEK_END
 from pprint import pprint
 
-from libfuncpy import chainf
+from libfuncpy import chainf, is_none
 
 from idpconfgen import Path, log
 from idpconfgen.libs import get_false
@@ -27,21 +27,32 @@ from idpconfgen.logger import S, T
 # Dispachers are at the bottom
 
 
-def make_folder(folder):
+def make_folder_or_cwd(folder):
+    log.info(T('setting up working directory'))
+    if is_none(folder):
+        ofolder = Path.cwd().resolve()
+        log.info(S(f'Using current working directory: {os.fspath(ofolder)}.'))
+        log.info(S('Previous data will be overwritten, if file names overlap.'))
+        return ofolder
+
     try:
-        output_folder = Path(folder)
-    except ValueError:
-        log.info('Could not create {folder} using CWD instead.')
+        ofolder = Path(folder)
+    except (ValueError, TypeError):
+        ofolder = Path.cwd().resolve()
+        log.info(S(f'Could not create folder from: {folder}.'))
+        log.info(S(f'Using current working directory: {os.fspath(ofolder)}.'))
         return Path.cwd()
 
     try:
-        output_folder.mkdir(parents=True, exist_ok=False)
+        ofolder.mkdir(parents=True, exist_ok=False)
     except FileExistsError:
-        log.info(f'Folder {os.fspath(output_folder)!r} already exists.')
+        log.info(S(f'Folder {os.fspath(ofolder.resolve())!r} already exists.'))
+        log.info(S('Using the existing folder.'))
+        log.info(S('Previous data will be overwritten, if file names overlap.'))
     else:
-        log.info(f'Created folder {os.fspath(output_folder)!r}')
+        log.info(S(f'Created folder {os.fspath(ofolder.resolve())!r}.'))
     finally:
-        return output_folder
+        return ofolder
 
 
 # NOT USED ANYWHERE

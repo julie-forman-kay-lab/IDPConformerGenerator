@@ -64,7 +64,10 @@ from idpconfgen.libs.libcalc import (
     rrd10_njit,
     )
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
-from idpconfgen.libs.libio import make_folder, read_dictionary_from_disk
+from idpconfgen.libs.libio import (
+    make_folder_or_cwd,
+    read_dictionary_from_disk,
+    )
 from idpconfgen.libs.libparse import (
     fill_list,
     get_seq_chunk_njit,
@@ -308,7 +311,7 @@ def main(
 
     Distributes over processors.
     """
-    output_folder = make_folder(output_folder)
+    output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
 
