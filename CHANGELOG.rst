@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Corrects `make_folder` function in `cli_build`.
+
 v0.0.23 (2021-07-01)
 ------------------------------------------------------------
 
