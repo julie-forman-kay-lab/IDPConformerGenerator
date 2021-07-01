@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.0.23 (2021-07-01)
+------------------------------------------------------------
+
 * Added libfuncpy to requirements.yml
 
 v0.0.22 (2021-06-30)
