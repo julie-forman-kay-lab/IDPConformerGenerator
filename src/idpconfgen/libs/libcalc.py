@@ -5,6 +5,7 @@ from math import cos, sin
 import numpy as np
 from numba import njit
 
+from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     build_bend_CA_C_OXT,
     distance_C_OXT,
@@ -872,7 +873,7 @@ def unit_vector(vector):
     return vector / np.linalgn.norm(vector)
 
 
-def init_lennard_jones_calculator(acoeff, bcoeff):
+def init_lennard_jones_calculator(acoeff, bcoeff, postf="pairs"):
     """
     Calculate Lennard-Jones full pontential.
 
@@ -888,24 +889,42 @@ def init_lennard_jones_calculator(acoeff, bcoeff):
         that resulting energy is np.nan for non-relevant ij-pairs, for
         example, covalently bonded pairs, or pairs 2 bonds apart.
 
+    postf : str
+        There are different implementations of the energy calculation.
+        Current options are:
+        "nansum": applies np.nansum after calculating the energy per
+        pair.
+        "pair": returns the energies per pair.
+
     Returns
     -------
     numba.njitted func
         Function closure with registered `acoeff`s and `bcoeff`s that
         expects an np.ndarray of distances with same shape as `acoeff`
-        and `bcoeff`: (N,).
-        `func` returns an integer.
+        and `bcoeff`: (N,). The `func` return value depends on the
+        `postf` options.
     """
     @njit
-    def calc_lennard_jones(distances_ij, NANSUM=np.nansum):
+    def calculate(distances_ij):
         ar = acoeff / (distances_ij ** 12)
         br = bcoeff / (distances_ij ** 6)
-        energy_ij = ar - br
+        return ar - br
+
+    @njit
+    def calculate_nansum(distances_ij, NANSUM=np.nansum):
+        energy_ij = calculate(distances_ij)
         return NANSUM(energy_ij)
-    return calc_lennard_jones
+
+    options = {
+        "whole": calculate_nansum,
+        "pairs": calculate,
+        }
+
+    log.info(f'Setting LJ for {postf}')
+    return options[postf]
 
 
-def init_coulomb_calculator(charges_ij):
+def init_coulomb_calculator(charges_ij, postf="pairs"):
     """
     Calculate Coulomb portential.
 
@@ -918,18 +937,34 @@ def init_coulomb_calculator(charges_ij):
         that resulting energy is np.nan for non-relevant ij-pairs, for
         example, covalently bonded pairs, or pairs 2 bonds apart.
 
+    postf : str
+        There are different implementations of the energy calculation.
+        Current options are:
+        "nansum": applies np.nansum after calculating the energy per
+        pair.
+        "pair": returns the energies per pair.
+
     Returns
     -------
     numba.njitted func
         Function closure with registered `charges_ij` that expects an
         np.ndarray of distances with same shape as `acoeff` and `bcoeff`:
-        (N,).
-        `func` returns an integer.
+        (N,). The `func` return value depends on the `postf` options.
     """
     @njit
-    def calculate(distances_ij, NANSUM=np.nansum):
-        return NANSUM(charges_ij / distances_ij)
-    return calculate
+    def calculate(distances_ij):
+        return charges_ij / distances_ij
+
+    @njit
+    def calculate_nansum(distances_ij, NANSUM=np.nansum):
+        return NANSUM(calculate(distances_ij))
+
+    options = {
+        "whole": calculate_nansum,
+        "pairs": calculate,
+        }
+
+    return options[postf]
 
 
 def energycalculator_ij(distf, efuncs):

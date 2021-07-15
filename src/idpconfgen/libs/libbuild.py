@@ -6,7 +6,7 @@ from functools import partial
 from itertools import cycle
 
 import numpy as np
-from libfuncpy import flatlist, make_iterable
+from libfuncpy import flatlist, make_iterable, pass_
 from numba import njit
 
 # import idpcpp, imported locally at init_faspr_sidechains
@@ -664,6 +664,7 @@ def prepare_energy_function(
         forcefield,
         lj_term=True,
         coulomb_term=False,
+        pairs_ij_postf='nansum',
         **kwnull,
         ):
     """."""
@@ -706,7 +707,11 @@ def prepare_energy_function(
         acoeff[bonds_le_2_mask] = np.nan
         bcoeff[bonds_le_2_mask] = np.nan
 
-        lf_calc = init_lennard_jones_calculator(acoeff, bcoeff)
+        lf_calc = init_lennard_jones_calculator(
+            acoeff,
+            bcoeff,
+            postf=pairs_ij_postf,
+            )
         energy_func_terms.append(lf_calc)
         log.info('prepared lj')
 
@@ -722,7 +727,7 @@ def prepare_energy_function(
         charges_ij[bonds_exact_3_mask] *= float(forcefield.forcefield['coulomb14scale'])  # noqa: E501
         charges_ij[bonds_le_2_mask] = np.nan
 
-        coulomb_calc = init_coulomb_calculator(charges_ij)
+        coulomb_calc = init_coulomb_calculator(charges_ij, postf=pairs_ij_postf)
         energy_func_terms.append(coulomb_calc)
         log.info('prepared Coulomb')
 

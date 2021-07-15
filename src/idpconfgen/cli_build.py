@@ -27,6 +27,7 @@ from idpconfgen.components.xmer_probs import (
     compress_xmer_to_key,
     prepare_xmer_probs,
     )
+from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -243,6 +244,10 @@ ap.add_argument(
     type=float,
     )
 
+
+add_et_type_arg(ap)
+
+
 ap.add_argument(
     '-subs',
     '--residue-substitutions',
@@ -262,6 +267,8 @@ ap.add_argument(
     type=Path,
     default='energies.log',
     )
+
+
 
 
 libcli.add_argument_output_folder(ap)
@@ -544,6 +551,7 @@ def conformer_generator(
         forcefield=None,
         lj_term=True,
         coulomb_term=False,
+        pairs_ij_postf='pairs',
         random_seed=0,
         ):
     """
@@ -724,6 +732,7 @@ def conformer_generator(
             forcefield=forcefields[forcefield],
             lj_term=lj_term,
             coulomb_term=coulomb_term,
+            pairs_ij_postf=pairs_ij_postf,
             )
 
     # semantic exchange for speed al readibility
@@ -1050,9 +1059,11 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #print(bbi, total_energy)
+            #print(bbi, total_energy[:10])
 
-            if total_energy > energy_threshold_backbone:
+            _is_higher = np.any(total_energy > energy_threshold_backbone)
+
+            if _is_higher:
                 #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
@@ -1154,13 +1165,18 @@ def conformer_generator(
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if total_energy > energy_threshold_sidechains:
-                _msg = f'Conformer with WORST energy {total_energy}'
+            _is_higher = np.any(total_energy > energy_threshold_sidechains)
+            if _is_higher:
+                _msg = (
+                    'Conformer with energy higher than allowed threshold '
+                    '- discarded.'
+                    )
                 log.info(seed_report(_msg))
                 continue
 
-        _msg = f'finished conf: {conf_n} with energy {total_energy}'
-        log.info( seed_report(_msg))
+        _total_energy = np.nansum(total_energy)
+        _msg = f'finished conf: {conf_n} with energy {_total_energy}'
+        log.info(seed_report(_msg))
 
         #print(all_atom_coords)
         yield total_energy, all_atom_coords
