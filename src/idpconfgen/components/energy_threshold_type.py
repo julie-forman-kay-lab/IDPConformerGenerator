@@ -2,6 +2,7 @@
 from libfuncpy import vartial
 
 from idpconfgen.libs.libcli import add_general_arg
+from idpconfgen.libs.libenergyij import post_calc_options
 
 
 et_type_help = \
@@ -16,7 +17,7 @@ even defined negative numbers for -etbb and -etss.
 et_type_args = ['--et-type']
 et_type_kwargs = {
     'help': et_type_help,
-    'choices': ['whole', 'pairs'],
+    'choices': post_calc_options,
     'dest': 'pairs_ij_postf',
     }
 
