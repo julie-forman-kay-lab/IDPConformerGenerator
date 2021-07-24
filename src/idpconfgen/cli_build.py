@@ -648,9 +648,6 @@ def conformer_generator(
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
 
-    energy_funcs_kwargs
-        See `libbuild.prepare_energy_function`.
-
     Yields
     ------
     First yield: tuple (np.ndarray, np.ndarray, np.ndarray)
