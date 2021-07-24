@@ -18,7 +18,7 @@ et_type_args = ['--et-type']
 et_type_kwargs = {
     'help': et_type_help,
     'choices': post_calc_options,
-    'dest': 'pairs_ij_postf',
+    'dest': 'energy_threshold_type',
     }
 
 add_et_type_arg = vartial(add_general_arg, *et_type_args, **et_type_kwargs)

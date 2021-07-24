@@ -551,7 +551,7 @@ def conformer_generator(
         forcefield=None,
         lj_term=True,
         coulomb_term=False,
-        pairs_ij_postf='pairs',
+        energy_threshold_type='pairs',
         random_seed=0,
         ):
     """
@@ -732,7 +732,7 @@ def conformer_generator(
             forcefield=forcefields[forcefield],
             lj_term=lj_term,
             coulomb_term=coulomb_term,
-            pairs_ij_postf=pairs_ij_postf,
+            energy_threshold_type=energy_threshold_type,
             )
 
     # semantic exchange for speed al readibility
