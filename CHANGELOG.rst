@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Implements energy calculation to individual pairs. Energy threshold
+  can now be compared to `pairs` or `whole`.
+
 v0.0.24 (2021-07-01)
 ------------------------------------------------------------
 

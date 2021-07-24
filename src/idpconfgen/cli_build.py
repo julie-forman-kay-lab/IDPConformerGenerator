@@ -27,6 +27,7 @@ from idpconfgen.components.xmer_probs import (
     compress_xmer_to_key,
     prepare_xmer_probs,
     )
+from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -243,6 +244,10 @@ ap.add_argument(
     type=float,
     )
 
+
+add_et_type_arg(ap)
+
+
 ap.add_argument(
     '-subs',
     '--residue-substitutions',
@@ -262,6 +267,8 @@ ap.add_argument(
     type=Path,
     default='energies.log',
     )
+
+
 
 
 libcli.add_argument_output_folder(ap)
@@ -542,9 +549,8 @@ def conformer_generator(
         energy_threshold_sidechains=1000,
         bgeo_path=None,
         forcefield=None,
-        lj_term=True,
-        coulomb_term=False,
         random_seed=0,
+        **energy_funcs_kwargs,
         ):
     """
     Build conformers.
@@ -642,10 +648,6 @@ def conformer_generator(
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
 
-    lj_term : bool
-        Whether to compute the Lennard-Jones term during building and
-        validation. If false, expect a physically meaningless result.
-
     Yields
     ------
     First yield: tuple (np.ndarray, np.ndarray, np.ndarray)
@@ -672,6 +674,7 @@ def conformer_generator(
     template_seq_3l = translate_seq_to_3l(template_input_seq)
     del input_seq
 
+    ANY = np.any
     BUILD_BEND_H_N_C = build_bend_H_N_C
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
@@ -722,8 +725,7 @@ def conformer_generator(
             input_seq=all_atom_input_seq,
             bgeo_path=bgeo_path or BGEO_path,
             forcefield=forcefields[forcefield],
-            lj_term=lj_term,
-            coulomb_term=coulomb_term,
+            **energy_funcs_kwargs,
             )
 
     # semantic exchange for speed al readibility
@@ -1050,9 +1052,8 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #print(bbi, total_energy)
 
-            if total_energy > energy_threshold_backbone:
+            if ANY(total_energy > energy_threshold_backbone):
                 #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
@@ -1154,13 +1155,17 @@ def conformer_generator(
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if total_energy > energy_threshold_sidechains:
-                _msg = f'Conformer with WORST energy {total_energy}'
+            if ANY(total_energy > energy_threshold_sidechains):
+                _msg = (
+                    'Conformer with energy higher than allowed threshold '
+                    '- discarded.'
+                    )
                 log.info(seed_report(_msg))
                 continue
 
-        _msg = f'finished conf: {conf_n} with energy {total_energy}'
-        log.info( seed_report(_msg))
+        _total_energy = np.nansum(total_energy)
+        _msg = f'finished conf: {conf_n} with energy {_total_energy}'
+        log.info(seed_report(_msg))
 
         #print(all_atom_coords)
         yield total_energy, all_atom_coords

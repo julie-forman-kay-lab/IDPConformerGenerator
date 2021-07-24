@@ -246,34 +246,6 @@ def test_rrd10_njit(radians_to_degree_bins_data):
     assert result == expected
 
 
-def test_lennard_jones_calculator():
-    c = libcalc.init_lennard_jones_calculator(np.arange(10), np.arange(10))
-    c(np.arange(1, 11))
-
-
-def test_energy_calculator_ij():
-    """."""
-    def dist_calc(coords):
-        return coords - 1
-
-    def calc_dummy(arg1, arg2=5):
-        def calc(distances):
-            return sum(distances) + arg1 - arg2
-        return calc
-
-    def calc_dummy2(arg3, arg6=5):
-        def calc(distances):
-            return sum(distances + arg3 - arg6)
-        return calc
-
-    d1 = calc_dummy(2, 3)
-    d3 = calc_dummy2(2, arg6=1)
-    calc = libcalc.energycalculator_ij(dist_calc, (d1, d3))
-    coords = np.arange(10)
-    energy = calc(coords)
-    assert energy == 79
-
-
 @pytest.mark.parametrize(
     "in1,reverse,expected",
     [

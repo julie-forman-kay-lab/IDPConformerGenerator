@@ -26,11 +26,14 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
+    multiply_upper_diagonal_raw_njit,
+    sum_upper_diagonal_raw_njit,
+    )
+from idpconfgen.libs.libenergyij import (
+    default_post_calc_option,
     energycalculator_ij,
     init_coulomb_calculator,
     init_lennard_jones_calculator,
-    multiply_upper_diagonal_raw_njit,
-    sum_upper_diagonal_raw_njit,
     )
 from idpconfgen.libs.libfilter import (
     aligndb,
@@ -41,7 +44,6 @@ from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     get_mers,
     translate_seq_to_3l,
-    remove_empty_keys,
     )
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
 
@@ -664,9 +666,22 @@ def prepare_energy_function(
         forcefield,
         lj_term=True,
         coulomb_term=False,
+        energy_type_ij=default_post_calc_option,
         **kwnull,
         ):
-    """."""
+    """
+    lj_term : bool
+        Whether to compute the Lennard-Jones term during building and
+        validation. If false, expect a physically meaningless result.
+
+    coulomb_term : bool
+        Whether to compute the Coulomb term during building and
+        validation. If false, expect a physically meaningless result.
+
+    energy_type_ij : str
+        How to calculate the energy for `ij` pairs. See
+        `libs.libenergyij.post_calc_options`.
+    """
     # this mask identifies covalently bonded pairs and pairs two bonds apart
     bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
         atom_labels,
@@ -706,7 +721,11 @@ def prepare_energy_function(
         acoeff[bonds_le_2_mask] = np.nan
         bcoeff[bonds_le_2_mask] = np.nan
 
-        lf_calc = init_lennard_jones_calculator(acoeff, bcoeff)
+        lf_calc = init_lennard_jones_calculator(
+            acoeff,
+            bcoeff,
+            postf=energy_type_ij,
+            )
         energy_func_terms.append(lf_calc)
         log.info('prepared lj')
 
@@ -722,7 +741,7 @@ def prepare_energy_function(
         charges_ij[bonds_exact_3_mask] *= float(forcefield.forcefield['coulomb14scale'])  # noqa: E501
         charges_ij[bonds_le_2_mask] = np.nan
 
-        coulomb_calc = init_coulomb_calculator(charges_ij)
+        coulomb_calc = init_coulomb_calculator(charges_ij, postf=energy_type_ij)
         energy_func_terms.append(coulomb_calc)
         log.info('prepared Coulomb')
 
