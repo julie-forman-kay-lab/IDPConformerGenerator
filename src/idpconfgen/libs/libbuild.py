@@ -667,10 +667,22 @@ def prepare_energy_function(
         forcefield,
         lj_term=True,
         coulomb_term=False,
-        energy_threshold_type=default_post_calc_option,
+        energy_type=default_post_calc_option,
         **kwnull,
         ):
-    """."""
+    """
+    lj_term : bool
+        Whether to compute the Lennard-Jones term during building and
+        validation. If false, expect a physically meaningless result.
+
+    coulomb_term : bool
+        Whether to compute the Coulomb term during building and
+        validation. If false, expect a physically meaningless result.
+
+    energy_type_ij : str
+        How to calculate the energy for `ij` pairs. See
+        `libs.libenergyij.post_calc_options`.
+    """
     # this mask identifies covalently bonded pairs and pairs two bonds apart
     bonds_le_2_mask = create_bonds_apart_mask_for_ij_pairs(
         atom_labels,
@@ -713,7 +725,7 @@ def prepare_energy_function(
         lf_calc = init_lennard_jones_calculator(
             acoeff,
             bcoeff,
-            postf=energy_threshold_type,
+            postf=energy_type,
             )
         energy_func_terms.append(lf_calc)
         log.info('prepared lj')
@@ -730,7 +742,7 @@ def prepare_energy_function(
         charges_ij[bonds_exact_3_mask] *= float(forcefield.forcefield['coulomb14scale'])  # noqa: E501
         charges_ij[bonds_le_2_mask] = np.nan
 
-        coulomb_calc = init_coulomb_calculator(charges_ij, postf=energy_threshold_type)
+        coulomb_calc = init_coulomb_calculator(charges_ij, postf=energy_type)
         energy_func_terms.append(coulomb_calc)
         log.info('prepared Coulomb')
 

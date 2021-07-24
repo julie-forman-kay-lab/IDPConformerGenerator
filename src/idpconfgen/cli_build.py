@@ -549,10 +549,8 @@ def conformer_generator(
         energy_threshold_sidechains=1000,
         bgeo_path=None,
         forcefield=None,
-        lj_term=True,
-        coulomb_term=False,
-        energy_threshold_type='pairs',
         random_seed=0,
+        **energy_funcs_kwargs,
         ):
     """
     Build conformers.
@@ -650,9 +648,8 @@ def conformer_generator(
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
 
-    lj_term : bool
-        Whether to compute the Lennard-Jones term during building and
-        validation. If false, expect a physically meaningless result.
+    energy_funcs_kwargs
+        See `libbuild.prepare_energy_function`.
 
     Yields
     ------
@@ -731,9 +728,7 @@ def conformer_generator(
             input_seq=all_atom_input_seq,
             bgeo_path=bgeo_path or BGEO_path,
             forcefield=forcefields[forcefield],
-            lj_term=lj_term,
-            coulomb_term=coulomb_term,
-            energy_threshold_type=energy_threshold_type,
+            **energy_funcs_kwargs,
             )
 
     # semantic exchange for speed al readibility
