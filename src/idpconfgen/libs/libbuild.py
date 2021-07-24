@@ -26,11 +26,13 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
+    multiply_upper_diagonal_raw_njit,
+    sum_upper_diagonal_raw_njit,
+    )
+from idpconfgen.libs.libenergyij import (
     energycalculator_ij,
     init_coulomb_calculator,
     init_lennard_jones_calculator,
-    multiply_upper_diagonal_raw_njit,
-    sum_upper_diagonal_raw_njit,
     )
 from idpconfgen.libs.libfilter import (
     aligndb,
