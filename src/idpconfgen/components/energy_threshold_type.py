@@ -14,7 +14,7 @@ always have a small positive energy contribution. If you choose `whole`, you can
 even defined negative numbers for -etbb and -etss.
 """
 
-et_type_args = ['--et-type']
+et_type_args = ['-et', '--et-type']
 et_type_kwargs = {
     'help': et_type_help,
     'choices': post_calc_options,

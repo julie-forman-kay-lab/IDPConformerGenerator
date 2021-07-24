@@ -4,7 +4,11 @@ Functions to calculate energy from i-j pairs evaluation.
 Contains only energy terms that evaluate energy for each atom-atom pair
 separately.
 """
+import numpy as np
+from numba import njit
+
 from idpconfgen import log
+from idpconfgen.logger import S, T
 
 
 post_calc_options = [
@@ -39,9 +43,9 @@ def init_lennard_jones_calculator(
     postf : str
         There are different implementations of the energy calculation.
         Current options are:
-        "nansum": applies np.nansum after calculating the energy per
+        "whole": applies np.nansum after calculating the energy per
         pair.
-        "pair": returns the energies per pair.
+        "pairs": returns the energies per pair.
 
     Returns
     -------
@@ -90,9 +94,9 @@ def init_coulomb_calculator(charges_ij, postf=default_post_calc_option):
     postf : str
         There are different implementations of the energy calculation.
         Current options are:
-        "nansum": applies np.nansum after calculating the energy per
+        "whole": applies np.nansum after calculating the energy per
         pair.
-        "pair": returns the energies per pair.
+        "pairs": returns the energies per pair.
 
     Returns
     -------

@@ -680,6 +680,7 @@ def conformer_generator(
     template_seq_3l = translate_seq_to_3l(template_input_seq)
     del input_seq
 
+    ANY = np.any
     BUILD_BEND_H_N_C = build_bend_H_N_C
     CALC_TORSION_ANGLES = calc_torsion_angles
     DISTANCE_NH = distance_H_N
@@ -1059,11 +1060,8 @@ def conformer_generator(
             # ?
 
             total_energy = TEMPLATE_EFUNC(template_coords)
-            #print(bbi, total_energy[:10])
 
-            _is_higher = np.any(total_energy > energy_threshold_backbone)
-
-            if _is_higher:
+            if ANY(total_energy > energy_threshold_backbone):
                 #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last chunk added
@@ -1165,8 +1163,7 @@ def conformer_generator(
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            _is_higher = np.any(total_energy > energy_threshold_sidechains)
-            if _is_higher:
+            if ANY(total_energy > energy_threshold_sidechains):
                 _msg = (
                     'Conformer with energy higher than allowed threshold '
                     '- discarded.'

@@ -30,6 +30,7 @@ from idpconfgen.libs.libcalc import (
     sum_upper_diagonal_raw_njit,
     )
 from idpconfgen.libs.libenergyij import (
+    default_post_calc_option,
     energycalculator_ij,
     init_coulomb_calculator,
     init_lennard_jones_calculator,
@@ -666,7 +667,7 @@ def prepare_energy_function(
         forcefield,
         lj_term=True,
         coulomb_term=False,
-        energy_threshold_type='nansum',
+        energy_threshold_type=default_post_calc_option,
         **kwnull,
         ):
     """."""
