@@ -5,7 +5,6 @@ from math import cos, sin
 import numpy as np
 from numba import njit
 
-from idpconfgen import log
 from idpconfgen.core.build_definitions import (
     build_bend_CA_C_OXT,
     distance_C_OXT,
@@ -271,7 +270,6 @@ def calc_torsion_angles(
 
     # torsion angles
     return -ARCTAN2(sin_theta, cos_theta)
-
 
 
 def calc_MSMV(data):
@@ -871,8 +869,6 @@ def round_radian_to_degree_bin_10(x0):
 def unit_vector(vector):
     """Calculate the unitary vector."""
     return vector / np.linalgn.norm(vector)
-
-
 
 
 # njit

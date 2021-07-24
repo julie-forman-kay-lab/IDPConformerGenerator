@@ -8,7 +8,7 @@ import numpy as np
 from numba import njit
 
 from idpconfgen import log
-from idpconfgen.logger import S, T
+from idpconfgen.logger import S
 
 
 post_calc_options = [

@@ -6,7 +6,7 @@ from functools import partial
 from itertools import cycle
 
 import numpy as np
-from libfuncpy import flatlist, make_iterable, pass_
+from libfuncpy import flatlist, make_iterable
 from numba import njit
 
 # import idpcpp, imported locally at init_faspr_sidechains
@@ -44,7 +44,6 @@ from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     get_mers,
     translate_seq_to_3l,
-    remove_empty_keys,
     )
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
 
