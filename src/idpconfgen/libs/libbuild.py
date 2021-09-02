@@ -616,6 +616,51 @@ def prepare_slice_dict(
     return slice_dict
 
 
+def init_mcsce_sidechains(
+        input_seq,
+        efunc_terms=('lj', 'clash'),
+        n_trials=200,
+        **kwargs,
+        ):
+    """."""
+    from functools import partial
+    from mcsce.libs.libstructure import Stucture
+    from mcsce.libs.libenergy import prepare_energy_function
+    from mcsce.core import build_definitions
+    from mcsce.core.side_chain_builder import create_side_chain
+
+    # initiates only the backbone atoms
+    s = Structure(fasta=input_seq)
+    s.build()
+
+    ff = build_definitions.forcefields["Amberff14SB"]
+    ff_obj = ff(add_OXT=True, add_Nterminal_H=True)
+
+    efunc_partial = partial(
+        prepare_energy_function,
+        forcefield=ff_obj,
+        terms=efunc_terms,
+        )
+
+    def calc(coords):
+
+        s.coords = coords
+
+        final_structure = create_side_chain(
+            s,
+            n_trials,
+            efunc_partial,
+            **kwargs)
+
+        if final_structure is None:
+            return None
+        else:
+            return final_structure.coords
+
+    return calc
+
+
+
 # Other functions should have the same API:
 # parameters = input_seq
 def init_faspr_sidechains(
@@ -1130,6 +1175,7 @@ def get_indexes_from_primer_length(
 
 compute_sidechains = {
     'faspr': init_faspr_sidechains,
+    'mcsce': init_mcsce_sidechains,
     }
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
