@@ -14,6 +14,7 @@ def add_sidechain_method(parser):
     parser.add_argument(
         '-scp',
         '--sidechainmethod',
+        dest='sidechain_method',
         default='faspr',
         choices=list(sidechain_packing_methods.keys()),
         )

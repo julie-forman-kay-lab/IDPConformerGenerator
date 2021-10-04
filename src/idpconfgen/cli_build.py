@@ -735,6 +735,7 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
+        print('############## ', sidechain_method)
         build_sidechains = sidechain_packing_methods[sidechain_method](all_atom_input_seq)  # noqa: E501
 
     # tests generative function complies with implementation requirements
@@ -1152,9 +1153,24 @@ def conformer_generator(
 
         if with_sidechains:
 
-            all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = build_sidechains(
-                template_coords[TEMPLATE_MASKS.bb4],
-                )
+            final_masks = [
+                ALL_ATOM_MASKS.non_Hs_non_OXT,
+                True,
+                ]
+
+            _w_sdcoords = build_sidechains(template_coords[TEMPLATE_MASKS.bb4])
+            print('side results', _w_sdcoords)
+
+            for _mask in final_masks:
+                try:
+                    all_atom_coords[_mask] = _w_sdcoords
+                except (IndexError, ValueError):
+                    continue
+                else:
+                    break
+            else:
+                raise RuntimeError('Sidechain mask failed')
+
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
@@ -1317,8 +1333,6 @@ def get_adjacent_angles(
             return primer_template, angles
 
     return func
-
-
 
 
 if __name__ == "__main__":

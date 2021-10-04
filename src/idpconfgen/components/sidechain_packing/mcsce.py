@@ -17,7 +17,7 @@ mcsce_defaults = {
 
 def init_mcsce_sidechains(input_seq, **kwargs):
     """."""
-    from mcsce.libs.libstructure import Stucture
+    from mcsce.libs.libstructure import Structure
     from mcsce.libs.libenergy import prepare_energy_function
     from mcsce.core import build_definitions
     from mcsce.core.side_chain_builder import create_side_chain
@@ -41,19 +41,17 @@ def init_mcsce_sidechains(input_seq, **kwargs):
     efunc_partial = partial(
         prepare_energy_function,
         forcefield=ff_obj,
-        terms=efunc_terms,
+        terms=params.pop('efunc_terms'),
         )
+
+    params['efunc_creator'] = efunc_partial
+    params['return_first_valid'] = return_first_valid
 
     def calc(coords):
 
         s.coords = coords
 
-        final_structure = create_side_chain(
-            s,
-            n_trials,
-            efunc_partial,
-            return_first_valid=return_first_valid,
-            **params)
+        final_structure = create_side_chain(s, **params)
 
         if final_structure is None:
             return None
