@@ -22,7 +22,6 @@ from idpconfgen.core.definitions import (
     bgeo_CaCNp1,
     bgeo_Cm1NCa,
     bgeo_NCaC,
-    faspr_dun2010bbdep_path,
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
@@ -616,92 +615,9 @@ def prepare_slice_dict(
     return slice_dict
 
 
-def init_mcsce_sidechains(
-        input_seq,
-        efunc_terms=('lj', 'clash'),
-        n_trials=200,
-        **kwargs,
-        ):
-    """."""
-    from functools import partial
-    from mcsce.libs.libstructure import Stucture
-    from mcsce.libs.libenergy import prepare_energy_function
-    from mcsce.core import build_definitions
-    from mcsce.core.side_chain_builder import create_side_chain
-
-    # initiates only the backbone atoms
-    s = Structure(fasta=input_seq)
-    s.build()
-
-    ff = build_definitions.forcefields["Amberff14SB"]
-    ff_obj = ff(add_OXT=True, add_Nterminal_H=True)
-
-    efunc_partial = partial(
-        prepare_energy_function,
-        forcefield=ff_obj,
-        terms=efunc_terms,
-        )
-
-    def calc(coords):
-
-        s.coords = coords
-
-        final_structure = create_side_chain(
-            s,
-            n_trials,
-            efunc_partial,
-            **kwargs)
-
-        if final_structure is None:
-            return None
-        else:
-            return final_structure.coords
-
-    return calc
 
 
 
-# Other functions should have the same API:
-# parameters = input_seq
-def init_faspr_sidechains(
-        input_seq,
-        # faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
-        # faspr_func=faspr_sc,
-        ):
-    """
-    Instantiate dedicated function environment for FASPR sidehchain calculation.
-
-    Examples
-    --------
-    >>> calc_faspr = init_fastpr_sidechains('MASFRTPKKLCVAGG')
-    >>> # a (N, 3) array with the N,CA,C,O coordinates
-    >>> coords = np.array( ... )
-    >>> calc_faspr(coords)
-
-    Parameters
-    ----------
-    input_seq : str
-        The FASTA sequence of the protein for which this function will
-        be used.
-
-    Returns
-    -------
-    np.ndarray (M, 3)
-        Heavy atom coordinates of the protein sequence.
-    """
-    # TODO:
-    # this is here because tox is not able to detect idpcpp module.
-    # this is a turnaround to allow tests to pass.
-    # currently tests to not test this function.
-    import idpcpp
-    faspr_func = idpcpp.faspr_sidechains
-    faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
-
-    def compute_faspr_sidechains(coords):
-        """Do calculation."""
-        return faspr_func(coords, input_seq, faspr_dun2010_bbdep_str)
-
-    return compute_faspr_sidechains
 
 
 def prepare_energy_function(
@@ -1173,9 +1089,5 @@ def get_indexes_from_primer_length(
         return sequence[current_residue - 3: current_residue + 7]
 
 
-compute_sidechains = {
-    'faspr': init_faspr_sidechains,
-    'mcsce': init_mcsce_sidechains,
-    }
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)

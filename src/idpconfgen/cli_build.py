@@ -22,12 +22,16 @@ import numpy as np
 from numba import njit
 
 from idpconfgen import Path, log
+from idpconfgen.components.energy_threshold_type import add_et_type_arg
+from idpconfgen.components.sidechain_packing import (
+    add_sidechain_method,
+    sidechain_packing_methods,
+    )
 from idpconfgen.components.xmer_probs import (
     add_xmer_arg,
     compress_xmer_to_key,
     prepare_xmer_probs,
     )
-from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -44,7 +48,6 @@ from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
     read_db_to_slices_given_secondary_structure,
-    compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
@@ -269,7 +272,7 @@ ap.add_argument(
     )
 
 
-
+add_sidechain_method(ap)
 
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
@@ -643,7 +646,7 @@ def conformer_generator(
     sidechain_method : str
         The method used to build/pack sidechains over the backbone
         structure. Defaults to `faspr`.
-        Expects a key in `libs.libbuild.compute_sidechains`.
+        Expects a key in `components.sidechain_packing.sidechain_packing_methods`.
 
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
@@ -658,10 +661,10 @@ def conformer_generator(
     """
     if not isinstance(input_seq, str):
         raise ValueError(f'`input_seq` must be given! {input_seq}')
-    if sidechain_method not in compute_sidechains:
+    if sidechain_method not in sidechain_packing_methods:
         raise ValueError(
-            f'{sidechain_method} not in `compute_sidechains`. '
-            f'Expected {list(compute_sidechains.keys())}.'
+            f'{sidechain_method} not in `sidechain_packing_methods`. '
+            f'Expected {list(sidechain_packing_methods.keys())}.'
             )
 
     log.info(f'random seed: {random_seed}')
@@ -732,7 +735,7 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        build_sidechains = compute_sidechains[sidechain_method](all_atom_input_seq)  # noqa: E501
+        build_sidechains = sidechain_packing_methods[sidechain_method](all_atom_input_seq)  # noqa: E501
 
     # tests generative function complies with implementation requirements
     if generative_function:
