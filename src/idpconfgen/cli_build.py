@@ -1155,7 +1155,8 @@ def conformer_generator(
 
             final_masks = [
                 ALL_ATOM_MASKS.non_Hs_non_OXT,
-                True,
+                ALL_ATOM_MASKS.non_NHs_non_OXT,
+                #True,
                 ]
 
             _w_sdcoords = build_sidechains(template_coords[TEMPLATE_MASKS.bb4])

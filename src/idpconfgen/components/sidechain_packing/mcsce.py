@@ -33,10 +33,12 @@ def init_mcsce_sidechains(input_seq, **kwargs):
 
     _mode = params.pop('mode')
     mcsce_sampling_options = {'simple': True, 'exhaustive': False}
+
     try:
         return_first_valid = mcsce_sampling_options[_mode]
     except KeyError as err:
-        raise ValueError("Mode has to be either simple or exhaustive.") from err
+        _msg = "Mode has to be either 'simple' or 'exhaustive'"
+        raise ValueError(_msg) from err
 
     efunc_partial = partial(
         prepare_energy_function,

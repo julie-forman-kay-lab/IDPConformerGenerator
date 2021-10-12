@@ -166,6 +166,7 @@ def init_confmasks(atom_labels):
     cterm : (OXT2, OXT1)
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
+    non_NHs_non_OXT : all but NHs and OXT atom
     H1_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
     """
@@ -191,6 +192,10 @@ def init_confmasks(atom_labels):
     hs_match = np.vectorize(lambda x: bool(rr.match(x)))
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
+
+    non_NHs_non_OXT = np.logical_not(np.where(np.isin(atom_labels, ('H', 'OXT')))[0])
+    assert set(atom_labels[non_NHs_non_OXT]) == {'H', 'OXT'}
+
 
     # used to rotate the N-terminal Hs to -60 degrees to  HA during
     # the building process
@@ -221,6 +226,7 @@ def init_confmasks(atom_labels):
         cterm=cterm,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
+        non_NHs_non_OXT=non_NHs_non_OXT,
         H1_N_CA_CB=H1_N_CA_CB,
         )
 
