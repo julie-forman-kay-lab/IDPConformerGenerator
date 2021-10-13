@@ -2,7 +2,10 @@
 from libfuncpy import vartial
 
 from idpconfgen.libs.libcli import add_general_arg
-from idpconfgen.libs.libenergyij import post_calc_options
+from idpconfgen.libs.libenergyij import (
+    default_post_calc_option,
+    post_calc_options,
+    )
 
 
 et_type_help = """How to calculate the energy for 'ij' atom pairs. `whole`
@@ -22,6 +25,7 @@ et_type_kwargs = {
     'help': et_type_help,
     'choices': post_calc_options,
     'dest': 'energy_type_ij',
+    'default': default_post_calc_option,
     }
 
 add_et_type_arg = vartial(add_general_arg, *et_type_args, **et_type_kwargs)
