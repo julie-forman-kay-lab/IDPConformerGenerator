@@ -67,6 +67,8 @@ ConfMasks = namedtuple(
         'cterm',
         'non_Hs',
         'non_Hs_non_OXT',
+        'non_NHs_non_OXT',
+        'non_sidechains',
         'H1_N_CA_CB',
         ]
     )
@@ -169,6 +171,7 @@ def init_confmasks(atom_labels):
     non_NHs_non_OXT : all but NHs and OXT atom
     H1_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
+    non_sidechains : all atoms except sidechains beyond CB
     """
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     assert len(bb3) % 3 == 0
@@ -193,9 +196,14 @@ def init_confmasks(atom_labels):
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
 
-    non_NHs_non_OXT = np.logical_not(np.where(np.isin(atom_labels, ('H', 'OXT')))[0])
-    assert set(atom_labels[non_NHs_non_OXT]) == {'H', 'OXT'}
+    non_NHs_non_OXT = np.where(np.logical_not(np.isin(atom_labels, ('H', 'OXT'))))[0]
+    _s = set(atom_labels[non_NHs_non_OXT])
+    assert not _s.intersection({'H', 'OXT'}), _s
 
+    non_sidechains = np.logical_not(np.logical_not(np.isin(
+        atom_labels,
+        ('H1', 'H2', 'H3', 'N', 'CA', 'CB', 'C', 'O', 'OXT', 'HA', 'H'),
+        )))[0]
 
     # used to rotate the N-terminal Hs to -60 degrees to  HA during
     # the building process
@@ -227,6 +235,7 @@ def init_confmasks(atom_labels):
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
         non_NHs_non_OXT=non_NHs_non_OXT,
+        non_sidechains=non_sidechains,
         H1_N_CA_CB=H1_N_CA_CB,
         )
 

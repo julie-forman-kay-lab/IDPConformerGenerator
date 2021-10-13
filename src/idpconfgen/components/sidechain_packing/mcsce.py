@@ -15,7 +15,7 @@ mcsce_defaults = {
     }
 
 
-def init_mcsce_sidechains(input_seq, **kwargs):
+def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
     """."""
     from mcsce.libs.libstructure import Structure
     from mcsce.libs.libenergy import prepare_energy_function
@@ -51,13 +51,13 @@ def init_mcsce_sidechains(input_seq, **kwargs):
 
     def calc(coords):
 
-        s.coords = coords
+        s.coords = coords[template_masks.non_sidechains]
 
         final_structure = create_side_chain(s, **params)
 
         if final_structure is None:
             return None
         else:
-            return final_structure.coords
+            return True, final_structure.coords
 
     return calc

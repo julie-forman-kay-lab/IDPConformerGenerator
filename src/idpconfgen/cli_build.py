@@ -736,7 +736,11 @@ def conformer_generator(
 
     if with_sidechains:
         print('############## ', sidechain_method)
-        build_sidechains = sidechain_packing_methods[sidechain_method](all_atom_input_seq)  # noqa: E501
+        build_sidechains = sidechain_packing_methods[sidechain_method](
+            all_atom_input_seq,
+            TEMPLATE_MASKS,
+            ALL_ATOM_MASKS,
+            )
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -1153,24 +1157,25 @@ def conformer_generator(
 
         if with_sidechains:
 
-            final_masks = [
-                ALL_ATOM_MASKS.non_Hs_non_OXT,
-                ALL_ATOM_MASKS.non_NHs_non_OXT,
-                #True,
-                ]
+            #final_masks = [
+            #    ALL_ATOM_MASKS.non_Hs_non_OXT,
+            #    ALL_ATOM_MASKS.non_NHs_non_OXT,
+            #    #True,
+            #    ]
 
-            _w_sdcoords = build_sidechains(template_coords[TEMPLATE_MASKS.bb4])
-            print('side results', _w_sdcoords)
+            _mask, _w_sdcoords = build_sidechains(template_coords)
+            all_atom_coords[_mask] = _w_sdcoords
+            #print('side results', _w_sdcoords)
 
-            for _mask in final_masks:
-                try:
-                    all_atom_coords[_mask] = _w_sdcoords
-                except (IndexError, ValueError):
-                    continue
-                else:
-                    break
-            else:
-                raise RuntimeError('Sidechain mask failed')
+            #for _mask in final_masks:
+            #    try:
+            #        all_atom_coords[_mask] = _w_sdcoords
+            #    except (IndexError, ValueError):
+            #        continue
+            #    else:
+            #        break
+            #else:
+            #    raise RuntimeError('Sidechain mask failed')
 
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
