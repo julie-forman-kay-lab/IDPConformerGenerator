@@ -39,7 +39,12 @@ The first step for creating the DB is to define which PDB chains you want to use
 for the database. Normally, these are "non-redundant PDBs under certain angstrom
 resolution", which can be a list of about 20,000 PDBs. Defining such a list
 manually is impossible. But we don't have to do it. `Dr. Dunbrack hosts the PICES
-Server <>` where different lists of non-redundant PDBs of different parameters are
-periodically created.
+server`_ where different lists of non-redundant PDBs of different parameters are
+periodically created. Our preference is to use the::
 
+    cullpdb_pc90.0_res0.0-2.2_len40-10000_R0.25_Xray_d*
 
+At the time of writing, the latest was `d2021_10_01`_.
+
+.. _Dr. Dunbrack hosts the PICES server: https://dunbrack.fccc.edu/pisces/
+.. _d2021_10_01: https://dunbrack.fccc.edu/pisces/download/cullpdb_pc90.0_res0.0-2.2_len40-10000_R0.25_Xray_d2021_10_01_chains29602
