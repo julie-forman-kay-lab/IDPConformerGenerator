@@ -200,7 +200,7 @@ def init_confmasks(atom_labels):
     _s = set(atom_labels[non_NHs_non_OXT])
     assert not _s.intersection({'H', 'OXT'}), _s
 
-    non_sidechains = np.logical_not(np.logical_not(np.isin(
+    non_sidechains = np.where(np.logical_not(np.isin(
         atom_labels,
         ('H1', 'H2', 'H3', 'N', 'CA', 'CB', 'C', 'O', 'OXT', 'HA', 'H'),
         )))[0]
