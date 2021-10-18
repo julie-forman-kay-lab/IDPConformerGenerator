@@ -1164,7 +1164,10 @@ def conformer_generator(
             #    ]
 
             _mask, _w_sdcoords = build_sidechains(template_coords)
-            all_atom_coords[_mask] = _w_sdcoords
+            print('shape.........', all_atom_coords.shape)
+            print('shape.2........', _w_sdcoords.shape)
+            #sys.exit()
+            all_atom_coords[:, :] = _w_sdcoords
             #print('side results', _w_sdcoords)
 
             #for _mask in final_masks:
