@@ -29,7 +29,16 @@ always up-to-date with the repository::
 
     python setup.py develop --no-deps
 
-5. To update to the latest version::
+Likely, you will see a strange output message, never mind. Try running
+IDPConfGen::
+
+    idpconfgen -h
+
+In case the above commands fails, let us know.
+
+5. To update to the latest version, navigate to the IDPConfgen repository folder
+in your computer and run::
 
     git pull
 
+The IDPConfGen updates will be readily available in your computer.

@@ -64,7 +64,7 @@ build interface has several parameters that can be use to fine tune the
 conformer construction protocol. You can read deeper instructions in the
 documentations and in the client help. The following is a good default::
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et 0 -xp 1 1 1 1 -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et pairs -rs 0
 
 After some time you will see 10 conformers in the folder.
 

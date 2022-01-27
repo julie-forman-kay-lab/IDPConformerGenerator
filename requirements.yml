@@ -1,4 +1,4 @@
-name: idpconfgen_tmp
+name: idpconfgen
 channels:
     - conda-forge
     - defaults
