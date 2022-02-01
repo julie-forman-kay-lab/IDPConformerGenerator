@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+# https://docs.python.org/3/library/argparse.html
 import sys
 from functools import partial
 from itertools import cycle
@@ -193,6 +194,13 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-csp',
+    '--custom-sampling',
+    help='Custom secondary-structure sampling parameters based on -dssp-regexes. Defaults to all (0).',
+    default='0',
+    )
+
+ap.add_argument(
     '-dsd',
     '--disable-sidechains',
     help='Whether or not to compute sidechais. Defaults to True.',
@@ -301,6 +309,7 @@ def main(
         input_seq,
         database,
         dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        custom_sampling='0',
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -321,7 +330,6 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
-
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -350,12 +358,21 @@ def main(
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         input_seq,
+        custom_sampling,
         xmer_probs_tmp.sizes,
         residue_substitutions,
-        )
+    )
+    
+    file = open("/home/nemo/Documents/debug.txt", "w")
+    file.write(repr(SLICEDICT_XMERS))
+    file.close()
+    
+    sys.exit()
+    
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs

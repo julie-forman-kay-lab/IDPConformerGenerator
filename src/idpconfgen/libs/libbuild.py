@@ -8,6 +8,8 @@ from itertools import cycle
 import numpy as np
 from libfuncpy import flatlist, make_iterable
 from numba import njit
+#For debugging - Nemo
+import sys
 
 # import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
@@ -501,7 +503,7 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     seqs = [resseq[slc] for slc in slices]
 
     primary = '|'.join(seqs)
-
+    
     omega, phi, psi = [], [], []
 
     oe, he, se = omega.extend, phi.extend, psi.extend
@@ -515,7 +517,8 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
         oa(nan)
         ha(nan)
         sa(nan)
-
+        
+    print(oa)
     omega.pop()
     phi.pop()
     psi.pop()
@@ -537,10 +540,20 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
 def prepare_slice_dict(
         primary,
         input_seq,
+        custom_sampling,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,
         ncores=1,
         ):
+    
+    # TODO:
+    # 1) See what "primary" is inputted
+    #   | Can probably have a standard 20AA long sample protein (sampled from good region with at least L+, H+)
+    #   | Residues 27-47 in Sic1 makes good
+    #   | -nconf 10, -nc 5, -dr "L+" "H+" "E+"
+    # 2) Possible to return more than 1 dictionary?
+    # 3) Figure out most efficient way to have "custom_sampling" flag, priority on intuitiveness
+    # 4) Create "new dictionary" of prepared chunk sizes (but how can we specify this in the build process?)
     """
     Prepare a dictionary mapping chunks to slices in `primary`.
 
@@ -568,12 +581,14 @@ def prepare_slice_dict(
     Return
     ------
     dict
-        A dict with the given mapping. First key-leve of the dict
+        A dict with the given mapping. First key-level of the dict
         is the length of the chunks, hence, integers.
         The second key level are the residue chunks found in the `primary`.
         A chunk in input_seq but not in `primary` is removed from the
         dict.
     """
+    
+    
     res_tolerance = res_tolerance or {}
     mers_size = make_iterable(mers_size)
 
