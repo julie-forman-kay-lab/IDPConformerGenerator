@@ -9,7 +9,6 @@ USAGE:
 
 """
 import argparse
-# https://docs.python.org/3/library/argparse.html
 import sys
 from functools import partial
 from itertools import cycle
@@ -365,13 +364,7 @@ def main(
         custom_sampling,
         xmer_probs_tmp.sizes,
         residue_substitutions,
-    )
-    
-    file = open("/home/nemo/Documents/debug.txt", "w")
-    file.write(repr(SLICEDICT_XMERS))
-    file.close()
-    
-    sys.exit()
+    )  
     
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))

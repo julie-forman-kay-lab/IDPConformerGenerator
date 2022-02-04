@@ -19,6 +19,7 @@ from idpconfgen import __version__
 from idpconfgen import cli_bgeo, cli_build, cli_fastaext, cli_fetch
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_torsionsJ, cli_validate, log
+from idpconfgen.components import cli_dssppii
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
@@ -43,6 +44,7 @@ Other useful routines:
     * {cli_fastaext._name}
     * {cli_validate._name}
     * {cli_torsionsJ._name}
+    * {cli_dssppii._name}
 """
 
 ap = libcli.CustomParser(
@@ -73,6 +75,7 @@ libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_ssext)
 libcli.add_subparser(subparsers, cli_validate)
+libcli.add_subparser(subparsers, cli_dssppii)
 
 
 def load_args():
