@@ -547,10 +547,6 @@ def prepare_slice_dict(
         ):
     
     # TODO:
-    # 1) See what "primary" is inputted
-    #   | Can probably have a standard 20AA long sample protein (sampled from good region with at least L+, H+)
-    #   | Residues 27-47 in Sic1 makes good
-    #   | -nconf 10, -nc 5, -dr "L+" "H+" "E+"
     # 2) Possible to return more than 1 dictionary?
     # 3) Figure out most efficient way to have "custom_sampling" flag, priority on intuitiveness
     # 4) Create "new dictionary" of prepared chunk sizes (but how can we specify this in the build process?)
