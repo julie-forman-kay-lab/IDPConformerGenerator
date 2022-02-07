@@ -1,5 +1,16 @@
+"""
+Adds polyproline type-2 helix assignment to DSSP.
+
+USAGE:
+    $ idpconfgen dssppii [--pdb-file] [--horiz] [--output]
+
+OPTIONS:
+    --horiz : Give output DSSP in 1D sequence fashion. Optional.
+    --output : Stores the output of DSSP in a .dssp file. If excluded, prints output in terminal.
+"""
 # Translated to Python3 by Nemo (Zi Hao @menoliu) Liu on Feb 3, 2022
-# Upgrades: no longer have to specify where DSSP is installed
+# Upgrades: no longer have to specify where DSSP is installed, updated CLI based on python standards.
+
 #REFERENCE
 #   Please cite:
 #   Mansiaux Y, Joseph AP, Gelly J-C, de Brevern AG (2011) Assignment of 
@@ -45,15 +56,21 @@
 # knowledge of the CeCILL-B license and that you accept its terms.
 
 import argparse
+from importlib.resources import path
 import os
 import re
 
-from idpconfgen import Path
-from idpconfgen.core import help_docs
+from idpconfgen import Path, log
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libio import FileReaderIterator
+from idpconfgen.logger import T, init_files, report_on_crash
 
+
+LOGFILESNAME = 'idpconfgen_dssppii'
 _name = 'dssppii'
-_help = help_docs.dssp_ppii_assignment_cli_help
+#TODO: make this iterable with a folder/.tar of PDBs
+_help = 'Extracts secondary structure information from one PDB at a time using DSSP.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -62,21 +79,27 @@ ap = libcli.CustomParser(
     description=libcli.detailed.format(_des),
     usage=_usage,
     formatter_class=argparse.RawDescriptionHelpFormatter,
-)
+    )
 
-libcli.add_argument_pdb_files(ap)
+#libcli.add_argument_pdb_files(ap)
+ap.add_argument(
+    '-pdb',
+    '--pdb-file',
+    help="Path to the PDB file to operate on.",
+    type=Path,
+)
 
 ap.add_argument(
     '-horiz',
     '--horizontal',
     help="Give output DSSP in 1D sequence fashion. Defaults to 1.",
-    Default = 1,
+    default = 1,
 )
 
 ap.add_argument(
     '-o',
     '--output',
-    help="The output file containing DSSP with PPII added.",
+    help=("The output file containing DSSP with PPII added."),
     type=Path,
     default=None,
     action=libcli.CheckExt({'.dssp'}),
@@ -84,160 +107,157 @@ ap.add_argument(
 
 libcli.add_argument_ncores(ap)
 
+def dssp_ppii_assignment(PDB):
+    aa = ""
+    ss = ""
+    assign = 0
+    i = 0
+    line = ""
+    
+    chain = ""
+    hash_chain = {}
+    
+    epsilon = 29
+    cannonical_phi = -75
+    cannonical_psi = 145
+    
+    sup_phi = cannonical_phi+epsilon
+    inf_phi = cannonical_phi-epsilon
+    
+    sup_psi = cannonical_psi+epsilon
+    inf_psi = cannonical_psi-epsilon
+    
+    tab_new_dssp = []
+    
+    #Launch DSSP
+    run_dssp = os.popen("dssp -i " + PDB).read()
+    tab_output = list(run_dssp.split("\n"))
+    tab_output.pop()
+    
+    #Parsing DSSP to detect Polyproline II Helix
+    #fix the while loop structure, it looks like the perl code is reading each line of tab_output's array in the while loop
+    for line in tab_output:
+        if re.search("#  RESIDUE AA STRUCTURE", line):
+            assign = 1
+        elif assign == 1:
+            ss = line[16]
+            aa = line[13]
+            
+            if re.search("\!", aa):
+                hash_chain[chain].insert(i, 0)
+                i += 1
+                continue
+            
+            index = line[0:5]
+            position = line[5:10]
+            
+            chain = line[11]
+            
+            phi = line[103:109]
+            psi = line[109:115]
+            
+            index = int(float(re.sub("\s", "", index)))
+            phi = int(float(re.sub("\s", "", phi)))
+            psi = int(float(re.sub("\s", "", psi)))
+            
+            if chain == ' ': chain = "_"
+            
+            if  chain not in hash_chain:
+                i = 0
+                hash_chain[chain] = []
+            
+            if phi <= sup_phi and phi >= inf_phi and psi <= sup_psi and psi >= inf_psi and ss == ' ':
+                hash_chain[chain].insert(i, 1)
+                if i != 0:
+                    if hash_chain[chain][i - 1] >= 1:
+                        hash_chain[chain][i] = 2
+                        hash_chain[chain][i - 1] = 2
+                else:
+                    hash_chain[chain][i] = 0
+            else:
+                hash_chain[chain].insert(i, 0)
+            
+            i += 1
+    #Print Modified Output       
+    i = 0
+    assign = 0
+    for line in tab_output:
+        if re.search("#  RESIDUE AA STRUCTURE", line):
+            assign = 1
+            tab_new_dssp.append(line)
+            i = 0
+        elif assign == 1:
+            aa = line[13]
+            chain = line[11]
+            
+            if re.search("\!", aa):
+                i += 1
+                tab_new_dssp.append(line)
+                continue
+            
+            if hash_chain[chain][i] >= 2:
+                line_list = list(line)
+                line_list[16] = "P"
+                line = "".join(line_list)
+            
+            tab_new_dssp.append(line)
+            i += 1
+        else:
+            tab_new_dssp.append(line)
+    
+    return tab_new_dssp
+    
+    
+def Parsing_Dssp(ref_tab_out_dssp):
+    aa = ""
+    AA = []
+    
+    tab_out = []
+    ss = ""
+    SS = []
+    buff = 1
+    assign = 0
+    
+    dsspto3 = {
+        "H" : "H",
+        "G" : "G",
+        "I" : "I",
+        "E" : "E",
+        "B" : "B",
+        "C" : "C",
+        "S" : "S",
+        "T" : "T",
+        " " : "-",
+        "P" : "P"
+    }
+    
+    tab_out.append(">SEQ\n")
+    
+    for line in ref_tab_out_dssp:
+        if re.search("#  RESIDUE AA STRUCTURE", line):
+            assign = 1
+        elif assign == 1:
+            ss = line[16]
+            aa = line[13]
+            chain = line[11]
+            #print "AA:aa SS:ss \nline\n"
+            if not re.search("\!", aa):
+                SS.append(dsspto3[ss])
+                AA.append(aa)
+                buff = line[7:10]
+    tab_out.append(''.join(AA)+"\n")
+    tab_out.append(">DSSPPII\n")
+    tab_out.append(''.join(SS)+"\n")
+    
+    return tab_out
+
 def main (
         pathfile,
         flag_horiz = 0,
         output = None,
         ncores = 1,
         **kwargs,
-    ):
-
-    def dssp_ppii_assignment(PDB):
-        aa = ""
-        ss = ""
-        assign = 0
-        i = 0
-        line = ""
-        
-        chain = ""
-        hash_chain = {}
-        
-        epsilon = 29
-        cannonical_phi = -75
-        cannonical_psi = 145
-        
-        sup_phi = cannonical_phi+epsilon
-        inf_phi = cannonical_phi-epsilon
-        
-        sup_psi = cannonical_psi+epsilon
-        inf_psi = cannonical_psi-epsilon
-        
-        tab_new_dssp = []
-        
-        #Launch DSSP
-        run_dssp = os.popen("dssp -i " + PDB).read()
-        tab_output = list(run_dssp.split("\n"))
-        tab_output.pop()
-        
-        #Parsing DSSP to detect Polyproline II Helix
-        #fix the while loop structure, it looks like the perl code is reading each line of tab_output's array in the while loop
-        for line in tab_output:
-            if re.search("#  RESIDUE AA STRUCTURE", line):
-                assign = 1
-            elif assign == 1:
-                ss = line[16]
-                aa = line[13]
-                
-                if re.search("\!", aa):
-                    hash_chain[chain].insert(i, 0)
-                    i += 1
-                    continue
-                
-                index = line[0:5]
-                position = line[5:10]
-                
-                chain = line[11]
-                
-                phi = line[103:109]
-                psi = line[109:115]
-                
-                index = int(float(re.sub("\s", "", index)))
-                phi = int(float(re.sub("\s", "", phi)))
-                psi = int(float(re.sub("\s", "", psi)))
-                
-                if chain == ' ': chain = "_"
-                
-                if  chain not in hash_chain:
-                    i = 0
-                    hash_chain[chain] = []
-
-                
-                if phi <= sup_phi and phi >= inf_phi and psi <= sup_psi and psi >= inf_psi and ss == ' ':
-                    hash_chain[chain].insert(i, 1)
-                    if i != 0:
-                        if hash_chain[chain][i - 1] >= 1:
-                            hash_chain[chain][i] = 2
-                            hash_chain[chain][i - 1] = 2
-                    else:
-                        hash_chain[chain][i] = 0
-                else:
-                    hash_chain[chain].insert(i, 0)
-                
-                i += 1
-
-        #Print Modified Output       
-        i = 0
-        assign = 0
-
-        for line in tab_output:
-            if re.search("#  RESIDUE AA STRUCTURE", line):
-                assign = 1
-                tab_new_dssp.append(line)
-                i = 0
-            elif assign == 1:
-                aa = line[13]
-                chain = line[11]
-                
-                if re.search("\!", aa):
-                    i += 1
-                    tab_new_dssp.append(line)
-                    continue
-                
-                if hash_chain[chain][i] >= 2:
-                    line_list = list(line)
-                    line_list[16] = "P"
-                    line = "".join(line_list)
-                
-                tab_new_dssp.append(line)
-                i += 1
-            else:
-                tab_new_dssp.append(line)
-        
-        return tab_new_dssp
-        
-        
-    def Parsing_Dssp(ref_tab_out_dssp):
-        aa = ""
-        AA = []
-        
-        tab_out = []
-        ss = ""
-        SS = []
-        buff = 1
-        assign = 0
-        
-        dsspto3 = {
-            "H" : "H",
-            "G" : "G",
-            "I" : "I",
-            "E" : "E",
-            "B" : "B",
-            "C" : "C",
-            "S" : "S",
-            "T" : "T",
-            " " : "-",
-            "P" : "P"
-        }
-        
-        tab_out.append(">SEQ\n")
-        
-        for line in ref_tab_out_dssp:
-            if re.search("#  RESIDUE AA STRUCTURE", line):
-                assign = 1
-            elif assign == 1:
-                ss = line[16]
-                aa = line[13]
-                chain = line[11]
-                #print "AA:aa SS:ss \nline\n"
-                if not re.search("\!", aa):
-                    SS.append(dsspto3[ss])
-                    AA.append(aa)
-                    buff = line[7:10]
-        tab_out.append(''.join(AA)+"\n")
-        tab_out.append(">DSSPPII\n")
-        tab_out.append(''.join(SS)+"\n")
-        
-        return tab_out
+        ):
 
     ref_tab_out_dssp = dssp_ppii_assignment(pathfile)
 
