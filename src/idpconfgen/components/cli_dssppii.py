@@ -63,7 +63,6 @@ from idpconfgen.logger import T, init_files
 
 LOGFILESNAME = 'idpconfgen_dssppii'
 _name = 'dssppii'
-#TODO: make this iterable with a folder/.tar of PDBs
 _help = 'Extracts DSSP-PPII secondary information from a PDB file.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
@@ -75,7 +74,7 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-#libcli.add_argument_pdb_files(ap)
+#TODO: make this iterable with a folder/.tar of PDBs
 ap.add_argument(
     '-pdb',
     '--pdb_file',
@@ -103,15 +102,28 @@ ap.add_argument(
     help="The output file containing DSSP with PPII added.",
     type=Path,
     default=None,
-    const='dssppii.dssp',
-    action=libcli.CheckExt({'.dssp'}),
     )
 
 libcli.add_argument_ncores(ap)
 
 
 def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
-    # TODO: Add documentation here.
+    """
+    Parsing DSSP output to include PPII as secondary structure.
+
+    Parameters
+    ----------
+    pdb_file : string
+        Path to the PDB file to operate on as indicated by the user
+        
+    dssp_cmd : string
+        Any custom dssp commands the user may want. Defaults to `dssp`
+
+    Returns
+    -------
+    tab_new_dssp : list
+        List of every line of DSSP output, now with PPII identification
+    """
     aa = ""
     ss = ""
     assign = 0
@@ -139,7 +151,6 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     tab_output.pop()
 
     #Parsing DSSP to detect Polyproline II Helix
-    #fix the while loop structure, it looks like the perl code is reading each line of tab_output's array in the while loop
     for line in tab_output:
         if re.search("#  RESIDUE AA STRUCTURE", line):
             assign = 1
@@ -153,7 +164,6 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
                 continue
 
             index = line[0:5]
-            position = line[5:10]  # TODO: this variable is never used
 
             chain = line[11]
 
@@ -224,15 +234,25 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
 
 
 def parsing_dssp(ref_tab_out_dssp):
-    """Parse the dssp information."""
-    # TODO: add more in the docstring
+    """
+    Parse the DSSP-PPII information to convert into simplified 1D output.
+    
+    Parameters
+    ----------
+    ref_tab_out_dssp : list
+        List of all the lines of DSSP-PPII output
+    
+    Returns
+    -------
+    tab_out : list
+        Simplified DSSP-PPII output that only includes primary sequence sligned to secondary structure codes
+    """
     aa = ""
     AA = []
 
     tab_out = []
     ss = ""
     SS = []
-    buff = 1
     assign = 0
 
     dsspto3 = {
@@ -252,24 +272,16 @@ def parsing_dssp(ref_tab_out_dssp):
 
     for line in ref_tab_out_dssp:
 
-        # TODO: if this is the beginning of the line do:
-        # if line.startswith("#  RESIDUE AA STRUCTURE")
-        # its more explicit
-        if re.search("#  RESIDUE AA STRUCTURE", line):
+        if line.startswith("  #  RESIDUE AA STRUCTURE"):
             assign = 1
 
         elif assign == 1:
             ss = line[16]
             aa = line[13]
-            chain = line[11]  # TODO: this variable is never used.
-            #print "AA:aa SS:ss \nline\n"
 
-            # TODO: try to see if you get the same results
-            # if "!" not in aa:
-            if not re.search("\!", aa):
+            if "!" not in aa:
                 SS.append(dsspto3[ss])
                 AA.append(aa)
-                buff = line[7:10]  # TODO: this `buff` is never use. Is it a bug?
 
     tab_out.append(''.join(AA) + "\n")
     tab_out.append(">DSSPPII\n")
@@ -286,18 +298,43 @@ def main(
         ncores=1,
         **kwargs,
         ):
-    """Perform main logic of the script."""
+    """
+    Perform main logic of the script.
+    
+    Parameters
+    ----------
+    pdb_file : string, required
+        A string to the path of a PDB to operate on
+    
+    output : string, optional
+        If given prints output to that file, else prints to console.
+        Defaults to `None`.
+    
+    dssp_cmd : string, optional
+        If given runs dssp as per user specification, else runs dssp as default.
+        Defaults to `dssp`.
+    
+    horizontal : bool, optional
+        If given the output will be a 1D line of DSSP-PPII codes, else output is full DSSP-PPII
+        Defaults to True.
+    """
+    log.info(T('Reading and processing DSSP information...'))
+    init_files(log, LOGFILESNAME)
+    
     ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd)
 
     if not horizontal:
+        log.info(T('Printing DSSP-PPII full output'))
         for line in ref_tab_out_dssp:
             print(line)
     else:
+        log.info(T('Converting DSSP-PPII output to 1D simplified version'))
         ref_tab_out_dssp_horiz = parsing_dssp(ref_tab_out_dssp)
         for line in ref_tab_out_dssp_horiz:
             print(line)
 
     if output is not None:
+        log.info(T('Saving DSSP-PPII output onto disk'))
         save_pairs_to_disk(ref_tab_out_dssp, output)
 
 
