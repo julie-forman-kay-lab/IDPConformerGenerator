@@ -57,7 +57,6 @@ import re
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import save_pairs_to_disk
 from idpconfgen.logger import T, init_files
 
 
@@ -158,7 +157,7 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
             ss = line[16]
             aa = line[13]
 
-            if re.search("\!", aa):
+            if "!" in aa:
                 hash_chain[chain].insert(i, 0)
                 i += 1
                 continue
@@ -170,14 +169,14 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
             phi = line[103:109]
             psi = line[109:115]
 
-            index = int(float(re.sub("\s", "", index)))
-            phi = int(float(re.sub("\s", "", phi)))
-            psi = int(float(re.sub("\s", "", psi)))
+            index = float(re.sub("\s", "", index))
+            phi = float(re.sub("\s", "", phi))
+            psi = float(re.sub("\s", "", psi))
 
             if chain==' ':
                 chain = "_"
 
-            if  chain not in hash_chain:
+            if chain not in hash_chain:
                 i = 0
                 hash_chain[chain] = []
 
@@ -203,6 +202,7 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     #Print Modified Output
     i = 0
     assign = 0
+    prev_chain = ''
     for line in tab_output:
 
         if re.search("#  RESIDUE AA STRUCTURE", line):
@@ -214,11 +214,15 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
             aa = line[13]
             chain = line[11]
 
-            if re.search("\!", aa):
+            if "!" in aa:
                 i += 1
                 tab_new_dssp.append(line)
                 continue
-
+            
+            if chain != prev_chain:
+                prev_chain = chain
+                i = 0            
+            
             if hash_chain[chain][i] >= 2:
                 line_list = list(line)
                 line_list[16] = "P"
@@ -272,7 +276,7 @@ def parsing_dssp(ref_tab_out_dssp):
 
     for line in ref_tab_out_dssp:
 
-        if line.startswith("  #  RESIDUE AA STRUCTURE"):
+        if re.search("#  RESIDUE AA STRUCTURE", line):
             assign = 1
 
         elif assign == 1:
@@ -335,7 +339,10 @@ def main(
 
     if output is not None:
         log.info(T('Saving DSSP-PPII output onto disk'))
-        save_pairs_to_disk(ref_tab_out_dssp, output)
+        f = open(output, "w")
+        for line in ref_tab_out_dssp:
+            f.write(line+"\n")
+        f.close()
 
 
 if __name__ == '__main__':
