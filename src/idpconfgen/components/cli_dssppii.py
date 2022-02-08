@@ -80,6 +80,14 @@ ap.add_argument(
     '-pdb',
     '--pdb_file',
     help="Path to the PDB file to operate on.",
+    required=True,
+    )
+
+ap.add_argument(
+    '-cmd',
+    '--dssp_cmd',
+    help="Path the do DSSP executable. Defaults to `dssp`.",
+    default="dssp",
     )
 
 ap.add_argument(
@@ -102,7 +110,7 @@ ap.add_argument(
 libcli.add_argument_ncores(ap)
 
 
-def dssp_ppii_assignment(PDB):
+def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     # TODO: Add documentation here.
     aa = ""
     ss = ""
@@ -126,7 +134,8 @@ def dssp_ppii_assignment(PDB):
     tab_new_dssp = []
 
     #Launch DSSP
-    run_dssp = os.popen("dssp -i " + PDB).read()
+    print(dssp_cmd)
+    run_dssp = os.popen(dssp_cmd + " -i " + pdb_file).read()
     tab_output = list(run_dssp.split("\n"))
     tab_output.pop()
 
@@ -273,12 +282,13 @@ def parsing_dssp(ref_tab_out_dssp):
 def main(
         pdb_file,
         output,
+        dssp_cmd="dssp",
         horizontal=False,
         ncores=1,
         **kwargs,
         ):
     """Perform main logic of the script."""
-    ref_tab_out_dssp = dssp_ppii_assignment(pdb_file)
+    ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd)
 
     if not horizontal:
         for line in ref_tab_out_dssp:
