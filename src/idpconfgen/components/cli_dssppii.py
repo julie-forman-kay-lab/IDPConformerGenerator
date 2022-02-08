@@ -61,9 +61,8 @@ import os
 import re
 
 from idpconfgen import Path, log
-from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import FileReaderIterator
+from idpconfgen.libs.libio import save_pairs_to_disk
 from idpconfgen.logger import T, init_files, report_on_crash
 
 
@@ -84,16 +83,15 @@ ap = libcli.CustomParser(
 #libcli.add_argument_pdb_files(ap)
 ap.add_argument(
     '-pdb',
-    '--pdb-file',
+    '--pdb_file',
     help="Path to the PDB file to operate on.",
-    type=Path,
 )
 
 ap.add_argument(
     '-horiz',
     '--horizontal',
-    help="Give output DSSP in 1D sequence fashion. Defaults to 1.",
-    default = 1,
+    help="Give output DSSP in 1D sequence fashion.",
+    action='store_true',
 )
 
 ap.add_argument(
@@ -102,6 +100,7 @@ ap.add_argument(
     help=("The output file containing DSSP with PPII added."),
     type=Path,
     default=None,
+    const='dssppii.dssp',
     action=libcli.CheckExt({'.dssp'}),
 )
 
@@ -252,21 +251,24 @@ def Parsing_Dssp(ref_tab_out_dssp):
     return tab_out
 
 def main (
-        pathfile,
-        flag_horiz = 0,
-        output = None,
+        pdb_file,
+        output,
+        horizontal = False,
         ncores = 1,
         **kwargs,
         ):
 
-    ref_tab_out_dssp = dssp_ppii_assignment(pathfile)
+    ref_tab_out_dssp = dssp_ppii_assignment(pdb_file)
 
-    if flag_horiz == 0:
+    if horizontal == False:
         for line in ref_tab_out_dssp:
             print(line)
-    elif flag_horiz == 1:
+    else:
         ref_tab_out_dssp_horiz = Parsing_Dssp(ref_tab_out_dssp)
         for line in ref_tab_out_dssp_horiz:
             print(line)
+    
+    if output != None:
+        save_pairs_to_disk(ref_tab_out_dssp, output)
 
 if __name__ == '__main__': libcli.maincli(ap, main)
