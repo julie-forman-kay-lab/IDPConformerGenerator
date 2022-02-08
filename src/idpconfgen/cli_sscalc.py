@@ -1,17 +1,25 @@
 """
 Extracts secondary structure information from PDBs.
 
+This client is upgraded to DSSP-PPII according to:
+
+   Mansiaux Y, Joseph AP, Gelly J-C, de Brevern AG (2011) Assignment of
+   PolyProline II conformation and analysis od sequence-structure
+   relationship. PLoS One 6(3): e18401. doi:10.1371/journal.pone.0018401
+
 Uses an external third party software.
 
 USAGE:
     $ idpconfgen sscalc [PDBS]
 """
 import argparse
+import os
 import shutil
 import traceback
 from functools import partial
 
 from idpconfgen import Path, log
+from idpconfgen.components.cli_dssppii import dssp_ppii_assignment
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
@@ -24,7 +32,7 @@ from idpconfgen.libs.libmulticore import (
     consume_iterable_in_list,
     pool_function_in_chunks,
     )
-from idpconfgen.libs.libparse import mkdssp_w_split
+from idpconfgen.libs.libparse import mkdssp_w_split, split_pdb_by_dssp
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -43,8 +51,14 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-libcli.add_argument_cmd(ap)
 libcli.add_argument_pdb_files(ap)
+
+ap.add_argument(
+    '-cmd',
+    '--dssp_cmd',
+    help="Path the do DSSP executable. Defaults to `dssp`.",
+    default="dssp",
+    )
 
 ap.add_argument(
     '-o',
@@ -97,9 +111,16 @@ libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
 
 
+def dssppi_helper(pdb_file, dssp_cmd, **kwargs):
+    """."""
+    pf = pdb_file.resolve()
+    result = str.encode(os.linesep.join(dssp_ppii_assignment(str(pf), dssp_cmd)))
+    yield from split_pdb_by_dssp(pf, result, **kwargs)
+
+
 def main(
-        cmd,
         pdb_files,
+        dssp_cmd="dssp",
         chunks=1000,
         destination='sscalc_splitted.tar',
         func=None,  # here just to receive from main cli.py
@@ -158,8 +179,8 @@ def main(
     try:
         consume_func = partial(
             consume_iterable_in_list,
-            mkdssp_w_split,
-            cmd=cmd,
+            dssppi_helper,
+            dssp_cmd=dssp_cmd,
             reduced=reduced,
             minimum=minimum,
             )

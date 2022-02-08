@@ -134,7 +134,6 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     tab_new_dssp = []
 
     #Launch DSSP
-    print(dssp_cmd)
     run_dssp = os.popen(dssp_cmd + " -i " + pdb_file).read()
     tab_output = list(run_dssp.split("\n"))
     tab_output.pop()

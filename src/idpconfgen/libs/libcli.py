@@ -468,7 +468,8 @@ def add_argument_reduced(parser):
         '--reduced',
         help=(
             'Reduces nomenclature for secondary structure identity '
-            'to \'L\', \'H\', \'G\', and \'E\'.'
+            'to \'L\', \'H\', \'G\', and \'E\'. '
+            'PPII segments are considered \'L\'.'
             ),
         action='store_true',
         )

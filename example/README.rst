@@ -43,7 +43,7 @@ To install DSSP follow these instructions: https://github.com/julie-forman-kay-l
 The following command will operate on the :code:`pdbs.tar` file and will create
 temporary files and a result file with the DSSP information::
 
-    idpconfgen sscalc mkdssp pdbs.tar -m 3 -rd
+    idpconfgen sscalc pdbs.tar -m 3 -rd -cmd <DSSP EXEC>
 
 You will see that the files :code:`sscalc.json` and :code:`sscalc_splittled.tar`
 were created. :code:`sscalc.json` matches the sequence information with that of
