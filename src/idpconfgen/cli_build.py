@@ -193,13 +193,6 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-csp',
-    '--custom-sampling',
-    help='Custom secondary-structure sampling parameters based on -dssp-regexes. Defaults to all (0).',
-    default='0',
-    )
-
-ap.add_argument(
     '-dsd',
     '--disable-sidechains',
     help='Whether or not to compute sidechais. Defaults to True.',
@@ -308,7 +301,6 @@ def main(
         input_seq,
         database,
         dssp_regexes=r'L+',#r'(?=(L{2,6}))',
-        custom_sampling='0',
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -361,7 +353,6 @@ def main(
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         input_seq,
-        custom_sampling,
         xmer_probs_tmp.sizes,
         residue_substitutions,
     )  

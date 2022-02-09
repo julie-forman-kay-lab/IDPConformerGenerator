@@ -517,8 +517,7 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
         oa(nan)
         ha(nan)
         sa(nan)
-        
-    print(oa)
+
     omega.pop()
     phi.pop()
     psi.pop()
@@ -540,16 +539,11 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
 def prepare_slice_dict(
         primary,
         input_seq,
-        custom_sampling,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,
         ncores=1,
         ):
     
-    # TODO:
-    # 2) Possible to return more than 1 dictionary?
-    # 3) Figure out most efficient way to have "custom_sampling" flag, priority on intuitiveness
-    # 4) Create "new dictionary" of prepared chunk sizes (but how can we specify this in the build process?)
     """
     Prepare a dictionary mapping chunks to slices in `primary`.
 

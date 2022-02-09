@@ -53,11 +53,12 @@ USAGE:
 # knowledge of the CeCILL-B license and that you accept its terms.
 import argparse
 import os
+import sys
 import re
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.logger import T, init_files
+from idpconfgen.logger import S, T, init_files
 
 
 LOGFILESNAME = 'idpconfgen_dssppii'
@@ -73,7 +74,6 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-#TODO: make this iterable with a folder/.tar of PDBs
 ap.add_argument(
     '-pdb',
     '--pdb_file',
@@ -322,28 +322,31 @@ def main(
         If given the output will be a 1D line of DSSP-PPII codes, else output is full DSSP-PPII
         Defaults to True.
     """
-    log.info(T('Reading and processing DSSP information...'))
+    log.info(S('reading and processing DSSP information...'))
     init_files(log, LOGFILESNAME)
     
     ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd)
-
+    
+    log.info(T('Printing DSSP-PPII output'))
     if not horizontal:
-        log.info(T('Printing DSSP-PPII full output'))
         for line in ref_tab_out_dssp:
             print(line)
     else:
-        log.info(T('Converting DSSP-PPII output to 1D simplified version'))
         ref_tab_out_dssp_horiz = parsing_dssp(ref_tab_out_dssp)
         for line in ref_tab_out_dssp_horiz:
             print(line)
+    log.info(S('done'))
 
     if output is not None:
-        log.info(T('Saving DSSP-PPII output onto disk'))
-        f = open(output, "w")
-        for line in ref_tab_out_dssp:
-            f.write(line+"\n")
-        f.close()
-
+        log.info(S('saving DSSP-PPII output onto disk...'))
+        with open(output, mode="w") as fd:
+            if not horizontal:
+                fd.write(os.linesep.join(ref_tab_out_dssp))
+            else:
+                fd.write(os.linesep.join(ref_tab_out_dssp_horiz))
+        log.info(S('done'))
+        
+    sys.stdout.flush()
 
 if __name__ == '__main__':
 
