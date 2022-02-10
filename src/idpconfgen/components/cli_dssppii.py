@@ -1,8 +1,12 @@
 """
 Adds polyproline type-2 helix assignment to DSSP.
 
+The output will be printed to the terminal window. To save the output to
+a file use the `>` command.
+
 USAGE:
-    $ idpconfgen dssppii [--pdb-file] [--horiz] [--output]
+    $ idpconfgen dssppii [--pdb-file] [--horiz]
+    $ idpconfgen dssppii [--pdb-file] [--horiz] > [OUTPUT]
 """
 # Translated to Python3 by Nemo (Zi Hao @menoliu) Liu on Feb 3, 2022
 # Upgrades: no longer have to specify where DSSP is installed, updated CLI
@@ -15,8 +19,8 @@ USAGE:
 #   relationship. PLoS One 6(3): e18401. doi:10.1371/journal.pone.0018401
 #
 #   Chebrek R, Leonard S, de Brevern AG, Gelly J-C (2014)
-#   PolyprOnline: polyproline helix II and secondary structure assignment database.
-#   Database ; Nov 7;2014 [pmid:25380779]
+#   PolyprOnline: polyproline helix II and secondary structure assignment
+#   database. Database; Nov 7;2014 [pmid:25380779]
 #
 #
 # Copyright Jean-Christophe Gelly (Jan 20 2012)
@@ -53,7 +57,6 @@ USAGE:
 # knowledge of the CeCILL-B license and that you accept its terms.
 import argparse
 import os
-import sys
 import re
 
 from idpconfgen import Path, log
@@ -108,13 +111,13 @@ libcli.add_argument_ncores(ap)
 
 def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     """
-    Parsing DSSP output to include PPII as secondary structure.
+    Parse DSSP output to include PPII as secondary structure.
 
     Parameters
     ----------
     pdb_file : string
         Path to the PDB file to operate on as indicated by the user
-        
+
     dssp_cmd : string
         Any custom dssp commands the user may want. Defaults to `dssp`
 
@@ -144,12 +147,12 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
 
     tab_new_dssp = []
 
-    #Launch DSSP
+    # Launch DSSP
     run_dssp = os.popen(dssp_cmd + " -i " + pdb_file).read()
     tab_output = list(run_dssp.split("\n"))
     tab_output.pop()
 
-    #Parsing DSSP to detect Polyproline II Helix
+    # Parsing DSSP to detect Polyproline II Helix
     for line in tab_output:
         if re.search("#  RESIDUE AA STRUCTURE", line):
             assign = 1
@@ -169,11 +172,11 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
             phi = line[103:109]
             psi = line[109:115]
 
-            index = float(re.sub("\s", "", index))
-            phi = float(re.sub("\s", "", phi))
-            psi = float(re.sub("\s", "", psi))
+            index = float(re.sub(r"\s", "", index))
+            phi = float(re.sub(r"\s", "", phi))
+            psi = float(re.sub(r"\s", "", psi))
 
-            if chain==' ':
+            if chain == ' ':
                 chain = "_"
 
             if chain not in hash_chain:
@@ -199,7 +202,7 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
 
             i += 1
 
-    #Print Modified Output
+    # Print Modified Output
     i = 0
     assign = 0
     prev_chain = ''
@@ -218,11 +221,11 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
                 i += 1
                 tab_new_dssp.append(line)
                 continue
-            
+
             if chain != prev_chain:
                 prev_chain = chain
-                i = 0            
-            
+                i = 0
+
             if hash_chain[chain][i] >= 2:
                 line_list = list(line)
                 line_list[16] = "P"
@@ -240,16 +243,17 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
 def parsing_dssp(ref_tab_out_dssp):
     """
     Parse the DSSP-PPII information to convert into simplified 1D output.
-    
+
     Parameters
     ----------
     ref_tab_out_dssp : list
         List of all the lines of DSSP-PPII output
-    
+
     Returns
     -------
     tab_out : list
-        Simplified DSSP-PPII output that only includes primary sequence sligned to secondary structure codes
+        Simplified DSSP-PPII output that only includes primary sequence
+        sligned to secondary structure codes.
     """
     aa = ""
     AA = []
@@ -304,49 +308,46 @@ def main(
         ):
     """
     Perform main logic of the script.
-    
+
     Parameters
     ----------
     pdb_file : string, required
         A string to the path of a PDB to operate on
-    
+
     output : string, optional
         If given prints output to that file, else prints to console.
         Defaults to `None`.
-    
+
     dssp_cmd : string, optional
-        If given runs dssp as per user specification, else runs dssp as default.
-        Defaults to `dssp`.
-    
+        If given runs dssp as per user specification, else runs dssp as
+        default.  Defaults to `dssp`.
+
     horizontal : bool, optional
-        If given the output will be a 1D line of DSSP-PPII codes, else output is full DSSP-PPII
-        Defaults to True.
+        If given the output will be a 1D line of DSSP-PPII codes, else
+        output is full DSSP-PPII. Defaults to True.
     """
-    log.info(S('reading and processing DSSP information...'))
     init_files(log, LOGFILESNAME)
-    
+    log.info(T('reading and processing DSSP information...'))
+
     ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd)
-    
-    log.info(T('Printing DSSP-PPII output'))
-    if not horizontal:
-        for line in ref_tab_out_dssp:
-            print(line)
-    else:
+
+    if horizontal:
         ref_tab_out_dssp_horiz = parsing_dssp(ref_tab_out_dssp)
-        for line in ref_tab_out_dssp_horiz:
-            print(line)
+        output_ = os.linesep.join(ref_tab_out_dssp_horiz)
+
+    else:
+        output_ = os.joinsep.join(ref_tab_out_dssp)
+
+    if output:
+        log.info(S('saving DSSP-PPII output onto disk...'))
+        with open(output, mode="w") as fout:
+            fout.write(output_)
+        log.info(S('done'))
+    else:
+        print(output_)
+
     log.info(S('done'))
 
-    if output is not None:
-        log.info(S('saving DSSP-PPII output onto disk...'))
-        with open(output, mode="w") as fd:
-            if not horizontal:
-                fd.write(os.linesep.join(ref_tab_out_dssp))
-            else:
-                fd.write(os.linesep.join(ref_tab_out_dssp_horiz))
-        log.info(S('done'))
-        
-    sys.stdout.flush()
 
 if __name__ == '__main__':
 
