@@ -8,6 +8,8 @@ from itertools import cycle
 import numpy as np
 from libfuncpy import flatlist, make_iterable
 from numba import njit
+#For debugging - Nemo
+import sys
 
 # import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
@@ -501,7 +503,7 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     seqs = [resseq[slc] for slc in slices]
 
     primary = '|'.join(seqs)
-
+    
     omega, phi, psi = [], [], []
 
     oe, he, se = omega.extend, phi.extend, psi.extend
@@ -541,6 +543,7 @@ def prepare_slice_dict(
         res_tolerance=None,
         ncores=1,
         ):
+    
     """
     Prepare a dictionary mapping chunks to slices in `primary`.
 
@@ -568,12 +571,14 @@ def prepare_slice_dict(
     Return
     ------
     dict
-        A dict with the given mapping. First key-leve of the dict
+        A dict with the given mapping. First key-level of the dict
         is the length of the chunks, hence, integers.
         The second key level are the residue chunks found in the `primary`.
         A chunk in input_seq but not in `primary` is removed from the
         dict.
     """
+    
+    
     res_tolerance = res_tolerance or {}
     mers_size = make_iterable(mers_size)
 

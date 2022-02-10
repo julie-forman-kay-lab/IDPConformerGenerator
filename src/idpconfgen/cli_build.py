@@ -321,7 +321,6 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
-
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -350,12 +349,14 @@ def main(
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         input_seq,
         xmer_probs_tmp.sizes,
         residue_substitutions,
-        )
+    )  
+    
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
