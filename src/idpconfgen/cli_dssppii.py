@@ -336,7 +336,7 @@ def main(
         output_ = os.linesep.join(ref_tab_out_dssp_horiz)
 
     else:
-        output_ = os.joinsep.join(ref_tab_out_dssp)
+        output_ = os.linesep.join(ref_tab_out_dssp)
 
     if output:
         log.info(S('saving DSSP-PPII output onto disk...'))

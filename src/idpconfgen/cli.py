@@ -15,11 +15,23 @@ USAGE:
 import argparse
 import sys
 
-from idpconfgen import __version__
-from idpconfgen import cli_bgeo, cli_build, cli_fastaext, cli_fetch
+from idpconfgen import (
+    __version__,
+    cli_bgeo,
+    cli_build,
+    cli_dssppii,
+    cli_fastaext,
+    cli_fetch,
+    )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
-from idpconfgen import cli_ssext, cli_sscalc, cli_torsions, cli_torsionsJ, cli_validate, log
-from idpconfgen.components import cli_dssppii
+from idpconfgen import (
+    cli_sscalc,
+    cli_ssext,
+    cli_torsions,
+    cli_torsionsJ,
+    cli_validate,
+    log,
+    )
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S
 
