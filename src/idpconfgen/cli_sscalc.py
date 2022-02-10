@@ -19,7 +19,7 @@ import traceback
 from functools import partial
 
 from idpconfgen import Path, log
-from idpconfgen.components.cli_dssppii import dssp_ppii_assignment
+from idpconfgen.cli_dssppii import dssp_ppii_assignment
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
