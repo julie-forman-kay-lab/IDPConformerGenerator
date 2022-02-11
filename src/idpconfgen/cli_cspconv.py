@@ -10,6 +10,7 @@ USAGE:
     $ idpconfgen cspconv [--chespi_p8] > [OUTPUT]
 """
 import argparse
+import re
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -35,8 +36,12 @@ ap.add_argument(
     required=True,
     )
 
-#TODO: make an additional flag signaling if the user wants to group DSSP codes
-# e.g. -g, --group to make L+, H+, E+ from the 8 different DSSP codes
+ap.add_argument(
+    '-g',
+    '--group',
+    help="Groups DSSP secondary structures into L+, H+, or E+.",
+    action="store_true",
+)
 
 ap.add_argument(
     '-o',
@@ -77,11 +82,6 @@ def chespi_probs8_convert(p8):
         "S" : [],
         "B" : []
     }
-    data = ''
-    aa = ''
-    resid = 0
-    prob = 0.0
-    idx = 0
     
     with open(p8) as reader:
         Lines = reader.readlines()
@@ -104,11 +104,57 @@ def chespi_probs8_convert(p8):
                     elif idx == 7: dict_p8["B"].append([aa, resid, prob])
                     
     return primary, dict_p8
+
+def group_ss_structures(p8):
+    """
+    Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
+    Groups together DSSP secondary structures as per idpconfgen definitions.
+    If a residue has multiple SS probabilities, they are summative per L+, H+, E+ definition.
+    
+    Parameters
+    ----------
+    p8 : string
+        Path to the probs8_[ID].txt to operate on as indicated by the user
+    
+    Returns
+    -------
+    header : string
+        Header for the converted file containing the primary sequence and residue numbers horizontally
+        
+    dict_p8 : dictionary
+        Dictionary of a list of lists (E.g. [AA, RESID, PROB]) for each
+        grouped secondary structure (L+, H+, E+) as indicated in idpconfgen
+    """
+    primary = 'PRIMARY SEQ: '
+    
+    dict_p8 = {
+        "L+" :[],
+        "H+" : [],
+        "E+" : []
+    }
+    
+    with open(p8) as reader:
+        Lines = reader.readlines()
+        for line in Lines:
+            data = line.split()
+            aa = data[0]
+            resid = int(data[1])
+            Lprob = float(data[3]) + float(data[4]) + float(data[6]) + float(data[7]) + float(data[8]) + float(data[9])
+            Hprob = float(data[2])
+            Eprob = float(data[5])
+            primary += aa
+            if Lprob != 0 : dict_p8["L+"].append([aa, resid, Lprob])
+            if Hprob != 0 : dict_p8["H+"].append([aa, resid, Hprob])
+            if Eprob != 0 : dict_p8["E+"].append([aa, resid, Eprob])
+            
+    return primary, dict_p8
+        
 
 def main(
     chespi_p8,
     output,
+    group=False,
     **kwargs,
         ):
     """
@@ -125,9 +171,17 @@ def main(
     """
     init_files(log, LOGFILESNAME)
     log.info(T('reading and processing CheSPI probs8 output...'))
-    #TODO: make a regex formatting matcher to see if user inputted the correct file
+
+    with open(chespi_p8) as reader:
+        line = reader.readline()
+        if not re.fullmatch(r"\s{3}[A-Z]{1}\d|\s|.{60,}\n", line):
+            log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
+            return
     
-    output_, converted_chespi = chespi_probs8_convert(chespi_p8)
+    if group:
+        output_, converted_chespi = group_ss_structures(chespi_p8)
+    else:
+        output_, converted_chespi = chespi_probs8_convert(chespi_p8)
 
     for key in converted_chespi.keys():
         output_ += ("\n%s: " % key)
