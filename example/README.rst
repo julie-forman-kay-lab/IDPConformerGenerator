@@ -64,9 +64,25 @@ build interface has several parameters that can be use to fine tune the
 conformer construction protocol. You can read deeper instructions in the
 documentations and in the client help. The following is a good default::
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et 0 -xp 1 1 1 1 -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et 'pairs' -xp 1 1 1 1 -rs 0
 
 After some time you will see 10 conformers in the folder.
+
+If you would like to use a preliminary secondary-structure assignment tool (CheSPI) to
+employ probabilistic custom secondary structure sampling (CSSS), the probs8_[ID].txt output
+from CheSPI would have to be standardized into a user-editable text file indicating the
+probability of secondary structures (based on DSSP codes) on a per residue basis.
+The following will process CheSPI output and assign probabilities to H/G/I/E/-/T/S/B
+structures on a per residue basis:
+
+    idpconfgen cspconv -p8 probs8_ex.txt -o csss_ex.txt
+
+For simplicity, the `-rd` flag could be used to group secondary structures into L+/H+/E+/G.
+To build with the CSSS file, `-csp` would have to point to the converted CheSPI file:
+
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csp csss_ex.txt -et 'pairs' -xp 1 1 1 1 -rs 0
+
+After some time you will see 10 conformers in the folder with the probabilistic CSSS.
 
 All IDPConfGen operations can be distributed over multiple cores. Use the flag
 :code:`-n` to indicate the number of cores you wish to use.

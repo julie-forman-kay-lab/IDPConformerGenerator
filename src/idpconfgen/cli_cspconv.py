@@ -1,3 +1,7 @@
+# CheSPI REFERENCE: https://github.com/protein-nmr/CheSPI
+# Nielsen JT, Mulder FAA. CheSPI: chemical shift secondary structure population inference.
+# J Biomol NMR. 2021 Jul;75(6-7):273-291. doi: 10.1007/s10858-021-00374-w.
+# Epub 2021 Jun 19. PMID: 34146207.
 """
 Parses probs8_[ID].txt output of CheSPI to generate a user-editable input
 for the idpconfgen build -csp module.
@@ -36,20 +40,8 @@ ap.add_argument(
     required=True,
     )
 
-ap.add_argument(
-    '-g',
-    '--group',
-    help="Groups DSSP secondary structures into L+, H+, or E+.",
-    action="store_true",
-)
-
-ap.add_argument(
-    '-o',
-    '--output',
-    help="The user editable output file.",
-    type=Path,
-    default=None,
-    )
+libcli.add_argument_reduced(ap)
+libcli.add_argument_output(ap)
 
 #Formatting may change depending on how CSSS is implemented
 def chespi_probs8_convert(p8):
@@ -84,8 +76,7 @@ def chespi_probs8_convert(p8):
     }
     
     with open(p8) as reader:
-        Lines = reader.readlines()
-        for line in Lines:
+        for line in reader:
             data = line.split()
             aa = data[0]
             resid = int(data[1])
@@ -131,22 +122,24 @@ def group_ss_structures(p8):
     dict_p8 = {
         "L+" :[],
         "H+" : [],
-        "E+" : []
+        "E+" : [],
+        "G" : []
     }
     
     with open(p8) as reader:
-        Lines = reader.readlines()
-        for line in Lines:
+        for line in reader:
             data = line.split()
             aa = data[0]
             resid = int(data[1])
-            Lprob = float(data[3]) + float(data[4]) + float(data[6]) + float(data[7]) + float(data[8]) + float(data[9])
+            Lprob = round((float(data[4]) + float(data[6]) + float(data[7]) + float(data[8]) + float(data[9])), 4)
+            Gprob = float(data[3])
             Hprob = float(data[2])
             Eprob = float(data[5])
             primary += aa
             if Lprob != 0 : dict_p8["L+"].append([aa, resid, Lprob])
             if Hprob != 0 : dict_p8["H+"].append([aa, resid, Hprob])
             if Eprob != 0 : dict_p8["E+"].append([aa, resid, Eprob])
+            if Gprob != 0 : dict_p8["G"].append([aa, resid, Gprob])
             
     return primary, dict_p8
         
@@ -154,7 +147,7 @@ def group_ss_structures(p8):
 def main(
     chespi_p8,
     output,
-    group=False,
+    reduced=False,
     **kwargs,
         ):
     """
@@ -178,21 +171,20 @@ def main(
             log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
             return
     
-    if group:
+    if reduced:
         output_, converted_chespi = group_ss_structures(chespi_p8)
     else:
         output_, converted_chespi = chespi_probs8_convert(chespi_p8)
 
     for key in converted_chespi.keys():
-        output_ += ("\n%s: " % key)
+        output_ += (f"\n{key}: ")
         for value in converted_chespi[key]:
-            output_ += "(%s%d, %f)" % (value[0], value[1], value[2])
+            output_ += f"({value[0]}{value[1]}, {value[2]})"
     
     if output:
         log.info(S('saving converted CheSPI output onto disk...'))
         with open(output, mode="w") as fout:
             fout.write(output_)
-        log.info(S('done'))
     else:
         print(output_)
     
