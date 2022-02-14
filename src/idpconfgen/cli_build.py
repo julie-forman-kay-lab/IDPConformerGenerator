@@ -193,6 +193,15 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-csss',
+    '--custom-sampling',
+    help=('Input file for probabilistic CSSS.'
+          'Will use DSSP codes in this instead of -dr if specified.'
+        ),
+    default=None,
+)
+
+ap.add_argument(
     '-dsd',
     '--disable-sidechains',
     help='Whether or not to compute sidechais. Defaults to True.',
@@ -300,6 +309,7 @@ ENERGYLOGSAVER = EnergyLogSaver()
 def main(
         input_seq,
         database,
+        custom_sampling,
         dssp_regexes=r'L+',#r'(?=(L{2,6}))',
         func=None,
         forcefield=None,
@@ -346,6 +356,15 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    if custom_sampling:
+        dssp_regexes = []
+        with open(custom_sampling) as csss:
+            lines = csss.readlines()
+            del lines[:2]
+            for l in lines:
+                if len(l) > 3:
+                    dssp_regexes.append(l[0:2].strip(":"))
+
     primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
@@ -355,7 +374,8 @@ def main(
         input_seq,
         xmer_probs_tmp.sizes,
         residue_substitutions,
-    )  
+    )
+    print(SLICEDICT_XMERS)
     
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))

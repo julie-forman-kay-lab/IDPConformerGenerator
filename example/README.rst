@@ -78,9 +78,9 @@ structures on a per residue basis:
     idpconfgen cspconv -p8 probs8_ex.txt -o csss_ex.txt
 
 For simplicity, the `-rd` flag could be used to group secondary structures into L+/H+/E+/G.
-To build with the CSSS file, `-csp` would have to point to the converted CheSPI file:
+To build with the CSSS file, `-csss` would have to point to the converted CheSPI file:
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csp csss_ex.txt -et 'pairs' -xp 1 1 1 1 -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.txt -et 'pairs' -xp 1 1 1 1 -rs 0
 
 After some time you will see 10 conformers in the folder with the probabilistic CSSS.
 

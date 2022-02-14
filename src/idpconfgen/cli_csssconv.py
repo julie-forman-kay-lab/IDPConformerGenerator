@@ -4,14 +4,14 @@
 # Epub 2021 Jun 19. PMID: 34146207.
 """
 Parses probs8_[ID].txt output of CheSPI to generate a user-editable input
-for the idpconfgen build -csp module.
+for the idpconfgen build -csss module.
 
 The output will be printed to the terminal window. To save the output to
 a file use the `>` command.
 
 USAGE:
-    $ idpconfgen cspconv [--chespi_p8]
-    $ idpconfgen cspconv [--chespi_p8] > [OUTPUT]
+    $ idpconfgen csssconv [--chespi_p8]
+    $ idpconfgen csssconv [--chespi_p8] > [OUTPUT]
 """
 import argparse
 import re
@@ -20,8 +20,8 @@ from idpconfgen import Path, log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 
-LOGFILESNAME = 'idpconfgen_cspconv'
-_name = 'cspconv'
+LOGFILESNAME = 'idpconfgen_csssconv'
+_name = 'csssconv'
 _help = 'Standardizes CheSPI probs8 output for CSSS.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
@@ -175,7 +175,9 @@ def main(
         output_, converted_chespi = group_ss_structures(chespi_p8)
     else:
         output_, converted_chespi = chespi_probs8_convert(chespi_p8)
-
+    
+    output_ += "\nTYPE: CheSPI"
+    
     for key in converted_chespi.keys():
         output_ += (f"\n{key}: ")
         for value in converted_chespi[key]:
