@@ -173,10 +173,11 @@ def main(
     
     if reduced:
         output_, converted_chespi = group_ss_structures(chespi_p8)
+        output_ += "\nTYPE: CheSPI_rd"
     else:
         output_, converted_chespi = chespi_probs8_convert(chespi_p8)
-    
-    output_ += "\nTYPE: CheSPI"
+        output_ += "\nTYPE: CheSPI_full"
+
     
     for key in converted_chespi.keys():
         output_ += (f"\n{key}: ")

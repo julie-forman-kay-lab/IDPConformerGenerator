@@ -43,6 +43,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
+    read_db_to_slices_given_csss,
     read_db_to_slices_given_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
@@ -358,14 +359,16 @@ def main(
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     if custom_sampling:
         dssp_regexes = []
+        csssLn = []
         with open(custom_sampling) as csss:
-            lines = csss.readlines()
-            del lines[:2]
-            for l in lines:
+            csssLn = csss.readlines()
+            del csssLn[:2]
+            for l in csssLn:
                 if len(l) > 3:
                     dssp_regexes.append(l[0:2].strip(":"))
-
-    primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
+        primary, ANGLES = read_db_to_slices_given_csss(database, dssp_regexes, csssLn)
+    else:
+        primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
