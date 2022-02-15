@@ -43,7 +43,6 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    read_db_to_slices_given_csss,
     read_db_to_slices_given_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
@@ -357,28 +356,31 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+
     if custom_sampling:
         dssp_regexes = []
-        csssLn = []
-        with open(custom_sampling) as csss:
-            csssLn = csss.readlines()
-            del csssLn[:2]
-            for l in csssLn:
-                if len(l) > 3:
-                    dssp_regexes.append(l[0:2].strip(":"))
-        primary, ANGLES = read_db_to_slices_given_csss(database, dssp_regexes, csssLn)
-    else:
-        primary, ANGLES = read_db_to_slices_given_secondary_structure(database, dssp_regexes)
-
+        dictCSSS = {}
+        with open(custom_sampling) as fcsss:
+            for line in fcsss.readlines():
+                csss = line.split(":")
+                csss[1] = csss[1].strip()
+                dictCSSS[csss[0]] = csss[1]
+        for key in dictCSSS.keys():
+            dssp_regexes.append(key)
+        dssp_regexes = dssp_regexes[2:]
+        
+    primary, secondary, ANGLES = \
+        read_db_to_slices_given_secondary_structure(database, dssp_regexes)
+    
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
+        secondary,
         input_seq,
         xmer_probs_tmp.sizes,
         residue_substitutions,
     )
-    print(SLICEDICT_XMERS)
     
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))

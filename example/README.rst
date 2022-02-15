@@ -75,7 +75,7 @@ probability of secondary structures (based on DSSP codes) on a per residue basis
 The following will process CheSPI output and assign probabilities to H/G/I/E/-/T/S/B
 structures on a per residue basis:
 
-    idpconfgen cspconv -p8 probs8_ex.txt -o csss_ex.txt
+    idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.txt
 
 For simplicity, the `-rd` flag could be used to group secondary structures into L+/H+/E+/G.
 To build with the CSSS file, `-csss` would have to point to the converted CheSPI file:

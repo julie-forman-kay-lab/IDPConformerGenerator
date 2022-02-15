@@ -501,7 +501,9 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
     slices = list(it.chain.from_iterable(_))
     seqs = [resseq[slc] for slc in slices]
-
+    ssc = [dssp[ss] for ss in slices]
+    
+    secondary = '|'.join(ssc)
     primary = '|'.join(seqs)
     
     omega, phi, psi = [], [], []
@@ -531,69 +533,15 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     assert seq_angles.shape[0] == len(primary)
 
     del omega, phi, psi
+    
     # TODO:
     # save table to a file
-    return primary, seq_angles
+    return primary, secondary, seq_angles
 
-# CURRENTLY WIP
-def read_db_to_slices_given_csss(database, ss_regexes, csss):
-    """
-    Read slices in the DB that belong to a single secondary structure.
-    Saves the torsion angles to a primary sequence only if it's specified in the csss.
-    
-    Concatenates primary sequences accordingly.
-    """
-    log.info(f'ss_regexes, {ss_regexes}')
-    db = read_dictionary_from_disk(database)
-    timed = partial(timeme, aligndb)
-    _, angles, dssp, resseq = timed(db)
-    if "_rd" in csss[1]:
-        return
-    elif "_full" in csss[1]:
-        return
-    else:
-        None
-
-    _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
-    slices = list(it.chain.from_iterable(_))
-    seqs = [resseq[slc] for slc in slices]
-
-    primary = '|'.join(seqs)
-    
-    ss, omega, phi, psi = [], [], [], []
-
-    oe, he, se = omega.extend, phi.extend, psi.extend
-    oa, ha, sa = omega.append, phi.append, psi.append
-    nan = np.nan
-
-    for s in slices:
-        oe(angles[s, 0])
-        he(angles[s, 1])
-        se(angles[s, 2])
-        oa(nan)
-        ha(nan)
-        sa(nan)
-
-    ss.pop()
-    omega.pop()
-    phi.pop()
-    psi.pop()
-
-    _ss = np.array(ss)
-    _omega = np.array(omega)
-    _phi = np.array(phi)
-    _psi = np.array(psi)
-
-    seq_angles = np.array([_ss, _omega, _phi, _psi]).T
-
-    assert seq_angles.shape[0] == len(primary)
-
-    del ss, omega, phi, psi
-
-    return primary, seq_angles
 
 def prepare_slice_dict(
         primary,
+        secondary,
         input_seq,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,

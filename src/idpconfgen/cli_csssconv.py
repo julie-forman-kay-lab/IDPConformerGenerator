@@ -40,11 +40,16 @@ ap.add_argument(
     required=True,
     )
 
-libcli.add_argument_reduced(ap)
+ap.add_argument(
+    '-v',
+    '--verbose',
+    help="Parses the CheSPI probs8 file as is, without grouping DSSP.",
+    action='store_true'
+)
+
 libcli.add_argument_output(ap)
 
-#Formatting may change depending on how CSSS is implemented
-def chespi_probs8_convert(p8):
+def chespi_probs8_convert_verbose(p8):
     """
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
@@ -69,7 +74,7 @@ def chespi_probs8_convert(p8):
         "G" : [],
         "I" : [],
         "E" : [],
-        "-" : [],
+        " " : [],
         "T" : [],
         "S" : [],
         "B" : []
@@ -89,14 +94,14 @@ def chespi_probs8_convert(p8):
                     elif idx == 1: dict_p8["G"].append([aa, resid, prob])
                     elif idx == 2: dict_p8["I"].append([aa, resid, prob])
                     elif idx == 3: dict_p8["E"].append([aa, resid, prob])
-                    elif idx == 4: dict_p8["-"].append([aa, resid, prob])
+                    elif idx == 4: dict_p8[" "].append([aa, resid, prob])
                     elif idx == 5: dict_p8["T"].append([aa, resid, prob])
                     elif idx == 6: dict_p8["S"].append([aa, resid, prob])
                     elif idx == 7: dict_p8["B"].append([aa, resid, prob])
                     
     return primary, dict_p8
 
-def group_ss_structures(p8):
+def chespi_probs8_convert_grouped(p8):
     """
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
@@ -115,7 +120,7 @@ def group_ss_structures(p8):
         
     dict_p8 : dictionary
         Dictionary of a list of lists (E.g. [AA, RESID, PROB]) for each
-        grouped secondary structure (L+, H+, E+) as indicated in idpconfgen
+        grouped secondary structure (L, H, E, G) as indicated in idpconfgen
     """
     primary = 'PRIMARY SEQ: '
     
@@ -123,7 +128,7 @@ def group_ss_structures(p8):
         "L+" :[],
         "H+" : [],
         "E+" : [],
-        "G" : []
+        "G+" : []
     }
     
     with open(p8) as reader:
@@ -139,7 +144,7 @@ def group_ss_structures(p8):
             if Lprob != 0 : dict_p8["L+"].append([aa, resid, Lprob])
             if Hprob != 0 : dict_p8["H+"].append([aa, resid, Hprob])
             if Eprob != 0 : dict_p8["E+"].append([aa, resid, Eprob])
-            if Gprob != 0 : dict_p8["G"].append([aa, resid, Gprob])
+            if Gprob != 0 : dict_p8["G+"].append([aa, resid, Gprob])
             
     return primary, dict_p8
         
@@ -147,7 +152,7 @@ def group_ss_structures(p8):
 def main(
     chespi_p8,
     output,
-    reduced=False,
+    verbose=False,
     **kwargs,
         ):
     """
@@ -171,12 +176,12 @@ def main(
             log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
             return
     
-    if reduced:
-        output_, converted_chespi = group_ss_structures(chespi_p8)
-        output_ += "\nTYPE: CheSPI_rd"
-    else:
-        output_, converted_chespi = chespi_probs8_convert(chespi_p8)
+    if verbose:
+        output_, converted_chespi = chespi_probs8_convert_verbose(chespi_p8)
         output_ += "\nTYPE: CheSPI_full"
+    else:
+        output_, converted_chespi = chespi_probs8_convert_grouped(chespi_p8)
+        output_ += "\nTYPE: CheSPI_rd"
 
     
     for key in converted_chespi.keys():
