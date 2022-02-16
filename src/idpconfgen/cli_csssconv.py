@@ -7,7 +7,7 @@ Parses probs8_[ID].txt output of CheSPI to generate a user-editable input
 for the idpconfgen build -csss module.
 
 The output will be printed to the terminal window. To save the output to
-a file use the `>` command.
+a file use the `>` command. Note that output MUST have the extension .JSON.
 
 USAGE:
     $ idpconfgen csssconv [--chespi_p8]
@@ -15,8 +15,9 @@ USAGE:
 """
 import argparse
 import re
+import json
 
-from idpconfgen import Path, log
+from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 
@@ -41,15 +42,15 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-v',
-    '--verbose',
+    '-f',
+    '--full',
     help="Parses the CheSPI probs8 file as is, without grouping DSSP.",
     action='store_true'
 )
 
 libcli.add_argument_output(ap)
 
-def chespi_probs8_convert_verbose(p8):
+def chespi_probs8_convert_full(p8):
     """
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
@@ -60,46 +61,51 @@ def chespi_probs8_convert_verbose(p8):
     
     Returns
     -------
-    header : string
-        Header for the converted file containing the primary sequence and residue numbers horizontally
-        
-    dict_p8 : dictionary
-        Dictionary of a list of lists (E.g. [AA, RESID, PROB]) for each
-        possible secondary structure dssp code (H/G/I/E/-/T/S/B) as indicated
-        in probs8_[ID].txt
+    dict_out : dictionary
+        Nested dictionary where the first key layer indicates residue number
+        and the second key later indicates secondary structure (H/G/I/E/-/T/S/B) 
+        as defined in DSSP. Values are their respective probabilities.
     """
-    primary = 'PRIMARY SEQ: '
+    dict_out = {}
     dict_p8 = {
-        "H" : [],
-        "G" : [],
-        "I" : [],
-        "E" : [],
-        " " : [],
-        "T" : [],
-        "S" : [],
-        "B" : []
+        "H" : 0.0,
+        "G" : 0.0,
+        "I" : 0.0,
+        "E" : 0.0,
+        " " : 0.0,
+        "T" : 0.0,
+        "S" : 0.0,
+        "B" : 0.0
     }
     
     with open(p8) as reader:
         for line in reader:
             data = line.split()
-            aa = data[0]
             resid = int(data[1])
-            primary += aa
             for i in range(2, 10):
                 prob = float(data[i])
                 if prob != 0:
                     idx = i - 2
-                    if idx == 0: dict_p8["H"].append([aa, resid, prob])
-                    elif idx == 1: dict_p8["G"].append([aa, resid, prob])
-                    elif idx == 2: dict_p8["I"].append([aa, resid, prob])
-                    elif idx == 3: dict_p8["E"].append([aa, resid, prob])
-                    elif idx == 4: dict_p8[" "].append([aa, resid, prob])
-                    elif idx == 5: dict_p8["T"].append([aa, resid, prob])
-                    elif idx == 6: dict_p8["S"].append([aa, resid, prob])
-                    elif idx == 7: dict_p8["B"].append([aa, resid, prob])
-                    
-    return primary, dict_p8
+                    if idx == 0: dict_p8["H"] = prob
+                    elif idx == 1: dict_p8["G"] = prob
+                    elif idx == 2: dict_p8["I"] = prob
+                    elif idx == 3: dict_p8["E"] = prob
+                    elif idx == 4: dict_p8[" "] = prob
+                    elif idx == 5: dict_p8["T"] = prob
+                    elif idx == 6: dict_p8["S"] = prob
+                    elif idx == 7: dict_p8["B"] = prob
+                else:
+                    idx = i - 2
+                    if idx == 0: dict_p8["H"] = 0.0
+                    elif idx == 1: dict_p8["G"] = 0.0
+                    elif idx == 2: dict_p8["I"] = 0.0
+                    elif idx == 3: dict_p8["E"] = 0.0
+                    elif idx == 4: dict_p8[" "] = 0.0
+                    elif idx == 5: dict_p8["T"] = 0.0
+                    elif idx == 6: dict_p8["S"] = 0.0
+                    elif idx == 7: dict_p8["B"] = 0.0
+            dict_out[resid] = dict_p8
+    return dict_out
 
 def chespi_probs8_convert_grouped(p8):
     """
@@ -115,44 +121,45 @@ def chespi_probs8_convert_grouped(p8):
     
     Returns
     -------
-    header : string
-        Header for the converted file containing the primary sequence and residue numbers horizontally
-        
-    dict_p8 : dictionary
-        Dictionary of a list of lists (E.g. [AA, RESID, PROB]) for each
-        grouped secondary structure (L, H, E, G) as indicated in idpconfgen
+    dict_out : dictionary
+        Nested dictionary where the first key layer indicates residue number
+        and the second key later indicates grouped secondary structure (L, H, E, G) 
+        as defined in idpconfgen. Values are their respective probabilities.
     """
-    primary = 'PRIMARY SEQ: '
-    
+    dict_out = {}
     dict_p8 = {
-        "L+" :[],
-        "H+" : [],
-        "E+" : [],
-        "G+" : []
+        "L+" : 0.0,
+        "H+" : 0.0,
+        "E+" : 0.0,
+        "G+" : 0.0
     }
     
     with open(p8) as reader:
         for line in reader:
             data = line.split()
-            aa = data[0]
             resid = int(data[1])
             Lprob = round((float(data[4]) + float(data[6]) + float(data[7]) + float(data[8]) + float(data[9])), 4)
             Gprob = float(data[3])
             Hprob = float(data[2])
             Eprob = float(data[5])
-            primary += aa
-            if Lprob != 0 : dict_p8["L+"].append([aa, resid, Lprob])
-            if Hprob != 0 : dict_p8["H+"].append([aa, resid, Hprob])
-            if Eprob != 0 : dict_p8["E+"].append([aa, resid, Eprob])
-            if Gprob != 0 : dict_p8["G+"].append([aa, resid, Gprob])
             
-    return primary, dict_p8
+            if Lprob != 0 : dict_p8["L+"] = Lprob 
+            else: dict_p8["L+"] = 0.0
+            if Hprob != 0 : dict_p8["H+"] = Hprob
+            else: dict_p8["H+"] = 0.0
+            if Eprob != 0 : dict_p8["E+"] = Eprob
+            else: dict_p8["E+"] = 0.0
+            if Gprob != 0 : dict_p8["G+"] = Gprob
+            else: dict_p8["G+"] = 0.0
+            dict_out[resid] = dict_p8
+            
+    return dict_out
         
 
 def main(
     chespi_p8,
     output,
-    verbose=False,
+    full=False,
     **kwargs,
         ):
     """
@@ -164,8 +171,12 @@ def main(
         A string to the path of probs8_[ID].txt output from CheSPI.
     
     output : string, optional
-        If given prints output to that file, else prints to console.
+        If given, prints output to that file (must be .JSON), else prints to console.
         Defaults to `None`.
+    
+    full : boolean, optional
+        If given, defaults to true and all of the CheSPI DSSP codes are used.
+        Defaults to False.
     """
     init_files(log, LOGFILESNAME)
     log.info(T('reading and processing CheSPI probs8 output...'))
@@ -176,25 +187,17 @@ def main(
             log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
             return
     
-    if verbose:
-        output_, converted_chespi = chespi_probs8_convert_verbose(chespi_p8)
-        output_ += "\nTYPE: CheSPI_full"
+    if full:
+        converted_chespi = chespi_probs8_convert_full(chespi_p8)
     else:
-        output_, converted_chespi = chespi_probs8_convert_grouped(chespi_p8)
-        output_ += "\nTYPE: CheSPI_rd"
-
-    
-    for key in converted_chespi.keys():
-        output_ += (f"\n{key}: ")
-        for value in converted_chespi[key]:
-            output_ += f"({value[0]}{value[1]}, {value[2]})"
+        converted_chespi = chespi_probs8_convert_grouped(chespi_p8)
     
     if output:
         log.info(S('saving converted CheSPI output onto disk...'))
         with open(output, mode="w") as fout:
-            fout.write(output_)
+            json.dump(converted_chespi, fout, indent=4)
     else:
-        print(output_)
+        print(converted_chespi)
     
     log.info(S('done'))
     

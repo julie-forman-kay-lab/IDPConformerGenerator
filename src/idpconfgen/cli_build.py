@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+import math
 import sys
 from functools import partial
 from itertools import cycle
@@ -67,6 +68,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
+    read_dict_from_json,
     read_dictionary_from_disk,
     )
 from idpconfgen.libs.libparse import (
@@ -195,8 +197,8 @@ ap.add_argument(
 ap.add_argument(
     '-csss',
     '--custom-sampling',
-    help=('Input file for probabilistic CSSS.'
-          'Will use DSSP codes in this instead of -dr if specified.'
+    help=('Input .JSON file for probabilistic CSSS.'
+          'Will use DSSP codes in this .JSON instead of -dr if specified.'
         ),
     default=None,
 )
@@ -358,16 +360,18 @@ def main(
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
 
     if custom_sampling:
-        dssp_regexes = []
-        dictCSSS = {}
-        with open(custom_sampling) as fcsss:
-            for line in fcsss.readlines():
-                csss = line.split(":")
-                csss[1] = csss[1].strip()
-                dictCSSS[csss[0]] = csss[1]
-        for key in dictCSSS.keys():
-            dssp_regexes.append(key)
-        dssp_regexes = dssp_regexes[2:]
+        dictCSSS = read_dict_from_json(custom_sampling)
+        temp_dssp = []
+        for resid in dictCSSS:
+            psum = 0.0
+            for dssp in dictCSSS[resid]:
+                psum += dictCSSS[resid][dssp]
+                temp_dssp.append(dssp)
+            if not math.isclose(psum, 1.0000, rel_tol=0.01): # check for summation of probabilities is around 1
+                for dssp in dictCSSS[resid]:
+                    temp_prob = dictCSSS[resid][dssp]/psum
+                    dictCSSS[resid][dssp] = round(temp_prob, 4)
+        dssp_regexes = list(set(temp_dssp)) # append to list only unique DSSP regexes        
         
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
@@ -1256,7 +1260,6 @@ def gen_PDB_from_conformer(
         atom_i += 1
 
     return '\n'.join(lines)
-
 
 def get_adjacent_angles(
         options,
