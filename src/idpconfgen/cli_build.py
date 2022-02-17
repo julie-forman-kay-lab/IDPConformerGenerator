@@ -358,7 +358,7 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-
+    dictCSSS = {}
     if custom_sampling:
         dictCSSS = read_dict_from_json(custom_sampling)
         temp_dssp = []
@@ -377,11 +377,13 @@ def main(
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
     
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
-
+    
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         secondary,
         input_seq,
+        dssp_regexes,
+        dictCSSS,
         xmer_probs_tmp.sizes,
         residue_substitutions,
     )
@@ -396,6 +398,7 @@ def main(
         input_seq,
         ANGLES,
         SLICEDICT_XMERS,
+        dictCSSS,
         residue_replacements=residue_substitutions,
         )
 
@@ -1267,6 +1270,7 @@ def get_adjacent_angles(
         seq,
         db,
         slice_dict,
+        csss,
         residue_replacements=None,
         RC=np.random.choice,
         ):
@@ -1290,6 +1294,10 @@ def get_adjacent_angles(
     slice_dict : dict-like
         A dictionary containing the chunks strings as keys and as values
         lists with slice objects.
+    
+    csss : dict-like
+        A dictionary containing probabilities of secondary structures per
+        amino acid residue position.
     """
     residue_replacements = residue_replacements or {}
     probs = fill_list(probs, 0, len(options))
