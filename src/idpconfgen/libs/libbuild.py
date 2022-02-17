@@ -636,6 +636,8 @@ def prepare_slice_dict(
                     slice_dict[lmer][ss][altered_mer_P] = list_slice
                     if not slice_dict[lmer][ss][altered_mer_P]:
                         slice_dict[lmer][ss].pop(altered_mer_P)
+                    if not slice_dict[lmer][ss]:
+                        slice_dict[lmer].pop(ss)
                     list_slice = []
                 
                 PW.increment()
