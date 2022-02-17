@@ -105,6 +105,7 @@ def chespi_probs8_convert_full(p8):
                     elif idx == 6: dict_p8["S"] = 0.0
                     elif idx == 7: dict_p8["B"] = 0.0
             dict_out[resid] = dict_p8
+            dict_p8 = {"H" : 0.0,"G" : 0.0,"I" : 0.0,"E" : 0.0," " : 0.0,"T" : 0.0,"S" : 0.0,"B" : 0.0}
     return dict_out
 
 def chespi_probs8_convert_grouped(p8):
@@ -152,6 +153,7 @@ def chespi_probs8_convert_grouped(p8):
             if Gprob != 0 : dict_p8["G+"] = Gprob
             else: dict_p8["G+"] = 0.0
             dict_out[resid] = dict_p8
+            dict_p8 = {"L+" : 0.0,"H+" : 0.0,"E+" : 0.0,"G+" : 0.0}
             
     return dict_out
         

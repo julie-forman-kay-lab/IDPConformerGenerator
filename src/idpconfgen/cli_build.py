@@ -362,17 +362,20 @@ def main(
     if custom_sampling:
         dictCSSS = read_dict_from_json(custom_sampling)
         temp_dssp = []
+        prob_dssp = []
         for resid in dictCSSS:
-            psum = 0.0
             for dssp in dictCSSS[resid]:
-                psum += dictCSSS[resid][dssp]
+                prob_dssp.append(dictCSSS[resid][dssp])
                 temp_dssp.append(dssp)
-            if not math.isclose(psum, 1.0000, rel_tol=0.01): # check for summation of probabilities is around 1
+            psum = sum(prob_dssp)
+            if psum != 1.0:
+                i = 0
+                prob_dssp = [p / psum for p in prob_dssp]
                 for dssp in dictCSSS[resid]:
-                    temp_prob = dictCSSS[resid][dssp]/psum
-                    dictCSSS[resid][dssp] = round(temp_prob, 4)
-        dssp_regexes = list(set(temp_dssp)) # append to list only unique DSSP regexes        
-        
+                    dictCSSS[resid][dssp] = prob_dssp[i]
+                    i += 1
+            prob_dssp = []
+        dssp_regexes = list(set(temp_dssp)) # append to list only unique DSSP regexes       
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
     
@@ -1321,12 +1324,23 @@ def get_adjacent_angles(
 
         pt_sub = build_regex_substitutions(primer_template, residue_replacements)
 
+        lss = []
+        lssprob = []
+
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
             try:
-                #print('pt_sub', pt_sub)
-                angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
+                if csss:
+                    for ss in csss[str(cr+1)]:
+                        lss.append(ss) #list of possible secondary structures for a given residue
+                        lssprob.append(csss[str(cr+1)][ss]) #list of possible probabilities for each ss
+                    pcsss = RC(lss, p=lssprob)
+                    lss = []
+                    lssprob = []
+                    angles = db[RC(slice_dict[plen][pcsss][pt_sub]), :].ravel()
+                else:
+                    angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
             except KeyError:
                 plen -= 1
                 next_residue = primer_template[-1]
