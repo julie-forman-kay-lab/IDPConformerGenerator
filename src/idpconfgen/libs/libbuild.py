@@ -605,40 +605,68 @@ def prepare_slice_dict(
     xmers = (get_mers(input_seq, i) for i in mers_size)
     xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
-    list_slice = []
     
     if csss:
+        ss_dict = {}
+        list_slice = []
         with ProgressCounter(suffix='Searching for xmers with csss: ') as PW:
             for mer in xmers_flat:
                 lmer = len(mer)
                 
                 altered_mer = build_regex_substitutions(mer, res_tolerance)
                 merregex = f'(?=({altered_mer}))'
-                aa_overlap = regex_forward_with_overlap(primary, merregex)
                 
+                slice_dict[lmer][altered_mer] = \
+                    regex_forward_with_overlap(primary, merregex)
+
+                # if no slices were found
+                if not slice_dict[lmer][altered_mer]:
+                    slice_dict[lmer].pop(altered_mer)
+                    
                 merregex_P = f'(?=({altered_mer}P))'
                 altered_mer_P = f'{altered_mer}_P'
-                aa_overlap_P = regex_forward_with_overlap(primary, merregex_P)
                 
+                slice_dict[lmer][altered_mer_P] = \
+                    regex_forward_with_overlap(primary, merregex_P)
+
+                # if no entrey was found
+                if not slice_dict[lmer][altered_mer_P]:
+                    slice_dict[lmer].pop(altered_mer_P)
+                
+                for am in slice_dict[lmer]: #going through each sequence match, am = altered_mer
+                    for sd in slice_dict[lmer][am]: #going through each list of slices, sd = slice_dict[lmer][altered_mer]
+                        for slc in sd: #going through each slice in the list
+                            for ss in dssp_regexes:
+                                ss_dict[ss] = []
+                                if re.match(ss, secondary(slc)):
+                                    ss_dict[ss].append(slc)
+                    slice_dict[lmer][am]=ss_dict
+                
+                '''
                 for ss in dssp_regexes:
+                    
                     slice_dict[lmer][ss]={altered_mer:[]}
-                    slice_dict[lmer][ss]={altered_mer_P:[]}
                     for aa in aa_overlap:
                         if re.match(ss, secondary[aa]) and len(secondary[aa]) == lmer:
                             list_slice.append(aa)
+                    print(list_slice)
                     slice_dict[lmer][ss][altered_mer] = list_slice
-                    if not slice_dict[lmer][ss][altered_mer]:
+                    if slice_dict[lmer][ss][altered_mer] == []:
                         slice_dict[lmer][ss].pop(altered_mer)
                     list_slice = []
+                    
+                    slice_dict[lmer][ss]={altered_mer_P:[]}
                     for aa in aa_overlap_P:
                         if re.match(ss, secondary[aa]) and len(secondary[aa]) == lmer:
                             list_slice.append(aa)
+                    print(list_slice)
                     slice_dict[lmer][ss][altered_mer_P] = list_slice
                     if not slice_dict[lmer][ss][altered_mer_P]:
                         slice_dict[lmer][ss].pop(altered_mer_P)
                     if not slice_dict[lmer][ss]:
                         slice_dict[lmer].pop(ss)
                     list_slice = []
+                '''
                 
                 PW.increment()
     else:
@@ -655,7 +683,7 @@ def prepare_slice_dict(
                 # if no slices were found
                 if not slice_dict[lmer][altered_mer]:
                     slice_dict[lmer].pop(altered_mer)
-
+                
                 # this is a trick to find the sequence that are proceeded
                 # by Proline. Still, these are registered in the "lmer" size
                 # without consider the proline addition.

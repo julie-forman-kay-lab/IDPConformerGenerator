@@ -394,6 +394,12 @@ def main(
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
+    
+    print(list(SLICEDICT_XMERS.keys()))
+    print(XMERPROBS)
+    print(SLICEDICT_XMERS)
+    
+    sys.exit()
 
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
@@ -1323,10 +1329,9 @@ def get_adjacent_angles(
         plen = len(primer_template)
 
         pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-
         lss = []
         lssprob = []
-
+        print(slice_dict)
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
@@ -1338,7 +1343,12 @@ def get_adjacent_angles(
                     pcsss = RC(lss, p=lssprob)
                     lss = []
                     lssprob = []
-                    angles = db[RC(slice_dict[plen][pcsss][pt_sub]), :].ravel()
+                    if pt_sub not in slice_dict[plen][pcsss]:
+                        print(pt_sub)
+                        print("PTSUB NOT FOUND!")
+                        raise KeyError
+                    else:
+                        angles = db[RC(slice_dict[plen][pcsss][pt_sub]), :].ravel()
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
             except KeyError:
