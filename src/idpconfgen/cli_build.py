@@ -402,6 +402,7 @@ def main(
         ANGLES,
         SLICEDICT_XMERS,
         dictCSSS,
+        secondary,
         residue_replacements=residue_substitutions,
         )
 
@@ -1274,6 +1275,7 @@ def get_adjacent_angles(
         db,
         slice_dict,
         csss,
+        secondary,
         residue_replacements=None,
         RC=np.random.choice,
         ):
@@ -1334,9 +1336,14 @@ def get_adjacent_angles(
                         lss.append(ss) #list of possible secondary structures for a given residue
                         lssprob.append(csss[str(cr+1)][ss]) #list of possible probabilities for each ss
                     pcsss = RC(lss, p=lssprob)
+                    print(lss)
+                    print(lssprob)
+                    print(pcsss)
                     lss = []
                     lssprob = []
-                    angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
+                    temp = RC(slice_dict[plen][pt_sub][pcsss])
+                    angles = db[temp, :].ravel()
+                    print(secondary[temp])
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
             except KeyError:

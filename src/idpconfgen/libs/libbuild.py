@@ -605,6 +605,7 @@ def prepare_slice_dict(
     xmers = (get_mers(input_seq, i) for i in mers_size)
     xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
+    ss_dict = {}
     
     if csss:
         csss_slice_dict = defaultdict(dict)
@@ -630,18 +631,22 @@ def prepare_slice_dict(
 
                 # if no entrey was found
                 if not slice_dict[lmer][altered_mer_P]:
-                    slice_dict[lmer].pop(altered_mer_P)
-                
-                for am in slice_dict[lmer]: #going through each sequence match, am = altered_mer or altered_mer_P
-                    ss_dict = {}
-                    for sd in slice_dict[lmer][am]: #going through each list of slices, sd = slice()
-                        ss_list = []
-                        for ss in dssp_regexes:
-                            if re.match(ss, secondary[sd]):
-                                ss_list.append(sd)
-                            ss_dict[ss] = ss_list
-                    csss_slice_dict[lmer][am]=ss_dict                
+                    slice_dict[lmer].pop(altered_mer_P)              
                 PW.increment()
+                
+        for lmer in slice_dict: #going through each sequence match, am = altered_mer or altered_mer_P
+            for am in slice_dict[lmer]:
+                for ss in dssp_regexes:
+                    ss_dict[ss] = []
+                
+                for sl in slice_dict[lmer][am]: #going through each list of slices, sd = slice()
+                    for ss in dssp_regexes:
+                        if re.fullmatch(ss, secondary[sl]):
+                            ss_dict[ss].append(sl)
+                            break
+                        
+                csss_slice_dict[lmer][am]=ss_dict
+                
         return csss_slice_dict
     else:
         with ProgressCounter(suffix='Searching for xmers: ') as PW:
