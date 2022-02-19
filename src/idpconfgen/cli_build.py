@@ -1336,17 +1336,12 @@ def get_adjacent_angles(
                         lss.append(ss) #list of possible secondary structures for a given residue
                         lssprob.append(csss[str(cr+1)][ss]) #list of possible probabilities for each ss
                     pcsss = RC(lss, p=lssprob)
-                    print(lss)
-                    print(lssprob)
-                    print(pcsss)
                     lss = []
                     lssprob = []
-                    temp = RC(slice_dict[plen][pt_sub][pcsss])
-                    angles = db[temp, :].ravel()
-                    print(secondary[temp])
+                    angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
-            except KeyError:
+            except (KeyError, ValueError):
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]

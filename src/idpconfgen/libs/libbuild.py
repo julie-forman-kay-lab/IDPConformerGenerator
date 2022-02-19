@@ -607,78 +607,49 @@ def prepare_slice_dict(
     slice_dict = defaultdict(dict)
     ss_dict = {}
     
+    with ProgressCounter(suffix='Searching for xmers: ') as PW:
+        for mer in xmers_flat:
+            lmer = len(mer)
+            altered_mer = build_regex_substitutions(mer, res_tolerance)
+            merregex = f'(?=({altered_mer}))'
+            
+            slice_dict[lmer][altered_mer] = \
+                regex_forward_with_overlap(primary, merregex)
+            # if no slices were found
+            if not slice_dict[lmer][altered_mer]:
+                slice_dict[lmer].pop(altered_mer)
+
+            # this is a trick to find the sequence that are proceeded
+            # by Proline. Still, these are registered in the "lmer" size
+            # without consider the proline addition.
+            # this is a combo with get_adjancent_angles
+            merregex_P = f'(?=({altered_mer}P))'
+            altered_mer_P = f'{altered_mer}_P'
+            
+            slice_dict[lmer][altered_mer_P] = \
+                regex_forward_with_overlap(primary, merregex_P)
+            # if no entrey was found
+            if not slice_dict[lmer][altered_mer_P]:
+                slice_dict[lmer].pop(altered_mer_P)
+            # for _s in slice_dict[lmer][mer]:
+                # assert '|' not in input_seq[_s]
+            PW.increment()
+            
     if csss:
-        csss_slice_dict = defaultdict(dict)
-        with ProgressCounter(suffix='Searching for xmers with csss: ') as PW:
-            for mer in xmers_flat:
-                lmer = len(mer)
-                
-                altered_mer = build_regex_substitutions(mer, res_tolerance)
-                merregex = f'(?=({altered_mer}))'
-                
-                slice_dict[lmer][altered_mer] = \
-                    regex_forward_with_overlap(primary, merregex)
-
-                # if no slices were found
-                if not slice_dict[lmer][altered_mer]:
-                    slice_dict[lmer].pop(altered_mer)
-                    
-                merregex_P = f'(?=({altered_mer}P))'
-                altered_mer_P = f'{altered_mer}_P'
-                
-                slice_dict[lmer][altered_mer_P] = \
-                    regex_forward_with_overlap(primary, merregex_P)
-
-                # if no entrey was found
-                if not slice_dict[lmer][altered_mer_P]:
-                    slice_dict[lmer].pop(altered_mer_P)              
-                PW.increment()
-                
-        for lmer in slice_dict: #going through each sequence match, am = altered_mer or altered_mer_P
-            for am in slice_dict[lmer]:
-                for ss in dssp_regexes:
-                    ss_dict[ss] = []
-                
-                for sl in slice_dict[lmer][am]: #going through each list of slices, sd = slice()
+        csss_slice_dict = defaultdict(dict)        
+        for lmer in slice_dict: #lmer = 1, 2, 3, 4, 5
+            for aa in slice_dict[lmer]: #aa = altered_mer or altered_mer_P
+                # each sequence should have a new ss_dict
+                ss_dict = defaultdict(list)
+                for sd in slice_dict[lmer][aa]: #sd = slice()
                     for ss in dssp_regexes:
-                        if re.fullmatch(ss, secondary[sl]):
-                            ss_dict[ss].append(sl)
-                            break
-                        
-                csss_slice_dict[lmer][am]=ss_dict
+                        if re.fullmatch(ss, secondary[sd]):
+                            # save sd to ss_dict
+                            ss_dict[ss].append(sd)
+                csss_slice_dict[lmer][aa] = ss_dict
                 
         return csss_slice_dict
-    else:
-        with ProgressCounter(suffix='Searching for xmers: ') as PW:
-            for mer in xmers_flat:
-                lmer = len(mer)
-                altered_mer = build_regex_substitutions(mer, res_tolerance)
-
-                merregex = f'(?=({altered_mer}))'
-
-                slice_dict[lmer][altered_mer] = \
-                    regex_forward_with_overlap(primary, merregex)
-
-                # if no slices were found
-                if not slice_dict[lmer][altered_mer]:
-                    slice_dict[lmer].pop(altered_mer)
-                
-                # this is a trick to find the sequence that are proceeded
-                # by Proline. Still, these are registered in the "lmer" size
-                # without consider the proline addition.
-                # this is a combo with get_adjancent_angles
-                merregex_P = f'(?=({altered_mer}P))'
-                altered_mer_P = f'{altered_mer}_P'
-                slice_dict[lmer][altered_mer_P] = \
-                    regex_forward_with_overlap(primary, merregex_P)
-
-                # if no entrey was found
-                if not slice_dict[lmer][altered_mer_P]:
-                    slice_dict[lmer].pop(altered_mer_P)
-                # for _s in slice_dict[lmer][mer]:
-                    # assert '|' not in input_seq[_s]
-                PW.increment()
-                
+ 
     return slice_dict
 
 

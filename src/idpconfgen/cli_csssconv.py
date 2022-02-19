@@ -67,45 +67,26 @@ def chespi_probs8_convert_full(p8):
         as defined in DSSP. Values are their respective probabilities.
     """
     dict_out = {}
-    dict_p8 = {
-        "H" : 0.0,
-        "G" : 0.0,
-        "I" : 0.0,
-        "E" : 0.0,
-        " " : 0.0,
-        "T" : 0.0,
-        "S" : 0.0,
-        "B" : 0.0
-    }
+    dict_p8 = {}
     
     with open(p8) as reader:
         for line in reader:
-            data = line.split()
-            resid = int(data[1])
-            for i in range(2, 10):
-                prob = float(data[i])
-                if prob != 0:
-                    idx = i - 2
-                    if idx == 0: dict_p8["H"] = prob
-                    elif idx == 1: dict_p8["G"] = prob
-                    elif idx == 2: dict_p8["I"] = prob
-                    elif idx == 3: dict_p8["E"] = prob
-                    elif idx == 4: dict_p8[" "] = prob
-                    elif idx == 5: dict_p8["T"] = prob
-                    elif idx == 6: dict_p8["S"] = prob
-                    elif idx == 7: dict_p8["B"] = prob
-                else:
-                    idx = i - 2
-                    if idx == 0: dict_p8["H"] = 0.0
-                    elif idx == 1: dict_p8["G"] = 0.0
-                    elif idx == 2: dict_p8["I"] = 0.0
-                    elif idx == 3: dict_p8["E"] = 0.0
-                    elif idx == 4: dict_p8[" "] = 0.0
-                    elif idx == 5: dict_p8["T"] = 0.0
-                    elif idx == 6: dict_p8["S"] = 0.0
-                    elif idx == 7: dict_p8["B"] = 0.0
+            pline = line.split()
+            pline.pop(0)
+            data = [float(i) for i in pline]
+            resid = int(data[0])
+            for i in range(1, 9):
+                prob = data[i]
+                if i == 1: dict_p8["H"] = prob
+                elif i == 2: dict_p8["G"] = prob
+                elif i == 3: dict_p8["I"] = prob
+                elif i == 4: dict_p8["E"] = prob
+                elif i == 5: dict_p8[" "] = prob
+                elif i == 6: dict_p8["T"] = prob
+                elif i == 7: dict_p8["S"] = prob
+                elif i == 8: dict_p8["B"] = prob
             dict_out[resid] = dict_p8
-            dict_p8 = {"H" : 0.0,"G" : 0.0,"I" : 0.0,"E" : 0.0," " : 0.0,"T" : 0.0,"S" : 0.0,"B" : 0.0}
+            dict_p8 = {}
     return dict_out
 
 def chespi_probs8_convert_grouped(p8):
@@ -128,32 +109,21 @@ def chespi_probs8_convert_grouped(p8):
         as defined in idpconfgen. Values are their respective probabilities.
     """
     dict_out = {}
-    dict_p8 = {
-        "L+" : 0.0,
-        "H+" : 0.0,
-        "E+" : 0.0,
-        "G+" : 0.0
-    }
+    dict_p8 = {}
     
     with open(p8) as reader:
         for line in reader:
-            data = line.split()
-            resid = int(data[1])
-            Lprob = round((float(data[4]) + float(data[6]) + float(data[7]) + float(data[8]) + float(data[9])), 4)
-            Gprob = float(data[3])
-            Hprob = float(data[2])
-            Eprob = float(data[5])
+            pline = line.split()
+            pline.pop(0)
+            data = [float(i) for i in pline]
+            resid = int(data[0])
             
-            if Lprob != 0 : dict_p8["L+"] = Lprob 
-            else: dict_p8["L+"] = 0.0
-            if Hprob != 0 : dict_p8["H+"] = Hprob
-            else: dict_p8["H+"] = 0.0
-            if Eprob != 0 : dict_p8["E+"] = Eprob
-            else: dict_p8["E+"] = 0.0
-            if Gprob != 0 : dict_p8["G+"] = Gprob
-            else: dict_p8["G+"] = 0.0
+            dict_p8["L+"] = (data[3] + data[5] + data[6] + data[7] + data[8])
+            dict_p8["H+"] = data[1]
+            dict_p8["E+"] = data[4]
+            dict_p8["G+"] = data[2]
             dict_out[resid] = dict_p8
-            dict_p8 = {"L+" : 0.0,"H+" : 0.0,"E+" : 0.0,"G+" : 0.0}
+            dict_p8 = {}
             
     return dict_out
         
@@ -194,12 +164,14 @@ def main(
     else:
         converted_chespi = chespi_probs8_convert_grouped(chespi_p8)
     
+    _output = json.dumps(converted_chespi, indent=4)
+    
     if output:
         log.info(S('saving converted CheSPI output onto disk...'))
         with open(output, mode="w") as fout:
-            json.dump(converted_chespi, fout, indent=4)
+            fout.write(_output)
     else:
-        print(converted_chespi)
+        print(_output)
     
     log.info(S('done'))
     

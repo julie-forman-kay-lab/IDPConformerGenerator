@@ -77,16 +77,14 @@ structures on a per residue basis:
 
     idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.txt
 
-For simplicity, the `-rd` flag could be used to group secondary structures into L+/H+/E+/G.
+For simplicity, secondary structures from CheSPI are grouped into L/H/E/G as defined by idpconfgen.
+If you do not want this grouping feature, please build the database above without `-rd` and run `csssconv`
+with `--full` to avoid grouping.
 To build with the CSSS file, `-csss` would have to point to the converted CheSPI file:
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.txt -et 'pairs' -xp 1 1 1 1 -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json -et 'pairs' -rs 0
 
 After some time you will see 10 conformers in the folder with the probabilistic CSSS.
-The "TYPE" in the `csssconv` output file indicates what format of DSSP codes are used.
-If a "_rd" is specified in "TYPE", idpconfgen assumes the reduced form (L+/H+/E+/G) is used.
-If a "_full" is specified in "TYPE", idpconfgen assumes singular DSSP codes are used.
-If neither "_rd" nor "_f" is specified in "TYPE", idpconfgen assumes combinations of _rd and _full are used.
 
 All IDPConfGen operations can be distributed over multiple cores. Use the flag
 :code:`-n` to indicate the number of cores you wish to use.
