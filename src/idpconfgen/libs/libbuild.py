@@ -634,8 +634,8 @@ def prepare_slice_dict(
                 
                 for am in slice_dict[lmer]: #going through each sequence match, am = altered_mer or altered_mer_P
                     ss_dict = {}
-                    ss_list = []
                     for sd in slice_dict[lmer][am]: #going through each list of slices, sd = slice()
+                        ss_list = []
                         for ss in dssp_regexes:
                             if re.match(ss, secondary[sd]):
                                 ss_list.append(sd)
