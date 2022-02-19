@@ -607,8 +607,7 @@ def prepare_slice_dict(
     slice_dict = defaultdict(dict)
     
     if csss:
-        ss_dict = {}
-        list_slice = []
+        csss_slice_dict = defaultdict(dict)
         with ProgressCounter(suffix='Searching for xmers with csss: ') as PW:
             for mer in xmers_flat:
                 lmer = len(mer)
@@ -633,42 +632,17 @@ def prepare_slice_dict(
                 if not slice_dict[lmer][altered_mer_P]:
                     slice_dict[lmer].pop(altered_mer_P)
                 
-                for am in slice_dict[lmer]: #going through each sequence match, am = altered_mer
-                    for sd in slice_dict[lmer][am]: #going through each list of slices, sd = slice_dict[lmer][altered_mer]
-                        for slc in sd: #going through each slice in the list
-                            for ss in dssp_regexes:
-                                ss_dict[ss] = []
-                                if re.match(ss, secondary(slc)):
-                                    ss_dict[ss].append(slc)
-                    slice_dict[lmer][am]=ss_dict
-                
-                '''
-                for ss in dssp_regexes:
-                    
-                    slice_dict[lmer][ss]={altered_mer:[]}
-                    for aa in aa_overlap:
-                        if re.match(ss, secondary[aa]) and len(secondary[aa]) == lmer:
-                            list_slice.append(aa)
-                    print(list_slice)
-                    slice_dict[lmer][ss][altered_mer] = list_slice
-                    if slice_dict[lmer][ss][altered_mer] == []:
-                        slice_dict[lmer][ss].pop(altered_mer)
-                    list_slice = []
-                    
-                    slice_dict[lmer][ss]={altered_mer_P:[]}
-                    for aa in aa_overlap_P:
-                        if re.match(ss, secondary[aa]) and len(secondary[aa]) == lmer:
-                            list_slice.append(aa)
-                    print(list_slice)
-                    slice_dict[lmer][ss][altered_mer_P] = list_slice
-                    if not slice_dict[lmer][ss][altered_mer_P]:
-                        slice_dict[lmer][ss].pop(altered_mer_P)
-                    if not slice_dict[lmer][ss]:
-                        slice_dict[lmer].pop(ss)
-                    list_slice = []
-                '''
-                
+                for am in slice_dict[lmer]: #going through each sequence match, am = altered_mer or altered_mer_P
+                    ss_dict = {}
+                    ss_list = []
+                    for sd in slice_dict[lmer][am]: #going through each list of slices, sd = slice()
+                        for ss in dssp_regexes:
+                            if re.match(ss, secondary[sd]):
+                                ss_list.append(sd)
+                            ss_dict[ss] = ss_list
+                    csss_slice_dict[lmer][am]=ss_dict                
                 PW.increment()
+        return csss_slice_dict
     else:
         with ProgressCounter(suffix='Searching for xmers: ') as PW:
             for mer in xmers_flat:
