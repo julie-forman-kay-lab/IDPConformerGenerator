@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+from importlib.resources import path
 import math
 import sys
 from functools import partial
@@ -280,8 +281,6 @@ ap.add_argument(
     )
 
 
-
-
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
@@ -307,6 +306,57 @@ class EnergyLogSaver:
 
 ENERGYLOGSAVER = EnergyLogSaver()
 
+def parse_CSSS(path2csss, ss_regexes):
+    """
+    Reads CSSS.JSON file into a dictionary. Contains information about
+    which secondary structure to sample per residue at a specific probability.
+    
+    Catches  and correctsinstances if the sum of all probabilities per residue
+    does not equal exactly 1.0.
+
+    Parameters
+    ----------
+    path2csss : string
+        Path to where the csss_[ID].json file is containing ss_regexes and
+        their respective probabilities.
+    
+    ss_regexes : list
+        List of DSSP codes to search for in regex form
+
+    Returns
+    -------
+    dictCSSS : dict-like
+        First key layer indicats residue number position, second key layer
+        indicates the DSSP regex to search for and the values are the probabilities.
+    
+    dssp_regexes : list
+        Refreshed list of regexes depending on what SS to look for in the CSSS.JSON file.
+        If no CSSS is used, returns the default list of dssp_regexes given by -dr.
+    """
+    dictCSSS = {}
+    dssp_regexes = ss_regexes
+    
+    if path2csss:
+        dictCSSS = read_dict_from_json(path2csss)
+        temp_dssp = []
+        prob_dssp = []
+        
+        for resid in dictCSSS:
+            for dssp in dictCSSS[resid]:
+                prob_dssp.append(dictCSSS[resid][dssp])
+                temp_dssp.append(dssp)
+            psum = sum(prob_dssp)
+            if psum != 1.0:
+                i = 0
+                # No rounding occurs here because we want an exact sum of 1.0
+                prob_dssp = [p / psum for p in prob_dssp]
+                for dssp in dictCSSS[resid]:
+                    dictCSSS[resid][dssp] = prob_dssp[i]
+                    i += 1
+            prob_dssp = []
+        dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes   
+    
+    return dictCSSS, dssp_regexes
 
 def main(
         input_seq,
@@ -358,24 +408,9 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-    dictCSSS = {}
-    if custom_sampling:
-        dictCSSS = read_dict_from_json(custom_sampling)
-        temp_dssp = []
-        prob_dssp = []
-        for resid in dictCSSS:
-            for dssp in dictCSSS[resid]:
-                prob_dssp.append(dictCSSS[resid][dssp])
-                temp_dssp.append(dssp)
-            psum = sum(prob_dssp)
-            if psum != 1.0:
-                i = 0
-                prob_dssp = [p / psum for p in prob_dssp]
-                for dssp in dictCSSS[resid]:
-                    dictCSSS[resid][dssp] = prob_dssp[i]
-                    i += 1
-            prob_dssp = []
-        dssp_regexes = list(set(temp_dssp)) # append to list only unique DSSP regexes       
+    
+    dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)    
+    
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
     

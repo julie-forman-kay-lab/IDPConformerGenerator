@@ -63,7 +63,7 @@ def chespi_probs8_convert_full(p8):
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
-        and the second key later indicates secondary structure (H/G/I/E/-/T/S/B) 
+        and the second key later indicates secondary structure (H/G/I/E/ /T/S/B) 
         as defined in DSSP. Values are their respective probabilities.
     """
     dict_out = {}
@@ -94,7 +94,7 @@ def chespi_probs8_convert_grouped(p8):
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
     Groups together DSSP secondary structures as per idpconfgen definitions.
-    If a residue has multiple SS probabilities, they are summative per L+, H+, E+ definition.
+    If a residue has multiple SS probabilities, they are summative per L, H, E, G definition.
     
     Parameters
     ----------
@@ -118,7 +118,7 @@ def chespi_probs8_convert_grouped(p8):
             data = [float(i) for i in pline]
             resid = int(data[0])
             
-            dict_p8["L+"] = (data[3] + data[5] + data[6] + data[7] + data[8])
+            dict_p8["L+"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
             dict_p8["H+"] = data[1]
             dict_p8["E+"] = data[4]
             dict_p8["G+"] = data[2]
