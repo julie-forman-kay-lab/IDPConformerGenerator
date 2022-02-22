@@ -20,6 +20,7 @@ from idpconfgen import (
     cli_bgeo,
     cli_build,
     cli_csssconv,
+    cli_makecsss,
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
@@ -58,6 +59,7 @@ Other useful routines:
     * {cli_validate._name}
     * {cli_torsionsJ._name}
     * {cli_dssppii._name}
+    * {cli_makecsss._name}
     * {cli_csssconv._name}
 """
 
@@ -90,6 +92,7 @@ libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_ssext)
 libcli.add_subparser(subparsers, cli_validate)
 libcli.add_subparser(subparsers, cli_dssppii)
+libcli.add_subparser(subparsers, cli_makecsss)
 libcli.add_subparser(subparsers, cli_csssconv)
 
 
