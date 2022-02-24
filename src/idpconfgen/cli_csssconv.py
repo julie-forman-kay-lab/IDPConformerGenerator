@@ -46,7 +46,7 @@ ap.add_argument(
     '--full',
     help="Parses the CheSPI probs8 file as is, without grouping DSSP.",
     action='store_true'
-)
+    )
 
 libcli.add_argument_output(ap)
 
