@@ -49,7 +49,7 @@ long_description = '{}\n{}'.format(
 
 setup(
     name='idpconfgen',
-    version='0.2.0',
+    version='0.2.1',
     description='Generates IDP conformers.',
     long_description=long_description,
     author='Julie Forman-Kay Lab',
