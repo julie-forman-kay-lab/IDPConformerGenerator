@@ -501,7 +501,9 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
     slices = list(it.chain.from_iterable(_))
     seqs = [resseq[slc] for slc in slices]
-
+    ssc = [dssp[ss] for ss in slices]
+    
+    secondary = '|'.join(ssc)
     primary = '|'.join(seqs)
     
     omega, phi, psi = [], [], []
@@ -531,14 +533,18 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     assert seq_angles.shape[0] == len(primary)
 
     del omega, phi, psi
+    
     # TODO:
     # save table to a file
-    return primary, seq_angles
+    return primary, secondary, seq_angles
 
 
 def prepare_slice_dict(
         primary,
+        secondary,
         input_seq,
+        dssp_regexes,
+        csss,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,
         ncores=1,
@@ -552,10 +558,23 @@ def prepare_slice_dict(
     primary : str
         A concatenated version of all primary sequences in the database.
         In the form of "QWERY|IPASDF", etc.
+    
+    secondary : str
+        A concatenated version of secondary structure codes that correspond to
+        primary. In the form of "LLLL|HHHH", etc.
 
     input_seq : str
         The 1-letter code amino-acid sequence of the conformer to construct.
 
+    dssp_regexes : list
+        List of all DSSP codes to look for in the sequence.
+        Will only be used when CSSS is activated
+        
+    csss : dict-like
+        A dictionary containing probabilities of secondary structures per
+        amino acid residue position.
+        Will only be used when CSSS is activated.
+    
     mers_size : iterable
         A iterable of integers denoting the size of the chunks to search
         for. Defaults from 1 to 5.
@@ -578,7 +597,6 @@ def prepare_slice_dict(
         dict.
     """
     
-    
     res_tolerance = res_tolerance or {}
     mers_size = make_iterable(mers_size)
 
@@ -587,17 +605,16 @@ def prepare_slice_dict(
     xmers = (get_mers(input_seq, i) for i in mers_size)
     xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
-
+    ss_dict = {}
+    
     with ProgressCounter(suffix='Searching for xmers: ') as PW:
         for mer in xmers_flat:
             lmer = len(mer)
             altered_mer = build_regex_substitutions(mer, res_tolerance)
-
             merregex = f'(?=({altered_mer}))'
-
+            
             slice_dict[lmer][altered_mer] = \
                 regex_forward_with_overlap(primary, merregex)
-
             # if no slices were found
             if not slice_dict[lmer][altered_mer]:
                 slice_dict[lmer].pop(altered_mer)
@@ -608,16 +625,31 @@ def prepare_slice_dict(
             # this is a combo with get_adjancent_angles
             merregex_P = f'(?=({altered_mer}P))'
             altered_mer_P = f'{altered_mer}_P'
+            
             slice_dict[lmer][altered_mer_P] = \
                 regex_forward_with_overlap(primary, merregex_P)
-
             # if no entrey was found
             if not slice_dict[lmer][altered_mer_P]:
                 slice_dict[lmer].pop(altered_mer_P)
             # for _s in slice_dict[lmer][mer]:
                 # assert '|' not in input_seq[_s]
             PW.increment()
-
+            
+    if csss:
+        csss_slice_dict = defaultdict(dict)        
+        for lmer in slice_dict: #lmer = 1, 2, 3, 4, 5
+            for aa in slice_dict[lmer]: #aa = altered_mer or altered_mer_P
+                # each sequence should have a new ss_dict
+                ss_dict = defaultdict(list)
+                for sd in slice_dict[lmer][aa]: #sd = slice()
+                    for ss in dssp_regexes:
+                        if re.fullmatch(ss, secondary[sd]):
+                            # save sd to ss_dict
+                            ss_dict[ss].append(sd)
+                csss_slice_dict[lmer][aa] = ss_dict
+                
+        return csss_slice_dict
+ 
     return slice_dict
 
 
