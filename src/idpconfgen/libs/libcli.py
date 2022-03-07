@@ -4,10 +4,9 @@ import json
 import sys
 from os import cpu_count
 
-from libfuncpy import pass_
 
 from idpconfgen import Path, __version__
-from idpconfgen.core.definitions import aa1to3, vdW_radii_dict
+from idpconfgen.core.definitions import vdW_radii_dict
 from idpconfgen.libs.libparse import is_valid_fasta
 from idpconfgen.libs.libio import (
     is_valid_fasta_file,
@@ -217,7 +216,7 @@ def add_subparser(parser, module):
     new_ap = parser.add_parser(
         module._name,
         usage=module._usage,
-        #prog=module._prog,
+        # prog=module._prog,
         description=module._prog + '\n\n' + module.ap.description,
         help=module._help,
         parents=[module.ap],
