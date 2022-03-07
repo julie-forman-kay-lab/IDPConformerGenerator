@@ -1,16 +1,9 @@
-"""Contain functions."""
+"""Contain functions to enhance functional programming in Python."""
+# from https://github.com/joaomcteixeira/libfuncpy
+# commit/967c4debde3f81df477f8725ba500c0eb4ea2a7e
 from contextlib import contextmanager
 from functools import partial, reduce
-from operator import (
-    lt, le, eq, ne, ge, gt,
-    add, sub, truediv, floordiv, mul, matmul, mod, pow, neg, pos,
-    contains, concat,
-    and_, or_, xor, not_, truth,
-    invert, lshift, rshift,
-    is_, is_not,
-    setitem, getitem, delitem,
-    iadd,
-    )  # noqa: F401
+from operator import is_, is_not
 
 
 def vartial(func, *args, **keywords):
