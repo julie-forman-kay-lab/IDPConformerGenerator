@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.2.2 (2022-03-07)
+------------------------------------------------------------
+
 * incorporated `libfuncpy` internally
 
 v0.2.1 (2022-03-03)
