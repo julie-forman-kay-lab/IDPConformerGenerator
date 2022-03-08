@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* corrected energy.log #162
+
 v0.2.2 (2022-03-07)
 ------------------------------------------------------------
 
