@@ -64,7 +64,7 @@ build interface has several parameters that can be use to fine tune the
 conformer construction protocol. You can read deeper instructions in the
 documentations and in the client help. The following is a good default::
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et 'pairs' -xp 1 1 1 1 -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -dr L+ -et 'pairs' -rs 0
 
 After some time you will see 10 conformers in the folder.
 
@@ -75,7 +75,7 @@ probability of secondary structures (based on DSSP codes) on a per residue basis
 The following will process CheSPI output and assign probabilities to H/G/I/E/-/T/S/B
 structures on a per residue basis:
 
-    idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.txt
+    idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.json
 
 For simplicity, secondary structures from CheSPI are grouped into L/H/E/G as defined by idpconfgen.
 If you do not want this grouping feature, please build the database above without `-rd` and run `csssconv`

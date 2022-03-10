@@ -767,6 +767,7 @@ def conformer_generator(
     ROT_COORDINATES = rotate_coordinates_Q_njit
     RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
+    SUM = np.nansum
     angles = ANGLES
     slices = SLICES
     global BGEO_full
@@ -1240,7 +1241,7 @@ def conformer_generator(
         log.info(seed_report(_msg))
 
         #print(all_atom_coords)
-        yield total_energy, all_atom_coords
+        yield SUM(total_energy), all_atom_coords
         conf_n += 1
 
 

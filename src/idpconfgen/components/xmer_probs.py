@@ -6,11 +6,10 @@ from itertools import compress
 from operator import contains
 from pathlib import Path
 
-from libfuncpy import ITEX, chainf, is_not_none, pass_, vartial
-
 from idpconfgen import log
 from idpconfgen.libs.libcalc import make_seq_probabilities
 from idpconfgen.libs.libcli import add_general_arg
+from idpconfgen.libs.libfunc import ITEX, chainf, is_not_none, pass_, vartial
 from idpconfgen.libs.libio import read_lines
 from idpconfgen.libs.libparse import convert_int_float_lines_to_dict
 from idpconfgen.logger import S, T

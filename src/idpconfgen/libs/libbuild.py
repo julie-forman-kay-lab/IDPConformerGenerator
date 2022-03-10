@@ -6,10 +6,7 @@ from functools import partial
 from itertools import cycle
 
 import numpy as np
-from libfuncpy import flatlist, make_iterable
 from numba import njit
-#For debugging - Nemo
-import sys
 
 # import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
@@ -42,6 +39,7 @@ from idpconfgen.libs.libfilter import (
     regex_forward_with_overlap,
     regex_search,
     )
+from idpconfgen.libs.libfunc import flatlist, make_iterable
 from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     get_mers,
