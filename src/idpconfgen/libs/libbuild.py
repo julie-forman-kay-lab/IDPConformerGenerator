@@ -486,7 +486,6 @@ def get_cycle_bond_type():
 #
 #    return slices, angles
 
-
 def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     """
     Read slices in the DB that belong to a single secondary structure.
@@ -498,7 +497,12 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     timed = partial(timeme, aligndb)
     _, angles, dssp, resseq = timed(db)
 
-    _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
+    # If the user doesn't care about secondary structure sampling, disregard DSSP
+    if ss_regexes == ['ANY']:
+        ss_regexes = ['A+']
+        any_dssp = re.sub(".", "A", dssp)
+            
+    _ = (regex_search(any_dssp, _regex) for _regex in ss_regexes)
     slices = list(it.chain.from_iterable(_))
     seqs = [resseq[slc] for slc in slices]
     ssc = [dssp[ss] for ss in slices]

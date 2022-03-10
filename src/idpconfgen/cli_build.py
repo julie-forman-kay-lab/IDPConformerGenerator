@@ -190,7 +190,7 @@ ap.add_argument(
 ap.add_argument(
     '-dr',
     '--dssp-regexes',
-    help='Regexes used to search in DSSP',
+    help='Regexes used to search in DSSP. `-dr ANY` will disregard DSSP.',
     default='(?=(L{2,6}))',
     nargs='+',
     )
