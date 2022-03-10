@@ -87,14 +87,14 @@ def chespi_probs8_convert_full(p8):
             resid = int(data[0])
             for i in range(1, 9):
                 prob = data[i]
-                if i == 1: dict_p8["H"] = prob
-                elif i == 2: dict_p8["G"] = prob
-                elif i == 3: dict_p8["I"] = prob
-                elif i == 4: dict_p8["E"] = prob
-                elif i == 5: dict_p8[" "] = prob
-                elif i == 6: dict_p8["T"] = prob
-                elif i == 7: dict_p8["S"] = prob
-                elif i == 8: dict_p8["B"] = prob
+                if i == 1: dict_p8["H+"] = prob
+                elif i == 2: dict_p8["G+"] = prob
+                elif i == 3: dict_p8["I+"] = prob
+                elif i == 4: dict_p8["E+"] = prob
+                elif i == 5: dict_p8["\s+"] = prob
+                elif i == 6: dict_p8["T+"] = prob
+                elif i == 7: dict_p8["S+"] = prob
+                elif i == 8: dict_p8["B+"] = prob
             dict_out[resid] = dict_p8
             dict_p8 = {}
     return dict_out
@@ -166,7 +166,7 @@ def d2D_convert_full(d2d):
                 resid = int(data[0])
                 dict_probs["H+"] = data[1]
                 dict_probs["E+"] = data[2]
-                dict_probs[" +"] = data[3]
+                dict_probs["\s+"] = data[3]
                 dict_probs["P+"] = data[4]
                 dict_out[resid] = dict_probs
                 dict_probs = {}
@@ -176,7 +176,7 @@ def d2D_convert_full(d2d):
                 resid = int(pline[1].strip())
                 dict_probs["H+"] = 0.25
                 dict_probs["E+"] = 0.25
-                dict_probs[" +"] = 0.25
+                dict_probs["\s+"] = 0.25
                 dict_probs["P+"] = 0.25
                 dict_out[resid] = dict_probs
     return dict_out
