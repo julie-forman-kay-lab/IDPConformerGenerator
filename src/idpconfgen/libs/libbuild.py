@@ -68,7 +68,7 @@ ConfMasks = namedtuple(
         'cterm',
         'non_Hs',
         'non_Hs_non_OXT',
-        'H1_N_CA_CB',
+        'H2_N_CA_CB',
         ]
     )
 
@@ -167,7 +167,7 @@ def init_confmasks(atom_labels):
     cterm : (OXT2, OXT1)
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    H1_N_CA_CB : these four atoms from the first residue
+    H2_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
     """
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
@@ -193,23 +193,25 @@ def init_confmasks(atom_labels):
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
 
-    # used to rotate the N-terminal Hs to -60 degrees to  HA during
-    # the building process
-    _H1_idx = np.where(atom_labels == 'H1')[0]
-    assert len(_H1_idx) == 1
-
-    # of the first residue
+    # for the first residue
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
     assert len(_N_CA_idx) == 2, _N_CA_idx
 
     _final_idx = np.where(np.isin(atom_labels, ('CB', 'HA3')))[0][0:1]
     assert len(_final_idx) == 1
 
-    H1_N_CA_CB = list(_H1_idx) + list(_N_CA_idx) + list(_final_idx)
-    assert len(H1_N_CA_CB) == 4
+    # used to rotate the N-terminal Hs to -60 degrees to  HA during
+    # the building process. Only used for Pro and Gly
+    # here we capture H2 because H2 exists in all atoms, so we don't break
+    # the flow (API). For Pro and Gly, these attributes are not used and
+    # that is it.
+    _H2_idx = np.where(atom_labels == 'H2')[0]
+    assert len(_H2_idx) == 1
+    H2_N_CA_CB = list(_H2_idx) + list(_N_CA_idx) + list(_final_idx)
+    assert len(H2_N_CA_CB) == 4
 
     Hterm = np.where(np.isin(atom_labels, ('H1', 'H2', 'H3')))[0]
-    assert len(Hterm) == 3
+    assert len(Hterm) in (2, 3)  # proline as no H1.
 
     conf_mask = ConfMasks(
         bb3=bb3,
@@ -222,7 +224,7 @@ def init_confmasks(atom_labels):
         cterm=cterm,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
-        H1_N_CA_CB=H1_N_CA_CB,
+        H2_N_CA_CB=H2_N_CA_CB,
         )
 
     return conf_mask
@@ -325,8 +327,8 @@ def make_list_atom_labels(input_seq, atom_labels_dictionary):
     """
     Make a list of the atom labels for an `input_seq`.
 
-    Considers the N-terminal to be protonated H1 to H3.
-    Adds also 'OXT' terminal label.
+    Considers the N-terminal to be protonated H1 to H3, or H1 only
+    for the case of Proline. Adds also 'OXT' terminal label.
 
     Parameters
     ----------
@@ -350,10 +352,14 @@ def make_list_atom_labels(input_seq, atom_labels_dictionary):
     # for consistency with the forcefield
     # TODO: parametrize? multiple forcefields?
     for atom in first_residue_atoms:
-        if atom == 'H':
+        # however, pro.pdb does not have an "H" atom.
+        if atom == 'H' and input_seq[0] != "P":
             LE(('H1', 'H2', 'H3'))
         else:
             labels.append(atom)
+
+    if input_seq[0] == "P":
+        LE(("H2", "H3"))
 
     for residue in input_seq[1:]:
         LE(atom_labels_dictionary[residue])
@@ -362,7 +368,8 @@ def make_list_atom_labels(input_seq, atom_labels_dictionary):
 
     assert Counter(labels)['N'] == len(input_seq)
     assert labels[-1] == 'OXT'
-    assert 'H1' in labels
+    if input_seq[0] != "P":
+        assert 'H1' in labels
     assert 'H2' in labels
     assert 'H3' in labels
     return labels

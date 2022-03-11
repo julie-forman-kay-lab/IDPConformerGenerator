@@ -140,6 +140,7 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
 
     assert isinstance(result, list)
     assert all(isinstance(S, slice) for S in result)  # heavy and slow!!
+    print("len result, ", len(result))
     return result
 
 
