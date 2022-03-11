@@ -736,7 +736,7 @@ sidechain_templates = {
     }
 
 # these template coordinates were created using Chimera-X daily given
-# a N-terminal at 0,0,0 and a CA along the X axis.
+# a CA-terminal at 0,0,0
 n_terminal_h_coords_at_origin = np.array([
     [ 0.087,  0.76 ,  1.245],
     [ 0.   ,  0.   ,  0.   ],
@@ -744,4 +744,15 @@ n_terminal_h_coords_at_origin = np.array([
     [-0.789,  1.241,  1.392],
     [ 0.837,  1.435,  1.189],
     [ 0.258,  0.13 ,  2.015]
+    ])
+
+# N-terminal hydrogen position templates for N-term Prolines
+# created from the pro.pdb in sidechains/amber with the AmberTools21 command
+# pdb4amber -i pro.pdb -o hhpro.pdb --dry --reduce
+n_proline_h_coord_at_origin = np.array([
+    [-0.792,-1.234, 0.000],
+    [ 0.   ,  0.   ,  0.   ],
+    [ 1.331, -0.182, -0.723],
+    [-0.243, -1.990, -0.409],
+    [-1.614, -1.109, -0.590],
     ])

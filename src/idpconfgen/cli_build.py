@@ -37,6 +37,7 @@ from idpconfgen.core.build_definitions import (
     distance_H_N,
     forcefields,
     n_terminal_h_coords_at_origin,
+    n_proline_h_coord_at_origin,
     sidechain_templates,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
@@ -744,7 +745,6 @@ def conformer_generator(
     all_atom_input_seq = input_seq
     template_input_seq = remap_sequence(all_atom_input_seq)
     template_seq_3l = translate_seq_to_3l(template_input_seq)
-    del input_seq
 
     ANY = np.any
     BUILD_BEND_H_N_C = build_bend_H_N_C
@@ -758,7 +758,10 @@ def conformer_generator(
     MAKE_COORD_Q_LOCAL = make_coord_Q
     NAN = np.nan
     NORM = np.linalg.norm
-    N_TERMINAL_H = n_terminal_h_coords_at_origin
+    # the N terminal Hs are three for all atoms but only two for Proline
+    # depending whether the first residue is a Proline, we use one template
+    # or another.
+    N_TERMINAL_H = n_proline_h_coord_at_origin if input_seq[0] == "P" else n_terminal_h_coords_at_origin  # noqa: E501
     PI2 = np.pi * 2
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RAD_60 = np.radians(60)
@@ -783,6 +786,8 @@ def conformer_generator(
     global SLICEDICT_MONOMERS
     global SLICEDICT_XMERS
     global GET_ADJ
+
+    del input_seq
 
     # these flags exist to populate the global variables in case they were not
     # populated yet. Global variables are populated through the main() function
@@ -1101,13 +1106,14 @@ def conformer_generator(
                 current_Hterm_coords = _[3:, :]
                 del _
 
-                if template_input_seq[0] != 'G':
+                # rotating the N-term H's is not needed for G and P
+                if template_input_seq[0] not in ('G', 'P'):
                     # rotates only if the first residue is not an
                     # alanie
 
                     # measure torsion angle reference H1 - HA
                     _h1_ha_angle = CALC_TORSION_ANGLES(
-                        template_coords[TEMPLATE_MASKS.H1_N_CA_CB, :]
+                        template_coords[TEMPLATE_MASKS.H2_N_CA_CB, :]
                         )[0]
 
                     # given any angle calculated along an axis, calculate how
