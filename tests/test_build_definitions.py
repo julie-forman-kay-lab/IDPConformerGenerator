@@ -152,19 +152,18 @@ def test_pdb_templates_element():
 def test_Nterm_H_connectivity():
     """Test adds H1-3 connectivities to N term and all atoms."""
     d = {
-        'A': ['H', 'C'],
-        'B': ['C', 'CB', 'O'],
-        'H': ['A'],
+        'N': ['H', 'CA'],
+        'CA': ['C', 'CB', 'N', 'HA'],
+        'H': ['CA'],
         }
 
     BD.add_Nterm_H_connectivity(d)
 
-    assert 'H1' in d['A']
-    assert 'H2' in d['A']
-    assert 'H3' in d['A']
-    assert d['B'] == ['C', 'CB', 'O']
+    assert 'H1' in d['N']
+    assert 'H2' in d['N']
+    assert 'H3' in d['N']
+    assert d['CA'] == ['C', 'CB', 'N', 'HA']
     assert 'H1' in d
     assert 'H2' in d
     assert 'H3' in d
-    assert d['H1'] == d['H2'] == d['H3']
-    assert 'A' in d['H1']
+    assert d['H1'] == d['H2'] == d['H3'] == ['N']
