@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.2.4 (2022-03-11)
+------------------------------------------------------------
+
 * implemented support for N-terminal Proline residues #166
 
 v0.2.3 (2022-03-08)
