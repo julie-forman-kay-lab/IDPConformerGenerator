@@ -207,23 +207,12 @@ def generate_residue_template_topology(
     res_covalent_bonds['MET']['SD'].extend(('CG', 'CE'))
     res_covalent_bonds['MET']['CE'].append('SD')
 
-    # asserts all atoms are considered
     for k1, v1 in res_covalent_bonds.items():
+        # asserts all atoms are considered
         assert len(v1) == len(residue_labels[k1]), k1
 
-        # add OXT connectivity
         if add_OXT:
             add_OXT_to_connectivity(v1)
-
-        ## added 'OXT' connectivity
-        #for atom, connects in v1.items():
-        #    if 'O' in connects:
-        #        connects.append('OXT')
-
-        ## this should be only 'C'
-        #v1['OXT'] = copy(v1['O'])
-        # if k1 == 'PRO':
-        #     continue
 
         if add_Nterminal_H:
             add_Nterm_H_connectivity(v1)
