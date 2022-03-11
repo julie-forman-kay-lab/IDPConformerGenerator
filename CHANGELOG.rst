@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Implemented capacity to read PDBs with names different from cull #167
+
 v0.2.4 (2022-03-11)
 ------------------------------------------------------------
 
