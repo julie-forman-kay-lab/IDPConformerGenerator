@@ -188,6 +188,31 @@ ap.add_argument(
     type=int,
     )
 
+#########################################
+ap.add_argument(
+    '--dloop',
+    help='Searches loops',
+    nargs=2,
+    default=(1, 5),
+    action=libcli.ListOfPositiveInts,
+    )
+
+ap.add_argument(
+    '--dhelix',
+    help='Searches helices.',
+    nargs=2,
+    default=None,
+    action=libcli.ListOfPositiveInts,
+    )
+
+ap.add_argument(
+    '--dstrand',
+    help='Searches strands.',
+    nargs=2,
+    default=None,
+    action=libcli.ListOfPositiveInts,
+    )
+
 ap.add_argument(
     '-dr',
     '--dssp-regexes',
@@ -196,6 +221,7 @@ ap.add_argument(
     nargs='+',
     )
 
+#########################################
 ap.add_argument(
     '-csss',
     '--custom-sampling',
