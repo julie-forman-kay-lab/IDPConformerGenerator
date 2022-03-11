@@ -5,15 +5,20 @@ import numpy as np
 import pytest
 
 from idpconfgen.libs.libfilter import (
+    REGEX_RANGE,
     aligndb,
+    make_any_overlap_regex,
+    make_helix_overlap_regex,
+    make_loop_overlap_regex,
+    make_overlap_regex,
     make_ranges,
     make_regex_combinations,
+    make_strand_overlap_regex,
     regex_forward_no_overlap,
     regex_forward_with_overlap,
     regex_has_overlap,
     regex_range,
     regex_search,
-    REGEX_RANGE,
     )
 
 
@@ -621,3 +626,84 @@ def test_regex_ranges(sequence, regex_string, expected):
     # here because is multicore the results are note sorted in order
     for i in result:
         assert i in expected, i
+
+
+@pytest.mark.parametrize(
+    's,pair,expected',
+    [
+        ("L", (1, 5), "(?=([L]{1,5}))"),
+        ("H", (2, 8), "(?=([H]{2,8}))"),
+        ("E", (3, 10), "(?=([E]{3,10}))"),
+        ("X", (4, 5), "(?=([X]{4,5}))"),
+        ("CDF", (4, 5), "(?=([CDF]{4,5}))"),
+        ]
+    )
+def test_makeoverlap_regex(s, pair, expected):
+    """Test make overlap regex."""
+    result = make_overlap_regex(s, pair)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'pair,expected',
+    [
+        ((1, 5), "(?=([L]{1,5}))"),
+        ((2, 8), "(?=([L]{2,8}))"),
+        ]
+    )
+def test_makeoverlap_regex_loop(pair, expected):
+    """Test make overlap regex."""
+    result = make_loop_overlap_regex(pair)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'pair,expected',
+    [
+        ((1, 5), "(?=([H]{1,5}))"),
+        ((2, 8), "(?=([H]{2,8}))"),
+        ]
+    )
+def test_makeoverlap_regex_helix(pair, expected):
+    """Test make overlap regex."""
+    result = make_helix_overlap_regex(pair)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'pair,expected',
+    [
+        ((1, 5), "(?=([E]{1,5}))"),
+        ((4, 8), "(?=([E]{4,8}))"),
+        ]
+    )
+def test_makeoverlap_regex_stand(pair, expected):
+    """Test make overlap regex."""
+    result = make_strand_overlap_regex(pair)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    'pair,expected',
+    [
+        ((1, 5), "(?=([LHE]{1,5}))"),
+        ((4, 8), "(?=([LHE]{4,8}))"),
+        ]
+    )
+def test_makeoverlap_regex_any(pair, expected):
+    """Test make overlap regex."""
+    result = make_any_overlap_regex(pair)
+    assert result == expected
+
+
+@pytest.mark.parametrize(
+    's,pair',
+    [
+        ("L", (5, 1)),
+        ("H", (-2, 8)),
+        ]
+    )
+def test_makeoverlap_regex_with_error(s, pair):
+    """Test make overlap regex."""
+    with pytest.raises(ValueError):
+        make_overlap_regex(s, pair)
