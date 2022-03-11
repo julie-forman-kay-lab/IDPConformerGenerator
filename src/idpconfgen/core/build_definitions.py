@@ -233,18 +233,13 @@ def generate_residue_template_topology(
 
 def add_Nterm_H_connectivity(connectivity_dict):
     """
-    Adds protons for Nterm connectivity.
+    Adds protons for Nterm covalent bond connectivity.
 
     Adds H1, H2, and H3 protons to N connectivity.
     This maintains compatibility with XML forcefields obtained
     from the OpenMM project.
     """
-    # assert 'H' in connectivity_dict, connectivity_dict
-    for atom, list_of_connects in connectivity_dict.items():
-        # if 'H' in list_of_connects:
-        if atom == 'N': # H1 through H3 should only be added to the connectivities for N atom
-            list_of_connects.extend(('H1', 'H2', 'H3'))
-
+    connectivity_dict["N"].extend(('H1', 'H2', 'H3'))
     for h in ('H1', 'H2', 'H3'):
         connectivity_dict[h] = ["N"]
 
