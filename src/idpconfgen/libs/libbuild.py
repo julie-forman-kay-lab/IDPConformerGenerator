@@ -497,7 +497,7 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
 
     # If the user doesn't care about secondary structure sampling, disregard DSSP
     if ss_regexes == ['ANY']:
-        ss_regexes = ['(?=(A{1,6}))']
+        ss_regexes = ['A+']
         any_dssp = re.sub(".", "A", dssp)
         _ = (regex_search(any_dssp, _regex) for _regex in ss_regexes)
     else:
