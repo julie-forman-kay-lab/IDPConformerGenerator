@@ -480,7 +480,19 @@ def main(
         dssp_regexes = make_overlap_regex(''.join(dssp_ss_keys.valid), xmer_range)
     elif custom_sampling:
         dictCSSS, csss_dssp_regexes = parse_CSSS(custom_sampling)
+
+        if "X" in csss_dssp_regexes:
+            _all_valid_ss = ''.join(dssp_ss_keys.valid)
+            csss_dssp_regexes.remove("X")
+            csss_dssp_regexes.add(_all_valid_ss)
+            for _key in dictCSSS.keys():
+                if "X" in dictCSSS[_key]:
+                    dictCSSS[_key][_all_valid_ss] = dictCSSS[_key].pop("X")
+            print(csss_dssp_regexes)
+
         dssp_regexes = [make_overlap_regex(_s, xmer_range) for _s in csss_dssp_regexes]
+
+
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
         if dloop:
@@ -1463,7 +1475,6 @@ def get_adjacent_angles(
                     pcsss = RC(lss, p=lssprob)
                     lss.clear()
                     lssprob.clear()
-                    print("KEYS: ", plen, pt_sub, pcsss)
                     angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()

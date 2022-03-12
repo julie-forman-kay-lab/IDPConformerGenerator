@@ -16,7 +16,7 @@ REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 # a more general version of the above is: r'\{\d*\,*\d*\}' but this would
 # accept also r'{}' which is not desired
 # also we consider \{\d+\} for simplicity of the algorithm
-REGEX_RANGE_CHAR = re.compile(r'((\w)\{|\[(\w+)\]\{)')
+REGEX_RANGE_CHAR = re.compile(r'((\w)\{|\[([\w ]+)\]\{)')
 
 
 def make_overlap_regex(s, range_):
@@ -24,7 +24,7 @@ def make_overlap_regex(s, range_):
     i, j = range_
     if any(_ < 1 for _ in range_):
         raise ValueError(f"Range must be positive: {range_!r}")
-    if j <= i:
+    if j < i:
         raise ValueError(f"End must be higher than start: {range_!r}")
     # (?=([LHE]{1,5})), for example.
     return r"(?=([" + s + r"]{" + str(i) + "," + str(j) + r"}))"

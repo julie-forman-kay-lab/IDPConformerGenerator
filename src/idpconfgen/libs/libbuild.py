@@ -658,7 +658,7 @@ def prepare_slice_dict(
                 ss_dict = defaultdict(list)
                 for sd in slice_dict[lmer][aa]: #sd = slice()
                     for ss in dssp_regexes:
-                        if re.fullmatch(f"{ss}+", secondary[sd]):
+                        if re.fullmatch(f"[{ss}]+", secondary[sd]):
                             # save sd to ss_dict
                             ss_dict[ss].append(sd)
                 csss_slice_dict[lmer][aa] = ss_dict
