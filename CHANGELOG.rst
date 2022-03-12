@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* dropped tox-conda because it is not needed for this project #169
+
 v0.2.5 (2022-03-11)
 ------------------------------------------------------------
 
