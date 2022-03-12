@@ -477,6 +477,7 @@ def main(
     print(dssp_regexes)
 
     dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)
+    print(dssp_regexes)
 
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
@@ -1448,8 +1449,8 @@ def get_adjacent_angles(
                         lss.append(ss) #list of possible secondary structures for a given residue
                         lssprob.append(csss[str(cr+1)][ss]) #list of possible probabilities for each ss
                     pcsss = RC(lss, p=lssprob)
-                    lss = []
-                    lssprob = []
+                    lss.clear()
+                    lssprob.clear()
                     angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
