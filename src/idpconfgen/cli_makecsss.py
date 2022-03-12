@@ -77,7 +77,7 @@ def parse_custom_pattern(cp):
             end_res = int(res_range[1])
             for i in range(start_res, end_res+1):
                 if i in respro:
-                    log.info(S(f'Warning: propensities for residue {i} has been changed due to overlap in `-cp`.'))
+                    log.info(S(f'Warning: propensities for residue {i} have been changed due to overlap in `-cp`.'))
                 else:
                     respro.append(i)
                 dict_out[i][split_gp[1]] = float(split_gp[2])
