@@ -378,7 +378,7 @@ def test_regex_forward_with_overlap(seq, regex, expected_slices):
     )
 def test_regex_forward_no_overlap(seq, regex, expected_slices):
     """."""
-    result = regex_forward_no_overlap(seq, re.compile(regex))
+    result = regex_forward_no_overlap(seq, regex)
 
     assert len(result) == len(expected_slices)
     # the line bellow does not report on which slice is wrong

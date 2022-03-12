@@ -347,10 +347,14 @@ def regex_forward_no_overlap(sequence, regex):
 
     Using expressions such as r'(?=(L))' give not correct results.
     """
+    # this function is not used currently
+    # adding an assert here to cause an error incase it is used
+    # unwanted
+    assert '(' not in regex and ')' not in regex
+
     # m.span() is used for regexes without overlap
     # using m.start(1) would not work here.
     # See regex_forward_with_overlap
-    assert False
     regex_c = re.compile(regex)
     return [slice(*m.span()) for m in regex_c.finditer(sequence)]
 
