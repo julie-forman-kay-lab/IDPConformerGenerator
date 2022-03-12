@@ -67,6 +67,13 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
+from idpconfgen.libs.libfilter import (
+    make_any_overlap_regex,
+    make_helix_overlap_regex,
+    make_loop_overlap_regex,
+    make_overlap_regex,
+    make_strand_overlap_regex,
+    )
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
@@ -214,10 +221,9 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-dr',
-    '--dssp-regexes',
+    '--duser',
     help='Regexes used to search in DSSP',
-    default='(?=(L{2,6}))',
+    default=None,
     nargs='+',
     )
 
@@ -333,11 +339,12 @@ class EnergyLogSaver:
 
 ENERGYLOGSAVER = EnergyLogSaver()
 
+
 def parse_CSSS(path2csss, ss_regexes):
     """
     Reads CSSS.JSON file into a dictionary. Contains information about
     which secondary structure to sample per residue at a specific probability.
-    
+
     Catches  and correctsinstances if the sum of all probabilities per residue
     does not equal exactly 1.0.
 
@@ -346,7 +353,7 @@ def parse_CSSS(path2csss, ss_regexes):
     path2csss : string
         Path to where the csss_[ID].json file is containing ss_regexes and
         their respective probabilities.
-    
+
     ss_regexes : list
         List of DSSP codes to search for in regex form
 
@@ -355,19 +362,20 @@ def parse_CSSS(path2csss, ss_regexes):
     dictCSSS : dict-like
         First key layer indicats residue number position, second key layer
         indicates the DSSP regex to search for and the values are the probabilities.
-    
+        Returns empty dict if `path2csss` evalutes to False.
+
     dssp_regexes : list
         Refreshed list of regexes depending on what SS to look for in the CSSS.JSON file.
         If no CSSS is used, returns the default list of dssp_regexes given by -dr.
     """
     dictCSSS = {}
     dssp_regexes = ss_regexes
-    
+
     if path2csss:
         dictCSSS = read_dict_from_json(path2csss)
         temp_dssp = []
         prob_dssp = []
-        
+
         for resid in dictCSSS:
             for dssp in dictCSSS[resid]:
                 prob_dssp.append(dictCSSS[resid][dssp])
@@ -381,15 +389,21 @@ def parse_CSSS(path2csss, ss_regexes):
                     dictCSSS[resid][dssp] = prob_dssp[i]
                     i += 1
             prob_dssp = []
-        dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes   
-    
+        dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes
+
     return dictCSSS, dssp_regexes
+
 
 def main(
         input_seq,
         database,
         custom_sampling,
-        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        #dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        dloop=(1, 5),
+        dstrand=None,
+        dhelix=None,
+        duser=None,
+        dany=None,
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -435,14 +449,31 @@ def main(
 
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-    
-    dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)    
-    
+
+
+    #### reads regexes regexes
+    if dany:
+        dssp_regexes = make_overlap_regex("LHE", dany)
+    elif any((dloop, dhelix, dstrand)):
+        dssp_regexes = []
+        if dloop:
+            dssp_regexes.append(make_loop_overlap_regex(dloop))
+        if dhelix:
+            dssp_regexes.append(make_helix_overlap_regex(dhelix))
+        if dstrand:
+            dssp_regexes.append(make_strand_overlap_regex(dstrand))
+    elif duser:
+        dssp_regexes = duser
+    else:
+        raise ValueError("One option is missing.")
+
+    dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)
+
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
-    
+
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
-    
+
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         secondary,
@@ -452,7 +483,7 @@ def main(
         xmer_probs_tmp.sizes,
         residue_substitutions,
     )
-    
+
     remove_empty_keys(SLICEDICT_XMERS)
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
@@ -1367,7 +1398,7 @@ def get_adjacent_angles(
     slice_dict : dict-like
         A dictionary containing the chunks strings as keys and as values
         lists with slice objects.
-    
+
     csss : dict-like
         A dictionary containing probabilities of secondary structures per
         amino acid residue position.

@@ -57,3 +57,16 @@ def test_ap_dSS_with_error(command, dtuples_bad):
     with pytest.raises(SystemExit) as err:
         ap.parse_args(f'-db dummy.json -seq AAAAA --{command} {one} {two}'.split())  # noqa: E501
     assert err.value.code == 2
+
+
+@pytest.mark.parametrize(
+    'command,one,two',
+    [
+        ('duser', "L+", "H+"),
+        ],
+    )
+def test_duser_argument(command, one, two):
+    """Test dloop argument."""
+    cmd = ap.parse_args(f'-db dummy.json -seq AAAAA --{command} {one} {two}'.split())  # noqa: E501
+    d = vars(cmd)
+    assert d[command] == [one, two]
