@@ -7,6 +7,7 @@ import numpy as np
 
 from idpconfgen import log
 from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import make_list_if_not
 
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
@@ -15,7 +16,7 @@ REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 # a more general version of the above is: r'\{\d*\,*\d*\}' but this would
 # accept also r'{}' which is not desired
 # also we consider \{\d+\} for simplicity of the algorithm
-REGEX_RANGE_CHAR = re.compile(r'\w\{')
+REGEX_RANGE_CHAR = re.compile(r'((\w)\{|\[(\w+)\]\{)')
 
 
 def make_overlap_regex(s, range_):
@@ -136,6 +137,18 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
     """
     Search for regex in sequence.
 
+    Parameters
+    ----------
+    sequence : str
+        The sequence where to apply the regex.
+
+    regex_string : str
+        The regex to search for.
+
+    regex_range : compiled regex
+        A regex to apply in `regex_string` to identify if `regex_string`
+        refers to a range.
+
     Return
     ------
     list of slices
@@ -149,9 +162,8 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
         result = regex_range(sequence, regex_string, **kwargs)
 
     else:
-        overlap = regex_has_overlap(regex_string)
         func = regex_forward_with_overlap \
-            if overlap \
+            if regex_has_overlap(regex_string) \
             else regex_forward_no_overlap
         result = func(sequence, regex_string)
 
@@ -242,7 +254,9 @@ def make_ranges(
 
     # examples of i according to `prev`
     # 'L{', 'H{'
-    chars = [i[:-1] for i in char_rex.findall(regex_string)]
+    chars = []
+    for i in char_rex.findall(regex_string):
+        chars.append(i[1] or i[2])
 
     # yes, I tried to write this in a list comprehension, but these are
     # 3 for loops. I thought is just more readable to make it explicit
@@ -297,8 +311,18 @@ def make_regex_combinations(ranges, chars, pre=None, suf=None):
     pre = pre or ''
     suf = suf or ''
     regex_combinations = []
+
+    def make_group(c):
+        if len(c) > 1:
+            return f"[{c}]"
+        return c
+
+    chars = make_list_if_not(chars)
     for range_tuple in it.product(*ranges):
-        c_regex = (c + '{' + str(ii) + '}' for ii, c in zip(range_tuple, chars))
+        c_regex = (
+            make_group(c) + '{' + str(ii) + '}'
+            for ii, c in zip(range_tuple, chars)
+            )
         regex_combinations.append(f"{pre}{''.join(c_regex)}{suf}")
     return regex_combinations
 

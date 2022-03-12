@@ -40,6 +40,13 @@ type2string = {
     }
 
 
+def make_list_if_not(item):
+    """Put `item` into a list if item is not list or tuple-lik if item is not list or tuple-like."""
+    if isinstance(item, (str, int, float)):
+        return [item]
+    return item
+
+
 def get_diff_between_groups(group1, group2):
     """Get difference between groups as a set."""
     return set(group1).difference(set(group2))

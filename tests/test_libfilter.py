@@ -29,7 +29,14 @@ from idpconfgen.libs.libfilter import (
         ('(?=(L{,6}))', True),
         ('(?=(L{6,}))', True),
         ('(?=(L{6}))', True),
+        ('(?=([L]{6}))', True),
+        ('(?=([L]{1,6}))', True),
+        ('(?=([LH]{2,6}))', True),
+        ('(?=([LHE]{,6}))', True),
+        ('(?=([LHE]{3,6}))', True),
         ('(?=(LLLH))', False),
+        ('L+', False),
+        ('L{1,5}', True),
         ]
     )
 def test_REX_RANGE_regex(regex, expected):
@@ -408,6 +415,18 @@ def test_regex_forward_no_overlap(seq, regex, expected_slices):
             [range(1, 7), range(1, 11), range(1, 7)],
             ['L', 'E', 'L'],
             ),
+        (
+            r'(?=([LHE]{1,5}))',
+            20,
+            [range(1, 6)],
+            ['LHE'],  # add this to the other function, is passing alist
+            ),
+        (
+            r'(?=([LHE]{1,5}K{3}))',
+            20,
+            [range(1, 6), range(3, 4)],
+            ['LHE', 'K'],
+            ),
         ]
     )
 def test_make_range(in1, max_range, expected_ranges, expected_chars):
@@ -436,15 +455,54 @@ def test_make_range(in1, max_range, expected_ranges, expected_chars):
             ['X{4}', 'X{5}', 'X{6}', 'X{7}'],
             ),
         (
+            [range(1, 6)],
+            ['LHE'],
+            r'(?=(',
+            r'))',
+            [
+                r'(?=([LHE]{1}))',
+                r'(?=([LHE]{2}))',
+                r'(?=([LHE]{3}))',
+                r'(?=([LHE]{4}))',
+                r'(?=([LHE]{5}))',
+                ]
+            ),
+        (
+            [range(1, 6), range(3, 4)],
+            ['LHE', 'K'],
+            r'(?=(',
+            r'))',
+            [
+                r'(?=([LHE]{1}K{3}))',
+                r'(?=([LHE]{2}K{3}))',
+                r'(?=([LHE]{3}K{3}))',
+                r'(?=([LHE]{4}K{3}))',
+                r'(?=([LHE]{5}K{3}))',
+                ]
+            ),
+        (
+            [range(1, 6)],
+            'LHE',
+            r'(?=(',
+            r'))',
+            [
+                r'(?=([LHE]{1}))',
+                r'(?=([LHE]{2}))',
+                r'(?=([LHE]{3}))',
+                r'(?=([LHE]{4}))',
+                r'(?=([LHE]{5}))',
+                ]
+            ),
+        (
             [range(1, 2), range(5, 9)],
             ['L', 'E'],
             r'(?=(',
             r'))',
             [
-                '(?=(L{1}E{5}))',
-                '(?=(L{1}E{6}))',
-                '(?=(L{1}E{7}))',
-                '(?=(L{1}E{8}))',
+                r'(?=(L{1}E{5}))',
+                r'(?=(L{1}E{6}))',
+                r'(?=(L{1}E{7}))',
+                r'(?=(L{1}E{8}))',
                 ],
             ),
         ]
@@ -468,6 +526,8 @@ def test_make_regex_combinations(
     [
         ('L{4,5}', False),
         ('(?=(L{4,5}))', True),
+        ('(?=(L))', True),
+        ('(?=([LHE]{2,5}))', True),
         ],
     )
 def test_regex_has_overlap(in1, expected):
