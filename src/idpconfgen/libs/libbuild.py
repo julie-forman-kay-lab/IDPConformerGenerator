@@ -554,8 +554,8 @@ def prepare_slice_dict(
         primary,
         secondary,
         input_seq,
-        dssp_regexes,
-        csss,
+        csss=False,
+        dssp_regexes=None,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,
         ncores=1,
@@ -577,14 +577,14 @@ def prepare_slice_dict(
     input_seq : str
         The 1-letter code amino-acid sequence of the conformer to construct.
 
+    csss : bool
+        Whether to update the output according ot the CSSS probabilities of
+        secondary structures per amino acid residue position. Will only be used
+        when CSSS is activated.
+
     dssp_regexes : list
         List of all DSSP codes to look for in the sequence.
         Will only be used when CSSS is activated
-
-    csss : dict-like
-        A dictionary containing probabilities of secondary structures per
-        amino acid residue position.
-        Will only be used when CSSS is activated.
 
     mers_size : iterable
         A iterable of integers denoting the size of the chunks to search
@@ -658,7 +658,7 @@ def prepare_slice_dict(
                 ss_dict = defaultdict(list)
                 for sd in slice_dict[lmer][aa]: #sd = slice()
                     for ss in dssp_regexes:
-                        if re.fullmatch(ss, secondary[sd]):
+                        if re.fullmatch(f"[{ss}]+", secondary[sd]):
                             # save sd to ss_dict
                             ss_dict[ss].append(sd)
                 csss_slice_dict[lmer][aa] = ss_dict

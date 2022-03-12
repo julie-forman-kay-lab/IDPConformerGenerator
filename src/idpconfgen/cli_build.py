@@ -8,6 +8,7 @@ USAGE:
     $ idpconfgen build -db torsions.json -seq MMMMMMM...
 
 """
+import sys
 import argparse
 from importlib.resources import path
 import math
@@ -40,6 +41,7 @@ from idpconfgen.core.build_definitions import (
     n_proline_h_coord_at_origin,
     sidechain_templates,
     )
+from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
@@ -197,35 +199,38 @@ ap.add_argument(
 
 #########################################
 ap.add_argument(
-    '--dloop',
+    '--dloop_off',
     help='Searches loops',
-    nargs=2,
-    default=(1, 5),
-    action=libcli.ListOfPositiveInts,
+    action="store_true",
+    #nargs=2,
+    #default=(1, 5),
+    #action=libcli.ListOfPositiveInts,
     )
 
 ap.add_argument(
     '--dhelix',
     help='Searches helices.',
-    nargs=2,
-    default=None,
-    action=libcli.ListOfPositiveInts,
+    action="store_true",
+    #nargs=2,
+    #default=None,
+    #action=libcli.ListOfPositiveInts,
     )
 
 ap.add_argument(
     '--dstrand',
     help='Searches strands.',
-    nargs=2,
-    default=None,
-    action=libcli.ListOfPositiveInts,
+    action="store_true",
+    #nargs=2,
+    #default=None,
+    #action=libcli.ListOfPositiveInts,
     )
 
 ap.add_argument(
     '--dany',
     help='Searches only based on sequence identity.',
-    nargs=2,
-    default=None,
-    action=libcli.ListOfPositiveInts,
+    #nargs=2,
+    #default=None,
+    #action=libcli.ListOfPositiveInts,
     )
 
 ap.add_argument(
@@ -348,7 +353,7 @@ class EnergyLogSaver:
 ENERGYLOGSAVER = EnergyLogSaver()
 
 
-def parse_CSSS(path2csss, ss_regexes):
+def parse_CSSS(path2csss):
     """
     Reads CSSS.JSON file into a dictionary. Contains information about
     which secondary structure to sample per residue at a specific probability.
@@ -362,42 +367,35 @@ def parse_CSSS(path2csss, ss_regexes):
         Path to where the csss_[ID].json file is containing ss_regexes and
         their respective probabilities.
 
-    ss_regexes : list
-        List of DSSP codes to search for in regex form
-
     Returns
     -------
-    dictCSSS : dict-like
+    dict-like
         First key layer indicats residue number position, second key layer
         indicates the DSSP regex to search for and the values are the probabilities.
         Returns empty dict if `path2csss` evalutes to False.
 
-    dssp_regexes : list
+    list
         Refreshed list of regexes depending on what SS to look for in the CSSS.JSON file.
         If no CSSS is used, returns the default list of dssp_regexes given by -dr.
     """
-    dictCSSS = {}
-    dssp_regexes = ss_regexes
+    dictCSSS = read_dict_from_json(path2csss)
+    temp_dssp = []
+    prob_dssp = []
 
-    if path2csss:
-        dictCSSS = read_dict_from_json(path2csss)
-        temp_dssp = []
-        prob_dssp = []
-
-        for resid in dictCSSS:
+    for resid in dictCSSS:
+        for dssp in dictCSSS[resid]:
+            prob_dssp.append(dictCSSS[resid][dssp])
+            temp_dssp.append(dssp)
+        psum = sum(prob_dssp)
+        if psum != 1.0:
+            i = 0
+            # No rounding occurs here because we want an exact sum of 1.0
+            prob_dssp = [p / psum for p in prob_dssp]
             for dssp in dictCSSS[resid]:
-                prob_dssp.append(dictCSSS[resid][dssp])
-                temp_dssp.append(dssp)
-            psum = sum(prob_dssp)
-            if psum != 1.0:
-                i = 0
-                # No rounding occurs here because we want an exact sum of 1.0
-                prob_dssp = [p / psum for p in prob_dssp]
-                for dssp in dictCSSS[resid]:
-                    dictCSSS[resid][dssp] = prob_dssp[i]
-                    i += 1
-            prob_dssp = []
-        dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes
+                dictCSSS[resid][dssp] = prob_dssp[i]
+                i += 1
+        prob_dssp = []
+    dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes
 
     return dictCSSS, dssp_regexes
 
@@ -407,11 +405,11 @@ def main(
         database,
         custom_sampling,
         #dssp_regexes=r'L+',#r'(?=(L{2,6}))',
-        dloop=(1, 5),
-        dstrand=None,
-        dhelix=None,
-        duser=None,
-        dany=None,
+        dloop_off=False,
+        dstrand=False,
+        dhelix=False,
+        duser=False,
+        dany=False,
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -429,6 +427,18 @@ def main(
 
     Distributes over processors.
     """
+    # ensuring some parameters
+    dloop = not dloop_off
+    _def_loops = any((dloop, dhelix, dstrand))
+    if sum(bool(i) for i in (_def_loops, dany, duser, bool(custom_sampling))) > 1:
+        raise ValueError("Note (dloop, dstrand, dhelix), dany, duser, and custom_sampling are mutually exclusive.")
+
+
+
+
+
+
+
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
@@ -458,47 +468,61 @@ def main(
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
 
+    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+    print('xmer_probs, ', xmer_probs_tmp)
 
     #### reads regexes regexes
+    xmer_range = xmer_probs_tmp.sizes[0], xmer_probs_tmp.sizes[-1]
+
+    dictCSSS = False
+    csss_dssp_regexes = None
     if dany:
-        dssp_regexes = make_overlap_regex("LHE", dany)
+        dssp_regexes = make_overlap_regex(''.join(dssp_ss_keys.valid), xmer_range)
+    elif custom_sampling:
+        dictCSSS, csss_dssp_regexes = parse_CSSS(custom_sampling)
+
+        if "X" in csss_dssp_regexes:
+            _all_valid_ss = ''.join(dssp_ss_keys.valid)
+            csss_dssp_regexes.remove("X")
+            csss_dssp_regexes.add(_all_valid_ss)
+            for _key in dictCSSS.keys():
+                if "X" in dictCSSS[_key]:
+                    dictCSSS[_key][_all_valid_ss] = dictCSSS[_key].pop("X")
+            print(csss_dssp_regexes)
+
+        dssp_regexes = [make_overlap_regex(_s, xmer_range) for _s in csss_dssp_regexes]
+
+
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
         if dloop:
-            dssp_regexes.append(make_loop_overlap_regex(dloop))
+            dssp_regexes.append(make_loop_overlap_regex(xmer_range))
         if dhelix:
-            dssp_regexes.append(make_helix_overlap_regex(dhelix))
+            dssp_regexes.append(make_helix_overlap_regex(xmer_range))
         if dstrand:
-            dssp_regexes.append(make_strand_overlap_regex(dstrand))
+            dssp_regexes.append(make_strand_overlap_regex(xmer_range))
     elif duser:
         dssp_regexes = duser
     else:
         raise ValueError("One option is missing.")
-    print(dssp_regexes)
 
-    dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)
-    print(dssp_regexes)
-
+    print(">>>>>>>>>>>> ", dssp_regexes)
     primary, secondary, ANGLES = \
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
-
-    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
-    print('xmer_probs, ', xmer_probs_tmp)
 
     # these are the slices from which to samle the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         secondary,
         input_seq,
-        dssp_regexes,
-        dictCSSS,
-        xmer_probs_tmp.sizes,
+        csss=bool(dictCSSS),
+        dssp_regexes=csss_dssp_regexes,
+        mers_size=xmer_probs_tmp.sizes,
         res_tolerance=residue_substitutions,
-    )
+        )
 
     remove_empty_keys(SLICEDICT_XMERS)
     print(SLICEDICT_XMERS.keys())
-    #print(SLICEDICT_XMERS[1])
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
@@ -1467,7 +1491,6 @@ def get_adjacent_angles(
             else:
                 break
         else:
-            log.debug(plen, primer_template, seq[cr:cr + plen])
             # raise AssertionError to avoid `python -o` silencing
             raise AssertionError('The code should not arrive here')
 
