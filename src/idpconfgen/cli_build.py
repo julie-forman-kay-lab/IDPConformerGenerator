@@ -227,6 +227,12 @@ ap.add_argument(
     nargs='+',
     )
 
+ap.add_argument(
+    '--dany',
+    help='Searches only based on sequence identity.',
+    action="store_true",
+    )
+
 #########################################
 ap.add_argument(
     '-csss',
