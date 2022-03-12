@@ -552,10 +552,10 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
 
 def prepare_slice_dict(
         primary,
-        secondary,
         input_seq,
         csss=False,
         dssp_regexes=None,
+        secondary=None,
         mers_size=(1, 2, 3, 4, 5),
         res_tolerance=None,
         ncores=1,
@@ -564,15 +564,39 @@ def prepare_slice_dict(
     """
     Prepare a dictionary mapping chunks to slices in `primary`.
 
+    Protocol
+    --------
+
+    1) The input sequence is split into all different possible smaller peptides
+    according to the `mers_size` tuple. Let's call these smaller peptides,
+    XMERS.
+
+    2) We search in the `primary` string where are all possible sequence matches
+    for each of the XMERS. And, we consider possible residue substitution in the
+    XMERS according to the `res_tolerance` dictionary, if given.
+
+    2.1) the found positions are saved in a list of slice objects that populates
+    the final dictionary (see Return section).
+
+    2.2) We repeat the process but considering the XMER can be followed by a
+    proline.
+
+    2.3) We save in the dictionary only those entries for which we find matches
+    in the `primary`.
+
+    3) optional if `csss` is given. Here, we rearrange the output dictionary so
+    it becomes compatible with the build process. The process goes as follows:
+
+    3.1) For each slice found in 2) we inspect the `secondary` string if it
+    matches any of the `dssp_regex`. If it matches we consider that slice to the
+    chunk-size, the XMER identify, the DSSP key. This allow us in the build
+    process to specify which SS to sample for specific regions of the conformer.
+
     Parameters
     ----------
     primary : str
         A concatenated version of all primary sequences in the database.
         In the form of "QWERY|IPASDF", etc.
-
-    secondary : str
-        A concatenated version of secondary structure codes that correspond to
-        primary. In the form of "LLLL|HHHH", etc.
 
     input_seq : str
         The 1-letter code amino-acid sequence of the conformer to construct.
@@ -582,9 +606,13 @@ def prepare_slice_dict(
         secondary structures per amino acid residue position. Will only be used
         when CSSS is activated.
 
-    dssp_regexes : list
+    dssp_regexes : list-like
         List of all DSSP codes to look for in the sequence.
-        Will only be used when CSSS is activated
+        Will only be used when `csss` is True.
+
+    secondary : str
+        A concatenated version of secondary structure codes that correspond to
+        primary. In the form of "LLLL|HHHH", etc. Only needed if `csss` True.
 
     mers_size : iterable
         A iterable of integers denoting the size of the chunks to search
@@ -601,11 +629,17 @@ def prepare_slice_dict(
     Return
     ------
     dict
-        A dict with the given mapping. First key-level of the dict
-        is the length of the chunks, hence, integers.
-        The second key level are the residue chunks found in the `primary`.
-        A chunk in input_seq but not in `primary` is removed from the
-        dict.
+        A dict with the given mapping:
+
+            1) First key-level of the dict is the length of the chunks, hence,
+            integers.
+
+            2) The second key level are the residue chunks found in the
+            `primary`. A chunk in input_seq but not in `primary` is removed
+            from the dict.
+
+            3) only if `csss` is True. Adds a new layer organizing the slice
+            objects with the SS keys.
     """
 
     res_tolerance = res_tolerance or {}
@@ -613,7 +647,6 @@ def prepare_slice_dict(
 
     log.info('preparing regex xmers')
 
-    print("merx_size ", mers_size)
     xmers = (get_mers(input_seq, i) for i in mers_size)
     xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
@@ -628,9 +661,6 @@ def prepare_slice_dict(
             matches_ = regex_forward_with_overlap(primary, merregex)
             if matches_:
                 slice_dict[lmer][altered_mer] = matches_
-            # if no slices were found
-            #if not slice_dict[lmer][altered_mer]:
-                #slice_dict[lmer].pop(altered_mer)
 
             # this is a trick to find the sequence that are proceeded
             # by Proline. Still, these are registered in the "lmer" size
@@ -643,11 +673,6 @@ def prepare_slice_dict(
             matches_ = regex_forward_with_overlap(primary, merregex_P)
             if matches_:
                 slice_dict[lmer][altered_mer_P] = matches_
-            # if no entrey was found
-            #if not slice_dict[lmer][altered_mer_P]:
-                #slice_dict[lmer].pop(altered_mer_P)
-            # for _s in slice_dict[lmer][mer]:
-                # assert '|' not in input_seq[_s]
             PW.increment()
 
     if csss:
