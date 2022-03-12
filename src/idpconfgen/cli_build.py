@@ -230,7 +230,7 @@ ap.add_argument(
     help=(
         'Samples the database based on sequence identity only. '
         'Activating this option disregards any secondary structure annotation. '
-        'Requires --dloop-of.'
+        'Requires --dloop-off.'
         ),
     action="store_true",
     )
@@ -242,7 +242,7 @@ ap.add_argument(
         'regular expressions for the database sampling process. '
         'You only want to use this option if you know how the code works '
         'internally. Use this option instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-of.'
+        '--dany. Requires --dloop-off.'
         ),
     default=None,
     nargs='+',
