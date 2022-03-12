@@ -221,16 +221,18 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '--dany',
+    help='Searches only based on sequence identity.',
+    nargs=2,
+    default=None,
+    action=libcli.ListOfPositiveInts,
+    )
+
+ap.add_argument(
     '--duser',
     help='Regexes used to search in DSSP',
     default=None,
     nargs='+',
-    )
-
-ap.add_argument(
-    '--dany',
-    help='Searches only based on sequence identity.',
-    action="store_true",
     )
 
 #########################################
@@ -472,6 +474,7 @@ def main(
         dssp_regexes = duser
     else:
         raise ValueError("One option is missing.")
+    print(dssp_regexes)
 
     dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)
 
@@ -479,7 +482,9 @@ def main(
         read_db_to_slices_given_secondary_structure(database, dssp_regexes)
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+    print('xmer_probs, ', xmer_probs_tmp)
 
+    # these are the slices from which to samle the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         secondary,
@@ -487,10 +492,12 @@ def main(
         dssp_regexes,
         dictCSSS,
         xmer_probs_tmp.sizes,
-        residue_substitutions,
+        res_tolerance=residue_substitutions,
     )
 
     remove_empty_keys(SLICEDICT_XMERS)
+    print(SLICEDICT_XMERS.keys())
+    #print(SLICEDICT_XMERS[1])
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 

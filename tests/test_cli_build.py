@@ -49,7 +49,7 @@ def test_ap_dsecondary_structure(command, dtuples_good):
 
 @pytest.mark.parametrize(
     'command',
-    ['dloop', 'dhelix', 'dstrand'],
+    ['dloop', 'dhelix', 'dstrand', 'dany'],
     )
 def test_ap_dSS_with_error(command, dtuples_bad):
     """Test dloop argument error on negative numbers."""
@@ -70,17 +70,3 @@ def test_duser_argument(command, one, two):
     cmd = ap.parse_args(f'-db dummy.json -seq AAAAA --{command} {one} {two}'.split())  # noqa: E501
     d = vars(cmd)
     assert d[command] == [one, two]
-
-
-def test_dany_argument_true():
-    """Test dany argument."""
-    cmd = ap.parse_args('-db dummy.json -seq AAAAA --dany'.split())
-    d = vars(cmd)
-    assert d["dany"] is True
-
-
-def test_dany_argument_false():
-    """Test dany argument."""
-    cmd = ap.parse_args('-db dummy.json -seq AAAAA'.split())
-    d = vars(cmd)
-    assert d["dany"] is False

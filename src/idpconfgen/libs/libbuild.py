@@ -44,6 +44,7 @@ from idpconfgen.libs.libio import read_dictionary_from_disk
 from idpconfgen.libs.libparse import (
     get_mers,
     translate_seq_to_3l,
+    make_list_if_not,
     )
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
 
@@ -494,6 +495,11 @@ def get_cycle_bond_type():
 
 def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     """
+    Read the sequence, dssp, and angles acording to regex search.
+
+    ss_regexes define what we search in the database.
+
+
     Read slices in the DB that belong to a single secondary structure.
 
     Concatenates primary sequences accordingly.
@@ -503,13 +509,13 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     timed = partial(timeme, aligndb)
     _, angles, dssp, resseq = timed(db)
 
-    _ = (regex_search(dssp, _regex) for _regex in ss_regexes)
+    _ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
     slices = list(it.chain.from_iterable(_))
     seqs = [resseq[slc] for slc in slices]
     ssc = [dssp[ss] for ss in slices]
 
-    secondary = '|'.join(ssc)
     primary = '|'.join(seqs)
+    secondary = '|'.join(ssc)
 
     omega, phi, psi = [], [], []
 
@@ -607,6 +613,7 @@ def prepare_slice_dict(
 
     log.info('preparing regex xmers')
 
+    print("merx_size ", mers_size)
     xmers = (get_mers(input_seq, i) for i in mers_size)
     xmers_flat = flatlist(xmers)
     slice_dict = defaultdict(dict)
@@ -618,11 +625,12 @@ def prepare_slice_dict(
             altered_mer = build_regex_substitutions(mer, res_tolerance)
             merregex = f'(?=({altered_mer}))'
 
-            slice_dict[lmer][altered_mer] = \
-                regex_forward_with_overlap(primary, merregex)
+            matches_ = regex_forward_with_overlap(primary, merregex)
+            if matches_:
+                slice_dict[lmer][altered_mer] = matches_
             # if no slices were found
-            if not slice_dict[lmer][altered_mer]:
-                slice_dict[lmer].pop(altered_mer)
+            #if not slice_dict[lmer][altered_mer]:
+                #slice_dict[lmer].pop(altered_mer)
 
             # this is a trick to find the sequence that are proceeded
             # by Proline. Still, these are registered in the "lmer" size
@@ -631,11 +639,13 @@ def prepare_slice_dict(
             merregex_P = f'(?=({altered_mer}P))'
             altered_mer_P = f'{altered_mer}_P'
 
-            slice_dict[lmer][altered_mer_P] = \
-                regex_forward_with_overlap(primary, merregex_P)
+            #slice_dict[lmer][altered_mer_P] = \
+            matches_ = regex_forward_with_overlap(primary, merregex_P)
+            if matches_:
+                slice_dict[lmer][altered_mer_P] = matches_
             # if no entrey was found
-            if not slice_dict[lmer][altered_mer_P]:
-                slice_dict[lmer].pop(altered_mer_P)
+            #if not slice_dict[lmer][altered_mer_P]:
+                #slice_dict[lmer].pop(altered_mer_P)
             # for _s in slice_dict[lmer][mer]:
                 # assert '|' not in input_seq[_s]
             PW.increment()
