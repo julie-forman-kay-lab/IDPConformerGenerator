@@ -166,7 +166,7 @@ def d2D_convert_full(d2d):
                 resid = int(data[0])
                 dict_probs["H"] = data[1]
                 dict_probs["E"] = data[2]
-                dict_probs["\s"] = data[3]
+                dict_probs[" "] = data[3]
                 dict_probs["P"] = data[4]
                 dict_out[resid] = dict_probs
                 dict_probs = {}
@@ -176,7 +176,7 @@ def d2D_convert_full(d2d):
                 resid = int(pline[1].strip())
                 dict_probs["H"] = 0.25
                 dict_probs["E"] = 0.25
-                dict_probs["\s"] = 0.25
+                dict_probs[" "] = 0.25
                 dict_probs["P"] = 0.25
                 dict_out[resid] = dict_probs
     return dict_out
