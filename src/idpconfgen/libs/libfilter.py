@@ -350,6 +350,7 @@ def regex_forward_no_overlap(sequence, regex):
     # m.span() is used for regexes without overlap
     # using m.start(1) would not work here.
     # See regex_forward_with_overlap
+    assert False
     regex_c = re.compile(regex)
     return [slice(*m.span()) for m in regex_c.finditer(sequence)]
 
