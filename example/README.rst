@@ -82,7 +82,7 @@ If you do not want this grouping feature, please build the database above withou
 with `--full` to avoid grouping.
 To build with the CSSS file, `-csss` would have to point to the converted CheSPI file:
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json -et 'pairs' -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json -et 'pairs' -rs 0 --dloop-off
 
 After some time you will see 10 conformers in the folder with the probabilistic CSSS.
 
