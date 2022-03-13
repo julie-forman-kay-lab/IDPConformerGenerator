@@ -667,7 +667,7 @@ def prepare_slice_dict(
                         #slice_dict[lmer][altered_mer] = slc_
                         lmer_alter_list.append(slc_)
             if not lmer_alter_list:
-                slice_dict[lmer].pop(altered_mer_P)
+                slice_dict[lmer].pop(altered_mer)
 
             # this is a trick to find the sequence that are proceeded
             # by Proline. Still, these are registered in the "lmer" size

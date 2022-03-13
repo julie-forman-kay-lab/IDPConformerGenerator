@@ -68,13 +68,7 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
-from idpconfgen.libs.libfilter import (
-    make_any_overlap_regex,
-    make_helix_overlap_regex,
-    make_loop_overlap_regex,
-    make_overlap_regex,
-    make_strand_overlap_regex,
-    )
+from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
@@ -500,7 +494,6 @@ def main(
 
     if dany:
         # will sample the database disregarding the SS annotation
-        #dssp_regexes = make_overlap_regex(all_valid_ss_codes, xmer_range)
         dssp_regexes = [all_valid_ss_codes]
 
     elif custom_sampling:
@@ -514,22 +507,13 @@ def main(
                 if "X" in _v:
                     _v[all_valid_ss_codes] = _v.pop("X")
 
-        # regexes identified in CSSS are single coded. Here we create the
-        # overlaping-ready regular expressions.
-        #dssp_regexes = [
-        #    make_overlap_regex(_s, xmer_range)
-        #    for _s in csss_dssp_regexes
-        #    ]
         dssp_regexes = csss_dssp_regexes
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
-        if dloop:
-            dssp_regexes.append("L")#make_loop_overlap_regex(xmer_range))
-        if dhelix:
-            dssp_regexes.append("H")#make_helix_overlap_regex(xmer_range))
-        if dstrand:
-            dssp_regexes.append("E")#make_strand_overlap_regex(xmer_range))
+        if dloop: dssp_regexes.append("L")
+        if dhelix: dssp_regexes.append("H")
+        if dstrand: dssp_regexes.append("E")
 
     elif duser:
         # this is very advanced, users should know what they are doing :-)
@@ -538,8 +522,12 @@ def main(
     else:
         raise AssertionError("One option is missing. Code shouldn't be here.")
 
-    primary, secondary, ANGLES = \
-        read_db_to_slices_given_secondary_structure(database)#, dssp_regexes)
+    assert isinstance(dssp_regexes, list), \
+        "`dssp_regexes` should be a list at this point"
+
+    db = read_dictionary_from_disk(database)
+    _, ANGLES, secondary, primary = aligndb(db)
+    del db
 
     # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
@@ -553,6 +541,8 @@ def main(
         )
 
     remove_empty_keys(SLICEDICT_XMERS)
+    # updates user defined chunk sizes and probabilities to the ones actually
+    # observed
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
