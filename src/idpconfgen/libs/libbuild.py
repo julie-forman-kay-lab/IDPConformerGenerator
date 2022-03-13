@@ -493,7 +493,7 @@ def get_cycle_bond_type():
 #    return slices, angles
 
 
-def read_db_to_slices_given_secondary_structure(database, ss_regexes):
+def read_db_to_slices_given_secondary_structure(database): #, ss_regexes):
     """
     Read the sequence, dssp, and angles acording to regex search.
 
@@ -504,50 +504,51 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
 
     Concatenates primary sequences accordingly.
     """
-    log.info(f'ss_regexes, {ss_regexes}')
+    #log.info(f'ss_regexes, {ss_regexes}')
     db = read_dictionary_from_disk(database)
     timed = partial(timeme, aligndb)
     _, angles, dssp, resseq = timed(db)
 
-    _ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
-    slices = list(it.chain.from_iterable(_))
-    seqs = [resseq[slc] for slc in slices]
-    ssc = [dssp[ss] for ss in slices]
+    #_ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
+    #slices = list(it.chain.from_iterable(_))
+    #seqs = [resseq[slc] for slc in slices]
+    #ssc = [dssp[ss] for ss in slices]
 
-    primary = '|'.join(seqs)
-    secondary = '|'.join(ssc)
+    #primary = '|'.join(seqs)
+    #secondary = '|'.join(ssc)
 
-    omega, phi, psi = [], [], []
+    #omega, phi, psi = [], [], []
 
-    oe, he, se = omega.extend, phi.extend, psi.extend
-    oa, ha, sa = omega.append, phi.append, psi.append
-    nan = np.nan
+    #oe, he, se = omega.extend, phi.extend, psi.extend
+    #oa, ha, sa = omega.append, phi.append, psi.append
+    #nan = np.nan
 
-    for s in slices:
-        oe(angles[s, 0])
-        he(angles[s, 1])
-        se(angles[s, 2])
-        oa(nan)
-        ha(nan)
-        sa(nan)
+    #for s in slices:
+    #    oe(angles[s, 0])
+    #    he(angles[s, 1])
+    #    se(angles[s, 2])
+    #    oa(nan)
+    #    ha(nan)
+    #    sa(nan)
 
-    omega.pop()
-    phi.pop()
-    psi.pop()
+    #omega.pop()
+    #phi.pop()
+    #psi.pop()
 
-    _omega = np.array(omega)
-    _phi = np.array(phi)
-    _psi = np.array(psi)
+    #_omega = np.array(omega)
+    #_phi = np.array(phi)
+    #_psi = np.array(psi)
 
-    seq_angles = np.array([_omega, _phi, _psi]).T
+    #seq_angles = np.array([_omega, _phi, _psi]).T
 
-    assert seq_angles.shape[0] == len(primary)
+    #assert seq_angles.shape[0] == len(primary)
 
-    del omega, phi, psi
+    #del omega, phi, psi
 
     # TODO:
     # save table to a file
-    return primary, secondary, seq_angles
+    # return primary, secondary, seq_angles
+    return resseq, dssp, angles
 
 
 def prepare_slice_dict(
@@ -658,9 +659,15 @@ def prepare_slice_dict(
             altered_mer = build_regex_substitutions(mer, res_tolerance)
             merregex = f'(?=({altered_mer}))'
 
-            matches_ = regex_forward_with_overlap(primary, merregex)
-            if matches_:
-                slice_dict[lmer][altered_mer] = matches_
+            slices_ = regex_forward_with_overlap(primary, merregex)
+            lmer_alter_list = slice_dict[lmer].setdefault(altered_mer, [])
+            for slc_ in slices_:  # ultra-slow
+                for ss in dssp_regexes:  # here I can create a regex gathering all regexes
+                    if re.fullmatch(f"[{ss}]+", secondary[slc_]):
+                        #slice_dict[lmer][altered_mer] = slc_
+                        lmer_alter_list.append(slc_)
+            if not lmer_alter_list:
+                slice_dict[lmer].pop(altered_mer_P)
 
             # this is a trick to find the sequence that are proceeded
             # by Proline. Still, these are registered in the "lmer" size
@@ -670,10 +677,21 @@ def prepare_slice_dict(
             altered_mer_P = f'{altered_mer}_P'
 
             #slice_dict[lmer][altered_mer_P] = \
-            matches_ = regex_forward_with_overlap(primary, merregex_P)
-            if matches_:
-                slice_dict[lmer][altered_mer_P] = matches_
+            slices_ = regex_forward_with_overlap(primary, merregex_P)
+            lmer_alter_list = slice_dict[lmer].setdefault(altered_mer_P, [])
+            for slc_ in slices_:  # ultra-slow
+                for ss in dssp_regexes:  # here I can create a regex gathering all regexes
+                    if re.fullmatch(f"[{ss}]+", secondary[slc_]):
+                        #slice_dict[lmer][altered_mer_P] = slc_
+                        lmer_alter_list.append(slc_)
+            if not lmer_alter_list:
+                slice_dict[lmer].pop(altered_mer_P)
+
             PW.increment()
+
+    from pprint import pprint
+    with open('superdict', 'w') as fout:
+        pprint(slice_dict, stream=fout)
 
     if csss:
         csss_slice_dict = defaultdict(dict)

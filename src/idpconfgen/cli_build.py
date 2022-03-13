@@ -80,6 +80,7 @@ from idpconfgen.libs.libio import (
     make_folder_or_cwd,
     read_dict_from_json,
     read_dictionary_from_disk,
+    save_dict_to_pickle,
     )
 from idpconfgen.libs.libparse import (
     fill_list,
@@ -140,6 +141,11 @@ ALL_ATOM_EFUNC = None
 TEMPLATE_LABELS = None
 TEMPLATE_MASKS = None
 TEMPLATE_EFUNC = None
+
+
+class _BuildPreparation:
+    pass
+
 
 
 def are_globals():
@@ -494,7 +500,8 @@ def main(
 
     if dany:
         # will sample the database disregarding the SS annotation
-        dssp_regexes = make_overlap_regex(all_valid_ss_codes, xmer_range)
+        #dssp_regexes = make_overlap_regex(all_valid_ss_codes, xmer_range)
+        dssp_regexes = [all_valid_ss_codes]
 
     elif custom_sampling:
         csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
@@ -509,19 +516,20 @@ def main(
 
         # regexes identified in CSSS are single coded. Here we create the
         # overlaping-ready regular expressions.
-        dssp_regexes = [
-            make_overlap_regex(_s, xmer_range)
-            for _s in csss_dssp_regexes
-            ]
+        #dssp_regexes = [
+        #    make_overlap_regex(_s, xmer_range)
+        #    for _s in csss_dssp_regexes
+        #    ]
+        dssp_regexes = csss_dssp_regexes
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
         if dloop:
-            dssp_regexes.append(make_loop_overlap_regex(xmer_range))
+            dssp_regexes.append("L")#make_loop_overlap_regex(xmer_range))
         if dhelix:
-            dssp_regexes.append(make_helix_overlap_regex(xmer_range))
+            dssp_regexes.append("H")#make_helix_overlap_regex(xmer_range))
         if dstrand:
-            dssp_regexes.append(make_strand_overlap_regex(xmer_range))
+            dssp_regexes.append("E")#make_strand_overlap_regex(xmer_range))
 
     elif duser:
         # this is very advanced, users should know what they are doing :-)
@@ -531,14 +539,14 @@ def main(
         raise AssertionError("One option is missing. Code shouldn't be here.")
 
     primary, secondary, ANGLES = \
-        read_db_to_slices_given_secondary_structure(database, dssp_regexes)
+        read_db_to_slices_given_secondary_structure(database)#, dssp_regexes)
 
     # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         input_seq,
         csss=bool(csss_dict),
-        dssp_regexes=csss_dssp_regexes,
+        dssp_regexes=dssp_regexes,
         secondary=secondary,
         mers_size=xmer_probs_tmp.sizes,
         res_tolerance=residue_substitutions,
@@ -548,6 +556,18 @@ def main(
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
+
+    #BP = _BuildPreparation()
+    #BP.SLICEDICT_XMERS = SLICEDICT_XMERS
+    #BP.ANGLES = ANGLES
+    #BP.csss_dict = csss_dict
+    #BP.residue_substitutions = residue_substitutions
+    #BP.xmerprobs = XMERPROBS
+    #save_dict_to_pickle(BP, 'BP.pickle')
+    #sys.exit()
+
+
+
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
         XMERPROBS,
@@ -555,7 +575,6 @@ def main(
         ANGLES,
         SLICEDICT_XMERS,
         csss_dict,
-        secondary,
         residue_replacements=residue_substitutions,
         )
 
@@ -1434,7 +1453,6 @@ def get_adjacent_angles(
         db,
         slice_dict,
         csss,
-        secondary,
         residue_replacements=None,
         RC=np.random.choice,
         ):
@@ -1491,6 +1509,9 @@ def get_adjacent_angles(
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
+            
+            print(">>>> ", plen, pt_sub)
+
             try:
                 if csss:
                     cr_plus_1 = str(cr + 1)
@@ -1512,6 +1533,7 @@ def get_adjacent_angles(
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
 
             except (KeyError, ValueError):
+                print('broke')
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]
@@ -1519,8 +1541,9 @@ def get_adjacent_angles(
                     primer_template,
                     residue_replacements,
                     )
-                if next_residue == 'P':
-                    pt_sub = f'{pt_sub}_P'
+                #if next_residue == 'P':
+                #    pt_sub = f'{pt_sub}_P'
+                print(">> ptsub ", pt_sub)
             else:
                 break
         else:
