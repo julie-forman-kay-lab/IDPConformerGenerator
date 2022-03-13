@@ -362,9 +362,9 @@ def make_list_atom_labels(input_seq, atom_labels_dictionary):
 
     assert Counter(labels)['N'] == len(input_seq)
     assert labels[-1] == 'OXT'
-    assert 'H1' in labels
-    assert 'H2' in labels
-    assert 'H3' in labels
+    # assert 'H1' in labels
+    # assert 'H2' in labels
+    # assert 'H3' in labels
     return labels
 
 

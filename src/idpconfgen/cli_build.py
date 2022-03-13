@@ -466,7 +466,10 @@ def populate_globals(
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
     global TEMPLATE_LABELS, TEMPLATE_MASKS, TEMPLATE_EFUNC
 
-    topobj = forcefield(add_OXT=True, add_Nterminal_H=True)
+    if forcefield is None:
+        topobj = forcefields['Amberff14SB'](add_OXT=True, add_Nterminal_H=True)
+    else:
+        topobj = forcefield(add_OXT=True, add_Nterminal_H=True)
 
     ALL_ATOM_LABELS = init_conflabels(input_seq, topobj.atom_names)
     TEMPLATE_LABELS = init_conflabels(remap_sequence(input_seq), topobj.atom_names)  # noqa: E501
@@ -474,19 +477,20 @@ def populate_globals(
     ALL_ATOM_MASKS = init_confmasks(ALL_ATOM_LABELS.atom_labels)
     TEMPLATE_MASKS = init_confmasks(TEMPLATE_LABELS.atom_labels)
 
-    ALL_ATOM_EFUNC = prepare_energy_function(
-        ALL_ATOM_LABELS.atom_labels,
-        ALL_ATOM_LABELS.res_nums,
-        ALL_ATOM_LABELS.res_labels,
-        topobj,
-        **efunc_kwargs)
+    if forcefield is not None:
+        ALL_ATOM_EFUNC = prepare_energy_function(
+            ALL_ATOM_LABELS.atom_labels,
+            ALL_ATOM_LABELS.res_nums,
+            ALL_ATOM_LABELS.res_labels,
+            topobj,
+            **efunc_kwargs)
 
-    TEMPLATE_EFUNC = prepare_energy_function(
-        TEMPLATE_LABELS.atom_labels,
-        TEMPLATE_LABELS.res_nums,
-        TEMPLATE_LABELS.res_labels,
-        topobj,
-        **efunc_kwargs)
+        TEMPLATE_EFUNC = prepare_energy_function(
+            TEMPLATE_LABELS.atom_labels,
+            TEMPLATE_LABELS.res_nums,
+            TEMPLATE_LABELS.res_labels,
+            topobj,
+            **efunc_kwargs)
 
     del topobj
     return
@@ -716,15 +720,17 @@ def conformer_generator(
     # if the script runs as CLI. Otherwise, if conformer_generator() is imported
     # and used directly, the global variables need to be configured here.
     if not are_globals():
-        if forcefield not in forcefields:
-            raise ValueError(
-                f'{forcefield} not in `forcefields`. '
-                f'Expected {list(forcefields.keys())}.'
-                )
+        if forcefield is not None:
+            if forcefield not in forcefields:
+                raise ValueError(
+                    f'{forcefield} not in `forcefields`. '
+                    f'Expected {list(forcefields.keys())}.'
+                    )
+            forcefield = forcefields[forcefield]
         populate_globals(
             input_seq=all_atom_input_seq,
             bgeo_path=bgeo_path or BGEO_path,
-            forcefield=forcefields[forcefield],
+            forcefield=forcefield,
             **energy_funcs_kwargs,
             )
 
@@ -885,7 +891,7 @@ def conformer_generator(
             # **kwargs handling was greater then the if-statement processing
             # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html
             if generative_function:
-                agls = generative_function(
+                primer_template, agls = generative_function(
                     nres=RINT(1, 6),
                     cres=calc_residue_num_from_index(bbi)
                     )
@@ -1051,7 +1057,11 @@ def conformer_generator(
                     template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
             # ?
 
-            total_energy = TEMPLATE_EFUNC(template_coords)
+
+            if TEMPLATE_EFUNC is None:
+                total_energy = 0
+            else:
+                total_energy = TEMPLATE_EFUNC(template_coords)
 
             if ANY(total_energy > energy_threshold_backbone):
                 #print('---------- energy positive')
@@ -1153,7 +1163,10 @@ def conformer_generator(
                 template_coords[TEMPLATE_MASKS.bb4],
                 )
 
-            total_energy = ALL_ATOM_EFUNC(all_atom_coords)
+            if ALL_ATOM_EFUNC is None:
+                total_energy = 0
+            else:
+                total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
             if ANY(total_energy > energy_threshold_sidechains):
                 _msg = (
