@@ -507,7 +507,7 @@ def main(
                 if "X" in _v:
                     _v[all_valid_ss_codes] = _v.pop("X")
 
-        dssp_regexes = csss_dssp_regexes
+        dssp_regexes = list(csss_dssp_regexes)
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
@@ -523,7 +523,8 @@ def main(
         raise AssertionError("One option is missing. Code shouldn't be here.")
 
     assert isinstance(dssp_regexes, list), \
-        "`dssp_regexes` should be a list at this point"
+        f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
+    print(dssp_regexes)
 
     db = read_dictionary_from_disk(database)
     _, ANGLES, secondary, primary = aligndb(db)

@@ -47,6 +47,7 @@ from idpconfgen.libs.libparse import (
     make_list_if_not,
     )
 from idpconfgen.libs.libtimer import ProgressCounter, timeme
+from idpconfgen.logger import S
 
 
 # See TODO at init_faspr_sidechains
@@ -642,16 +643,18 @@ def prepare_slice_dict(
             3) only if `csss` is True. Adds a new layer organizing the slice
             objects with the SS keys.
     """
-
     res_tolerance = res_tolerance or {}
-    mers_size = make_iterable(mers_size)
 
     log.info('preparing regex xmers')
 
+    # gets all possible xmers from the input sequence (with overlap)
+    mers_size = make_iterable(mers_size)
     xmers = (get_mers(input_seq, i) for i in mers_size)
-    xmers_flat = flatlist(xmers)
+    xmers_flat = flatlist(xmers)  # generator
     slice_dict = defaultdict(dict)
-    ss_dict = {}
+
+    combined_dssps = make_combined_regex(dssp_regexes)
+    log.info(S(f"searching database with DSSP regexes: {combined_dssps}"))
 
     with ProgressCounter(suffix='Searching for xmers: ') as PW:
         for mer in xmers_flat:
@@ -662,10 +665,8 @@ def prepare_slice_dict(
             slices_ = regex_forward_with_overlap(primary, merregex)
             lmer_alter_list = slice_dict[lmer].setdefault(altered_mer, [])
             for slc_ in slices_:  # ultra-slow
-                for ss in dssp_regexes:  # here I can create a regex gathering all regexes
-                    if re.fullmatch(f"[{ss}]+", secondary[slc_]):
-                        #slice_dict[lmer][altered_mer] = slc_
-                        lmer_alter_list.append(slc_)
+                if re.fullmatch(combined_dssps, secondary[slc_]):
+                    lmer_alter_list.append(slc_)
             if not lmer_alter_list:
                 slice_dict[lmer].pop(altered_mer)
 
@@ -680,10 +681,8 @@ def prepare_slice_dict(
             slices_ = regex_forward_with_overlap(primary, merregex_P)
             lmer_alter_list = slice_dict[lmer].setdefault(altered_mer_P, [])
             for slc_ in slices_:  # ultra-slow
-                for ss in dssp_regexes:  # here I can create a regex gathering all regexes
-                    if re.fullmatch(f"[{ss}]+", secondary[slc_]):
-                        #slice_dict[lmer][altered_mer_P] = slc_
-                        lmer_alter_list.append(slc_)
+                if re.fullmatch(combined_dssps, secondary[slc_]):
+                    lmer_alter_list.append(slc_)
             if not lmer_alter_list:
                 slice_dict[lmer].pop(altered_mer_P)
 
@@ -694,12 +693,15 @@ def prepare_slice_dict(
         pprint(slice_dict, stream=fout)
 
     if csss:
+        ss_dict = {}
         csss_slice_dict = defaultdict(dict)
         for lmer in slice_dict: #lmer = 1, 2, 3, 4, 5
             for aa in slice_dict[lmer]: #aa = altered_mer or altered_mer_P
                 # each sequence should have a new ss_dict
                 ss_dict = defaultdict(list)
                 for sd in slice_dict[lmer][aa]: #sd = slice()
+                    # here we cannot use the trick with `combined_dssp`
+                    # because we need to know exactly which dssp we have found
                     for ss in dssp_regexes:
                         if re.fullmatch(f"[{ss}]+", secondary[sd]):
                             # save sd to ss_dict
@@ -1228,3 +1230,11 @@ compute_sidechains = {
     }
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
+
+def make_combined_regex(regexes):
+    """
+    Make a combined regex with ORs.
+
+    To be used with re.fullmatch.
+    """
+    return "(" + '+|'.join(regexes) + "+)"
