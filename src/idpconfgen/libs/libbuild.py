@@ -46,7 +46,7 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     make_list_if_not,
     )
-from idpconfgen.libs.libtimer import ProgressCounter, timeme
+from idpconfgen.libs.libtimer import ProgressWatcher, timeme
 from idpconfgen.logger import S
 
 
@@ -650,13 +650,13 @@ def prepare_slice_dict(
     # gets all possible xmers from the input sequence (with overlap)
     mers_size = make_iterable(mers_size)
     xmers = (get_mers(input_seq, i) for i in mers_size)
-    xmers_flat = flatlist(xmers)  # generator
+    xmers_flat = list(flatlist(xmers))
     slice_dict = defaultdict(dict)
 
     combined_dssps = make_combined_regex(dssp_regexes)
     log.info(S(f"searching database with DSSP regexes: {combined_dssps}"))
 
-    with ProgressCounter(suffix='Searching for xmers: ') as PW:
+    with ProgressWatcher(xmers_flat, suffix='Searching for xmers: ') as PW:
         for mer in xmers_flat:
             lmer = len(mer)
             altered_mer = build_regex_substitutions(mer, res_tolerance)
@@ -688,9 +688,9 @@ def prepare_slice_dict(
 
             PW.increment()
 
-    from pprint import pprint
-    with open('superdict', 'w') as fout:
-        pprint(slice_dict, stream=fout)
+    # from pprint import pprint
+    # with open('superdict', 'w') as fout:
+    #     pprint(slice_dict, stream=fout)
 
     if csss:
         ss_dict = {}
