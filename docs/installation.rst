@@ -10,11 +10,10 @@ Although it's recommended to run IDPConfGen on UNIX based OS, it will work with 
 
 Pre-installation Reqirements
 ----------------------------
-An up-to-date version of anaconda3, pip, gcc, java, csh, perl, automake, boostlib, and dssp are required
+An up-to-date version of anaconda3, pip, java, csh, perl are required
+For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
 
     sudo apt install python3-pip
-
-    sudo apt-get install build-essential
 
     sudo apt-get install default-jdk
 
@@ -22,12 +21,6 @@ An up-to-date version of anaconda3, pip, gcc, java, csh, perl, automake, boostli
 
     sudo perl -MCPAN -e'install "LWP::Simple"'
     sudo apt-get install libswitch-perl
-
-    sudo apt-get install automake
-
-    sudo apt-get install libboost-all-dev
-
-    sudo apt install dssp
 
 To install IDPConformerGenerator (idpconfgen for short) on your local machine:
 
@@ -87,10 +80,8 @@ Install ``idpconfgen``::
     pip install IDPConformerGenerator
 
 
-To install IDPConformerGenerator (idpconfgen for short) on your Graham@ComputeCanada:
-
-From source
------------
+From source in Graham@ComputeCanada
+-----------------------------------
 Log-in and make sure you're in the /home directory
 
     cd
