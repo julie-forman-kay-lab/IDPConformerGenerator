@@ -48,7 +48,6 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    read_db_to_slices_given_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -539,6 +538,7 @@ def main(
         secondary=secondary,
         mers_size=xmer_probs_tmp.sizes,
         res_tolerance=residue_substitutions,
+        ncores=ncores,
         )
 
     remove_empty_keys(SLICEDICT_XMERS)

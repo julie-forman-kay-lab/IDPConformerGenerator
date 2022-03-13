@@ -1,5 +1,4 @@
 """Tools for conformer building operations."""
-import itertools as it
 import re
 from collections import Counter, defaultdict, namedtuple
 from functools import partial
@@ -34,19 +33,10 @@ from idpconfgen.libs.libenergyij import (
     init_coulomb_calculator,
     init_lennard_jones_calculator,
     )
-from idpconfgen.libs.libfilter import (
-    aligndb,
-    regex_forward_with_overlap,
-    regex_search,
-    )
-from idpconfgen.libs.libfunc import flatlist, make_iterable
-from idpconfgen.libs.libio import read_dictionary_from_disk
-from idpconfgen.libs.libparse import (
-    get_mers,
-    translate_seq_to_3l,
-    make_list_if_not,
-    )
-from idpconfgen.libs.libtimer import ProgressWatcher, timeme
+from idpconfgen.libs.libfilter import regex_forward_with_overlap
+from idpconfgen.libs.libfunc import make_iterable
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import get_mers, translate_seq_to_3l
 from idpconfgen.logger import S
 
 
@@ -472,7 +462,7 @@ def get_cycle_bond_type():
         ))
 
 
-#def read_db_to_slices(database, dssp_regexes, ncores=1):
+# def read_db_to_slices(database, dssp_regexes, ncores=1):
 #    """Create database base of slice and angles."""
 #    # reads db dictionary from disk
 #    db = read_dictionary_from_disk(database)
@@ -494,64 +484,6 @@ def get_cycle_bond_type():
 #    return slices, angles
 
 
-def read_db_to_slices_given_secondary_structure(database): #, ss_regexes):
-    """
-    Read the sequence, dssp, and angles acording to regex search.
-
-    ss_regexes define what we search in the database.
-
-
-    Read slices in the DB that belong to a single secondary structure.
-
-    Concatenates primary sequences accordingly.
-    """
-    #log.info(f'ss_regexes, {ss_regexes}')
-    db = read_dictionary_from_disk(database)
-    timed = partial(timeme, aligndb)
-    _, angles, dssp, resseq = timed(db)
-
-    #_ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
-    #slices = list(it.chain.from_iterable(_))
-    #seqs = [resseq[slc] for slc in slices]
-    #ssc = [dssp[ss] for ss in slices]
-
-    #primary = '|'.join(seqs)
-    #secondary = '|'.join(ssc)
-
-    #omega, phi, psi = [], [], []
-
-    #oe, he, se = omega.extend, phi.extend, psi.extend
-    #oa, ha, sa = omega.append, phi.append, psi.append
-    #nan = np.nan
-
-    #for s in slices:
-    #    oe(angles[s, 0])
-    #    he(angles[s, 1])
-    #    se(angles[s, 2])
-    #    oa(nan)
-    #    ha(nan)
-    #    sa(nan)
-
-    #omega.pop()
-    #phi.pop()
-    #psi.pop()
-
-    #_omega = np.array(omega)
-    #_phi = np.array(phi)
-    #_psi = np.array(psi)
-
-    #seq_angles = np.array([_omega, _phi, _psi]).T
-
-    #assert seq_angles.shape[0] == len(primary)
-
-    #del omega, phi, psi
-
-    # TODO:
-    # save table to a file
-    # return primary, secondary, seq_angles
-    return resseq, dssp, angles
-
-
 def prepare_slice_dict(
         primary,
         input_seq,
@@ -562,7 +494,6 @@ def prepare_slice_dict(
         res_tolerance=None,
         ncores=1,
         ):
-
     """
     Prepare a dictionary mapping chunks to slices in `primary`.
 
@@ -649,44 +580,23 @@ def prepare_slice_dict(
 
     # gets all possible xmers from the input sequence (with overlap)
     mers_size = make_iterable(mers_size)
-    xmers = (get_mers(input_seq, i) for i in mers_size)
-    xmers_flat = list(flatlist(xmers))
-    slice_dict = defaultdict(dict)
+    xmers = [tuple(get_mers(input_seq, i)) for i in mers_size]
 
     combined_dssps = make_combined_regex(dssp_regexes)
     log.info(S(f"searching database with DSSP regexes: {combined_dssps}"))
 
-    with ProgressWatcher(xmers_flat, suffix='Searching for xmers: ') as PW:
-        for mer in xmers_flat:
-            lmer = len(mer)
-            altered_mer = build_regex_substitutions(mer, res_tolerance)
-            merregex = f'(?=({altered_mer}))'
+    consume = partial(
+        populate_dict_with_database,
+        res_tolerance=res_tolerance,
+        primary=primary,
+        secondary=secondary,
+        combined_dssps=combined_dssps,
+        )
 
-            slices_ = regex_forward_with_overlap(primary, merregex)
-            lmer_alter_list = slice_dict[lmer].setdefault(altered_mer, [])
-            for slc_ in slices_:  # ultra-slow
-                if re.fullmatch(combined_dssps, secondary[slc_]):
-                    lmer_alter_list.append(slc_)
-            if not lmer_alter_list:
-                slice_dict[lmer].pop(altered_mer)
-
-            # this is a trick to find the sequence that are proceeded
-            # by Proline. Still, these are registered in the "lmer" size
-            # without consider the proline addition.
-            # this is a combo with get_adjancent_angles
-            merregex_P = f'(?=({altered_mer}P))'
-            altered_mer_P = f'{altered_mer}_P'
-
-            #slice_dict[lmer][altered_mer_P] = \
-            slices_ = regex_forward_with_overlap(primary, merregex_P)
-            lmer_alter_list = slice_dict[lmer].setdefault(altered_mer_P, [])
-            for slc_ in slices_:  # ultra-slow
-                if re.fullmatch(combined_dssps, secondary[slc_]):
-                    lmer_alter_list.append(slc_)
-            if not lmer_alter_list:
-                slice_dict[lmer].pop(altered_mer_P)
-
-            PW.increment()
+    execute = pool_function(consume, xmers, ncores=ncores)
+    slice_dict = {}
+    for lmer_size, slice_dict_ in execute:
+        slice_dict[lmer_size] = slice_dict_
 
     # from pprint import pprint
     # with open('superdict', 'w') as fout:
@@ -695,12 +605,12 @@ def prepare_slice_dict(
     if csss:
         ss_dict = {}
         csss_slice_dict = defaultdict(dict)
-        for lmer in slice_dict: #lmer = 1, 2, 3, 4, 5
-            for aa in slice_dict[lmer]: #aa = altered_mer or altered_mer_P
+        for lmer in slice_dict:  # lmer = 1, 2, 3, 4, 5
+            for aa in slice_dict[lmer]:  # aa = altered_mer or altered_mer_P
                 # each sequence should have a new ss_dict
                 ss_dict = defaultdict(list)
-                for sd in slice_dict[lmer][aa]: #sd = slice()
-                    # here we cannot use the trick with `combined_dssp`
+                for sd in slice_dict[lmer][aa]:  # sd is a slice() object
+                    # here we cannot use the trick with `combined_dssps`
                     # because we need to know exactly which dssp we have found
                     for ss in dssp_regexes:
                         if re.fullmatch(f"[{ss}]+", secondary[sd]):
@@ -767,6 +677,10 @@ def prepare_energy_function(
         **kwnull,
         ):
     """
+    Prepare energy function.
+
+    Parameters
+    ----------
     lj_term : bool
         Whether to compute the Lennard-Jones term during building and
         validation. If false, expect a physically meaningless result.
@@ -1231,6 +1145,7 @@ compute_sidechains = {
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
 
+
 def make_combined_regex(regexes):
     """
     Make a combined regex with ORs.
@@ -1238,3 +1153,70 @@ def make_combined_regex(regexes):
     To be used with re.fullmatch.
     """
     return "(" + '+|'.join(regexes) + "+)"
+
+
+def populate_dict_with_database(
+        xmers,
+        res_tolerance,
+        primary,
+        secondary,
+        combined_dssps):
+    """
+    Identify sampling positions.
+
+    Identifies slices in `primary` and `secondary` where the `combined_dssps`
+    regexes apply. Considers also residue tolerance.
+
+    This function is used internally for `prepare_slice_dict` with
+    multiprocessing.
+
+    Parameters
+    ----------
+    xmers : list
+        The list of all protein chunks we want to search in the `primary`
+        and `secondary` "database" strings. This list should contain only
+        sequence of the same length.
+
+    combined_dssps : string
+        A string regex prepared with all the combined DSSPs that need to
+        be searched: see code in `prepare_slice_dict` and `make_combined_regex`.
+
+    others
+        Other parameters are like described in `prepare_slice_dict`.
+
+    Returns
+    -------
+    int, dict
+        The length of the xmers in `xmers` list.
+        The dictionary with the identified slice positions.
+    """
+    slice_dict = {}
+    lmer = len(xmers[0])  # all xmers are expected to have the same length
+    for mer in xmers:
+        altered_mer = build_regex_substitutions(mer, res_tolerance)
+        merregex = f'(?=({altered_mer}))'
+
+        slices_ = regex_forward_with_overlap(primary, merregex)
+        lmer_alter_list = slice_dict.setdefault(altered_mer, [])
+        for slc_ in slices_:  # ultra-slow
+            if re.fullmatch(combined_dssps, secondary[slc_]):
+                lmer_alter_list.append(slc_)
+        if not lmer_alter_list:
+            slice_dict.pop(altered_mer)
+
+        # this is a trick to find the sequence that are proceeded
+        # by Proline. Still, these are registered in the "lmer" size
+        # without consider the proline addition.
+        # this is a combo with get_adjancent_angles
+        merregex_P = f'(?=({altered_mer}P))'
+        altered_mer_P = f'{altered_mer}_P'
+
+        slices_ = regex_forward_with_overlap(primary, merregex_P)
+        lmer_alter_list = slice_dict.setdefault(altered_mer_P, [])
+        for slc_ in slices_:  # ultra-slow
+            if re.fullmatch(combined_dssps, secondary[slc_]):
+                lmer_alter_list.append(slc_)
+        if not lmer_alter_list:
+            slice_dict.pop(altered_mer_P)
+
+    return lmer, slice_dict
