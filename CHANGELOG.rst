@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.3.0 (2022-03-13)
+------------------------------------------------------------
+
 * see #168
 * Revisited the whole regex sampling machinery during conformer building
 * A initial major part for preparing the regex database was dropped
