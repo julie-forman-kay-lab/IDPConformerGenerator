@@ -9,7 +9,20 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* dropped tox-conda because it is not needed for this project #169
+v0.3.0 (2022-03-13)
+------------------------------------------------------------
+
+* see #168
+* Revisited the whole regex sampling machinery during conformer building
+* A initial major part for preparing the regex database was dropped
+* applied multiprocessing to the regex database preparation steps
+* updated the `cli_build` API with 4 new command options
+* dropped using regex in the `cli_build` command line
+
+v0.2.6 (2022-03-13)
+------------------------------------------------------------
+
+* corrected `sscalc` from * input in command-line #175
 
 v0.2.5 (2022-03-11)
 ------------------------------------------------------------

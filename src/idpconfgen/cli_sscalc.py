@@ -169,7 +169,7 @@ def main(
     try:
         pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
         _istarfile = True
-    except (FileNotFoundError, TypeError):
+    except (OSError, FileNotFoundError, TypeError):
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))

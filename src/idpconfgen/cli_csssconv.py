@@ -128,10 +128,10 @@ def chespi_probs8_convert_grouped(p8):
             data = [float(i) for i in pline]
             resid = int(data[0])
             
-            dict_p8["L+"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
-            dict_p8["H+"] = data[1]
-            dict_p8["E+"] = data[4]
-            dict_p8["G+"] = data[2]
+            dict_p8["L"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
+            dict_p8["H"] = data[1]
+            dict_p8["E"] = data[4]
+            dict_p8["G"] = data[2]
             dict_out[resid] = dict_p8
             dict_p8 = {}
             
@@ -164,20 +164,20 @@ def d2D_convert_full(d2d):
                 pline.pop()
                 data = [float(i) for i in pline]
                 resid = int(data[0])
-                dict_probs["H+"] = data[1]
-                dict_probs["E+"] = data[2]
-                dict_probs[" +"] = data[3]
-                dict_probs["P+"] = data[4]
+                dict_probs["H"] = data[1]
+                dict_probs["E"] = data[2]
+                dict_probs[" "] = data[3]
+                dict_probs["P"] = data[4]
                 dict_out[resid] = dict_probs
                 dict_probs = {}
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H+"] = 0.25
-                dict_probs["E+"] = 0.25
-                dict_probs[" +"] = 0.25
-                dict_probs["P+"] = 0.25
+                dict_probs["H"] = 0.25
+                dict_probs["E"] = 0.25
+                dict_probs[" "] = 0.25
+                dict_probs["P"] = 0.25
                 dict_out[resid] = dict_probs
     return dict_out
 
@@ -211,18 +211,18 @@ def d2D_convert_grouped(d2d):
                 pline.pop()
                 data = [float(i) for i in pline]
                 resid = int(data[0])
-                dict_probs["H+"] = data[1]
-                dict_probs["E+"] = data[2]
-                dict_probs["L+"] = round((data[3]+data[4]), 3)
+                dict_probs["H"] = data[1]
+                dict_probs["E"] = data[2]
+                dict_probs["L"] = round((data[3]+data[4]), 3)
                 dict_out[resid] = dict_probs
                 dict_probs = {}
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H+"] = 0.333
-                dict_probs["E+"] = 0.333
-                dict_probs["L+"] = 0.333
+                dict_probs["H"] = 0.333
+                dict_probs["E"] = 0.333
+                dict_probs["L"] = 0.333
                 dict_out[resid] = dict_probs
     return dict_out
 
