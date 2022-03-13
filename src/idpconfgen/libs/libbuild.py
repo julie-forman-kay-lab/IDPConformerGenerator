@@ -1152,7 +1152,12 @@ def make_combined_regex(regexes):
 
     To be used with re.fullmatch.
     """
-    return "(" + '+|'.join(regexes) + "+)"
+    if len(regexes) > 1:
+        return "(" + '+|'.join(regexes) + "+)"
+    if len(regexes) == 1:
+        return "([" + regexes[0] + "]+)"
+    else:
+        raise AssertionError("Regexes are expected to have something.")
 
 
 def populate_dict_with_database(

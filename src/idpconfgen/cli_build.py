@@ -1501,7 +1501,7 @@ def get_adjacent_angles(
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
             
-            print(">>>> ", plen, pt_sub)
+            #print(">>>> ", plen, pt_sub)
 
             try:
                 if csss:
@@ -1524,7 +1524,7 @@ def get_adjacent_angles(
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
 
             except (KeyError, ValueError):
-                print('broke')
+                #print('broke')
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]
@@ -1534,7 +1534,7 @@ def get_adjacent_angles(
                     )
                 #if next_residue == 'P':
                 #    pt_sub = f'{pt_sub}_P'
-                print(">> ptsub ", pt_sub)
+                #print(">> ptsub ", pt_sub)
             else:
                 break
         else:
