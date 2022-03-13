@@ -249,7 +249,7 @@ ap.add_argument(
     help=(
         'Input .JSON file for probabilistic CSSS. '
         'Will use DSSP codes in this .JSON instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-of. CSSS.JSON file is as created by the '
+        '--dany. Requires --dloop-off. CSSS.JSON file is as created by the '
         '`idpconfgen csssconv` command.'
         ),
     default=None,
@@ -492,6 +492,13 @@ def main(
     elif custom_sampling:
         csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
         dssp_regexes = list(csss_dssp_regexes)
+        # The error below will only show if users made some illegal edits in `makecsss`
+        if 'X+' in dssp_regexes:
+            emsg = (
+            'Warning: you cannot have --dany sampling within CSSS. '
+            'custom_sampling depends on SS preferences.'
+            )
+            raise ValueError(emsg)
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
