@@ -109,12 +109,9 @@ dssp_ss_keys = Namespace(
 
 dssp_ss_keys.all_helix = (
     dssp_ss_keys.ahelix,
-    #dssp_ss_keys.helix_3,
+    dssp_ss_keys.helix_3,
     #dssp_ss_keys.helix_5,
     )
-
-dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
-#dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
 
 dssp_ss_keys.all_strand = (
     # dssp_ss_keys.bbridge,
@@ -148,7 +145,6 @@ dssp_trans = str.maketrans(
         'H' * len(dssp_ss_keys.all_helix),
         'E' * len(dssp_ss_keys.all_strand),
         'L' * len(dssp_ss_keys.all_loops),
-        'G' * len(dssp_ss_keys.helix_3)
         )
     )
 
@@ -157,8 +153,7 @@ dssp_trans_bytes = bytes.maketrans(
     b''.join(c.encode() for c in dssp_ss_keys.all),
     b'H' * len(dssp_ss_keys.all_helix)
     + b'E' * len(dssp_ss_keys.all_strand)
-    + b'L' * len(dssp_ss_keys.all_loops)
-    + b'G' * len(dssp_ss_keys.helix_3),
+    + b'L' * len(dssp_ss_keys.all_loops),
     )
 
 
