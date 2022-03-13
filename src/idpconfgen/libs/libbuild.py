@@ -189,9 +189,9 @@ def init_confmasks(atom_labels):
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
 
-    non_NHs_non_OXT = np.where(np.logical_not(np.isin(atom_labels, ('H', 'H1', 'H2', 'H3', 'OXT'))))[0]  # noqa E:501
+    non_NHs_non_OXT = np.where(np.logical_not(np.isin(atom_labels, ('H', 'OXT'))))[0]  # noqa E:501
     _s = set(atom_labels[non_NHs_non_OXT])
-    assert not _s.intersection({'H', 'H1', 'H2', 'H3', 'OXT'}), _s
+    assert not _s.intersection({'H', 'OXT'}), _s
 
     non_sidechains = np.where(np.isin(atom_labels, backbone_atoms,))[0]
 
