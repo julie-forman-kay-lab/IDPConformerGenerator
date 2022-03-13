@@ -1445,7 +1445,6 @@ def get_adjacent_angles(
         slice_dict,
         csss,
         residue_replacements=None,
-        RC=np.random.choice,
         ):
     """
     Get angles to build the next adjacent protein chunk.
@@ -1474,34 +1473,40 @@ def get_adjacent_angles(
     """
     residue_replacements = residue_replacements or {}
     probs = fill_list(probs, 0, len(options))
+
+    # prepares helper lists
     lss = []  # list of possible secondary structures in case `csss` is given
     lssprobs = []  # list of possible ss probabilities in case `csss` is given
     lssE, lssprobsE = lss.extend, lssprobs.extend
     lssC, lssprobsC = lss.clear, lssprobs.clear
 
-    def func(aidx):
+    def func(
+            aidx,
+            CRNFI=calc_residue_num_from_index,
+            RC=np.random.choice,
+            GSCNJIT=get_seq_chunk_njit,
+            BRS=build_regex_substitutions,
+            ):
 
         # calculates the current residue number from the atom index
-        cr = calc_residue_num_from_index(aidx)
+        cr = CRNFI(aidx)
 
         # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
 
         # defines the chunk identity accordingly
-        primer_template = get_seq_chunk_njit(seq, cr, plen)
-        next_residue = get_seq_chunk_njit(seq, cr + plen, 1)
+        primer_template = GSCNJIT(seq, cr, plen)
+        next_residue = GSCNJIT(seq, cr + plen, 1)
 
         # recalculates the plen to avoid plen/template inconsistencies that
         # occur if the plen is higher then the number of
         # residues until the end of the protein.
         plen = len(primer_template)
 
-        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
+        pt_sub = BRS(primer_template, residue_replacements)
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
-            
-            #print(">>>> ", plen, pt_sub)
 
             try:
                 if csss:
@@ -1524,17 +1529,11 @@ def get_adjacent_angles(
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
 
             except (KeyError, ValueError):
-                #print('broke')
+                # walks back one residue
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]
-                pt_sub = build_regex_substitutions(
-                    primer_template,
-                    residue_replacements,
-                    )
-                #if next_residue == 'P':
-                #    pt_sub = f'{pt_sub}_P'
-                #print(">> ptsub ", pt_sub)
+                pt_sub = BRS(primer_template, residue_replacements)
             else:
                 break
         else:
