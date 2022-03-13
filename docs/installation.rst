@@ -10,17 +10,8 @@ Although it's recommended to run IDPConfGen on UNIX based OS, it will work with 
 
 Pre-installation Reqirements
 ----------------------------
-An up-to-date version of anaconda3, pip, java, csh, perl are required
+An up-to-date version of anaconda3, and pip are required
 For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
-
-    sudo apt install python3-pip
-
-    sudo apt-get install default-jdk
-
-    sudo apt-get install csh
-
-    sudo perl -MCPAN -e'install "LWP::Simple"'
-    sudo apt-get install libswitch-perl
 
 To install IDPConformerGenerator (idpconfgen for short) on your local machine:
 
