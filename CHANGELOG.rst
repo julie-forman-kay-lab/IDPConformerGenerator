@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.2.6 (2022-03-13)
+------------------------------------------------------------
+
 * corrected `sscalc` from * input in command-line #175
 
 v0.2.5 (2022-03-11)
