@@ -255,7 +255,7 @@ ap.add_argument(
     help=(
         'Input .JSON file for probabilistic CSSS. '
         'Will use DSSP codes in this .JSON instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-of. CSSS.JSON file is as created by the '
+        '--dany. Requires --dloop-off. CSSS.JSON file is as created by the '
         '`idpconfgen csssconv` command.'
         ),
     default=None,
