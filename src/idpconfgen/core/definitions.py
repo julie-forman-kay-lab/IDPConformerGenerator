@@ -98,6 +98,8 @@ dssp_ss_keys = Namespace(
     turn='T',
     bend='S',
     loop=' ',
+    # adding PPII definition
+    polypII="P",
     )
 
 dssp_ss_keys.all_helix = (
@@ -122,21 +124,26 @@ dssp_ss_keys.all_loops = (
     # helix_5 added as loops, following
     # Balasco, N. et al. BioMed Research International vol. 2017 e2617629 (2017)
     dssp_ss_keys.helix_5,
+    # polyproline II helix added as loops, following
+    # Mansiaux, Y., Joseph, A. P., Gelly, J.-C. & Brevern, A. G. PLOS ONE 6, e18401 (2011)
+    dssp_ss_keys.polypII,
     )
 
 dssp_ss_keys.all = \
     dssp_ss_keys.all_helix \
     + dssp_ss_keys.all_strand \
-    + dssp_ss_keys.all_loops
+    + dssp_ss_keys.all_loops \
+    + dssp_ss_keys.helix_3
 
 dssp_ss_keys.valid = dssp_ss_keys.all + ('L',)
 
 dssp_trans = str.maketrans(
     ''.join(dssp_ss_keys.all),
-    '{}{}{}'.format(
+    '{}{}{}{}'.format(
         'H' * len(dssp_ss_keys.all_helix),
         'E' * len(dssp_ss_keys.all_strand),
         'L' * len(dssp_ss_keys.all_loops),
+        'G' * len(dssp_ss_keys.helix_3)
         )
     )
 
@@ -145,7 +152,8 @@ dssp_trans_bytes = bytes.maketrans(
     b''.join(c.encode() for c in dssp_ss_keys.all),
     b'H' * len(dssp_ss_keys.all_helix)
     + b'E' * len(dssp_ss_keys.all_strand)
-    + b'L' * len(dssp_ss_keys.all_loops),
+    + b'L' * len(dssp_ss_keys.all_loops)
+    + b'G' * len(dssp_ss_keys.helix_3),
     )
 
 
