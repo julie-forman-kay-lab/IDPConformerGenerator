@@ -68,6 +68,13 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
+from idpconfgen.libs.libfilter import (
+    make_any_overlap_regex,
+    make_helix_overlap_regex,
+    make_loop_overlap_regex,
+    make_overlap_regex,
+    make_strand_overlap_regex,
+    )
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
@@ -487,20 +494,34 @@ def main(
 
     if dany:
         # will sample the database disregarding the SS annotation
-        dssp_regexes = ['X+']
+        dssp_regexes = make_overlap_regex(all_valid_ss_codes, xmer_range)
 
     elif custom_sampling:
         csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
-        dssp_regexes = list(csss_dssp_regexes)
+
+        if "X" in csss_dssp_regexes:
+            csss_dssp_regexes.remove("X")
+            csss_dssp_regexes.add(all_valid_ss_codes)
+            for _k, _v in csss_dict.items():
+                # X means any SS.
+                if "X" in _v:
+                    _v[all_valid_ss_codes] = _v.pop("X")
+
+        # regexes identified in CSSS are single coded. Here we create the
+        # overlaping-ready regular expressions.
+        dssp_regexes = [
+            make_overlap_regex(_s, xmer_range)
+            for _s in csss_dssp_regexes
+            ]
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
         if dloop:
-            dssp_regexes.append('L+')
+            dssp_regexes.append(make_loop_overlap_regex(xmer_range))
         if dhelix:
-            dssp_regexes.append('H+')
+            dssp_regexes.append(make_helix_overlap_regex(xmer_range))
         if dstrand:
-            dssp_regexes.append('E+')
+            dssp_regexes.append(make_strand_overlap_regex(xmer_range))
 
     elif duser:
         # this is very advanced, users should know what they are doing :-)
