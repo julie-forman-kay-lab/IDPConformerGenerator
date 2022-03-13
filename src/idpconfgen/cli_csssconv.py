@@ -28,7 +28,7 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = 'idpconfgen_csssconv'
 _name = 'csssconv'
-_help = 'Standardizes secondary-structure prediction output for CSSS.'
+_help = 'Standardizes secondary-structure prediction output for custom secondary-structure sampling (CSSS).'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -54,7 +54,7 @@ ap.add_argument(
 ap.add_argument(
     '-f',
     '--full',
-    help="Parses the secondary structure prediction files as is, without grouping DSSP.",
+    help="Parses the secondary structure prediction files as is, without grouping DSSP codes.",
     action='store_true'
     )
 
@@ -67,7 +67,7 @@ def chespi_probs8_convert_full(p8):
     Parameters
     ----------
     p8 : string
-        Path to the probs8_[ID].txt to operate on as indicated by the user
+        Path to the probs8_[ID].txt to operate on as indicated by the user.
     
     Returns
     -------
@@ -104,7 +104,7 @@ def chespi_probs8_convert_grouped(p8):
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
     Groups together DSSP secondary structures as per idpconfgen definitions.
-    If a residue has multiple SS probabilities, they are summative per L, H, E, G definition.
+    If a residue has multiple SS probabilities, they are summative per L, H, E definition.
     
     Parameters
     ----------
@@ -115,7 +115,7 @@ def chespi_probs8_convert_grouped(p8):
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
-        and the second key later indicates grouped secondary structure (L, H, E, G) 
+        and the second key later indicates grouped secondary structure (L, H, E) 
         as defined in idpconfgen. Values are their respective probabilities.
     """
     dict_out = {}
@@ -150,8 +150,9 @@ def d2D_convert_full(d2d):
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
-        and the second key later indicates secondary structure (H/E/L/P) 
-        as defined in DSSP. Values are their respective probabilities.
+        and the second key later indicates secondary structure ( /H/E/P) 
+        as defined in DSSP. Values for the second key-layer are their
+        respective probabilities.
     """
     dict_out = {}
     dict_probs = {}
@@ -198,7 +199,8 @@ def d2D_convert_grouped(d2d):
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
         and the second key later indicates grouped secondary structure (L, H, E) 
-        as defined in idpconfgen. Values are their respective probabilities.
+        as defined in idpconfgen. Values for the second key-layer are their
+        respective probabilities.
     """
     dict_out = {}
     dict_probs = {}
@@ -239,7 +241,7 @@ def main(
     Parameters
     ----------
     chespi_p8 : string
-        A string to the path of probs8_[ID].txt output from CheSPI.
+        A string to the path of probs8_[ID].TXT output from CheSPI.
         
     delta2D : string
         A string to the path of the .TXT output from delta2D.
