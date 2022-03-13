@@ -8,6 +8,7 @@ USAGE:
     $ idpconfgen build -db torsions.json -seq MMMMMMM...
 
 """
+import sys
 import argparse
 from importlib.resources import path
 import math
@@ -40,13 +41,13 @@ from idpconfgen.core.build_definitions import (
     n_proline_h_coord_at_origin,
     sidechain_templates,
     )
+from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    read_db_to_slices_given_secondary_structure,
     compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -54,7 +55,6 @@ from idpconfgen.libs.libbuild import (
     init_conflabels,
     init_confmasks,
     prepare_energy_function,
-    #read_db_to_slices,
     )
 from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
@@ -67,11 +67,13 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
+from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
     read_dict_from_json,
     read_dictionary_from_disk,
+    save_dict_to_pickle,
     )
 from idpconfgen.libs.libparse import (
     fill_list,
@@ -134,6 +136,11 @@ TEMPLATE_MASKS = None
 TEMPLATE_EFUNC = None
 
 
+class _BuildPreparation:
+    pass
+
+
+
 def are_globals():
     """Assess if global variables needed for building are populated."""
     return all((
@@ -188,22 +195,71 @@ ap.add_argument(
     type=int,
     )
 
+#########################################
 ap.add_argument(
-    '-dr',
-    '--dssp-regexes',
-    help='Regexes used to search in DSSP',
-    default='(?=(L{2,6}))',
+    '--dloop-off',
+    help='Sampling loops is active by default. Use this flag to deactivate it.',
+    action="store_true",
+    )
+
+ap.add_argument(
+    '--dhelix',
+    help=(
+        'Samples the database also for helix segments. '
+        'This feature can be used in combination with --dstrand.'
+        'To explore the three secondary structures, activate --dhelix and '
+        '--dstrand, loop search is always active. '
+        'These features need to be used in combination with the `-rd` flag '
+        'in `idpconfgen sscalc`.'
+        ),
+    action="store_true",
+    )
+
+ap.add_argument(
+    '--dstrand',
+    help=(
+        'Samples the database also for strand segments. '
+        'See help for `--dhelix`.'
+        ),
+    action="store_true",
+    )
+
+ap.add_argument(
+    '--dany',
+    help=(
+        'Samples the database based on sequence identity only. '
+        'Activating this option disregards any secondary structure annotation. '
+        'Requires --dloop-off.'
+        ),
+    action="store_true",
+    )
+
+ap.add_argument(
+    '--duser',
+    help=(
+        'NOTE: Very advanced users only. Use this option to define your own '
+        'regular expressions for the database sampling process. '
+        'You only want to use this option if you know how the code works '
+        'internally. Use this option instead of --dhelix, --dstrand, '
+        '--dany. Requires --dloop-off.'
+        ),
+    default=None,
     nargs='+',
     )
+
+#########################################
 
 ap.add_argument(
     '-csss',
     '--custom-sampling',
-    help=('Input .JSON file for probabilistic CSSS.'
-          'Will use DSSP codes in this .JSON instead of -dr if specified.'
+    help=(
+        'Input .JSON file for probabilistic CSSS. '
+        'Will use DSSP codes in this .JSON instead of --dhelix, --dstrand, '
+        '--dany. Requires --dloop-of. CSSS.JSON file is as created by the '
+        '`idpconfgen csssconv` command.'
         ),
     default=None,
-)
+    )
 
 ap.add_argument(
     '-dsd',
@@ -307,63 +363,56 @@ class EnergyLogSaver:
 
 ENERGYLOGSAVER = EnergyLogSaver()
 
-def parse_CSSS(path2csss, ss_regexes):
+
+def parse_CSSS(path2csss):
     """
-    Reads CSSS.JSON file into a dictionary. Contains information about
-    which secondary structure to sample per residue at a specific probability.
-    
-    Catches  and correctsinstances if the sum of all probabilities per residue
-    does not equal exactly 1.0.
+    Prepares CSSS.JSON dictionary for the conformer building process.
+
+    The secondary structure keys are identified.
+    The probabilities for each residue are normalized to 1, that is:
+    (1 2 2) result in (0.2 0.4 0.4).
 
     Parameters
     ----------
     path2csss : string
         Path to where the csss_[ID].json file is containing ss_regexes and
         their respective probabilities.
-    
-    ss_regexes : list
-        List of DSSP codes to search for in regex form
 
     Returns
     -------
-    dictCSSS : dict-like
+    dict
         First key layer indicats residue number position, second key layer
         indicates the DSSP regex to search for and the values are the probabilities.
-    
-    dssp_regexes : list
-        Refreshed list of regexes depending on what SS to look for in the CSSS.JSON file.
-        If no CSSS is used, returns the default list of dssp_regexes given by -dr.
+
+    set
+        A set with all the different secondary structure keys identified in the
+        CSSS.JSON file.
     """
-    dictCSSS = {}
-    dssp_regexes = ss_regexes
-    
-    if path2csss:
-        dictCSSS = read_dict_from_json(path2csss)
-        temp_dssp = []
-        prob_dssp = []
-        
-        for resid in dictCSSS:
-            for dssp in dictCSSS[resid]:
-                prob_dssp.append(dictCSSS[resid][dssp])
-                temp_dssp.append(dssp)
-            psum = sum(prob_dssp)
-            if psum != 1.0:
-                i = 0
-                # No rounding occurs here because we want an exact sum of 1.0
-                prob_dssp = [p / psum for p in prob_dssp]
-                for dssp in dictCSSS[resid]:
-                    dictCSSS[resid][dssp] = prob_dssp[i]
-                    i += 1
-            prob_dssp = []
-        dssp_regexes = set(temp_dssp) # save to list only unique DSSP regexes   
-    
-    return dictCSSS, dssp_regexes
+    # this function was originally done by @menoliu
+    # @joaomcteixeira gave it a touch
+    csss_dict = read_dict_from_json(path2csss)
+    all_dssps = set()
+
+    # we can use this implementation because dictionaries are sorted by default
+    for resid, dssps in csss_dict.items():
+        probabilities = list(dssps.values())
+        all_dssps.update(dssps.keys())
+        prob_normalized = make_seq_probabilities(probabilities)
+        for dssp_code, prob_n in zip(dssps.keys(), prob_normalized):
+            dssps[dssp_code] = prob_n
+
+    return csss_dict, all_dssps
+
 
 def main(
         input_seq,
         database,
         custom_sampling,
-        dssp_regexes=r'L+',#r'(?=(L{2,6}))',
+        dloop_off=False,
+        dstrand=False,
+        dhelix=False,
+        duser=False,
+        dany=False,
         func=None,
         forcefield=None,
         bgeo_path=None,
@@ -381,6 +430,25 @@ def main(
 
     Distributes over processors.
     """
+    # ensuring some parameters do not overlap
+    dloop = not dloop_off
+    any_def_loops = any((dloop, dhelix, dstrand))
+    non_overlapping_parameters = (any_def_loops, dany, duser, bool(custom_sampling))  # noqa: E501
+    _sum = sum(map(bool, non_overlapping_parameters))
+
+    if _sum > 1:
+        emsg = (
+            'Note (dloop, dstrand, dhelix), dany, duser, and '
+            'custom_sampling are mutually exclusive.'
+            )
+        raise ValueError(emsg)
+    elif _sum < 1:
+        raise ValueError("Give at least one sampling option.")
+
+    del _sum
+    del non_overlapping_parameters
+    # done
+
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(f'input sequence: {input_seq}')
@@ -400,36 +468,96 @@ def main(
         f'{remaining_confs} remaining confs'
         )
 
-    # populates globals
-    #if False:
-    #    global ANGLES, SLICES
-    #    _slices, ANGLES = read_db_to_slices(database, dssp_regexes, ncores=ncores)
-    #    SLICES.extend(_slices)
-    # #
-
     # we use a dictionary because chunks will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-    
-    dictCSSS, dssp_regexes = parse_CSSS(custom_sampling, dssp_regexes)    
-    
-    primary, secondary, ANGLES = \
-        read_db_to_slices_given_secondary_structure(database, dssp_regexes)
-    
+
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
-    
+
+    # reads regexes regexes
+    # regexes will only be sampled for the chunk sizes selected.
+    xmer_range = xmer_probs_tmp.sizes[0], xmer_probs_tmp.sizes[-1]
+
+    csss_dict = False
+    csss_dssp_regexes = None
+    all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
+
+    # There are four possibilities of sampling:
+    # 1) Sampling loops and/or helix and/or strands, where the found chunks are
+    #    all of the same secondary structure
+    # 2) sample "any". Disregards any secondary structure annotated
+    # 3) custom sample given by the user
+    # 4) advanced sampling
+    #
+    # The following if/else block creates the needed variables according to each
+    # scenario.
+
+    if dany:
+        # will sample the database disregarding the SS annotation
+        dssp_regexes = [all_valid_ss_codes]
+
+    elif custom_sampling:
+        csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
+
+        if "X" in csss_dssp_regexes:
+            csss_dssp_regexes.remove("X")
+            csss_dssp_regexes.add(all_valid_ss_codes)
+            for _k, _v in csss_dict.items():
+                # X means any SS.
+                if "X" in _v:
+                    _v[all_valid_ss_codes] = _v.pop("X")
+
+        dssp_regexes = list(csss_dssp_regexes)
+
+    elif any((dloop, dhelix, dstrand)):
+        dssp_regexes = []
+        if dloop: dssp_regexes.append("L")
+        if dhelix: dssp_regexes.append("H")
+        if dstrand: dssp_regexes.append("E")
+
+    elif duser:
+        # this is very advanced, users should know what they are doing :-)
+        dssp_regexes = duser
+
+    else:
+        raise AssertionError("One option is missing. Code shouldn't be here.")
+
+    assert isinstance(dssp_regexes, list), \
+        f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
+    print(dssp_regexes)
+
+    db = read_dictionary_from_disk(database)
+    _, ANGLES, secondary, primary = aligndb(db)
+    del db
+
+    # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
-        secondary,
         input_seq,
-        dssp_regexes,
-        dictCSSS,
-        xmer_probs_tmp.sizes,
-        residue_substitutions,
-    )
-    
+        csss=bool(csss_dict),
+        dssp_regexes=dssp_regexes,
+        secondary=secondary,
+        mers_size=xmer_probs_tmp.sizes,
+        res_tolerance=residue_substitutions,
+        ncores=ncores,
+        )
+
     remove_empty_keys(SLICEDICT_XMERS)
+    # updates user defined chunk sizes and probabilities to the ones actually
+    # observed
     _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
+
+
+    #BP = _BuildPreparation()
+    #BP.SLICEDICT_XMERS = SLICEDICT_XMERS
+    #BP.ANGLES = ANGLES
+    #BP.csss_dict = csss_dict
+    #BP.residue_substitutions = residue_substitutions
+    #BP.xmerprobs = XMERPROBS
+    #save_dict_to_pickle(BP, 'BP.pickle')
+    #sys.exit()
+
+
 
     GET_ADJ = get_adjacent_angles(
         list(SLICEDICT_XMERS.keys()),
@@ -437,8 +565,7 @@ def main(
         input_seq,
         ANGLES,
         SLICEDICT_XMERS,
-        dictCSSS,
-        secondary,
+        csss_dict,
         residue_replacements=residue_substitutions,
         )
 
@@ -1317,9 +1444,7 @@ def get_adjacent_angles(
         db,
         slice_dict,
         csss,
-        secondary,
         residue_replacements=None,
-        RC=np.random.choice,
         ):
     """
     Get angles to build the next adjacent protein chunk.
@@ -1341,7 +1466,7 @@ def get_adjacent_angles(
     slice_dict : dict-like
         A dictionary containing the chunks strings as keys and as values
         lists with slice objects.
-    
+
     csss : dict-like
         A dictionary containing probabilities of secondary structures per
         amino acid residue position.
@@ -1349,54 +1474,69 @@ def get_adjacent_angles(
     residue_replacements = residue_replacements or {}
     probs = fill_list(probs, 0, len(options))
 
-    def func(aidx):
+    # prepares helper lists
+    lss = []  # list of possible secondary structures in case `csss` is given
+    lssprobs = []  # list of possible ss probabilities in case `csss` is given
+    lssE, lssprobsE = lss.extend, lssprobs.extend
+    lssC, lssprobsC = lss.clear, lssprobs.clear
+
+    def func(
+            aidx,
+            CRNFI=calc_residue_num_from_index,
+            RC=np.random.choice,
+            GSCNJIT=get_seq_chunk_njit,
+            BRS=build_regex_substitutions,
+            ):
 
         # calculates the current residue number from the atom index
-        cr = calc_residue_num_from_index(aidx)
+        cr = CRNFI(aidx)
 
         # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
 
         # defines the chunk identity accordingly
-        primer_template = get_seq_chunk_njit(seq, cr, plen)
-        next_residue = get_seq_chunk_njit(seq, cr + plen, 1)
+        primer_template = GSCNJIT(seq, cr, plen)
+        next_residue = GSCNJIT(seq, cr + plen, 1)
 
         # recalculates the plen to avoid plen/template inconsistencies that
         # occur if the plen is higher then the number of
         # residues until the end of the protein.
         plen = len(primer_template)
 
-        pt_sub = build_regex_substitutions(primer_template, residue_replacements)
-        lss = []
-        lssprob = []
+        pt_sub = BRS(primer_template, residue_replacements)
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
+
             try:
                 if csss:
-                    for ss in csss[str(cr+1)]:
-                        lss.append(ss) #list of possible secondary structures for a given residue
-                        lssprob.append(csss[str(cr+1)][ss]) #list of possible probabilities for each ss
-                    pcsss = RC(lss, p=lssprob)
-                    lss = []
-                    lssprob = []
+                    cr_plus_1 = str(cr + 1)
+
+                    # clear lists
+                    lssC()
+                    lssprobsC()
+
+                    # adds possible secondary structure for the residue
+                    # the first residue of the chunk
+                    lssE(csss[cr_plus_1].keys())
+                    # adds SS probabilities for the same residue
+                    lssprobsE(csss[cr_plus_1].values())
+
+                    pcsss = RC(lss, p=lssprobs)
                     angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
+
                 else:
                     angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
+
             except (KeyError, ValueError):
+                # walks back one residue
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]
-                pt_sub = build_regex_substitutions(
-                    primer_template,
-                    residue_replacements,
-                    )
-                if next_residue == 'P':
-                    pt_sub = f'{pt_sub}_P'
+                pt_sub = BRS(primer_template, residue_replacements)
             else:
                 break
         else:
-            log.debug(plen, primer_template, seq[cr:cr + plen])
             # raise AssertionError to avoid `python -o` silencing
             raise AssertionError('The code should not arrive here')
 
@@ -1407,8 +1547,6 @@ def get_adjacent_angles(
             return primer_template, angles
 
     return func
-
-
 
 
 if __name__ == "__main__":

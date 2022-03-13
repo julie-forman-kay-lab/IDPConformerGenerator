@@ -11,7 +11,6 @@ USAGE:
 """
 import argparse
 from collections import defaultdict
-import re
 import json
 
 from idpconfgen.libs.libio import read_dict_from_json
@@ -69,6 +68,7 @@ def parse_custom_pattern(cp):
     """
     dict_out = defaultdict(dict)
     lst_cp = cp.split("|")
+    respro = []
     for groups in lst_cp:
         split_gp = groups.split()
         if "-" in split_gp[0]:
@@ -76,6 +76,10 @@ def parse_custom_pattern(cp):
             start_res = int(res_range[0])
             end_res = int(res_range[1])
             for i in range(start_res, end_res+1):
+                if i in respro:
+                    log.info(S(f'Warning: propensities for residue {i} have been changed due to overlap in `-cp`.'))
+                else:
+                    respro.append(i)
                 dict_out[i][split_gp[1]] = float(split_gp[2])
         else:
             num_res = int(split_gp[0])
@@ -103,7 +107,6 @@ def main(
     """
     init_files(log, LOGFILESNAME)
     log.info(T('processing custom CSSS pattern...'))
-    
     
     converted_csss = parse_custom_pattern(custom_pattern)
     

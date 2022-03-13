@@ -60,6 +60,17 @@ class AllParam(argparse.Action):
             setattr(namespace, self.dest, values)
 
 
+class ListOfPositiveInts(argparse.Action):
+    def __call__(self, parser, namespace, values, option_string=None):
+        try:
+            iv = list(map(int, values))
+        except Exception:
+            raise parser.error(f'{self.dest!r} can only receive integers.')
+        if any(i < 1 for i in iv):
+            raise parser.error(f'{self.dest!r} can not have a negative range.')
+        setattr(namespace, self.dest, iv)
+
+
 class CSV2Tuple(argparse.Action):
     """Convert list of arguments in tuple."""
 
