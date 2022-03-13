@@ -127,7 +127,7 @@ def chespi_probs8_convert_grouped(p8):
             pline.pop(0)
             data = [float(i) for i in pline]
             resid = int(data[0])
-            
+            # adds up the probabilities for SS codes based on idpconfgen definitions
             dict_p8["L"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
             dict_p8["H"] = data[1]
             dict_p8["E"] = data[4]
@@ -171,6 +171,7 @@ def d2D_convert_full(d2d):
                 dict_probs["P"] = data[4]
                 dict_out[resid] = dict_probs
                 dict_probs = {}
+            # if there aren't any predicted probabilities for this residue, make them all equal
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
@@ -218,6 +219,7 @@ def d2D_convert_grouped(d2d):
                 dict_probs["L"] = round((data[3]+data[4]), 3)
                 dict_out[resid] = dict_probs
                 dict_probs = {}
+            # if there aren't any predicted probabilities for this residue, make them all equal
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
@@ -259,6 +261,7 @@ def main(
     if chespi_p8:
         log.info(T('reading and processing CheSPI predictions...'))
         with open(chespi_p8) as reader:
+            # regex matching pattern for the format of CheSPI output files
             if not re.fullmatch(r"\s{3}[A-Z]{1}\d|\s|.{60,}\n", reader.readline()):
                 log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
                 return
@@ -270,6 +273,7 @@ def main(
         
     if delta2D:
         log.info(T('reading and processing delta2D predictions...'))
+        #TODO: regex matching to see the format of alleged delta2D output files
         if full: converted_delta2D = d2D_convert_full(delta2D)
         else: converted_delta2D = d2D_convert_grouped(delta2D)
         

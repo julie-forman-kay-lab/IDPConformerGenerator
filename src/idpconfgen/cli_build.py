@@ -467,12 +467,14 @@ def main(
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
-    # reads regexes regexes
+    # reads regexes
     # regexes will only be sampled for the chunk sizes selected.
     xmer_range = xmer_probs_tmp.sizes[0], xmer_probs_tmp.sizes[-1]
 
+    # set up the information from CSSS.JSON files
     csss_dict = False
     csss_dssp_regexes = None
+    
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
     # There are four possibilities of sampling:
@@ -1493,6 +1495,7 @@ def get_adjacent_angles(
 
             try:
                 if csss:
+                    #matches current residue to build with residue number in CSSS
                     cr_plus_1 = str(cr + 1)
 
                     # clear lists
@@ -1505,6 +1508,7 @@ def get_adjacent_angles(
                     # adds SS probabilities for the same residue
                     lssprobsE(csss[cr_plus_1].values())
 
+                    # based on the probabilities, select a SS for residue in question
                     pcsss = RC(lss, p=lssprobs)
                     angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
 
