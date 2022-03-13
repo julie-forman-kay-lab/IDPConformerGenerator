@@ -134,14 +134,13 @@ dssp_ss_keys.all_loops = (
 dssp_ss_keys.all = \
     dssp_ss_keys.all_helix \
     + dssp_ss_keys.all_strand \
-    + dssp_ss_keys.all_loops \
-    + dssp_ss_keys.helix_3
+    + dssp_ss_keys.all_loops
 
 dssp_ss_keys.valid = dssp_ss_keys.all + ('L',)
 
 dssp_trans = str.maketrans(
     ''.join(dssp_ss_keys.all),
-    '{}{}{}{}'.format(
+    '{}{}{}'.format(
         'H' * len(dssp_ss_keys.all_helix),
         'E' * len(dssp_ss_keys.all_strand),
         'L' * len(dssp_ss_keys.all_loops),
