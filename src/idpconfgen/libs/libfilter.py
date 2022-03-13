@@ -18,24 +18,6 @@ REGEX_RANGE = re.compile(r'(\{\d+\,\d+\}|\{\d+\}|\{\d+\,\}|\{\,\d+\})')
 # also we consider \{\d+\} for simplicity of the algorithm
 REGEX_RANGE_CHAR = re.compile(r'((\w)\{|\[([\w ]+)\]\{)')
 
-
-def make_overlap_regex(s, range_):
-    """Make an overlap regex."""
-    i, j = range_
-    if any(_ < 1 for _ in range_):
-        raise ValueError(f"Range must be positive: {range_!r}")
-    if j < i:
-        raise ValueError(f"End must be higher than start: {range_!r}")
-    # (?=([LHE]{1,5})), for example.
-    return r"(?=([" + s + r"]{" + str(i) + "," + str(j) + r"}))"
-
-
-make_loop_overlap_regex = partial(make_overlap_regex, "L")
-make_helix_overlap_regex = partial(make_overlap_regex, "H")
-make_strand_overlap_regex = partial(make_overlap_regex, "E")
-make_any_overlap_regex = partial(make_overlap_regex, "LHE")
-
-
 def aligndb(db):
     """Aligns IDPConfGen DB."""
     NAN = np.nan
@@ -167,7 +149,6 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
 
     assert isinstance(result, list)
     assert all(isinstance(S, slice) for S in result)  # heavy and slow!!
-    print("len result, ", len(result))
     return result
 
 

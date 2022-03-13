@@ -508,8 +508,13 @@ def read_db_to_slices_given_secondary_structure(database, ss_regexes):
     db = read_dictionary_from_disk(database)
     timed = partial(timeme, aligndb)
     _, angles, dssp, resseq = timed(db)
-
-    _ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
+    
+    if ss_regexes == ['X+']:
+        any_dssp = re.sub(".", "X", dssp)
+        _ = (regex_search(any_dssp, _regex) for _regex in make_list_if_not(ss_regexes))
+    else:
+        _ = (regex_search(dssp, _regex) for _regex in make_list_if_not(ss_regexes))
+        
     slices = list(it.chain.from_iterable(_))
     seqs = [resseq[slc] for slc in slices]
     ssc = [dssp[ss] for ss in slices]
