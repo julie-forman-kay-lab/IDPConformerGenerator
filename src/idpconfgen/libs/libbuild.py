@@ -21,6 +21,7 @@ from idpconfgen.core.definitions import (
     bgeo_CaCNp1,
     bgeo_Cm1NCa,
     bgeo_NCaC,
+    dssp_ss_keys,
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
@@ -1137,8 +1138,10 @@ def make_combined_regex(regexes):
     To be used with re.fullmatch.
     """
     if len(regexes) > 1:
-        return "(" + '+|'.join(regexes) + "+)"
+        regexes_ = (f'[{r}]*' if len(r) > 1 else f'{r}+' for r in regexes)
+        return "(" + '|'.join(regexes_) + ")"
     if len(regexes) == 1:
+        assert regexes[0] == ''.join(dssp_ss_keys.valid), (regexes, ''.join(dssp_ss_keys.valid))
         return "([" + regexes[0] + "]+)"
     else:
         raise AssertionError("Regexes are expected to have something.")
