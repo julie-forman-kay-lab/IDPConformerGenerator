@@ -740,6 +740,7 @@ def conformer_generator(
             all_atom_input_seq,
             TEMPLATE_MASKS,
             ALL_ATOM_MASKS,
+            ALL_ATOM_LABELS
             )
 
     # tests generative function complies with implementation requirements

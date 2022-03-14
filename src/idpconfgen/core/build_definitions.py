@@ -744,3 +744,22 @@ n_terminal_h_coords_at_origin = np.array([
     [ 0.837,  1.435,  1.189],
     [ 0.258,  0.13 ,  2.015]
     ])
+
+
+def convert_one2three(input_sequence):
+    """
+    Convert 1 letter code sequence (FASTA) in a 3 letter code list.
+    
+    AAA -> ['ALA', 'ALA', 'ALA']
+    
+    Parameters
+    ----------
+    input_sequence : str
+        Input sequence in FASTA format.
+
+    Returns
+    -------
+    List
+        List of 3 letter code version of the input sequence.
+    """
+    return [aa1to3[amino_acid] for amino_acid in input_sequence]

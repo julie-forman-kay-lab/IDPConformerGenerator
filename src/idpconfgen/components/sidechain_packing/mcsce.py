@@ -4,6 +4,7 @@ Implement MCSCE sidechain packing algorithm logic.
 MCSCE repository at: https://github.com/THGLab/MCSCE
 """
 from functools import partial
+from idpconfgen.core.build_definitions import convert_one2three
 
 
 mcsce_defaults = {
@@ -15,12 +16,12 @@ mcsce_defaults = {
     }
 
 
-def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
+def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, all_atom_labels, **kwargs):
     """."""
     from mcsce.libs.libstructure import Structure
     from mcsce.libs.libenergy import prepare_energy_function
     from mcsce.core import build_definitions
-    from mcsce.core.side_chain_builder import create_side_chain
+    from mcsce.core.side_chain_builder import create_side_chain, initialize_func_calc
 
     params = {**mcsce_defaults, **kwargs}
 
@@ -46,7 +47,9 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
         terms=params.pop('efunc_terms'),
         )
 
-    params['efunc_creator'] = efunc_partial
+    # params['efunc_creator'] = efunc_partial
+    input_seq_3 = convert_one2three(input_seq)
+    initialize_func_calc(efunc_partial, input_seq_3, s)
     params['return_first_valid'] = return_first_valid
 
     def calc(coords):
@@ -54,6 +57,8 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
         s.coords = coords[template_masks.non_sidechains]
 
         final_structure = create_side_chain(s, **params)
+
+        final_structure.reorder_by_atom_labels(all_atom_labels)
 
         if final_structure is None:
             return None
