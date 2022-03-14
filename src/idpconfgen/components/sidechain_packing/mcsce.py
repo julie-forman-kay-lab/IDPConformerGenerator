@@ -28,7 +28,6 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
     # initiates only the backbone atoms
     s = Structure(fasta=input_seq)
     s.build()
-    s = s.remove_side_chains()
 
     ff = build_definitions.forcefields["Amberff14SB"]
     ff_obj = ff(add_OXT=True, add_Nterminal_H=True)
@@ -60,7 +59,10 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
 
         final_structure = create_side_chain(s, **params)
 
-        return final_structure.coords
+        if final_structure is None:
+            return final_structure
+
+        return final_structure.coords[all_atom_masks.non_Hs_non_OXT]
         #if final_structure is None:
         #    return None
         #else:

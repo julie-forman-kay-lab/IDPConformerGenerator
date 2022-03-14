@@ -941,12 +941,13 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        print('############## ', sidechain_method)
-        with_sidechains = sidechain_method
+        log.info(S(f"configurin sidechain method: {sidechain_method}"))
+        # we use named arguments here to allow ignored non needed parameters
+        # with **kwargs
         build_sidechains = sidechain_packing_methods[sidechain_method](
-            all_atom_input_seq,
-            TEMPLATE_MASKS,
-            ALL_ATOM_MASKS,
+            input_seq=all_atom_input_seq,
+            template_masks=TEMPLATE_MASKS,
+            all_atom_masks=ALL_ATOM_MASKS,
             )
 
     # tests generative function complies with implementation requirements
@@ -1364,26 +1365,22 @@ def conformer_generator(
         all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
 
         if with_sidechains:
-            if with_sidechains == "mcsce":
 
-                mcsce_coords = build_sidechains(template_coords)
-                assert mcsce_coords.shape == all_atom_coords.shape
-                if mcsce_coords is None:
-                    _emsg = "MCSCE failed to build sidechain., discarding the conformer"
-                    log.info(seed_report(_msg))
-                    continue
-                else:
-                    all_atom_coords[:, :] = mcsce_coords
+            _new_sd_coords = build_sidechains(template_coords)
 
-            elif with_sidechains == "faspr":
+            if _new_sd_coords is None:
+                _emsg = (
+                    "Could not find a solution for sidechains, "
+                    "discarding the conformer...")
+                log.info(seed_report(_msg))
+                continue
 
-                all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = \
-                    build_sidechains(template_coords[TEMPLATE_MASKS.bb4])
+            all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = _new_sd_coords
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            #if ANY(total_energy > energy_threshold_sidechains):
-            if False:
+            if ANY(total_energy > energy_threshold_sidechains):
+            #if False:
                 _msg = (
                     'Conformer with energy higher than allowed threshold '
                     '- discarded.'

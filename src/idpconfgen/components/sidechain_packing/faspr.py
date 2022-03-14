@@ -10,7 +10,7 @@ faspr_dun2010bbdep_path = Path(
     )
 
 
-def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
+def init_faspr_sidechains(input_seq, template_masks, *ignore, **everything):
     """
     Instantiate dedicated function environment for FASPR sidehchain calculation.
 
@@ -32,10 +32,7 @@ def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
     np.ndarray (M, 3)
         Heavy atom coordinates of the protein sequence.
     """
-    # TODO:
-    # this is here because tox is not able to detect idpcpp module.
-    # this is a turnaround to allow tests to pass.
-    # currently tests to not test this function.
+    # we import idpcpp here to avoid problems with tox
     import idpcpp
     faspr_func = idpcpp.faspr_sidechains
     faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
@@ -48,6 +45,6 @@ def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
             faspr_dun2010_bbdep_str,
             )
 
-        return all_atom_masks.non_Hs_non_OXT, _coords
+        return _coords
 
     return compute_faspr_sidechains
