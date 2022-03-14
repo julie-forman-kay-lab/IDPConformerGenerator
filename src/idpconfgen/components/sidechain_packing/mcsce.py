@@ -4,7 +4,6 @@ Implement MCSCE sidechain packing algorithm logic.
 MCSCE repository at: https://github.com/THGLab/MCSCE
 """
 from functools import partial
-from idpconfgen.core.build_definitions import convert_one2three
 
 import numpy as np
 
@@ -100,9 +99,6 @@ def init_mcsce_sidechains(
         structure=s,
         )
 
-    # params['efunc_creator'] = efunc_partial
-    input_seq_3 = convert_one2three(input_seq)
-    initialize_func_calc(efunc_partial, input_seq_3, s)
     params['return_first_valid'] = return_first_valid
 
     def calc(coords):
