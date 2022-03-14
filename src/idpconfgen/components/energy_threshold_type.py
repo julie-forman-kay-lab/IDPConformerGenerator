@@ -1,7 +1,10 @@
 """Components controlling the energy threshold evaluation."""
 
 from idpconfgen.libs.libcli import add_general_arg
-from idpconfgen.libs.libenergyij import post_calc_options
+from idpconfgen.libs.libenergyij import (
+    default_post_calc_option,
+    post_calc_options,
+    )
 from idpconfgen.libs.libfunc import vartial
 
 
