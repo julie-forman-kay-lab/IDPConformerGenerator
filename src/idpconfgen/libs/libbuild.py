@@ -1141,7 +1141,6 @@ def make_combined_regex(regexes):
         regexes_ = (f'[{r}]*' if len(r) > 1 else f'{r}+' for r in regexes)
         return "(" + '|'.join(regexes_) + ")"
     if len(regexes) == 1:
-        assert regexes[0] == ''.join(dssp_ss_keys.valid), (regexes, ''.join(dssp_ss_keys.valid))
         return "([" + regexes[0] + "]+)"
     else:
         raise AssertionError("Regexes are expected to have something.")

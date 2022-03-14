@@ -12,6 +12,11 @@ Changelog
 * Integrates the MCSCE protocol in the building process as part of the
   sidechain packing method options.
 
+v0.3.3 (2022-03-14)
+------------------------------------------------------------
+
+* removes assert in 0.3.2
+
 v0.3.2 (2022-03-14)
 ------------------------------------------------------------
 
