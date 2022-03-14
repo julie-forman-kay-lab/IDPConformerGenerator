@@ -27,7 +27,10 @@ from numba import njit
 from idpconfgen import Path, log
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.components.sidechain_packing import (
+    DEFAULT_SDM,
+    add_mcsce_subparser,
     add_sidechain_method,
+    get_sidechain_packing_parameters,
     sidechain_packing_methods,
     )
 from idpconfgen.components.xmer_probs import (
@@ -342,6 +345,7 @@ ap.add_argument(
 
 
 add_sidechain_method(ap)
+add_mcsce_subparser(ap)
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
@@ -427,6 +431,7 @@ def main(
         xmer_probs=None,
         output_folder=None,
         energy_log='energies.log',
+        sidechain_method=DEFAULT_SDM,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -527,7 +532,6 @@ def main(
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
-    print(dssp_regexes)
 
     db = read_dictionary_from_disk(database)
     _, ANGLES, secondary, primary = aligndb(db)
@@ -591,12 +595,18 @@ def main(
 
     ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
+    # get sidechain dedicated parameters
+    sidechain_parameters = \
+        get_sidechain_packing_parameters(kwargs, sidechain_method)
+
     # prepars execution function
     consume = partial(
         _build_conformers,
         input_seq=input_seq,  # string
         output_folder=output_folder,
         nconfs=conformers_per_core,  # int
+        sidechain_parameters=sidechain_parameters,
+        sidechain_method=sidechain_method,  # goes back to kwards
         **kwargs,
         )
 
@@ -704,6 +714,7 @@ def _build_conformers(
         conformer_name='conformer',
         output_folder=None,
         nconfs=1,
+        sidechain_parameters=None,
         **kwargs,
         ):
     """Arrange building of conformers and saves them to PDB files."""
@@ -716,6 +727,7 @@ def _build_conformers(
     builder = conformer_generator(
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
+        sidechain_parameters=sidechain_parameters,
         **kwargs)
 
     atom_labels, residue_numbers, residue_labels = next(builder)
@@ -754,6 +766,7 @@ def conformer_generator(
         bgeo_path=None,
         forcefield=None,
         random_seed=0,
+        sidechain_parameters=None,
         **energy_funcs_kwargs,
         ):
     """
@@ -941,13 +954,14 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        print('############## ', sidechain_method)
-        with_sidechains = sidechain_method
+        log.info(S(f"configuring sidechain method: {sidechain_method}"))
+        # we use named arguments here to allow ignored non needed parameters
+        # with **kwargs
         build_sidechains = sidechain_packing_methods[sidechain_method](
-            all_atom_input_seq,
-            TEMPLATE_MASKS,
-            ALL_ATOM_MASKS,
-            ALL_ATOM_LABELS
+            input_seq=all_atom_input_seq,
+            template_masks=TEMPLATE_MASKS,
+            all_atom_masks=ALL_ATOM_MASKS,
+            user_parameters=sidechain_parameters,
             )
 
     # tests generative function complies with implementation requirements
@@ -969,7 +983,6 @@ def conformer_generator(
         ALL_ATOM_LABELS.res_nums,
         ALL_ATOM_LABELS.res_labels,
         )
-
     all_atom_num_atoms = len(ALL_ATOM_LABELS.atom_labels)
     template_num_atoms = len(TEMPLATE_LABELS.atom_labels)
 
@@ -1365,26 +1378,22 @@ def conformer_generator(
         all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
 
         if with_sidechains:
-            if with_sidechains == "mcsce":
 
-                mcsce_coords = build_sidechains(template_coords)
-                assert mcsce_coords.shape == all_atom_coords.shape
-                if mcsce_coords is None:
-                    _emsg = "MCSCE failed to build sidechain., discarding the conformer"
-                    log.info(seed_report(_msg))
-                    continue
-                else:
-                    all_atom_coords[:, :] = mcsce_coords
+            # this is uniformed API for all build_sidechains
+            _mask, _new_sd_coords = build_sidechains(template_coords)
 
-            elif with_sidechains == "faspr":
+            if _new_sd_coords is None:
+                _emsg = (
+                    "Could not find a solution for sidechains, "
+                    "discarding the conformer...")
+                log.info(seed_report(_msg))
+                continue
 
-                all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = \
-                    build_sidechains(template_coords[TEMPLATE_MASKS.bb4])
+            all_atom_coords[_mask] = _new_sd_coords
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            #if ANY(total_energy > energy_threshold_sidechains):
-            if False:
+            if ANY(total_energy > energy_threshold_sidechains):
                 _msg = (
                     'Conformer with energy higher than allowed threshold '
                     '- discarded.'
@@ -1396,7 +1405,6 @@ def conformer_generator(
         _msg = f'finished conf: {conf_n} with energy {_total_energy}'
         log.info(seed_report(_msg))
 
-        #print(all_atom_coords)
         yield SUM(total_energy), all_atom_coords
         conf_n += 1
 
