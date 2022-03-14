@@ -21,6 +21,7 @@ from idpconfgen.core.definitions import (
     bgeo_CaCNp1,
     bgeo_Cm1NCa,
     bgeo_NCaC,
+    dssp_ss_keys,
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
@@ -50,6 +51,7 @@ from idpconfgen.logger import S
 ConfMasks = namedtuple(
     'ConfMaks',
     [
+        'all',
         'bb3',
         'bb4',
         'NHs',
@@ -61,7 +63,8 @@ ConfMasks = namedtuple(
         'non_Hs',
         'non_Hs_non_OXT',
         'non_NHs_non_OXT',
-        'non_sidechains',
+        'non_sidechains',  # carbon beta included
+        'all_sidechains',  # carbon beta included
         'H2_N_CA_CB',
         ]
     )
@@ -165,7 +168,10 @@ def init_confmasks(atom_labels):
     H2_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
     non_sidechains : all atoms except sidechains beyond CB
+    all_sidechain : all sidechain atoms including CB and HA
     """
+    _all = np.ones(len(atom_labels), dtype=bool)
+
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     assert len(bb3) % 3 == 0
 
@@ -194,6 +200,12 @@ def init_confmasks(atom_labels):
     assert not _s.intersection({'H', 'OXT'}), _s
 
     non_sidechains = np.where(np.isin(atom_labels, backbone_atoms,))[0]
+    all_sidechains = np.where(np.in1d(
+        atom_labels,
+        ('N', 'CA', 'C', 'O', 'H1', 'H2', 'H3', 'OXT', 'H'),
+        invert=True,
+        ))
+
 
     # for the first residue
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
@@ -216,6 +228,7 @@ def init_confmasks(atom_labels):
     assert len(Hterm) in (2, 3)  # proline as no H1.
 
     conf_mask = ConfMasks(
+        all=_all,
         bb3=bb3,
         bb4=bb4,
         NHs=NHs,
@@ -229,6 +242,7 @@ def init_confmasks(atom_labels):
         non_NHs_non_OXT=non_NHs_non_OXT,
         non_sidechains=non_sidechains,
         H2_N_CA_CB=H2_N_CA_CB,
+        all_sidechains=all_sidechains,
         )
 
     return conf_mask
@@ -1124,7 +1138,8 @@ def make_combined_regex(regexes):
     To be used with re.fullmatch.
     """
     if len(regexes) > 1:
-        return "(" + '+|'.join(regexes) + "+)"
+        regexes_ = (f'[{r}]*' if len(r) > 1 else f'{r}+' for r in regexes)
+        return "(" + '|'.join(regexes_) + ")"
     if len(regexes) == 1:
         return "([" + regexes[0] + "]+)"
     else:
