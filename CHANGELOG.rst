@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.3.3 (2022-03-14)
+------------------------------------------------------------
+
 * removes assert in 0.3.2
 
 v0.3.2 (2022-03-14)
