@@ -52,8 +52,6 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    read_db_to_slices_given_secondary_structure,
-    compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
@@ -344,7 +342,6 @@ ap.add_argument(
 
 
 add_sidechain_method(ap)
-
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
@@ -945,6 +942,7 @@ def conformer_generator(
 
     if with_sidechains:
         print('############## ', sidechain_method)
+        with_sidechains = sidechain_method
         build_sidechains = sidechain_packing_methods[sidechain_method](
             all_atom_input_seq,
             TEMPLATE_MASKS,
@@ -1367,31 +1365,26 @@ def conformer_generator(
         all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
 
         if with_sidechains:
+            if with_sidechains == "mcsce":
 
-            #final_masks = [
-            #    ALL_ATOM_MASKS.non_Hs_non_OXT,
-            #    ALL_ATOM_MASKS.non_NHs_non_OXT,
-            #    #True,
-            #    ]
+                mcsce_coords = build_sidechains(template_coords)
+                assert mcsce_coords.shape == all_atom_coords.shape
+                if mcsce_coords is None:
+                    _emsg = "MCSCE failed to build sidechain., discarding the conformer"
+                    log.info(seed_report(_msg))
+                    continue
+                else:
+                    all_atom_coords[:, :] = mcsce_coords
 
-            _mask, _w_sdcoords = build_sidechains(template_coords)
-            all_atom_coords[_mask] = _w_sdcoords
-            #print('side results', _w_sdcoords)
+            elif with_sidechains == "faspr":
 
-            #for _mask in final_masks:
-            #    try:
-            #        all_atom_coords[_mask] = _w_sdcoords
-            #    except (IndexError, ValueError):
-            #        continue
-            #    else:
-            #        break
-            #else:
-            #    raise RuntimeError('Sidechain mask failed')
-
+                all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = \
+                    build_sidechains(template_coords[TEMPLATE_MASKS.bb4])
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if ANY(total_energy > energy_threshold_sidechains):
+            #if ANY(total_energy > energy_threshold_sidechains):
+            if False:
                 _msg = (
                     'Conformer with energy higher than allowed threshold '
                     '- discarded.'

@@ -10,6 +10,7 @@ from idpconfgen.core.build_definitions import convert_one2three
 mcsce_defaults = {
     'efunc_terms': ('lj', 'clash'),
     'n_trials': 200,
+    'batch_size': 16,
     'mode': 'simple',
     'temperature': 300,
     'parallel_worker': 1,
@@ -28,6 +29,7 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, all_atom_la
     # initiates only the backbone atoms
     s = Structure(fasta=input_seq)
     s.build()
+    s = s.remove_side_chains()
 
     ff = build_definitions.forcefields["Amberff14SB"]
     ff_obj = ff(add_OXT=True, add_Nterminal_H=True)
@@ -41,10 +43,14 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, all_atom_la
         _msg = "Mode has to be either 'simple' or 'exhaustive'"
         raise ValueError(_msg) from err
 
-    efunc_partial = partial(
-        prepare_energy_function,
-        forcefield=ff_obj,
-        terms=params.pop('efunc_terms'),
+    initialize_func_calc(
+        partial(
+            prepare_energy_function,
+            batch_size=params.pop('batch_size'),
+            forcefield=ff_obj,
+            terms=params.pop("efunc_terms"),
+            ),
+        structure=s,
         )
 
     # params['efunc_creator'] = efunc_partial

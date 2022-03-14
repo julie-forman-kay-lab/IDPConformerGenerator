@@ -60,6 +60,8 @@ ConfMasks = namedtuple(
         'cterm',
         'non_Hs',
         'non_Hs_non_OXT',
+        'non_NHs_non_OXT',
+        'non_sidechains',
         'H2_N_CA_CB',
         ]
     )
@@ -159,6 +161,7 @@ def init_confmasks(atom_labels):
     cterm : (OXT2, OXT1)
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
+    non_NHs_non_OXT : all but NHs and OXT atom
     H2_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
     non_sidechains : all atoms except sidechains beyond CB
@@ -185,6 +188,12 @@ def init_confmasks(atom_labels):
     hs_match = np.vectorize(lambda x: bool(rr.match(x)))
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
+
+    non_NHs_non_OXT = np.where(np.logical_not(np.isin(atom_labels, ('H', 'OXT'))))[0]  # noqa E:501
+    _s = set(atom_labels[non_NHs_non_OXT])
+    assert not _s.intersection({'H', 'OXT'}), _s
+
+    non_sidechains = np.where(np.isin(atom_labels, backbone_atoms,))[0]
 
     # for the first residue
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
@@ -217,6 +226,8 @@ def init_confmasks(atom_labels):
         cterm=cterm,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
+        non_NHs_non_OXT=non_NHs_non_OXT,
+        non_sidechains=non_sidechains,
         H2_N_CA_CB=H2_N_CA_CB,
         )
 
