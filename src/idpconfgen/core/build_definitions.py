@@ -207,23 +207,12 @@ def generate_residue_template_topology(
     res_covalent_bonds['MET']['SD'].extend(('CG', 'CE'))
     res_covalent_bonds['MET']['CE'].append('SD')
 
-    # asserts all atoms are considered
     for k1, v1 in res_covalent_bonds.items():
+        # asserts all atoms are considered
         assert len(v1) == len(residue_labels[k1]), k1
 
-        # add OXT connectivity
         if add_OXT:
             add_OXT_to_connectivity(v1)
-
-        ## added 'OXT' connectivity
-        #for atom, connects in v1.items():
-        #    if 'O' in connects:
-        #        connects.append('OXT')
-
-        ## this should be only 'C'
-        #v1['OXT'] = copy(v1['O'])
-        if k1 == 'PRO':
-            continue
 
         if add_Nterminal_H:
             add_Nterm_H_connectivity(v1)
@@ -233,19 +222,15 @@ def generate_residue_template_topology(
 
 def add_Nterm_H_connectivity(connectivity_dict):
     """
-    Adds protons for Nterm connectivity.
+    Adds protons for Nterm covalent bond connectivity.
 
     Adds H1, H2, and H3 protons to N connectivity.
     This maintains compatibility with XML forcefields obtained
     from the OpenMM project.
     """
-    assert 'H' in connectivity_dict, connectivity_dict
-    for atom, list_of_connects in connectivity_dict.items():
-        if 'H' in list_of_connects:
-            list_of_connects.extend(('H1', 'H2', 'H3'))
-
+    connectivity_dict["N"].extend(('H1', 'H2', 'H3'))
     for h in ('H1', 'H2', 'H3'):
-        connectivity_dict[h] = copy(connectivity_dict['H'])
+        connectivity_dict[h] = ["N"]
 
 
 def add_OXT_to_connectivity(connectivity_dict):
@@ -735,7 +720,7 @@ sidechain_templates = {
     }
 
 # these template coordinates were created using Chimera-X daily given
-# a N-terminal at 0,0,0 and a CA along the X axis.
+# a CA-terminal at 0,0,0
 n_terminal_h_coords_at_origin = np.array([
     [ 0.087,  0.76 ,  1.245],
     [ 0.   ,  0.   ,  0.   ],
@@ -763,3 +748,13 @@ def convert_one2three(input_sequence):
         List of 3 letter code version of the input sequence.
     """
     return [aa1to3[amino_acid] for amino_acid in input_sequence]
+# N-terminal hydrogen position templates for N-term Prolines
+# created from the pro.pdb in sidechains/amber with the AmberTools21 command
+# pdb4amber -i pro.pdb -o hhpro.pdb --dry --reduce
+n_proline_h_coord_at_origin = np.array([
+    [-0.792,-1.234, 0.000],
+    [ 0.   ,  0.   ,  0.   ],
+    [ 1.331, -0.182, -0.723],
+    [-0.243, -1.990, -0.409],
+    [-1.614, -1.109, -0.590],
+    ])

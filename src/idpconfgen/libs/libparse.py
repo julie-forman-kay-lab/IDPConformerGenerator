@@ -11,11 +11,16 @@ from pathlib import Path as Path_
 from operator import setitem
 
 from numba import njit
-from libfuncpy import chainfs, consume
 
 from idpconfgen import Path, log
-from idpconfgen.core.definitions import aa1to3, dssp_trans_bytes, jsonparameters, aa1set, aa3set
+from idpconfgen.core.definitions import (
+    aa1set,
+    aa1to3,
+    dssp_trans_bytes,
+    jsonparameters,
+    )
 from idpconfgen.core.exceptions import DSSPParserError
+from idpconfgen.libs.libfunc import chainfs, consume
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
 
@@ -35,10 +40,15 @@ type2string = {
     }
 
 
+def make_list_if_not(item):
+    """Put `item` into a list if item is not list or tuple-lik if item is not list or tuple-like."""
+    if isinstance(item, (str, int, float)):
+        return [item]
+    return item
+
+
 def get_diff_between_groups(group1, group2):
-    """
-    Get difference between groups as a set.
-    """
+    """Get difference between groups as a set."""
     return set(group1).difference(set(group2))
 
 
@@ -56,6 +66,7 @@ def is_valid_fasta(fasta):  # str -> bool
         and not get_diff_between_aa1l(fasta)
 
     return is_valid
+
 
 # USED OKAY
 def group_by(data):
@@ -324,11 +335,12 @@ def remap_sequence(seq, target='A', group=('P', 'G')):
 # njit available
 # domain specific
 def get_trimer_seq(seq, idx):
+    """Get sequence of trimer."""
     pre = seq[idx - 1] if idx > 0 else 'G'
     curr_res = seq[idx]
     try:
         pos = seq[idx + 1]
-    except:  #IndexError in plain python
+    except:  # noqa: E722  IndexError in plain python
         pos = 'G'
 
     return curr_res, pre + pos
@@ -391,7 +403,7 @@ def fill_list(seq, fill, size):
 
 
 def convert_int_float_lines_to_dict(lines):
-    """
+    r"""
     Convert string lines composed of putative int and float to dict.
 
     Example
@@ -401,7 +413,6 @@ def convert_int_float_lines_to_dict(lines):
 
     >>> convert_int_float_lines_to_dict(['1 2\n', '3 45.5\n'])
     {1: 2.0, 3: 45.5}
-
     """
     pairs = {}
 
@@ -419,6 +430,7 @@ def convert_int_float_lines_to_dict(lines):
 
 
 def remove_empty_keys(ddict):
+    """Remove empty keys from dictionary."""
     empty_keys = [k for k, v in ddict.items() if not v]
     consume(map(ddict.pop, empty_keys))
 

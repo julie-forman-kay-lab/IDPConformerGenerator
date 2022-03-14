@@ -12,4 +12,3 @@ Example:
 
 will consider Ala or Glycines when searching the database. When looking
 for "GHLAT" both "GHLAT" and "GHLGT" will be considered valid matches."""
-

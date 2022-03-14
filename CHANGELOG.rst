@@ -9,6 +9,50 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.3.1 (2022-03-13)
+------------------------------------------------------------
+
+v0.3.0 (2022-03-13)
+------------------------------------------------------------
+
+* see #168
+* Revisited the whole regex sampling machinery during conformer building
+* A initial major part for preparing the regex database was dropped
+* applied multiprocessing to the regex database preparation steps
+* updated the `cli_build` API with 4 new command options
+* dropped using regex in the `cli_build` command line
+
+v0.2.6 (2022-03-13)
+------------------------------------------------------------
+
+* corrected `sscalc` from * input in command-line #175
+
+v0.2.5 (2022-03-11)
+------------------------------------------------------------
+
+* Implemented capacity to read PDBs with names different from cull #167
+
+v0.2.4 (2022-03-11)
+------------------------------------------------------------
+
+* implemented support for N-terminal Proline residues #166
+
+v0.2.3 (2022-03-08)
+------------------------------------------------------------
+
+* corrected energy.log #162
+
+v0.2.2 (2022-03-07)
+------------------------------------------------------------
+
+* incorporated `libfuncpy` internally
+
+v0.2.1 (2022-03-03)
+------------------------------------------------------------
+
+v0.2.0 (2022-02-10)
+------------------------------------------------------------
+
 v0.1.0 (2021-07-24)
 ------------------------------------------------------------
 

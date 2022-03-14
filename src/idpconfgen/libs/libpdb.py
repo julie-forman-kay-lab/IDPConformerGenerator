@@ -245,6 +245,7 @@ class PDBIDFactory:
     rgx_XXXXC = re.compile(r'^[0-9a-zA-Z]{5,}(\s|$)')
     rgx_XXXX_C = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+(\s|$)')
     rgx_XXXX_C_segS = re.compile(r'^[0-9a-zA-Z]{4}_[0-9a-zA-Z]+_seg\d+(\s|$)')
+    rgx_any = re.compile(r'\w+(\.pdb)?')
 
     def __new__(cls, name):
         """Construct class."""
@@ -261,6 +262,7 @@ class PDBIDFactory:
             cls.rgx_XXXXC: cls._parse_XXXXC,
             cls.rgx_XXXX_C: cls._parse_XXXX_C,
             cls.rgx_XXXX_C_segS: cls._parse_XXXX_C_segS,
+            cls.rgx_any: cls._parse_any_name,
             }
 
         for regex, parser in pdb_filename_regex.items():
@@ -288,6 +290,10 @@ class PDBIDFactory:
     def _parse_XXXX_C_segS(pdbid):
         pdbid, chainid, segID = pdbid.split()[0].split('_')
         return pdbid, chainid, segID.lstrip('seg')
+
+    @staticmethod
+    def _parse_any_name(pdbid):
+        return [Path(pdbid).stem]
 
 
 # USED OKAY
