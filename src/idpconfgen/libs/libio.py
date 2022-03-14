@@ -8,14 +8,13 @@ import tarfile
 from collections import defaultdict
 from functools import partial
 from io import BytesIO
-from operator import setitem
 from os import SEEK_END
 from pprint import pprint
 
-from libfuncpy import chainf, is_none
 
 from idpconfgen import Path, log
 from idpconfgen.libs import get_false
+from idpconfgen.libs.libfunc import is_none
 from idpconfgen.libs.libpdb import PDBList
 from idpconfgen.logger import S, T
 

@@ -98,15 +98,17 @@ dssp_ss_keys = Namespace(
     turn='T',
     bend='S',
     loop=' ',
+    # adding PPII definition
+    polypII="P",
     )
 
 dssp_ss_keys.all_helix = (
     dssp_ss_keys.ahelix,
-    #dssp_ss_keys.helix_3,
+    dssp_ss_keys.helix_3,
     #dssp_ss_keys.helix_5,
     )
 
-dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
+#dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
 #dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
 
 dssp_ss_keys.all_strand = (
@@ -122,6 +124,9 @@ dssp_ss_keys.all_loops = (
     # helix_5 added as loops, following
     # Balasco, N. et al. BioMed Research International vol. 2017 e2617629 (2017)
     dssp_ss_keys.helix_5,
+    # polyproline II helix added as loops, following
+    # Mansiaux, Y., Joseph, A. P., Gelly, J.-C. & Brevern, A. G. PLOS ONE 6, e18401 (2011)
+    dssp_ss_keys.polypII,
     )
 
 dssp_ss_keys.all = \
@@ -136,7 +141,7 @@ dssp_trans = str.maketrans(
     '{}{}{}'.format(
         'H' * len(dssp_ss_keys.all_helix),
         'E' * len(dssp_ss_keys.all_strand),
-        'L' * len(dssp_ss_keys.all_loops),
+        'L' * len(dssp_ss_keys.all_loops)
         )
     )
 

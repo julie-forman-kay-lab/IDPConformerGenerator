@@ -1,4 +1,4 @@
-name: idpconfgen_tmp
+name: idpconfgen
 channels:
     - conda-forge
     - defaults
@@ -11,6 +11,3 @@ dependencies:
     - matplotlib=3
     - pip
     - tox=3
-    - pip:
-        - tox-conda
-        - libfuncpy>=0.0.3
