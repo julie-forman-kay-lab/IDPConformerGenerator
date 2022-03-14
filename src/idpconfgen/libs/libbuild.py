@@ -167,6 +167,7 @@ def init_confmasks(atom_labels):
     H2_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
     non_sidechains : all atoms except sidechains beyond CB
+    all_sidechain : all sidechain atoms including CB and HA
     """
     _all = np.ones(len(atom_labels), dtype=bool)
 

@@ -10,9 +10,9 @@ import numpy as np
 
 mcsce_defaults = {
     'efunc_terms': ('lj', 'clash'),
-    'n_trials': 200,
-    'batch_size': 16,
     'mode': 'simple',
+    'n_trials': 10,
+    'batch_size': 16,
     'temperature': 300,
     'parallel_worker': 1,
     }
@@ -21,14 +21,57 @@ need_H_mask = True
 only_H_mask = None
 
 
-def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
+def add_mcsce_subparser(ap):
+    """Add MCSCE related parameters to client."""
+    group = ap.add_argument_group(
+        title="MCSCE related parameters",
+        description=(
+            "Parameters configuring MCSCE sidechain sampling. "
+            "Used only if `-scm mcsce` is selected."
+            ),
+        )
+    group.add_argument(
+        '--mcsce-mode',
+        help=f'Sidechain sampling method. Defaults to {mcsce_defaults["mode"]!r}.',
+        choices=('simple', 'exhaustive'),
+        default=mcsce_defaults['mode'],
+        )
+    group.add_argument(
+        '--mcsce-n_trials',
+        help=f'Sampling trials in exhaustive mode. Defaults to {mcsce_defaults["n_trials"]}.',
+        type=int,
+        default=mcsce_defaults['n_trials'],
+        )
+    group.add_argument(
+        '--mcsce-batch_size',
+        help=f'The MCSCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',
+        type=int,
+        default=mcsce_defaults['batch_size'],
+        )
+    group.add_argument(
+        '--mcsce-temperature',
+        help=f'Sampling temperature. Defaults to {mcsce_defaults["temperature"]}.',
+        type=int,
+        default=mcsce_defaults['temperature'],
+        )
+    return
+
+
+def init_mcsce_sidechains(
+        input_seq,
+        template_masks,
+        all_atom_masks,
+        user_parameters=None,
+        **ignore,
+        ):
     """."""
     from mcsce.libs.libstructure import Structure
     from mcsce.libs.libenergy import prepare_energy_function
     from mcsce.core import build_definitions
     from mcsce.core.side_chain_builder import create_side_chain, initialize_func_calc
 
-    params = {**mcsce_defaults, **kwargs}
+    _up = user_parameters or {}
+    params = {**mcsce_defaults, **_up}
 
     # initiates only the backbone atoms
     s = Structure(fasta=input_seq)
@@ -73,6 +116,11 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
             return None
 
         if need_H_mask:
+            # the atoms in final_structure are not ordered the same as the
+            # atoms in cli_build. Instead of reordering the atoms in
+            # final_structure, we extract a mask to take all sidechain atoms
+            # and pass those to cli_build. The globals are used to perform
+            # this operation only once.
             need_H_mask = False
             only_H_mask = np.where(
                 np.in1d(
@@ -82,6 +130,6 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
                     ),
                 )
 
-        return all_atom_masks.all_sidechains, final_structure.coords[only_H_mask]
+        return all_atom_masks.all_sidechains, final_structure.coords[only_H_mask]  # noqa: E501
 
     return calc

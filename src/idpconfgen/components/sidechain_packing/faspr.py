@@ -10,13 +10,18 @@ faspr_dun2010bbdep_path = Path(
     )
 
 
-def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
+def init_faspr_sidechains(
+        input_seq,
+        template_masks,
+        all_atom_masks,
+        **ignore,
+        ):
     """
     Instantiate dedicated function environment for FASPR sidehchain calculation.
 
     Examples
     --------
-    >>> calc_faspr = init_fastpr_sidechains('MASFRTPKKLCVAGG')
+    >>> calc_faspr = init_fastpr_sidechains('MASFRTPKKLCVAGG', ...)
     >>> # a (N, 3) array with the N,CA,C,O coordinates
     >>> coords = np.array( ... )
     >>> calc_faspr(coords)
@@ -27,8 +32,17 @@ def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
         The FASTA sequence of the protein for which this function will
         be used.
 
+    template_masks : `libbuil.ConfMasks` object
+        Related to the building template in `cli_build`.
+
+    all_atom_masks : `libbuil.ConfMasks` object
+        Related to the all atoom coordinate system in `cli_build`.
+
     Returns
     -------
+    np.ndarray, dtype=bool, (M, 3)
+        Array mask for the builder.
+
     np.ndarray (M, 3)
         Heavy atom coordinates of the protein sequence.
     """
