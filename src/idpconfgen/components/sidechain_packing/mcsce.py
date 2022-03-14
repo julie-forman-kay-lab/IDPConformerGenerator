@@ -5,6 +5,8 @@ MCSCE repository at: https://github.com/THGLab/MCSCE
 """
 from functools import partial
 
+import numpy as np
+
 
 mcsce_defaults = {
     'efunc_terms': ('lj', 'clash'),
@@ -14,6 +16,9 @@ mcsce_defaults = {
     'temperature': 300,
     'parallel_worker': 1,
     }
+
+need_H_mask = True
+only_H_mask = None
 
 
 def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
@@ -55,17 +60,28 @@ def init_mcsce_sidechains(input_seq, template_masks, all_atom_masks, **kwargs):
 
     def calc(coords):
 
+        # yes, I could have made a class, store these attributes, bla bla
+        # ... but I didn't want to :-)
+        global need_H_mask
+        global only_H_mask
+
         s.coords = coords[template_masks.non_sidechains]
 
         final_structure = create_side_chain(s, **params)
 
         if final_structure is None:
-            return final_structure
+            return None
 
-        return final_structure.coords[all_atom_masks.non_Hs_non_OXT]
-        #if final_structure is None:
-        #    return None
-        #else:
-        #    return final_structure.coords
+        if need_H_mask:
+            need_H_mask = False
+            only_H_mask = np.where(
+                np.in1d(
+                    final_structure.data_array[:, 2],
+                    ('N', 'CA', 'C', 'O', 'H1', 'H2', 'H3', 'OXT', 'H'),
+                    invert=True,
+                    ),
+                )
+
+        return all_atom_masks.all_sidechains, final_structure.coords[only_H_mask]
 
     return calc

@@ -941,7 +941,7 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        log.info(S(f"configurin sidechain method: {sidechain_method}"))
+        log.info(S(f"configuring sidechain method: {sidechain_method}"))
         # we use named arguments here to allow ignored non needed parameters
         # with **kwargs
         build_sidechains = sidechain_packing_methods[sidechain_method](
@@ -969,7 +969,7 @@ def conformer_generator(
         ALL_ATOM_LABELS.res_nums,
         ALL_ATOM_LABELS.res_labels,
         )
-
+    print(ALL_ATOM_LABELS.atom_labels, len(ALL_ATOM_LABELS.atom_labels))
     all_atom_num_atoms = len(ALL_ATOM_LABELS.atom_labels)
     template_num_atoms = len(TEMPLATE_LABELS.atom_labels)
 
@@ -1366,7 +1366,7 @@ def conformer_generator(
 
         if with_sidechains:
 
-            _new_sd_coords = build_sidechains(template_coords)
+            _mask, _new_sd_coords = build_sidechains(template_coords)
 
             if _new_sd_coords is None:
                 _emsg = (
@@ -1375,12 +1375,13 @@ def conformer_generator(
                 log.info(seed_report(_msg))
                 continue
 
-            all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = _new_sd_coords
+            #all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = _new_sd_coords
+            all_atom_coords[_mask] = _new_sd_coords
 
             total_energy = ALL_ATOM_EFUNC(all_atom_coords)
 
-            if ANY(total_energy > energy_threshold_sidechains):
-            #if False:
+            # if ANY(total_energy > energy_threshold_sidechains):
+            if False:
                 _msg = (
                     'Conformer with energy higher than allowed threshold '
                     '- discarded.'

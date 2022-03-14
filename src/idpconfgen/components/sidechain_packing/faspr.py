@@ -10,7 +10,7 @@ faspr_dun2010bbdep_path = Path(
     )
 
 
-def init_faspr_sidechains(input_seq, template_masks, *ignore, **everything):
+def init_faspr_sidechains(input_seq, template_masks, all_atom_masks):
     """
     Instantiate dedicated function environment for FASPR sidehchain calculation.
 
@@ -45,6 +45,6 @@ def init_faspr_sidechains(input_seq, template_masks, *ignore, **everything):
             faspr_dun2010_bbdep_str,
             )
 
-        return _coords
+        return all_atom_masks.non_Hs_non_OXT, _coords
 
     return compute_faspr_sidechains
