@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.0 (2022-03-15)
+------------------------------------------------------------
+
 * Integrates the MCSCE protocol in the building process as part of the
   sidechain packing method options.
 
