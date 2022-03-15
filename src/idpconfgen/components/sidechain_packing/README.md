@@ -1,20 +1,15 @@
-# Forcefield Parameters
+# Dunbrack BB dependent SD library
 
-Forcefield parameters in this folder were obtained from the OpenMM official repositories:
+`dun2010bbdep.bin` was obtained from [FASPR
+repository](https://github.com/tommyhuangthu/FASPR/tree/f0e6a6d8e8312f34341203f2600cf18df252cab1).
 
-1. https://github.com/openmm/openmmforcefields
-1. https://github.com/openmm/openmm
-
-OpenMM XML files follow MIT Licensing:
-
-*Extracted from: https://github.com/openmm/openmmforcefields/blob/master/LICENSE*
+FASPR repository is licensed under MIT License. An integral copy of that
+license as found in the FASPR repository is displayed bellow:
 
 ```
 MIT License
 
-Copyright (c) 2016-2019 by
-    Chodera lab // Memorial Sloan Kettering Cancer Center
-    Pande group // Stanford University
+Copyright (c) 2020 Xiaoqiang Huang
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -34,9 +29,3 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
-
-# BGEO.tar file
-
-`bgeo.tar` file was created using `$ idpconfgen bgeo -c` interface from
-the culled list of structures obtained from the [PISCES repository](http://dunbrack.fccc.edu/PISCES.php),
-file name: `cullpdb_pc90_res1.6_R0.25_d210211_chains9286`.

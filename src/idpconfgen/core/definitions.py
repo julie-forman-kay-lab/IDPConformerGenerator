@@ -8,11 +8,6 @@ from pathlib import Path
 
 
 core_folder = Path(__file__).parent
-faspr_dun2010bbdep_path = Path(
-    core_folder,
-    'data',
-    'dun2010bbdep.bin',
-    )
 
 
 # Bond Geometry definitions

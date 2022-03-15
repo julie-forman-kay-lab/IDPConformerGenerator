@@ -32,7 +32,6 @@ class Path(type(_Path())):
     This creates an interface so that if new methods are required
     the Path interface does not need to be refactored across.
     """
-
     def str(self):
         """
         Return string version of Path.
@@ -42,6 +41,11 @@ class Path(type(_Path())):
         return fspath(self)
 
     def myparents(self):
+        """Return the Path to the parent folder resolved to absolute."""
+        return self.resolve().parent
+
+    @property
+    def absparent(self):
         """Return the Path to the parent folder resolved to absolute."""
         return self.resolve().parent
 
@@ -60,5 +64,7 @@ def assert_subclass(objs, subclass):
             return True
     return False
 
+
+source_folder = Path(__file__).absparent
 
 __version__ = '0.3.3'

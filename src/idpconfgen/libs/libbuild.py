@@ -10,6 +10,7 @@ from numba import njit
 # import idpcpp, imported locally at init_faspr_sidechains
 from idpconfgen import log
 from idpconfgen.core.build_definitions import (
+    backbone_atoms,
     bonds_equal_3_inter,
     bonds_le_2_inter,
     distances_C_Np1,
@@ -21,7 +22,6 @@ from idpconfgen.core.definitions import (
     bgeo_Cm1NCa,
     bgeo_NCaC,
     dssp_ss_keys,
-    faspr_dun2010bbdep_path,
     )
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
@@ -51,6 +51,7 @@ from idpconfgen.logger import S
 ConfMasks = namedtuple(
     'ConfMaks',
     [
+        'all',
         'bb3',
         'bb4',
         'NHs',
@@ -61,6 +62,9 @@ ConfMasks = namedtuple(
         'cterm',
         'non_Hs',
         'non_Hs_non_OXT',
+        'non_NHs_non_OXT',
+        'non_sidechains',  # carbon beta included
+        'all_sidechains',  # carbon beta included
         'H2_N_CA_CB',
         ]
     )
@@ -160,9 +164,14 @@ def init_confmasks(atom_labels):
     cterm : (OXT2, OXT1)
     non_Hs : all but hydrogens
     non_Hs_non_OXT : all but hydrogens and the only OXT atom
+    non_NHs_non_OXT : all but NHs and OXT atom
     H2_N_CA_CB : these four atoms from the first residue
                  if Gly, uses HA3.
+    non_sidechains : all atoms except sidechains beyond CB
+    all_sidechain : all sidechain atoms including CB and HA
     """
+    _all = np.ones(len(atom_labels), dtype=bool)
+
     bb3 = np.where(np.isin(atom_labels, ('N', 'CA', 'C')))[0]
     assert len(bb3) % 3 == 0
 
@@ -186,6 +195,18 @@ def init_confmasks(atom_labels):
     non_Hs = np.where(np.logical_not(hs_match(atom_labels)))[0]
     non_Hs_non_OXT = non_Hs[:-1]
 
+    non_NHs_non_OXT = np.where(np.logical_not(np.isin(atom_labels, ('H', 'OXT'))))[0]  # noqa E:501
+    _s = set(atom_labels[non_NHs_non_OXT])
+    assert not _s.intersection({'H', 'OXT'}), _s
+
+    non_sidechains = np.where(np.isin(atom_labels, backbone_atoms,))[0]
+    all_sidechains = np.where(np.in1d(
+        atom_labels,
+        ('N', 'CA', 'C', 'O', 'H1', 'H2', 'H3', 'OXT', 'H'),
+        invert=True,
+        ))
+
+
     # for the first residue
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
     assert len(_N_CA_idx) == 2, _N_CA_idx
@@ -207,6 +228,7 @@ def init_confmasks(atom_labels):
     assert len(Hterm) in (2, 3)  # proline as no H1.
 
     conf_mask = ConfMasks(
+        all=_all,
         bb3=bb3,
         bb4=bb4,
         NHs=NHs,
@@ -217,7 +239,10 @@ def init_confmasks(atom_labels):
         cterm=cterm,
         non_Hs=non_Hs,
         non_Hs_non_OXT=non_Hs_non_OXT,
+        non_NHs_non_OXT=non_NHs_non_OXT,
+        non_sidechains=non_sidechains,
         H2_N_CA_CB=H2_N_CA_CB,
+        all_sidechains=all_sidechains,
         )
 
     return conf_mask
@@ -624,47 +649,9 @@ def prepare_slice_dict(
     return slice_dict
 
 
-# Other functions should have the same API:
-# parameters = input_seq
-def init_faspr_sidechains(
-        input_seq,
-        # faspr_dun2010db_spath=faspr_dun2010_bbdep_str,
-        # faspr_func=faspr_sc,
-        ):
-    """
-    Instantiate dedicated function environment for FASPR sidehchain calculation.
 
-    Examples
-    --------
-    >>> calc_faspr = init_fastpr_sidechains('MASFRTPKKLCVAGG')
-    >>> # a (N, 3) array with the N,CA,C,O coordinates
-    >>> coords = np.array( ... )
-    >>> calc_faspr(coords)
 
-    Parameters
-    ----------
-    input_seq : str
-        The FASTA sequence of the protein for which this function will
-        be used.
 
-    Returns
-    -------
-    np.ndarray (M, 3)
-        Heavy atom coordinates of the protein sequence.
-    """
-    # TODO:
-    # this is here because tox is not able to detect idpcpp module.
-    # this is a turnaround to allow tests to pass.
-    # currently tests to not test this function.
-    import idpcpp
-    faspr_func = idpcpp.faspr_sidechains
-    faspr_dun2010_bbdep_str = str(faspr_dun2010bbdep_path)
-
-    def compute_faspr_sidechains(coords):
-        """Do calculation."""
-        return faspr_func(coords, input_seq, faspr_dun2010_bbdep_str)
-
-    return compute_faspr_sidechains
 
 
 def prepare_energy_function(
@@ -1140,9 +1127,6 @@ def get_indexes_from_primer_length(
         return sequence[current_residue - 3: current_residue + 7]
 
 
-compute_sidechains = {
-    'faspr': init_faspr_sidechains,
-    }
 
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
 
