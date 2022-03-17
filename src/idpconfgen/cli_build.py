@@ -1527,6 +1527,7 @@ def get_adjacent_angles(
 
         # defines the chunk identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
+        _ori_template = primer_template
         next_residue = GSCNJIT(seq, cr + plen, 1)
 
         # recalculates the plen to avoid plen/template inconsistencies that
@@ -1569,7 +1570,12 @@ def get_adjacent_angles(
                 break
         else:
             # raise AssertionError to avoid `python -o` silencing
-            raise AssertionError('The code should not arrive here')
+            _emsg = (
+                "The code should not arrive here. "
+                "If it does, it may mean no matches were fund for chunk "
+                f"{_ori_template!r} down to the single residue."
+                )
+            raise AssertionError(_emsg)
 
         if next_residue == 'P':
             # because angles have the proline information
