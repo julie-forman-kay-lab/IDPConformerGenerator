@@ -1,8 +1,19 @@
 ============
 Installation
 ============
+IDPConformerGenerator v0.3.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and Graham@ComputeCanada.
+Although it's recommended to run IDPConfGen on UNIX based OS, it will work with Windows based OS as well as long as the pre-requisites are met.
 
-To install IDPConformerGenerator (idpconfgen for short):
+**Remember** to update your Linux distribution prior to installation:
+    sudo apt-get update
+    sudo apt-get upgrade
+
+Pre-installation Reqirements
+----------------------------
+An up-to-date version of anaconda3, and pip are required
+For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
+
+To install IDPConformerGenerator (idpconfgen for short) on your local machine:
 
 From source
 -----------
@@ -58,3 +69,38 @@ To install ``idpconfgen`` from PyPI, first create a new environment::
 Install ``idpconfgen``::
 
     pip install IDPConformerGenerator
+
+
+From source in Graham@ComputeCanada
+-----------------------------------
+Log-in and make sure you're in the /home directory
+
+    cd
+
+Load the required python packages and modules in ComputeCanada's servers.
+    
+    module load scipy-stack dssp boost
+
+Create and activate a :code:`virtualenv` as ComputeCanada recommands anaconda3 not be installed in the home folder.
+
+    virtualenv --no-download idpconfgen
+    source idpconfgen/bin/activate
+
+For the first time installation, install dependencies manually using :code:`pip`.
+Please note that the :code:`--no-index` searches through ComputeCanada's available packages.
+If they're not available, it will install from the web.
+
+    pip install --no-index --upgrade pip
+    pip install numba --no-index
+    pip install pybind11 --no-index
+    pip install tox
+    pip install libfuncpy
+
+We are ready to clone from source and installation from here will be similar to local.
+
+    git clone https://github.com/julie-forman-kay-lab/IDPConformerGenerator
+    cd IDPConformerGenerator
+
+Make sure you're in the :code:`idpconfgen` virtual environment before installing.
+
+    python setup.py develop --no-deps

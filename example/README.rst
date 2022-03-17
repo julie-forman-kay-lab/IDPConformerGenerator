@@ -67,20 +67,23 @@ documentations and in the client help. The following is a good default::
     idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 --dhelix --dstrand -et 'pairs' -rs 0
 
 After some time you will see 10 conformers in the folder.
+Please note that searching for loops is enabled by default for :code:`--dloop`.
+Appending :code:`--dhelix --dstrand` will extend sampling to alpha-helicies and beta-strands in addition
+to loops. For more information on usage, please view :code:`idpconfgen build -h`.
 
-If you would like to use a preliminary secondary-structure assignment tool (CheSPI) to
+If you would like to use a preliminary secondary-structure assignment tool (e.g. CheSPI or delta2D) to
 employ probabilistic custom secondary structure sampling (CSSS), the probs8_[ID].txt output
-from CheSPI would have to be standardized into a user-editable text file indicating the
+from CheSPI or .TXT output from delta2D would have to be standardized into a user-editable text file indicating the
 probability of secondary structures (based on DSSP codes) on a per residue basis.
-The following will process CheSPI output and assign probabilities to H/G/I/E/-/T/S/B
+The following example will process CheSPI output and assign probabilities to L/H/E based on H/G/I/E/ /T/S/B
 structures on a per residue basis:
 
     idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.json
 
-For simplicity, secondary structures from CheSPI are grouped into L/H/E/G as defined by idpconfgen.
+For simplicity, secondary structures from CheSPI and delta2D are grouped into L/H/E as defined by idpconfgen.
 If you do not want this grouping feature, please build the database above without `-rd` and run `csssconv`
 with `--full` to avoid grouping.
-To build with the CSSS file, `-csss` would have to point to the converted CheSPI file:
+To build with the CSSS file, `-csss` would have to point to the CSSS.JSON file:
 
     idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json -et 'pairs' -rs 0 --dloop-off
 

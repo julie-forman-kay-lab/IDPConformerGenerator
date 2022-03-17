@@ -1,5 +1,5 @@
 """
-Adds polyproline type-2 helix assignment to DSSP.
+Adds polyproline type-2 helix assignment to DSSP. For DSSP v2-v3.
 
 The output will be printed to the terminal window. To save the output to
 a file use the `>` command.
