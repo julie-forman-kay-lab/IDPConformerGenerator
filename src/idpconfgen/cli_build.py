@@ -323,13 +323,6 @@ ap.add_argument(
 add_et_type_arg(ap)
 
 
-ap.add_argument(
-    '-subs',
-    '--residue-substitutions',
-    help=help_docs.residue_substitutions_cli_help,
-    default=None,
-    action=libcli.ReadDictionary,
-    )
 
 
 add_xmer_arg(ap)
