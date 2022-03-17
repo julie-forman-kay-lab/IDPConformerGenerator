@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.1 (2022-03-17)
+------------------------------------------------------------
+
 * Adds support for single residues when not specified. Addresses #184
 
 v0.4.0 (2022-03-15)
