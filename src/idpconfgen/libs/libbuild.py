@@ -17,12 +17,7 @@ from idpconfgen.core.build_definitions import (
     distances_CA_C,
     distances_N_CA,
     )
-from idpconfgen.core.definitions import (
-    bgeo_CaCNp1,
-    bgeo_Cm1NCa,
-    bgeo_NCaC,
-    dssp_ss_keys,
-    )
+from idpconfgen.core.definitions import bgeo_CaCNp1, bgeo_Cm1NCa, bgeo_NCaC
 from idpconfgen.libs.libcalc import (
     calc_all_vs_all_dists_njit,
     multiply_upper_diagonal_raw_njit,
@@ -205,7 +200,6 @@ def init_confmasks(atom_labels):
         ('N', 'CA', 'C', 'O', 'H1', 'H2', 'H3', 'OXT', 'H'),
         invert=True,
         ))
-
 
     # for the first residue
     _N_CA_idx = np.where(np.isin(atom_labels, ('N', 'CA')))[0][:2]
@@ -624,6 +618,18 @@ def prepare_slice_dict(
     for lmer_size, slice_dict_ in execute:
         slice_dict[lmer_size] = slice_dict_
 
+    # add single residue in case not selected by the user
+    if 1 not in slice_dict:
+        xmers_1 = tuple(get_mers(input_seq, 1))
+        _lmer_ignore, _pop = populate_dict_with_database(
+            xmers_1,
+            res_tolerance=None,
+            primary=primary,
+            secondary=secondary,
+            combined_dssps="L",
+            )
+        slice_dict[1] = _pop
+
     # from pprint import pprint
     # with open('superdict', 'w') as fout:
     #     pprint(slice_dict, stream=fout)
@@ -647,11 +653,6 @@ def prepare_slice_dict(
         return csss_slice_dict
 
     return slice_dict
-
-
-
-
-
 
 
 def prepare_energy_function(
@@ -1127,7 +1128,6 @@ def get_indexes_from_primer_length(
         return sequence[current_residue - 3: current_residue + 7]
 
 
-
 get_idx_primer_njit = njit(get_indexes_from_primer_length)
 
 
@@ -1184,7 +1184,12 @@ def populate_dict_with_database(
     slice_dict = {}
     lmer = len(xmers[0])  # all xmers are expected to have the same length
     for mer in xmers:
-        altered_mer = build_regex_substitutions(mer, res_tolerance)
+
+        if res_tolerance:
+            altered_mer = build_regex_substitutions(mer, res_tolerance)
+        else:
+            altered_mer = mer
+
         merregex = f'(?=({altered_mer}))'
 
         slices_ = regex_forward_with_overlap(primary, merregex)
