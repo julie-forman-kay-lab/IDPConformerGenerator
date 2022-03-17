@@ -33,3 +33,30 @@ always up-to-date with the repository::
 
     git pull
 
+
+Install MCSCE
+-------------
+
+IDPConformerGenerator can integrate MCSCE to generate sidechains on top of the
+backbone conformers it generates, on the fly. For that you need to install MCSCE
+on top of the `idpconfgen` Python environment. First, install IDPConfGen as
+described above. Next, follow these steps::
+
+    # clone MCSCE, navigate to a folder of your preference
+    git clone https://github.com/THGLab/MCSCE
+
+    # Install MCSCE on top of idpconfgen
+    cd MCSCE
+    conda env update --file requirements.yml --name idpconfgen
+
+    # deactivate the environment and come back
+    conda deactivate
+    conda activate idpconfgen
+
+    # navigate back to the idpconfgen github folder and re-run
+    python setup-py develop --no-deps
+
+Now, if you choose the flag `-scm mcsce`, IDPConfGen will use MCSCE to build
+sidechains as backbone conformers are generated. You will see `idpconfgen build
+-h` has a specific group of parameters dedicated to MCSCE, you can explore those
+as well.
