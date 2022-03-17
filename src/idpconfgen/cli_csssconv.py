@@ -129,9 +129,8 @@ def chespi_probs8_convert_grouped(p8):
             resid = int(data[0])
             # adds up the probabilities for SS codes based on idpconfgen definitions
             dict_p8["L"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
-            dict_p8["H"] = data[1]
+            dict_p8["H"] = round(data[1] + data[2], 4)
             dict_p8["E"] = data[4]
-            dict_p8["G"] = data[2]
             dict_out[resid] = dict_p8
             dict_p8 = {}
             

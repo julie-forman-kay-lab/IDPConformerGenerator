@@ -8,11 +8,6 @@ from pathlib import Path
 
 
 core_folder = Path(__file__).parent
-faspr_dun2010bbdep_path = Path(
-    core_folder,
-    'data',
-    'dun2010bbdep.bin',
-    )
 
 
 # Bond Geometry definitions
@@ -109,11 +104,11 @@ dssp_ss_keys = Namespace(
 
 dssp_ss_keys.all_helix = (
     dssp_ss_keys.ahelix,
-    #dssp_ss_keys.helix_3,
+    dssp_ss_keys.helix_3,
     #dssp_ss_keys.helix_5,
     )
 
-dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
+#dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
 #dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
 
 dssp_ss_keys.all_strand = (
@@ -137,18 +132,16 @@ dssp_ss_keys.all_loops = (
 dssp_ss_keys.all = \
     dssp_ss_keys.all_helix \
     + dssp_ss_keys.all_strand \
-    + dssp_ss_keys.all_loops \
-    + dssp_ss_keys.helix_3
+    + dssp_ss_keys.all_loops
 
 dssp_ss_keys.valid = dssp_ss_keys.all + ('L',)
 
 dssp_trans = str.maketrans(
     ''.join(dssp_ss_keys.all),
-    '{}{}{}{}'.format(
+    '{}{}{}'.format(
         'H' * len(dssp_ss_keys.all_helix),
         'E' * len(dssp_ss_keys.all_strand),
-        'L' * len(dssp_ss_keys.all_loops),
-        'G' * len(dssp_ss_keys.helix_3)
+        'L' * len(dssp_ss_keys.all_loops)
         )
     )
 
@@ -157,8 +150,7 @@ dssp_trans_bytes = bytes.maketrans(
     b''.join(c.encode() for c in dssp_ss_keys.all),
     b'H' * len(dssp_ss_keys.all_helix)
     + b'E' * len(dssp_ss_keys.all_strand)
-    + b'L' * len(dssp_ss_keys.all_loops)
-    + b'G' * len(dssp_ss_keys.helix_3),
+    + b'L' * len(dssp_ss_keys.all_loops),
     )
 
 

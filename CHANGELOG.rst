@@ -9,6 +9,33 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.1 (2022-03-17)
+------------------------------------------------------------
+
+* Adds support for single residues when not specified. Addresses #184
+
+v0.4.0 (2022-03-15)
+------------------------------------------------------------
+
+* Integrates the MCSCE protocol in the building process as part of the
+  sidechain packing method options.
+
+v0.3.3 (2022-03-14)
+------------------------------------------------------------
+
+* removes assert in 0.3.2
+
+v0.3.2 (2022-03-14)
+------------------------------------------------------------
+
+* improves regex creation to avoid silent bugs in possible parallel
+  futures
+
+v0.3.1 (2022-03-13)
+------------------------------------------------------------
+
+* incorporates `G` in `H` when treating DSSP with reduced labels
+
 v0.3.0 (2022-03-13)
 ------------------------------------------------------------
 
