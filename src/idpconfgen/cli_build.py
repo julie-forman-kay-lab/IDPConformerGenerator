@@ -548,11 +548,11 @@ def main(
         res_tolerance=residue_substitutions,
         ncores=ncores,
         )
-
+    
     remove_empty_keys(SLICEDICT_XMERS)
     # updates user defined chunk sizes and probabilities to the ones actually
     # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
+    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
 
@@ -565,10 +565,8 @@ def main(
     #save_dict_to_pickle(BP, 'BP.pickle')
     #sys.exit()
 
-
-
     GET_ADJ = get_adjacent_angles(
-        list(SLICEDICT_XMERS.keys()),
+        sorted(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
@@ -1524,7 +1522,6 @@ def get_adjacent_angles(
 
         # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
-
         # defines the chunk identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
         _ori_template = primer_template
