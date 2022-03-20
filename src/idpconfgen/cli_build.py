@@ -552,7 +552,7 @@ def main(
     remove_empty_keys(SLICEDICT_XMERS)
     # updates user defined chunk sizes and probabilities to the ones actually
     # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(list(SLICEDICT_XMERS.keys())))
+    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
 
@@ -566,7 +566,7 @@ def main(
     #sys.exit()
 
     GET_ADJ = get_adjacent_angles(
-        sorted(list(SLICEDICT_XMERS.keys())),
+        sorted(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
