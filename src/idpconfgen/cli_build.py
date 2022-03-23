@@ -483,7 +483,7 @@ def main(
     # set up the information from CSSS.JSON files
     csss_dict = False
     csss_dssp_regexes = None
-    
+
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
     # There are four possibilities of sampling:
@@ -502,7 +502,7 @@ def main(
 
     elif custom_sampling:
         csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
-        
+
         # If the user wants to sample "any" for some residues
         # they can have "X" in the CSSS.JSON but that will be converted internally below
         if "X" in csss_dssp_regexes:
@@ -550,11 +550,11 @@ def main(
     remove_empty_keys(SLICEDICT_XMERS)
     # updates user defined chunk sizes and probabilities to the ones actually
     # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
+    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
     GET_ADJ = get_adjacent_angles(
-        list(SLICEDICT_XMERS.keys()),
+        sorted(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
@@ -1510,7 +1510,6 @@ def get_adjacent_angles(
 
         # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
-
         # defines the chunk identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
         _ori_template = primer_template
