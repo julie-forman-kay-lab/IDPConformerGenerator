@@ -1,5 +1,6 @@
 """Implement residue replacement possibilities."""
 from idpconfgen.libs.libparse import make_list_if_not
+from idpconfgen.libs import libcli
 
 
 residue_substitutions_cli_help = \
@@ -13,21 +14,26 @@ will consider Ala or Glycines when searching the database. When looking
 for "GHLAT" both "GHLAT" and "GHLGT" will be considered valid matches."""
 
 
-def add_subs_groups(ap):
-    ap.add_argument(
+def add_substitution_groups(ap):
+    parser = ap.add_mutually_exclusive_group(required=False)
+    parser.add_argument(
         '-usubs',
         '--user-residue-substitutions',
-        help=help_docs.residue_substitutions_cli_help,
+        help=residue_substitutions_cli_help,
         default=None,
         action=libcli.ReadDictionary,
         )
 
-    ap.add_argument(
+    parser.add_argument(
         '-edss50',
         '--edss50-residue-substitutions',
         nargs='+',
         default=(5, 3, 2),
-        help='',
+        help=(
+            'Uses residue substituion matrix EDSS50. '
+            'Provide the indexes of the table columns to add up replacements. '
+            'Example: -edss50 5 3 2'
+            ),
         )
 
 
@@ -76,7 +82,7 @@ def make_EDSSMat50_subs(idx=(5, 3, 2, 1, 0)):
     idxs = make_list_if_not(idx)
     subsd = {}
     for k, v in subs.items():
-        subsd[k] = ''.join(v[EDSSMat50_idx[i]] for i in idxs)
+        subsd[k] = k + ''.join(v[EDSSMat50_idx[i]] for i in idxs)
     return subsd
 
 

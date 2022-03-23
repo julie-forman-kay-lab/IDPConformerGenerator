@@ -26,6 +26,7 @@ from numba import njit
 
 from idpconfgen import Path, log
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
+from idpconfgen.components.residue_tolerance import add_substitution_groups
 from idpconfgen.components.sidechain_packing import (
     DEFAULT_SDM,
     add_mcsce_subparser,
@@ -326,6 +327,7 @@ add_et_type_arg(ap)
 
 
 add_xmer_arg(ap)
+add_substitution_groups(ap)
 
 
 ap.add_argument(
