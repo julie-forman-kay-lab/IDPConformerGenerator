@@ -533,6 +533,7 @@ def main(
     del db
 
     # these are the slices with which to sample the ANGLES array
+    print(residue_substitutions)
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
         input_seq,

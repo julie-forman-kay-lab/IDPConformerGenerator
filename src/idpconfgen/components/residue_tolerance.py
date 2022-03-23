@@ -1,4 +1,6 @@
 """Implement residue replacement possibilities."""
+import argparse
+
 from idpconfgen.libs.libparse import make_list_if_not
 from idpconfgen.libs import libcli
 
@@ -34,6 +36,8 @@ def add_substitution_groups(ap):
             'Provide the indexes of the table columns to add up replacements. '
             'Example: -edss50 5 3 2'
             ),
+        action=MakeResSubs,
+        type=int,
         )
 
 
@@ -81,8 +85,16 @@ def make_EDSSMat50_subs(idx=(5, 3, 2, 1, 0)):
     """Make subs."""
     idxs = make_list_if_not(idx)
     subsd = {}
-    for k, v in subs.items():
-        subsd[k] = k + ''.join(v[EDSSMat50_idx[i]] for i in idxs)
+    for k, v in EDSSMat50_subs.items():
+        EDSSMat50_subs[k] = k + ''.join(v[EDSSMat50_idx[i]] for i in idxs)
     return subsd
 
 
+
+class MakeResSubs(argparse.Action):
+    """Controls if input is folder, files or tar."""
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Hello."""
+        subs = make_EDSSMat50_subs(list(map(int, values)))
+        setattr(namespace, self.dest, subs)
