@@ -27,7 +27,8 @@ What does it mean that IDPConfGen is deterministic?
 ---------------------------------------------------
 Reproducibility is one of the most important pillars in scientific research. Thus, we've ensured
 reproducibility by implementing a :code:`--random-seed` flag while building. Therefore, generating
-ensembles with the same database file and building parameters will generate the same set of conformers.
+ensembles with the same database file and building parameters on the same processing system
+will generate the same set of conformers.
 
 The random seed parameter is also helpful for appending to incomplete conformer pools. For example,
 if your target was 3000 conformers and the requested job-time was not enough and only 2000 were generated,
