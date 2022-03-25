@@ -62,7 +62,7 @@ To initialize the database if you do not already have one, we must download the 
 Next we will create temporary files storing the secondary structure information for each
 PDB file downloaded. Later to be processed for their torsion angles.::
 
-    idpconfgen sscalc pdbs.tar -rd -cmd <DSSP EXEC>
+    idpconfgen sscalc pdbs.tar -rd -n -cmd <DSSP EXEC>
 
 Please note that since IDPConfGen is a toolkit, many of these modules can be used with
 custom folders or .tar files.
@@ -70,7 +70,7 @@ custom folders or .tar files.
 Finally, torsion angles are extracted and the database we will use for future calculations
 can be created with the :code:`torsions` subclient::
 
-    idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -o idpconfgen_database.json
+    idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -n -o idpconfgen_database.json
 
 Now we're ready to construct multiple conformer ensembles for drkN SH3. To build 100 conformers,
 sampling only the loop region, limiting the backbone and side chain L-J energy potentials to 
