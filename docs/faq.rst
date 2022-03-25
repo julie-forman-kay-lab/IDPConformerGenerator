@@ -4,24 +4,16 @@ Frequently Asked Questions (F.A.Q.s)
 
 How long does the database generation take?
 -------------------------------------------
-Although it is possible to generate the torsion angle and secondary structure database
-for IDPConformerGenerator on the login node on ComputeCanada, we strongly advise against this.
-It is recommended that the generation of this database be done locally or as a submitted job on HPC clusters.  
-
-As per ComputeCanada recommendations, processes taking up more than 10 CPU-minutes and 
-4 GB of RAM should be submitted as jobs via the slurm job scheduler. Furthermore, due to
-the quantity of PDB files downloaded, many read-write requests will slow down the login node
-for other users as well as create errors in file I/O processing in IDPConfGen. For reference,
-generating a database using 24,002 PDB files takes 1 hour and 13 minutes (using 31 workers)
-as a job on Graham@ComputeCanada. 
-
-Generating this same database locally (using 63 workers of an AMD Threadripper 2990wx), takes
-only 37 minutes (this is approximately half the time compared to 31 workers on Graham@ComputeCanada
-due to majority of the time is taken up by the PDB downloading process). It is important to note that
-this database can then be transferred onto HPC clusters and can be reused for all future calculations.
-Users do not need to generate specific input files for each case of IDP conformer generation
-(unless CSSS is used, in that case standard NMR STAR files can be read by CheSPI and the output of
-CheSPI/delta2D can be converted to CSSS.JSON files by IDPConfGen’s :code:`csssconv` subclient.
+Although it is possible to generate the torsion angle and secondary structure database for
+IDPConformerGenerator on any system, including HPC clusters, we recommend local systems with the
+largest number of workers and the fastest read-write times. Due to the quantity of PDB files downloaded,
+many read-write requests will slow down the login node for other users on HPC resources as well as create
+errors in file I/O processing in IDPConfGen. For reference, generating a database using 24,002 PDB files
+takes 1 hour 13 minutes (using 31 workers) as a job on Graham@ComputeCanada, an HPC resource. Generating
+this same database locally (using 63 workers of an AMD Threadripper 2990wx) takes only 37 minutes
+(approximately half the time compared to 31 workers on Graham@ComputeCanada) since the bulk of the time
+is the PDB downloading process. Importantly, this database can then be transferred onto HPC clusters and
+can be reused for all future calculations.
 
 What does it mean that IDPConfGen is deterministic?
 ---------------------------------------------------
