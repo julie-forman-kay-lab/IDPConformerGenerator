@@ -54,7 +54,7 @@ described above. Next, follow these steps::
     conda activate idpconfgen
 
     # navigate back to the idpconfgen github folder and re-run
-    python setup-py develop --no-deps
+    python setup.py develop --no-deps
 
 Now, if you choose the flag `-scm mcsce`, IDPConfGen will use MCSCE to build
 sidechains as backbone conformers are generated. You will see `idpconfgen build
