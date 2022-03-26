@@ -1,5 +1,5 @@
 IDPConfGen Small Peptide Example
-==================
+================================
 
 To build the torsion angle database you need to provide IDPConfGen with a list
 of PDB/mmCIF files. Our advice is that you use a culled list of your choice from
