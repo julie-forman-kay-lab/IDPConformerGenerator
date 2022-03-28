@@ -113,7 +113,7 @@ def init_mcsce_sidechains(
         final_structure = create_side_chain(s, **params)
 
         if final_structure is None:
-            return None
+            return None, None
 
         if need_H_mask:
             # the atoms in final_structure are not ordered the same as the

@@ -1384,7 +1384,7 @@ def conformer_generator(
                 _emsg = (
                     "Could not find a solution for sidechains, "
                     "discarding the conformer...")
-                log.info(seed_report(_msg))
+                log.info(seed_report(_emsg))
                 continue
 
             all_atom_coords[_mask] = _new_sd_coords
