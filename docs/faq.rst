@@ -2,6 +2,16 @@
 Frequently Asked Questions (F.A.Q.s)
 ====================================
 
+What are the best options for number of conformers and cores to use?
+--------------------------------------------------------------------
+It is best to have the number of conformers/trials equal to an integer multiple of the number of cores/workers.
+For example, if you choose to use 32 cores via :code:`-n 32`, it's ideal to have :code:`-nc` as 32, 64, 128, etc.
+
+For hyperthreadded systems, :code:`-n` will use the maximum number of THREADS - 1. For the best experience however,
+we recommend running on the maximum number of physical cores for hyperthreadded CPUs.
+For example, a Threadripper 2990wx has 32 cores and 64 threads, it's best to use :code:`-n 32` to avoid overloading
+the system.
+
 How long does the database generation take?
 -------------------------------------------
 Although it is possible to generate the torsion angle and secondary structure database for
