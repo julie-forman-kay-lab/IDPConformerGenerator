@@ -74,7 +74,7 @@ def test_pool_in_chunks_nested():
 
 @pytest.mark.skip(reason="something is halting this")
 def test_pool_in_chunks_flatten():
-    """Test pool in chunk from nested result."""
+    """Test pool in fragment from nested result."""
     execute = partial(LM.consume_iterable_in_list, dummy_generator)
     execute_pool = partial(
         LM.pool_function_in_chunks,
