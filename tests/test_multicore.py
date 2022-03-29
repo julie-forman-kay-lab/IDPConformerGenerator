@@ -32,7 +32,7 @@ def test_pool_function():
 
 @pytest.mark.skip(reason="something is halting this")
 def test_pool_in_chunks():
-    """Test pool in chunks."""
+    """Test pool in fragments."""
     execute = LM.pool_function_in_chunks(
         str,
         range(10_000),
@@ -47,7 +47,7 @@ def test_pool_in_chunks():
 
 @pytest.mark.skip(reason="something is halting this")
 def test_pool_in_chunks_nested():
-    """Test pool in chunk from nested result."""
+    """Test pool in fragment from nested result."""
     execute = partial(LM.consume_iterable_in_list, dummy_generator)
     execute_pool = LM.pool_function_in_chunks(
         execute,
@@ -58,7 +58,7 @@ def test_pool_in_chunks_nested():
 
     for chunk in execute_pool:
 
-        # chunk of results
+        # fragment of results
         assert len(chunk) == 5
         assert isinstance(chunk, list)
 
