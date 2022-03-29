@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.4 (2022-03-29)
+------------------------------------------------------------
+
 * Fixes MCSCE integration when sidechain packing fails
 * Corrects MCSCE installation
 * #190
