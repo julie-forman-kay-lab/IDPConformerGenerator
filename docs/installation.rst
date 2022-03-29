@@ -53,6 +53,9 @@ described above. Next, follow these steps::
     conda deactivate
     conda activate idpconfgen
 
+    # install MCSCE within the `idpconfgen` environment
+    python setup.py develop --no-deps
+
     # navigate back to the idpconfgen github folder and re-run
     python setup.py develop --no-deps
 
