@@ -297,7 +297,13 @@ def create_conformer_labels(
         shape (N,) where N is the number of atoms.
         The three arrays have the same length.
     """
-    input_seq_3_letters = transfunc(input_seq)
+    input_seq_3_letters = transfunc(input_seq) # note HIS treated as HIP
+    
+    # change "H" to "p" as idpconfgen builds histidines as HIP,
+    # see `translate_seq_to_3l`
+    # can be changed later after TODO for `translate_seq_to_3l` is completed
+    input_seq = input_seq.replace("H", "p")
+    
     # /
     # prepares data based on the input sequence
     # considers sidechain all-atoms
