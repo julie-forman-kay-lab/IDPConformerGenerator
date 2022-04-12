@@ -1,5 +1,5 @@
 """Functions and variables to download files and data."""
-import time
+import time, sys
 import urllib.request
 from urllib.error import URLError
 
@@ -42,9 +42,13 @@ def download_structure(pdbid, **kwargs):
         )
 
 
-def fetch_pdb_id_from_RCSB(pdbid):
+def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
     """Fetch PDBID from RCSB."""
-    possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
+    if not mmcif:
+        possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
+    else:
+        POSSIBLELINKS.reverse()
+        possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
 
     attempts = 0
     while attempts < 10:
@@ -76,3 +80,9 @@ def fetch_raw_PDBs(pdbid, **kwargs):
     pdbname = pdbid[0]
     downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
     yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')
+
+def fetch_raw_CIFs(pdbid, **kwargs):
+    """Download raw mmCIFs without any filtering."""
+    pdbname = pdbid[0]
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbname, True)
+    yield f'{pdbname}.cif', downloaded_data.decode('utf-8')

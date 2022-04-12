@@ -14,16 +14,20 @@ The following PDBID formats are allowed:
 
 where, XXXX is the PDB ID code.
 
+By default, .PDB structures are downloaded. If you'd like to download
+.CIF structures, use the flag `--mmcif`.
+
 USAGE:
     $ idpconfgen fetch XXXX
     $ idpconfgen fetch XXXX -d destination_folder
     $ idpconfgen fetch pdb.list -d destination_folder -u
     $ idpconfgen fetch pdb.list -d file.tar -u -n
+    $ idpconfgen fetch pdb.list -d file.tar -u -n --mmcif
 """
 import argparse
 
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libdownload import fetch_raw_PDBs
+from idpconfgen.libs.libdownload import fetch_raw_PDBs, fetch_raw_CIFs
 from idpconfgen.libs.libhigherlevel import download_pipeline
 
 
@@ -48,14 +52,23 @@ libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 libcli.add_argument_chunks(ap)
 
+ap.add_argument(
+    '-mmc',
+    '--mmcif',
+    help="Prioritizes PDBx/mmCIF formatted structures.",
+    action='store_true',
+    )
 
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
-def main(*args, func=None, **kwargs):
+def main(*args, mmcif=False, func=None, **kwargs):
     """Perform main logic."""
-    f = download_pipeline(fetch_raw_PDBs)
-    f(*args, **kwargs)
-
+    if not mmcif:
+        f = download_pipeline(fetch_raw_PDBs)
+        f(*args, **kwargs)
+    else:
+        f = download_pipeline(fetch_raw_CIFs)
+        f(*args, **kwargs)
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
