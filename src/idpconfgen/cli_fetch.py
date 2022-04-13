@@ -14,8 +14,8 @@ The following PDBID formats are allowed:
 
 where, XXXX is the PDB ID code.
 
-By default, .PDB structures are downloaded. If you'd like to download
-.CIF structures, use the flag `--mmcif`.
+By default, PDB structure files are prioritized.
+If you prefer to prioritize mmCIF files, use the flag `--mmcif`.
 
 USAGE:
     $ idpconfgen fetch XXXX
@@ -53,7 +53,7 @@ libcli.add_argument_ncores(ap)
 libcli.add_argument_chunks(ap)
 
 ap.add_argument(
-    '-mmc',
+    '-cif',
     '--mmcif',
     help="Prioritizes PDBx/mmCIF formatted structures.",
     action='store_true',
@@ -63,11 +63,11 @@ ap.add_argument(
 # defined at cli.py
 def main(*args, mmcif=False, func=None, **kwargs):
     """Perform main logic."""
-    if not mmcif:
-        f = download_pipeline(fetch_raw_PDBs)
+    if mmcif:
+        f = download_pipeline(fetch_raw_CIFs)
         f(*args, **kwargs)
     else:
-        f = download_pipeline(fetch_raw_CIFs)
+        f = download_pipeline(fetch_raw_PDBs)
         f(*args, **kwargs)
 
 if __name__ == '__main__':

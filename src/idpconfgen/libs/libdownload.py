@@ -2,6 +2,7 @@
 import time, sys
 import urllib.request
 from urllib.error import URLError
+from functools import partial
 
 from idpconfgen import log
 from idpconfgen.core.exceptions import DownloadFailedError
@@ -44,12 +45,11 @@ def download_structure(pdbid, **kwargs):
 
 def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
     """Fetch PDBID from RCSB."""
-    if not mmcif:
-        possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
-    else:
+    if mmcif:
         POSSIBLELINKS.reverse()
-        possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
 
+    possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
+    
     attempts = 0
     while attempts < 10:
         try:
@@ -74,15 +74,13 @@ def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
     else:
         raise DownloadFailedError(f'Failed to download {pdbid}')
 
-
-def fetch_raw_PDBs(pdbid, **kwargs):
-    """Download raw PDBs without any filtering."""
+def fetch_raw_structure(pdbid, ext, **kwargs):
+    """Download raw structure from RCSB without any filtering."""
     pdbname = pdbid[0]
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
-    yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')
+    mmcif=False
+    if ext == 'cif': mmcif=True
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbname, mmcif)
+    yield f'{pdbname}.{ext}', downloaded_data.decode('utf-8')
 
-def fetch_raw_CIFs(pdbid, **kwargs):
-    """Download raw mmCIFs without any filtering."""
-    pdbname = pdbid[0]
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname, True)
-    yield f'{pdbname}.cif', downloaded_data.decode('utf-8')
+fetch_raw_PDBs = partial(fetch_raw_structure, ext='pdb')
+fetch_raw_CIFs = partial(fetch_raw_structure, ext='cif')
