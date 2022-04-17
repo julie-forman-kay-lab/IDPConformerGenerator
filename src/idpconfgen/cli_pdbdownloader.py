@@ -63,6 +63,7 @@ libcli.add_argument_destination_folder(ap)
 libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 libcli.add_argument_chunks(ap)
+libcli.add_argument_cif(ap)
 
 
 def main(*args, func=None, **kwargs):

@@ -27,7 +27,7 @@ USAGE:
 import argparse
 
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libdownload import fetch_raw_PDBs, fetch_raw_CIFs
+from idpconfgen.libs.libdownload import fetch_raw_CIFs, fetch_raw_PDBs
 from idpconfgen.libs.libhigherlevel import download_pipeline
 
 
@@ -51,13 +51,8 @@ libcli.add_argument_destination_folder(ap)
 libcli.add_argument_update(ap)
 libcli.add_argument_ncores(ap)
 libcli.add_argument_chunks(ap)
+libcli.add_argument_cif(ap)
 
-ap.add_argument(
-    '-cif',
-    '--mmcif',
-    help="Prioritizes PDBx/mmCIF formatted structures.",
-    action='store_true',
-    )
 
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
@@ -69,6 +64,7 @@ def main(*args, mmcif=False, func=None, **kwargs):
     else:
         f = download_pipeline(fetch_raw_PDBs)
         f(*args, **kwargs)
+
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)

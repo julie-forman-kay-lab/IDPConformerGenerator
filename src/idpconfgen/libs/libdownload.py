@@ -18,7 +18,7 @@ POSSIBLELINKS = [
     ]
 
 
-def download_structure(pdbid, **kwargs):
+def download_structure(pdbid, mmcif=False, **kwargs):
     """
     Download a PDB/CIF structure chains.
 
@@ -33,7 +33,7 @@ def download_structure(pdbid, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    downloaded_data = fetch_pdb_id_from_RCSB(pdbname, mmcif=mmcif)
 
     yield from save_structure_by_chains(
         downloaded_data,
@@ -49,7 +49,7 @@ def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
         POSSIBLELINKS.reverse()
 
     possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
-    
+
     attempts = 0
     while attempts < 10:
         try:
