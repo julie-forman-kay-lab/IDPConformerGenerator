@@ -93,10 +93,11 @@ def plot_torsions(
 
     return
 
-def plot_fracSS_DSSP(
+def plot_fracSS(
         residues,
-        frac_dssp,
+        frac_ss,
         *,
+        type="Generic",
         title=None,
         xlabel="Residues",
         ylabel="Fraction Secondary Structure",
@@ -111,17 +112,18 @@ def plot_fracSS_DSSP(
         xticks_fs=15,
         yticks_fs=15,
         fig_size=(6, 4),
-        filename='plot_fracSS_6AIO.png',
+        filename='plot_fracSS.png',
         dpi=300,
         ):
     """
-    Plot all torsion angle distributions as a scatter plot.
+    Plot the fractional secondary structure information as a line graph.
+    Made to handel DSSP as well as Rama.
     
     Parameters
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-    frac_DSSP : dictionary
+    frac_ss : dictionary
         Contains fraction of each secondary structure code per residue.
     n_conf : integer
         Number of conformers we're processing.
@@ -136,8 +138,8 @@ def plot_fracSS_DSSP(
     
     plt.figure(figsize=fig_size)
     for i in len(colors):
-        for ss in frac_dssp:
-            plt.plot(residues, frac_dssp[ss], label=f'DSSP {ss}', color=colors[i])
+        for ss in frac_ss:
+            plt.plot(residues, frac_ss[ss], label=f'{type} {ss}', color=colors[i])
     plt.legend(bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0)
     ax = plt.gca()
     if xticks == None:

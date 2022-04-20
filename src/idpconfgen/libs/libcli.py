@@ -2,6 +2,7 @@
 import argparse
 import json
 import sys
+import ast
 from os import cpu_count
 
 
@@ -137,7 +138,54 @@ class SeqOrFasta(argparse.Action):
 
         setattr(namespace, self.dest, seq)
 
+class ParamsToDict(argparse.Action):
+    """
+    Convert command-line parameters in an argument to a dictionary.
+    
+    Adapted from https://github.com/joaomcteixeira/taurenmd
+    
+    Example
+    -------
+    Where ``-x`` is an optional argument of the command-line client
+    interface.
+        >>> par1=1 par2='my name' par3=[1,2,3]
+        >>> {'par1': 1, 'par2': 'my name', 'par3': [1, 2, 3]}
+    """
 
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Execute."""
+        bool_value = {
+            'true': True,
+            'false': False,
+            }
+
+        param_dict = {}
+        for kv in values:
+            # print(param_dict, kv)
+            try:
+                k, v = kv.split('=')
+            except ValueError:
+                param_dict[kv] = True
+            else:
+                if ',' in v:
+                    vs = v.split(',')
+                    try:
+                        param_dict[k] = tuple(ast.literal_eval(i) for i in vs)
+                    except (ValueError, TypeError, SyntaxError):
+                        param_dict[k] = tuple(i for i in vs)
+
+                else:
+                    try:
+                        param_dict[k] = ast.literal_eval(v)
+                    except (ValueError, TypeError):  # is string or list
+                        param_dict[k] = bool_value.get(v.lower(), v)
+                    except (SyntaxError):
+                        param_dict[k] = v
+
+        namespace.plotvars = param_dict
+        setattr(namespace, self.dest, True)
+        
+        
 def minimum_value(minimum):
     """Define a minimum value for action."""
 
@@ -604,3 +652,30 @@ def add_argument_vdWb(parser):
         action=minimum_value(3),
         type=int,
         )
+
+def add_argument_plot(parser):
+    """
+    Add argument for plotting parameters.
+    
+    Plot kwargs that will be passed to the plotting function.
+    If given, plot results. Additional arguments can be given to
+    specify the plot parameters.
+    
+    Inspired by https://github.com/joaomcteixeira/taurenmd
+    
+    Defined by ``--plot``.
+    """
+    parser.add_argument(
+        '--plot',
+        help=(
+            'Plot results. '
+            'Additional arguments can be given to configure the '
+            'plot style. '
+            'Example: --plot xlabel=Sic1 Residues ylabel=Frac. Sec. Str. color=orange'
+            'Accepted plot arguments are defined by the plotting function used. '
+            'Defaults to ``False``, no plot is produced.'
+        ),
+        nargs='*',
+        default=False,
+        action=ParamsToDict,
+    )
