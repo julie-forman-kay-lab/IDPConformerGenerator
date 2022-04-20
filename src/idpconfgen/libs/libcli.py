@@ -671,9 +671,9 @@ def add_argument_plot(parser):
             'Plot results. '
             'Additional arguments can be given to configure the '
             'plot style. '
-            'Example: --plot xlabel=Sic1 Residues ylabel=Frac. Sec. Str. color=orange'
+            'Example: --plot xlabel=Sic1 Residues ylabel=Frac. Sec. Str. color=orange. '
             'Accepted plot arguments are defined by the plotting function used. '
-            'Defaults to ``False``, no plot is produced.'
+            'Defaults to ``None``, no plot is produced.'
         ),
         nargs='*',
         default=False,

@@ -29,6 +29,8 @@ USAGE:
     $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n -deg
 """
 import argparse
+import tty
+import numpy as np
 from functools import partial
 
 from idpconfgen import Path, log
@@ -41,6 +43,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log
+from idpconfgen.plots.plotfuncs import plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -64,15 +67,18 @@ libcli.add_argument_source(ap)
 libcli.add_argument_output(ap)
 libcli.add_argument_degrees(ap)
 libcli.add_argument_ncores(ap)
+libcli.add_argument_plot(ap)
 
 
 def main(
         pdb_files,
         source=None,
         output=None,
-        degrees=True,
+        degrees=False, #documentation for `add_argument_degrees()` specifies rad as default
         func=None,
         ncores=1,
+        plot=False,
+        plotvars=None,
         ):
     """Perform main script logic."""
     # validates before performing time consuming calculations
@@ -121,7 +127,30 @@ def main(
 
     else:
         save_dict_to_json(torsion_result, output=output)
-
+    
+    if plot:
+        log.info(T("Plotting results:"))
+        plotvars = plotvars or dict()
+        
+        ttype = plotvars['type']
+        
+        first = next(iter(torsion_result))
+        n_residues = len(torsion_result[first][ttype])+1
+        
+        n_confs = len(torsion_result)
+        
+        angles = np.ndarray(shape=(n_confs, n_residues), dtype=float)
+        
+        j=0
+        for t in torsion_result:
+            for i in range(1, n_residues):
+                angles[j:,i-1] = torsion_result[t][ttype][i-1]
+            j+=1
+                
+        plot_torsions(n_residues, angles, degrees, n_confs, **plotvars)
+        
+        log.info(S(f'saved plot: {plotvars["filename"]}'))
+        
     return
 
 

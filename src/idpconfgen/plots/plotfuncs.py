@@ -38,11 +38,13 @@ def get_xtick_lbl(xticks):
 def plot_torsions(
         residues,
         angles,
+        degrees,
         n_conf,
         *,
+        type="phi",
         title=None,
         xlabel="Residues",
-        ylabel="Torsions (deg)",
+        ylabel=None,
         xlabel_fs=20,
         ylabel_fs=20,
         xticks=None,
@@ -58,12 +60,13 @@ def plot_torsions(
         ):
     """
     Plot all torsion angle distributions as a scatter plot.
+    Defaults to Phi torsion angles.
     
     Parameters
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-    angles : np.ndarray, shape=(angles, len(residues))
+    angles : np.ndarray, shape=(n_confs, residues)
         Container of the Y axis data.
     n_conf : integer
         Number of conformers we're processing.
@@ -77,14 +80,21 @@ def plot_torsions(
     """
 
     plt.figure(figsize=fig_size)
-    for i in range(1, len(residues)):
+    print(angles)
+    for i in range(1, residues):
         res_ang = [i]*n_conf
-        plt.scatter(res_ang, angles, s=10, facecolors='none', edgecolors='k')
+        plt.scatter(res_ang, angles[:,i-1], s=10, facecolors='none', edgecolors='k')
+    
     if xticks == None:
-        xticks = np.arange(0,len(residues), increment)
+        xticks = np.arange(0,residues, increment)
         xticks_labels = get_xtick_lbl(xticks)
     plt.xticks(ticks= xticks, labels=xticks_labels, fontsize=xticks_fs)
     plt.yticks(fontsize = yticks_fs)
+    
+    if degrees: yunits="deg"
+    else: yunits="rad"
+    if not ylabel: ylabel = f'{type} ({yunits})'
+    
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
     plt.title(title)
