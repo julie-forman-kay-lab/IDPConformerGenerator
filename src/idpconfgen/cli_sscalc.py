@@ -16,6 +16,7 @@ import argparse
 import os
 import shutil
 import traceback
+import numpy as np
 from functools import partial
 
 from idpconfgen import Path, log
@@ -34,7 +35,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import mkdssp_w_split, split_pdb_by_dssp
 from idpconfgen.logger import S, T, init_files, report_on_crash
-
+from idpconfgen.plots.plotfuncs import plot_fracSS
 
 LOGFILESNAME = '.idpconfgen_sscalc'
 TMPDIR = '__tmpsscalc__'
@@ -109,6 +110,7 @@ libcli.add_argument_reduced(ap)
 libcli.add_argument_minimum(ap)
 libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
+libcli.add_argument_plot(ap)
 
 
 def dssppi_helper(pdb_file, dssp_cmd, **kwargs):
@@ -130,6 +132,8 @@ def main(
         reduced=False,
         tmpdir=TMPDIR,
         update=None,
+        plot=False,
+        plotvars=None,
         ):
     """
     Run main cli logic.
@@ -155,6 +159,12 @@ def main(
 
     ncores : int
         The numbers of cores to use.
+    
+    plot : Bool, optional
+        Whether to plot the fractional secondary structure information
+    
+    plotvars : dictionary, optional
+        Parameters for creating the plot        
     """
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
@@ -228,6 +238,74 @@ def main(
         save_dictionary(previous.update(dssp_data), output)
     else:
         save_dictionary(dssp_data, output)
+    
+    if plot:
+        log.info(T("Plotting fractional secondary structure information:"))
+        
+        first = next(iter(dssp_data))
+        n_residues = len(dssp_data[first]["dssp"])
+        n_confs = len(dssp_data)        
+        
+        plotvars = plotvars or dict()
+        plt_default = {
+            'type': 'DSSP',
+            'filename': 'plot_dssp_fracSS.png',
+        }
+        plt_default.update(plotvars)
+        
+        if reduced:
+            frac_dssp = {
+                'Loops': np.zeros(n_residues),
+                'Helices': np.zeros(n_residues),
+                'Strands': np.zeros(n_residues),
+            }
+            p=np.ones(n_confs)
+            p=p/len(p)
+
+            c=0
+            for conf in dssp_data:
+                r=0
+                for ss in dssp_data[conf]["dssp"]:
+                    if ss == "L": frac_dssp['Loops'][r] += p[c]
+                    elif ss == "H": frac_dssp['Helices'][r] += p[c]
+                    elif ss == "E": frac_dssp['Strands'][r] += p[c]
+                    r+=1
+
+                c+=1
+        else:
+            frac_dssp = {
+                'H': np.zeros(n_residues),
+                'B': np.zeros(n_residues),
+                'E': np.zeros(n_residues),
+                'G': np.zeros(n_residues),
+                'I': np.zeros(n_residues),
+                'T': np.zeros(n_residues),
+                'S': np.zeros(n_residues),
+                'P': np.zeros(n_residues),
+                '-': np.zeros(n_residues),
+            }
+            p=np.ones(n_confs)
+            p=p/len(p)
+
+            c=0
+            for conf in dssp_data:
+                r=0
+                for ss in dssp_data[conf]["dssp"]:
+                    if ss == "H": frac_dssp['H'][r] += p[c]
+                    elif ss == "B": frac_dssp['B'][r] += p[c]
+                    elif ss == "E": frac_dssp['E'][r] += p[c]
+                    elif ss == "G": frac_dssp['G'][r] += p[c]
+                    elif ss == "I": frac_dssp['I'][r] += p[c]
+                    elif ss == "T": frac_dssp['T'][r] += p[c]
+                    elif ss == "S": frac_dssp['S'][r] += p[c]
+                    elif ss == "P": frac_dssp['P'][r] += p[c]
+                    elif ss == "-": frac_dssp['-'][r] += p[c]
+                    r+=1
+
+                c+=1
+        
+        plot_fracSS(n_residues, frac_dssp, **plt_default)
+        log.info(S(f'saved plot: {plt_default["filename"]}'))
 
     return
 

@@ -118,7 +118,7 @@ def plot_fracSS(
         xticks_labels=None,
         yticks_labels=None,
         increment=20,
-        colors=['#D55E00', '#0072B2', 'k'],
+        colors=['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b'],
         xticks_fs=15,
         yticks_fs=15,
         fig_size=(6, 4),

@@ -171,7 +171,10 @@ def main(
             'type': 'Rama.',
             'filename': newfname,
         }
-        if ramaplot: rama_defaults.update(ramaplot)
+        
+        if ramaplot: 
+            ramaplot = values_to_dict(ramaplot)
+            rama_defaults.update(ramaplot)
         
         frac_rama={
             'alpha':np.zeros(n_residues),
