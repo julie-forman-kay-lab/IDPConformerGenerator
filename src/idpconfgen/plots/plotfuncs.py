@@ -111,14 +111,14 @@ def plot_fracSS(
         title=None,
         xlabel="Residues",
         ylabel="Fraction Secondary Structure",
-        xlabel_fs=20,
-        ylabel_fs=20,
+        xlabel_fs=15,
+        ylabel_fs=15,
         xticks=None,
         yticks=None,
         xticks_labels=None,
         yticks_labels=None,
-        increment=10,
-        colors=('b', 'g', 'r', 'c', 'm', 'y', 'k'),
+        increment=20,
+        colors=['#D55E00', '#0072B2', 'k'],
         xticks_fs=15,
         yticks_fs=15,
         fig_size=(6, 4),
@@ -134,7 +134,7 @@ def plot_fracSS(
     residues : integer
         Total number of residues of a protein in the ensemble.
     frac_ss : dictionary
-        Contains fraction of each secondary structure code per residue.
+        Contains fraction of each secondary structure per residue.
     n_conf : integer
         Number of conformers we're processing.
     filename : str, optional
@@ -145,11 +145,12 @@ def plot_fracSS(
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
     """
-    
+    aa = [x+1 for x in range(residues)] 
     plt.figure(figsize=fig_size)
-    for i in len(colors):
-        for ss in frac_ss:
-            plt.plot(residues, frac_ss[ss], label=f'{type} {ss}', color=colors[i])
+    clr=0
+    for ss in frac_ss:
+        plt.plot(aa, frac_ss[ss], label=f'{type} {ss}', color=colors[clr])
+        clr+=1
     plt.legend(bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0)
     ax = plt.gca()
     if xticks == None:

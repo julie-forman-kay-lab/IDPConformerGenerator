@@ -42,7 +42,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
-from idpconfgen.plots.plotfuncs import plot_torsions
+from idpconfgen.plots.plotfuncs import plot_fracSS, plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -138,7 +138,7 @@ def main(
         save_dict_to_json(torsion_result, output=output)
     
     if plot:
-        # Plotting torsion angles has more flexibility
+        # Plotting torsion angle distributions
         log.info(T("Plotting torsion angle distribution:"))
         plotvars = plotvars or dict()
         
@@ -163,8 +163,7 @@ def main(
         plot_torsions(n_residues, angles, degrees, n_confs, **tor_defaults)
         log.info(S(f'saved plot: {tor_defaults["filename"]}'))
         
-        # Plotting ramachandran frac sec. str. has less flexibility
-        # TODO: generalizing the `ParamsToDict` as a utility
+        # Plotting ramachandran frac sec. str.
         log.info(T("Plotting ramachandran fractional secondary structure:"))
         
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
@@ -172,9 +171,32 @@ def main(
             'type': 'Rama.',
             'filename': newfname,
         }
-        
         if ramaplot: rama_defaults.update(ramaplot)
         
+        frac_rama={
+            'alpha':np.zeros(n_residues),
+            'beta':np.zeros(n_residues),
+            'other':np.zeros(n_residues),
+            }
+        p=np.ones(n_confs)
+        p=p/len(p)           
+        
+        c=0
+        for conf in torsion_result:
+            for res in range(n_residues-1):
+                phi = torsion_result[conf]["phi"][res]
+                psi = torsion_result[conf]["psi"][res]
+                if (-180.0 < phi and phi < 10.0) and (-120.0 < psi and psi < 45.0):
+                    frac_rama['alpha'][res] += p[c]
+                elif (-180.0 < phi and phi < 0.0) and ((-180 < psi and psi < -120) or (45 < psi and psi < 180)):
+                    frac_rama['beta'][res] += p[c]
+                else:
+                    frac_rama['other'][res] += p[c]
+            c+=1
+        
+        plot_fracSS(n_residues, frac_rama, **rama_defaults)
+        log.info(S(f'saved plot: {rama_defaults["filename"]}'))
+             
     return
 
 if __name__ == '__main__':
