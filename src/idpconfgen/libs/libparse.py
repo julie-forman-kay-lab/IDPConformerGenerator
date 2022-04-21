@@ -4,7 +4,7 @@ Parsing routines for different data structure.
 All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
-import subprocess
+import subprocess, ast
 from itertools import product, repeat
 from functools import partial
 from pathlib import Path as Path_
@@ -433,6 +433,38 @@ def remove_empty_keys(ddict):
     """Remove empty keys from dictionary."""
     empty_keys = [k for k, v in ddict.items() if not v]
     consume(map(ddict.pop, empty_keys))
+
+
+def values_to_dict(values):
+    """Genralization of converting parameters to dict."""
+    bool_value = {
+            'true': True,
+            'false': False,
+            }
+
+    param_dict = {}
+    for kv in values:
+        # print(param_dict, kv)
+        try:
+            k, v = kv.split('=')
+        except ValueError:
+            param_dict[kv] = True
+        else:
+            if ',' in v:
+                vs = v.split(',')
+                try:
+                    param_dict[k] = tuple(ast.literal_eval(i) for i in vs)
+                except (ValueError, TypeError, SyntaxError):
+                    param_dict[k] = tuple(i for i in vs)
+            else:
+                try:
+                    param_dict[k] = ast.literal_eval(v)
+                except (ValueError, TypeError):  # is string or list
+                    param_dict[k] = bool_value.get(v.lower(), v)
+                except (SyntaxError):
+                    param_dict[k] = v
+                    
+    return param_dict
 
 
 get_trimer_seq_njit = njit(get_trimer_seq)

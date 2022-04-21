@@ -41,9 +41,10 @@ def plot_torsions(
         degrees,
         n_conf,
         *,
-        type="phi",
+        type=None,
         title=None,
         xlabel="Residues",
+        colors='k',
         ylabel=None,
         xlabel_fs=20,
         ylabel_fs=20,
@@ -80,10 +81,9 @@ def plot_torsions(
     """
 
     plt.figure(figsize=fig_size)
-    print(angles)
     for i in range(1, residues):
         res_ang = [i]*n_conf
-        plt.scatter(res_ang, angles[:,i-1], s=10, facecolors='none', edgecolors='k')
+        plt.scatter(res_ang, angles[:,i-1], s=10, facecolors='none', edgecolors=colors)
     
     if xticks == None:
         xticks = np.arange(0,residues, increment)
@@ -127,7 +127,7 @@ def plot_fracSS(
         ):
     """
     Plot the fractional secondary structure information as a line graph.
-    Made to handel DSSP as well as Rama.
+    Made to handel DSSP as well as Ramachandran.
     
     Parameters
     ----------

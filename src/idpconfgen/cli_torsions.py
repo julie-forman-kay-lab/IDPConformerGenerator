@@ -29,7 +29,6 @@ USAGE:
     $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n -deg
 """
 import argparse
-import tty
 import numpy as np
 from functools import partial
 
@@ -42,7 +41,7 @@ from idpconfgen.libs.libio import (
     save_dict_to_json,
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
-from idpconfgen.libs.libparse import pop_difference_with_log
+from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
 from idpconfgen.plots.plotfuncs import plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -69,6 +68,15 @@ libcli.add_argument_degrees(ap)
 libcli.add_argument_ncores(ap)
 libcli.add_argument_plot(ap)
 
+ap.add_argument(
+    '--ramaplot',
+    help=(
+        "Change default parameters of fractional secondary structure plot "
+        "using alpha, beta, and other regions of the ramachandran space. "
+        "Optionally to be used with ``--plot``."
+        "Example: --ramaplot filename=fracRama.png colors=['o', 'b', 'k']"
+    ),
+)
 
 def main(
         pdb_files,
@@ -79,6 +87,7 @@ def main(
         ncores=1,
         plot=False,
         plotvars=None,
+        ramaplot=None,
         ):
     """Perform main script logic."""
     # validates before performing time consuming calculations
@@ -129,30 +138,44 @@ def main(
         save_dict_to_json(torsion_result, output=output)
     
     if plot:
-        log.info(T("Plotting results:"))
+        # Plotting torsion angles has more flexibility
+        log.info(T("Plotting torsion angle distribution:"))
         plotvars = plotvars or dict()
         
-        ttype = plotvars['type']
+        tor_defaults = {
+            'type': 'phi',
+            'filename': 'plot_torsions.png'
+        }
+        tor_defaults.update(plotvars)
         
+        ttype = tor_defaults['type']
         first = next(iter(torsion_result))
         n_residues = len(torsion_result[first][ttype])+1
-        
         n_confs = len(torsion_result)
         
         angles = np.ndarray(shape=(n_confs, n_residues), dtype=float)
-        
         j=0
         for t in torsion_result:
             for i in range(1, n_residues):
                 angles[j:,i-1] = torsion_result[t][ttype][i-1]
             j+=1
                 
-        plot_torsions(n_residues, angles, degrees, n_confs, **plotvars)
+        plot_torsions(n_residues, angles, degrees, n_confs, **tor_defaults)
+        log.info(S(f'saved plot: {tor_defaults["filename"]}'))
         
-        log.info(S(f'saved plot: {plotvars["filename"]}'))
+        # Plotting ramachandran frac sec. str. has less flexibility
+        # TODO: generalizing the `ParamsToDict` as a utility
+        log.info(T("Plotting ramachandran fractional secondary structure:"))
+        
+        newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
+        rama_defaults = {
+            'type': 'Rama.',
+            'filename': newfname,
+        }
+        
+        if ramaplot: rama_defaults.update(ramaplot)
         
     return
-
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)

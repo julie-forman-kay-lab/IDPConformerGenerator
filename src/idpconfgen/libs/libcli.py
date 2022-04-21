@@ -8,7 +8,7 @@ from os import cpu_count
 
 from idpconfgen import Path, __version__
 from idpconfgen.core.definitions import vdW_radii_dict
-from idpconfgen.libs.libparse import is_valid_fasta
+from idpconfgen.libs.libparse import is_valid_fasta, values_to_dict
 from idpconfgen.libs.libio import (
     is_valid_fasta_file,
     read_FASTAS_from_file_to_strings,
@@ -154,34 +154,8 @@ class ParamsToDict(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         """Execute."""
-        bool_value = {
-            'true': True,
-            'false': False,
-            }
-
-        param_dict = {}
-        for kv in values:
-            # print(param_dict, kv)
-            try:
-                k, v = kv.split('=')
-            except ValueError:
-                param_dict[kv] = True
-            else:
-                if ',' in v:
-                    vs = v.split(',')
-                    try:
-                        param_dict[k] = tuple(ast.literal_eval(i) for i in vs)
-                    except (ValueError, TypeError, SyntaxError):
-                        param_dict[k] = tuple(i for i in vs)
-
-                else:
-                    try:
-                        param_dict[k] = ast.literal_eval(v)
-                    except (ValueError, TypeError):  # is string or list
-                        param_dict[k] = bool_value.get(v.lower(), v)
-                    except (SyntaxError):
-                        param_dict[k] = v
-
+        param_dict = values_to_dict(values)
+        
         namespace.plotvars = param_dict
         setattr(namespace, self.dest, True)
         
@@ -671,7 +645,7 @@ def add_argument_plot(parser):
             'Plot results. '
             'Additional arguments can be given to configure the '
             'plot style. '
-            'Example: --plot xlabel=Sic1 Residues ylabel=Frac. Sec. Str. color=orange. '
+            'Example: --plot xlabel=Sic1 type=omega color=orange. '
             'Accepted plot arguments are defined by the plotting function used. '
             'Defaults to ``None``, no plot is produced.'
         ),
