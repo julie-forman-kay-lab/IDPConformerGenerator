@@ -33,8 +33,10 @@ def download_structure(pdbid, mmcif=False, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname, mmcif=mmcif)
+    downloaded_data, _ = fetch_pdb_id_from_RCSB(pdbname, mmcif=mmcif)
 
+    # save_structure_by_chains is a specific function that always saves
+    # in PDB format.
     yield from save_structure_by_chains(
         downloaded_data,
         pdbname,
@@ -44,9 +46,15 @@ def download_structure(pdbid, mmcif=False, **kwargs):
 
 
 def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
-    """Fetch PDBID from RCSB."""
-    # assumes the file to-download will have the intended format
-    priority=True
+    """
+    Fetch PDBID from RCSB.
+
+    Returns
+    -------
+    tuple (str, str)
+        urllib.request.urlopen.response.read()
+        PDB file extension (.pdb, .cif, ...)
+    """
     if mmcif:
         POSSIBLELINKS.reverse()
 
@@ -58,10 +66,7 @@ def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
             for weblink in possible_links:
                 try:
                     response = urllib.request.urlopen(weblink)
-                    # if the 2nd link goes through, then the format is not the one prioritized
-                    if weblink == possible_links[1]:
-                        priority=False
-                    return response.read(), priority
+                    return response.read(), weblink.rpartition(".")[-1]
                 except urllib.error.HTTPError:
                     continue
                 except (AttributeError, UnboundLocalError):  # response is None
@@ -82,17 +87,9 @@ def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
 def fetch_raw_structure(pdbid, ext, **kwargs):
     """Download raw structure from RCSB without any filtering."""
     pdbname = pdbid[0]
-    mmcif=False
-    if ext == 'cif': mmcif=True
-    downloaded_data, priority = fetch_pdb_id_from_RCSB(pdbname, mmcif)
-    
-    if priority==True: # download file as intended
-        yield f'{pdbname}.{ext}', downloaded_data.decode('utf-8') 
-    else:
-        if mmcif==False: # we want pdb but looks like there's only mmcif
-            yield f'{pdbname}.cif', downloaded_data.decode('utf-8')
-        else: # we want mmcif but looks like there's only pdb
-            yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')
+    mmcif = True if ext == "cif" else False
+    downloaded_data, ext = fetch_pdb_id_from_RCSB(pdbname, mmcif)
+    yield f'{pdbname}.{ext}', downloaded_data.decode('utf-8')
 
 
 fetch_raw_PDBs = partial(fetch_raw_structure, ext='pdb')
