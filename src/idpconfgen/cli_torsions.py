@@ -76,6 +76,7 @@ ap.add_argument(
         "Optionally to be used with ``--plot``."
         "Example: --ramaplot filename=fracRama.png colors=['o', 'b', 'k']"
     ),
+    nargs='*',
 )
 
 def main(
@@ -139,7 +140,7 @@ def main(
     
     if plot:
         # Plotting torsion angle distributions
-        log.info(T("Plotting torsion angle distribution:"))
+        log.info(T("Plotting torsion angle distribution"))
         plotvars = plotvars or dict()
         
         tor_defaults = {
@@ -160,11 +161,13 @@ def main(
                 angles[j:,i-1] = torsion_result[t][ttype][i-1]
             j+=1
                 
-        plot_torsions(n_residues, angles, degrees, n_confs, **tor_defaults)
+        errs=plot_torsions(n_residues, angles, degrees, n_confs, **tor_defaults)
+        for e in errs:
+            log.info(S(f'{e}'))
         log.info(S(f'saved plot: {tor_defaults["filename"]}'))
         
         # Plotting ramachandran frac sec. str.
-        log.info(T("Plotting ramachandran fractional secondary structure:"))
+        log.info(T("Plotting ramachandran fractional secondary structure"))
         
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
         rama_defaults = {
@@ -197,7 +200,10 @@ def main(
                     frac_rama['other'][res] += p[c]
             c+=1
         
-        plot_fracSS(n_residues, frac_rama, **rama_defaults)
+        errs = plot_fracSS(n_residues, frac_rama, **rama_defaults)
+        for e in errs:
+            log.info(S(f'{e}'))
+            
         log.info(S(f'saved plot: {rama_defaults["filename"]}'))
              
     return

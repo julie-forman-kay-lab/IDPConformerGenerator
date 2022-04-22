@@ -2,7 +2,6 @@
 import argparse
 import json
 import sys
-import ast
 from os import cpu_count
 
 
@@ -642,10 +641,10 @@ def add_argument_plot(parser):
     parser.add_argument(
         '--plot',
         help=(
-            'Plot results. '
+            'Plot results from same system ensembles. '
             'Additional arguments can be given to configure the '
             'plot style. '
-            'Example: --plot xlabel=Sic1 type=omega color=orange. '
+            'Example: --plot xlabel=Sic1_Res. type=omega color=[b,r]. '
             'Accepted plot arguments are defined by the plotting function used. '
             'Defaults to ``None``, no plot is produced.'
         ),

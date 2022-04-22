@@ -240,7 +240,7 @@ def main(
         save_dictionary(dssp_data, output)
     
     if plot:
-        log.info(T("Plotting fractional secondary structure information:"))
+        log.info(T("Plotting fractional secondary structure information"))
         
         first = next(iter(dssp_data))
         n_residues = len(dssp_data[first]["dssp"])
@@ -304,7 +304,10 @@ def main(
 
                 c+=1
         
-        plot_fracSS(n_residues, frac_dssp, **plt_default)
+        errs=plot_fracSS(n_residues, frac_dssp, **plt_default)
+        for e in errs:
+            log.info(S(f'{e}'))
+            
         log.info(S(f'saved plot: {plt_default["filename"]}'))
 
     return

@@ -13,6 +13,7 @@ are not listed in the paremeter list bellow. We hope these
 parameter names are self-explanatory and are listed in the function
 definition.
 """
+import os
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -46,8 +47,9 @@ def plot_torsions(
         xlabel="Residues",
         colors='k',
         ylabel=None,
-        xlabel_fs=20,
-        ylabel_fs=20,
+        title_fs=20,
+        xlabel_fs=15,
+        ylabel_fs=15,
         xticks=None,
         yticks=None,
         xticks_labels=None,
@@ -78,8 +80,21 @@ def plot_torsions(
         the file name.
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
+        
+    Returns
+    -------
+    errmsg : list
+        List of errors to print to the log while plotting.
     """
-
+    errmsg=[]
+    
+    path, ext = os.path.splitext(filename)
+    verExts = [".png", ".pdf", ".svg", ".eps"]
+    if ext.lower() not in verExts:
+        errmsg.append(f"File does not have a proper extension: `{ext}`.")
+        errmsg.append("Reverting to default `.png`...")
+        filename=path+'.png'
+    
     plt.figure(figsize=fig_size)
     for i in range(1, residues):
         res_ang = [i]*n_conf
@@ -97,11 +112,11 @@ def plot_torsions(
     
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
-    plt.title(title)
+    plt.title(title, fontsize=title_fs)
     plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
     plt.close("all")
 
-    return
+    return errmsg
 
 def plot_fracSS(
         residues,
@@ -111,13 +126,14 @@ def plot_fracSS(
         title=None,
         xlabel="Residues",
         ylabel="Fraction Secondary Structure",
+        title_fs=20,
         xlabel_fs=15,
         ylabel_fs=15,
         xticks=None,
         yticks=None,
         xticks_labels=None,
         yticks_labels=None,
-        increment=20,
+        increment=10,
         colors=['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b'],
         xticks_fs=15,
         yticks_fs=15,
@@ -144,9 +160,29 @@ def plot_fracSS(
         the file name.
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
+        
+    Returns
+    -------
+    errmsg : list
+        List of errors to print to the log while plotting.
     """
+    errmsg=[]
+    
+    path, ext = os.path.splitext(filename)
+    verExts = [".png", ".pdf", ".svg", ".eps"]
+    if ext.lower() not in verExts:
+        errmsg.append(f"File does not have a proper extension: `{ext}`.")
+        errmsg.append("Reverting to default `.png`...")
+        filename=path+'.png'
+    
     aa = [x+1 for x in range(residues)] 
     plt.figure(figsize=fig_size)
+    
+    if len(colors) < len(frac_ss):
+        errmsg.append("Number of colors is less than number of secondary structures.")
+        errmsg.append("Reverting to default colorset...")
+        colors = ['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b']
+    
     clr=0
     for ss in frac_ss:
         plt.plot(aa, frac_ss[ss], label=f'{type} {ss}', color=colors[clr])
@@ -160,10 +196,10 @@ def plot_fracSS(
     ax.set_xticklabels(labels=xticks_labels)
     ax.tick_params(axis='x', labelsize=xticks_fs)
     ax.tick_params(axis='y', labelsize=yticks_fs)
-    plt.title(title)
+    plt.title(title, fontsize=title_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
     plt.close("all")
 
-    return
+    return errmsg
