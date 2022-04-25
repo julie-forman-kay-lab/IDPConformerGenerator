@@ -268,9 +268,11 @@ def add_version(parser):
 # -c, --chunks            : number of chunks to process in memory
 # -cif, --mmcif           : prioritizes downloading mmCIF files
 # -d, --destination       : destination folder
+# -db, -database          : the input database
 # -deg, --degrees         : degrees
 # -dec, --decimals        : decimal numbers
 # --no_hn_term                : has H of N-terminal
+# -seq, --input_seq       : the input sequence
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # -o, --ouput             : general output string
@@ -331,6 +333,28 @@ def add_argument_db(parser):
         help='The database being built. Must be JSON.',
         type=Path,
         action=CheckExt('.json'),
+        )
+
+
+def add_argument_idb(parser):
+    """Add argument for input database."""
+    parser.add_argument(
+        '-db',
+        '--database',
+        help='The IDPConfGen database.',
+        required=True,
+        )
+
+
+def add_argument_seq(parser):
+    """Add argument for input sequence."""
+    parser.add_argument(
+        '-seq',
+        '--input_seq',
+        help='The Conformer residue sequence. String or FASTA file.',
+        required=True,
+        nargs='?',
+        action=SeqOrFasta,
         )
 
 

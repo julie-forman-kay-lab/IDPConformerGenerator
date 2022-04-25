@@ -177,21 +177,8 @@ ap = libcli.CustomParser(
     )
 # https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    '-db',
-    '--database',
-    help='The IDPConfGen database.',
-    required=True,
-    )
-
-ap.add_argument(
-    '-seq',
-    '--input_seq',
-    help='The Conformer residue sequence. String or FASTA file.',
-    required=True,
-    nargs='?',
-    action=libcli.SeqOrFasta,
-    )
+libcli.add_argument_idb(ap)
+libcli.add_argument_seq(ap)
 
 ap.add_argument(
     '-nc',
