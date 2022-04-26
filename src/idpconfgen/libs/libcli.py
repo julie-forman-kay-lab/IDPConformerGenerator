@@ -634,8 +634,9 @@ def add_argument_plot(parser):
     If given, plot results. Additional arguments can be given to
     specify the plot parameters.
     
-    Inspired by https://github.com/joaomcteixeira/taurenmd
-    
+    Adapted from:
+    https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L539-L570
+        
     Defined by ``--plot``.
     """
     parser.add_argument(

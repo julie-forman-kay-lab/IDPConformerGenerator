@@ -436,7 +436,23 @@ def remove_empty_keys(ddict):
 
 
 def values_to_dict(values):
-    """Genralization of converting parameters to dict."""
+    """
+    Generalization of converting parameters to dict.
+    
+    Adapted from:
+    https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L94-L138
+    
+    Parameters
+    ----------
+    values : string
+        List of values with the format "par1=1 par2='string' par3=[1,2,3]
+    
+    Returns
+    -------
+    param_dict : dictionary
+        Converted string above to dictionary with `=` denoting linkage
+        E.g. {'par1': 1, 'par2':'string', 'par3': [1,2,3]}
+    """
     bool_value = {
             'true': True,
             'false': False,
