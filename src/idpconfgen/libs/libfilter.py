@@ -346,11 +346,12 @@ def regex_forward_no_overlap(sequence, regex):
         is found, returns that. Same for 'L' if found at the end.
 
     Using expressions such as r'(?=(L))' give not correct results.
+    Use `regex_forward_with_overlap` instead.
     """
     # this function is not used currently
-    # adding an assert here to cause an error incase it is used
+    # adding an assert here to cause an error in case it is used
     # unwanted
-    assert '(' not in regex and ')' not in regex
+    assert '(?=' not in regex
 
     # m.span() is used for regexes without overlap
     # using m.start(1) would not work here.
