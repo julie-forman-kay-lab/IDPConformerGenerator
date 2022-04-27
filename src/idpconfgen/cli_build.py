@@ -25,12 +25,19 @@ import numpy as np
 from numba import njit
 
 from idpconfgen import Path, log
+from idpconfgen.components.energy_threshold_type import add_et_type_arg
+from idpconfgen.components.sidechain_packing import (
+    DEFAULT_SDM,
+    add_mcsce_subparser,
+    add_sidechain_method,
+    get_sidechain_packing_parameters,
+    sidechain_packing_methods,
+    )
 from idpconfgen.components.xmer_probs import (
     add_xmer_arg,
     compress_xmer_to_key,
     prepare_xmer_probs,
     )
-from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
@@ -48,7 +55,6 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     prepare_slice_dict,
-    compute_sidechains,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
@@ -338,6 +344,8 @@ ap.add_argument(
     )
 
 
+add_sidechain_method(ap)
+add_mcsce_subparser(ap)
 libcli.add_argument_output_folder(ap)
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
@@ -423,6 +431,7 @@ def main(
         xmer_probs=None,
         output_folder=None,
         energy_log='energies.log',
+        sidechain_method=DEFAULT_SDM,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -523,7 +532,6 @@ def main(
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
-    print(dssp_regexes)
 
     db = read_dictionary_from_disk(database)
     _, ANGLES, secondary, primary = aligndb(db)
@@ -540,11 +548,11 @@ def main(
         res_tolerance=residue_substitutions,
         ncores=ncores,
         )
-
+    
     remove_empty_keys(SLICEDICT_XMERS)
     # updates user defined chunk sizes and probabilities to the ones actually
     # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, list(SLICEDICT_XMERS.keys()))
+    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
 
 
@@ -557,10 +565,8 @@ def main(
     #save_dict_to_pickle(BP, 'BP.pickle')
     #sys.exit()
 
-
-
     GET_ADJ = get_adjacent_angles(
-        list(SLICEDICT_XMERS.keys()),
+        sorted(SLICEDICT_XMERS.keys()),
         XMERPROBS,
         input_seq,
         ANGLES,
@@ -587,12 +593,18 @@ def main(
 
     ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
+    # get sidechain dedicated parameters
+    sidechain_parameters = \
+        get_sidechain_packing_parameters(kwargs, sidechain_method)
+
     # prepars execution function
     consume = partial(
         _build_conformers,
         input_seq=input_seq,  # string
         output_folder=output_folder,
         nconfs=conformers_per_core,  # int
+        sidechain_parameters=sidechain_parameters,
+        sidechain_method=sidechain_method,  # goes back to kwards
         **kwargs,
         )
 
@@ -704,6 +716,7 @@ def _build_conformers(
         conformer_name='conformer',
         output_folder=None,
         nconfs=1,
+        sidechain_parameters=None,
         **kwargs,
         ):
     """Arrange building of conformers and saves them to PDB files."""
@@ -716,6 +729,7 @@ def _build_conformers(
     builder = conformer_generator(
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
+        sidechain_parameters=sidechain_parameters,
         **kwargs)
 
     atom_labels, residue_numbers, residue_labels = next(builder)
@@ -754,6 +768,7 @@ def conformer_generator(
         bgeo_path=None,
         forcefield=None,
         random_seed=0,
+        sidechain_parameters=None,
         **energy_funcs_kwargs,
         ):
     """
@@ -847,7 +862,7 @@ def conformer_generator(
     sidechain_method : str
         The method used to build/pack sidechains over the backbone
         structure. Defaults to `faspr`.
-        Expects a key in `libs.libbuild.compute_sidechains`.
+        Expects a key in `components.sidechain_packing.sidechain_packing_methods`.
 
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
@@ -862,10 +877,10 @@ def conformer_generator(
     """
     if not isinstance(input_seq, str):
         raise ValueError(f'`input_seq` must be given! {input_seq}')
-    if sidechain_method not in compute_sidechains:
+    if sidechain_method not in sidechain_packing_methods:
         raise ValueError(
-            f'{sidechain_method} not in `compute_sidechains`. '
-            f'Expected {list(compute_sidechains.keys())}.'
+            f'{sidechain_method} not in `sidechain_packing_methods`. '
+            f'Expected {list(sidechain_packing_methods.keys())}.'
             )
 
     log.info(f'random seed: {random_seed}')
@@ -943,7 +958,15 @@ def conformer_generator(
     with_sidechains = not(disable_sidechains)
 
     if with_sidechains:
-        build_sidechains = compute_sidechains[sidechain_method](all_atom_input_seq)  # noqa: E501
+        log.info(S(f"configuring sidechain method: {sidechain_method}"))
+        # we use named arguments here to allow ignored non needed parameters
+        # with **kwargs
+        build_sidechains = sidechain_packing_methods[sidechain_method](
+            input_seq=all_atom_input_seq,
+            template_masks=TEMPLATE_MASKS,
+            all_atom_masks=ALL_ATOM_MASKS,
+            user_parameters=sidechain_parameters,
+            )
 
     # tests generative function complies with implementation requirements
     if generative_function:
@@ -964,7 +987,6 @@ def conformer_generator(
         ALL_ATOM_LABELS.res_nums,
         ALL_ATOM_LABELS.res_labels,
         )
-
     all_atom_num_atoms = len(ALL_ATOM_LABELS.atom_labels)
     template_num_atoms = len(TEMPLATE_LABELS.atom_labels)
 
@@ -1365,9 +1387,17 @@ def conformer_generator(
 
         if with_sidechains:
 
-            all_atom_coords[ALL_ATOM_MASKS.non_Hs_non_OXT] = build_sidechains(
-                template_coords[TEMPLATE_MASKS.bb4],
-                )
+            # this is uniformed API for all build_sidechains
+            _mask, _new_sd_coords = build_sidechains(template_coords)
+
+            if _new_sd_coords is None:
+                _emsg = (
+                    "Could not find a solution for sidechains, "
+                    "discarding the conformer...")
+                log.info(seed_report(_emsg))
+                continue
+
+            all_atom_coords[_mask] = _new_sd_coords
 
             if ALL_ATOM_EFUNC is None:
                 total_energy = 0
@@ -1386,7 +1416,6 @@ def conformer_generator(
         _msg = f'finished conf: {conf_n} with energy {_total_energy}'
         log.info(seed_report(_msg))
 
-        #print(all_atom_coords)
         yield SUM(total_energy), all_atom_coords
         conf_n += 1
 
@@ -1506,9 +1535,9 @@ def get_adjacent_angles(
 
         # chooses the size of the chunk from pre-configured range of sizes
         plen = RC(options, p=probs)
-
         # defines the chunk identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
+        _ori_template = primer_template
         next_residue = GSCNJIT(seq, cr + plen, 1)
 
         # recalculates the plen to avoid plen/template inconsistencies that
@@ -1551,7 +1580,12 @@ def get_adjacent_angles(
                 break
         else:
             # raise AssertionError to avoid `python -o` silencing
-            raise AssertionError('The code should not arrive here')
+            _emsg = (
+                "The code should not arrive here. "
+                "If it does, it may mean no matches were fund for chunk "
+                f"{_ori_template!r} down to the single residue."
+                )
+            raise AssertionError(_emsg)
 
         if next_residue == 'P':
             # because angles have the proline information
