@@ -111,6 +111,7 @@ BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
 BGEO_full = {}
 BGEO_trimer = {}
 BGEO_res = {}
+int2cart = None
 
 # SLICES and ANGLES will be populated in main() with the torsion angles.
 # it is not expected SLICES or ANGLES to be populated anywhere else.
@@ -147,19 +148,30 @@ class _BuildPreparation:
 
 
 
-def are_globals():
+def are_globals(use_int2cart=False):
     """Assess if global variables needed for building are populated."""
-    return all((
+    if use_int2cart:
+        return all((
         ALL_ATOM_LABELS,
         ALL_ATOM_MASKS,
         ALL_ATOM_EFUNC,
         TEMPLATE_LABELS,
         TEMPLATE_MASKS,
         TEMPLATE_EFUNC,
-        BGEO_full,
-        BGEO_trimer,
-        BGEO_res,
+        BGEO_int2cart
         ))
+    else:
+        return all((
+            ALL_ATOM_LABELS,
+            ALL_ATOM_MASKS,
+            ALL_ATOM_EFUNC,
+            TEMPLATE_LABELS,
+            TEMPLATE_MASKS,
+            TEMPLATE_EFUNC,
+            BGEO_full,
+            BGEO_trimer,
+            BGEO_res,
+            ))
 
 
 # CLI argument parser parameters
@@ -297,6 +309,17 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-bgeo_int2cart',
+    '--bgeo_int2cart',
+    action='store_true',
+    help=(
+        'Use Int2Cart rather than the bgeo library to provide bond lenths'
+        'and bond angles. Overrides bgeo_path.'
+    ),
+    default=False
+)
+
+ap.add_argument(
     '-etbb',
     '--energy-threshold-backbone',
     help=(
@@ -423,6 +446,7 @@ def main(
         dany=False,
         func=None,
         forcefield=None,
+        use_bgeo_int2cart=False,
         bgeo_path=None,
         residue_substitutions=None,
         nconfs=1,
@@ -632,6 +656,7 @@ def main(
 def populate_globals(
         *,
         input_seq=None,
+        use_bgeo_int2cart=False,
         bgeo_path=BGEO_path,
         forcefield=None,
         **efunc_kwargs):
@@ -661,18 +686,23 @@ def populate_globals(
             f'Expected string found {type(input_seq)}'
             )
 
-    global BGEO_full, BGEO_trimer, BGEO_res
+    if use_bgeo_int2cart:
+        global int2cart
+        from idpconfgen.components.bgeo_int2cart import BGEO_Int2Cart
+        int2cart = BGEO_Int2Cart()
+    else:
+        global BGEO_full, BGEO_trimer, BGEO_res
 
-    BGEO_full.update(read_dictionary_from_disk(bgeo_path))
-    _1, _2 = bgeo_reduce(BGEO_full)
-    BGEO_trimer.update(_1)
-    BGEO_res.update(_2)
-    del _1, _2
-    assert BGEO_full
-    assert BGEO_trimer
-    assert BGEO_res
-    # this asserts only the first layer of keys
-    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
+        BGEO_full.update(read_dictionary_from_disk(bgeo_path))
+        _1, _2 = bgeo_reduce(BGEO_full)
+        BGEO_trimer.update(_1)
+        BGEO_res.update(_2)
+        del _1, _2
+        assert BGEO_full
+        assert BGEO_trimer
+        assert BGEO_res
+        # this asserts only the first layer of keys
+        assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
     # populates the labels
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
@@ -765,6 +795,7 @@ def conformer_generator(
         sidechain_method='faspr',
         energy_threshold_backbone=10,
         energy_threshold_sidechains=1000,
+        bgeo_int2cart=False,
         bgeo_path=None,
         forcefield=None,
         random_seed=0,
@@ -864,6 +895,9 @@ def conformer_generator(
         structure. Defaults to `faspr`.
         Expects a key in `components.sidechain_packing.sidechain_packing_methods`.
 
+    bgeo_int2cart : bool
+        Whether to use the Int2Cart algorithm to obtain bond lengths and bond angles
+    
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
 
@@ -949,6 +983,7 @@ def conformer_generator(
             forcefield = forcefields[forcefield]
         populate_globals(
             input_seq=all_atom_input_seq,
+            use_bgeo_int2cart=bgeo_int2cart,
             bgeo_path=bgeo_path or BGEO_path,
             forcefield=forcefield,
             **energy_funcs_kwargs,
@@ -1144,6 +1179,7 @@ def conformer_generator(
 
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
+            torsion_records = []
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
 
@@ -1161,18 +1197,21 @@ def conformer_generator(
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
                     for torsion_angle in (omg, phi, psi):
+                        if bgeo_int2cart:
+                            seq = all_atom_input_seq[:current_res_number + 1]
+                            _bond_lens = _ #?
+                        else:
+                            _bt = next(bond_type)
 
-                        _bt = next(bond_type)
-
-                        try:
-                            _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])  # noqa: E501
-                        except KeyError:
                             try:
-                                _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])  # noqa: E501
+                                _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])  # noqa: E501
                             except KeyError:
-                                _bend_angle = RC(BGEO_res[_bt][curr_res])
+                                try:
+                                    _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])  # noqa: E501
+                                except KeyError:
+                                    _bend_angle = RC(BGEO_res[_bt][curr_res])
 
-                        _bond_lens = next(bond_lens)[curr_res]
+                            _bond_lens = next(bond_lens)[curr_res]
 
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
