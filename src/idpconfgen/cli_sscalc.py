@@ -241,9 +241,12 @@ def main(
     
     if plot:
         log.info(T("Plotting fractional secondary structure information"))
+        log.info(S("Tip: plotting is best for same protein-system ensembles."))
         
-        first = next(iter(dssp_data))
-        n_residues = len(dssp_data[first]["dssp"])
+        max_residues=0
+        for key in dssp_data:
+            if len(dssp_data[key]["dssp"]) > max_residues:
+                max_residues = len(dssp_data[key]["dssp"])
         n_confs = len(dssp_data)        
         
         plotvars = plotvars or dict()
@@ -255,9 +258,9 @@ def main(
         
         if reduced:
             frac_dssp = {
-                'Loops': np.zeros(n_residues),
-                'Helices': np.zeros(n_residues),
-                'Strands': np.zeros(n_residues),
+                'Loops': np.zeros(max_residues),
+                'Helices': np.zeros(max_residues),
+                'Strands': np.zeros(max_residues),
             }
             p=np.ones(n_confs)
             p=p/len(p)
@@ -274,15 +277,15 @@ def main(
                 c+=1
         else:
             frac_dssp = {
-                'H': np.zeros(n_residues),
-                'B': np.zeros(n_residues),
-                'E': np.zeros(n_residues),
-                'G': np.zeros(n_residues),
-                'I': np.zeros(n_residues),
-                'T': np.zeros(n_residues),
-                'S': np.zeros(n_residues),
-                'P': np.zeros(n_residues),
-                '-': np.zeros(n_residues),
+                'H': np.zeros(max_residues),
+                'B': np.zeros(max_residues),
+                'E': np.zeros(max_residues),
+                'G': np.zeros(max_residues),
+                'I': np.zeros(max_residues),
+                'T': np.zeros(max_residues),
+                'S': np.zeros(max_residues),
+                'P': np.zeros(max_residues),
+                '-': np.zeros(max_residues),
             }
             p=np.ones(n_confs)
             p=p/len(p)
@@ -304,7 +307,7 @@ def main(
 
                 c+=1
         
-        errs=plot_fracSS(n_residues, frac_dssp, **plt_default)
+        errs=plot_fracSS(max_residues, frac_dssp, **plt_default)
         for e in errs:
             log.info(S(f'{e}'))
             

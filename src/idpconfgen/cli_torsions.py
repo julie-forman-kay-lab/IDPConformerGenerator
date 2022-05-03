@@ -141,6 +141,8 @@ def main(
     if plot:
         # Plotting torsion angle distributions
         log.info(T("Plotting torsion angle distribution"))
+        log.info(S("Reminder: PDBs must be conformers of the same protein-system."))
+        
         plotvars = plotvars or dict()
         
         tor_defaults = {
