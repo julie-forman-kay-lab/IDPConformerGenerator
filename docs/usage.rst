@@ -39,6 +39,7 @@ To use IDP Conformer Generator in your project, import it as a library::
 
 Exploring IDPConfGen with drkN SH3
 ----------------------------------
+
 The example with a small peptide in the :code:`example` folder is a good way to get introduced
 to IDPConfGen. Although building other IDP conformer ensembles use the same workflow as the 
 one provided in :code:`example/README.rst`, we will go over more detailed usage examples with
@@ -88,7 +89,7 @@ be 100 kJ and 250 kJ respectively, using default chunk sizes, no substitutions, 
         -n
 
 :code:`idpconfgen` is deterministic. Therefore, the random seed defines the sampling progression - 
-read :ref:`here <faq>`::for more information.
+read :ref:`here <Frequently Asked Questions (F.A.Q.s)>` for more information.
 
 To switch the side chain building algorithm to MCSCE (recommended), you would first have to install MCSCE.
 Please re-visit the :code:`docs/installation.rst` to get MCSCE set up. Here's the following example::
