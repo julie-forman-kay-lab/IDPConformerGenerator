@@ -1,2 +1,5 @@
-sphinx>=2.2
-sphinx-py3doc-enhanced-theme
+sphinx>=2
+sphinx-rtd-theme
+sphinx-argparse
+CommonMark
+mock
