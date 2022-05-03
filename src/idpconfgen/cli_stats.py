@@ -8,6 +8,7 @@ USAGE:
 import argparse
 import os
 import re
+from pathlib import Path
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
@@ -40,6 +41,7 @@ libcli.add_argument_dstrand(ap)
 libcli.add_argument_dany(ap)
 libcli.add_argument_duser(ap)
 libcli.add_argument_subs(ap)
+libcli.add_argument_output_folder(ap)
 
 OUTPUT_PREFIX = "count_stats"
 ap.add_argument(
@@ -67,6 +69,7 @@ def main(
         dany=False,
         residue_substitutions=None,
         output_prefix=OUTPUT_PREFIX,
+        output_folder=None,
         func=None):
     """Perform main logic."""
     dloop = not dloop_off
@@ -171,9 +174,16 @@ def main(
 
     # Saves to files.
     log.info(T("saving CSV files to disk"))
+
+    if output_folder is not None:
+        pof = Path(output_folder)
+        pof.mkdir(parents=True, exist_ok=True)
+    else:
+        pof = Path.cwd()
+
     for mer_len, labels_values in data_to_plot.items():
         to_save = sorted(zip(*labels_values), key=lambda x: x[1], reverse=True)
-        fpath = f"{output_prefix}_{mer_len}.csv"
+        fpath = Path(pof, f"{output_prefix}_{mer_len}.csv")
         with open(fpath, "w") as fout:
             fout.write(f"# fragment counts in the database for {input_seq}{os.linesep}")
             _ = os.linesep.join(','.join(map(str, pair)) for pair in to_save)
