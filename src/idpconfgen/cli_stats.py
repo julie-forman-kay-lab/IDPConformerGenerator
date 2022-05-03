@@ -19,7 +19,7 @@ from idpconfgen.libs.libparse import get_mers
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
-LOGFILESNAME = '.db_stats'
+LOGFILESNAME = '.stats'
 
 _name = 'stats'
 _help = 'Gets statistics from DB and input sequence.'
@@ -72,6 +72,8 @@ def main(
         output_folder=None,
         func=None):
     """Perform main logic."""
+    init_files(log, LOGFILESNAME)
+
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
     non_overlapping_parameters = (any_def_loops, dany, duser)  # noqa: E501
@@ -79,12 +81,15 @@ def main(
 
     if _sum > 1:
         emsg = (
-            'Note (dloop, dstrand, dhelix), dany, and duser'
+            ' * ERROR * (dloop, dstrand, dhelix), dany, and duser '
             'are mutually exclusive.'
             )
+        log.error(emsg)
         raise ValueError(emsg)
     elif _sum < 1:
-        raise ValueError("Give at least one sampling option.")
+        emsg = ' * ERROR * Give at least one sampling option.'
+        log.error(emsg)
+        raise ValueError(emsg)
 
     del _sum
     del non_overlapping_parameters
