@@ -3,6 +3,7 @@ Calculate fragment statistics for the input sequence in the database.
 
 USAGE:
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ>
+    $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ> -o stats
 """
 import argparse
 import os
@@ -40,6 +41,19 @@ libcli.add_argument_dany(ap)
 libcli.add_argument_duser(ap)
 libcli.add_argument_subs(ap)
 
+OUTPUT_PREFIX = "count_stats"
+ap.add_argument(
+    '-op',
+    '--output-prefix',
+    help=(
+        'The prefix for the output CSV files. One CSV file is generated '
+        'for each fragment size. These files will have this prefix. '
+        'Defaults to `count_stats`.'
+        ),
+    default=OUTPUT_PREFIX,
+    type=str,
+    )
+
 
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
@@ -52,6 +66,7 @@ def main(
         duser=False,
         dany=False,
         residue_substitutions=None,
+        output_prefix=OUTPUT_PREFIX,
         func=None):
     """Perform main logic."""
     dloop = not dloop_off
@@ -158,7 +173,7 @@ def main(
     log.info(T("saving CSV files to disk"))
     for mer_len, labels_values in data_to_plot.items():
         to_save = sorted(zip(*labels_values), key=lambda x: x[1], reverse=True)
-        fpath = f"counts_in_database_{mer_len}.csv"
+        fpath = f"{output_prefix}_{mer_len}.csv"
         with open(fpath, "w") as fout:
             fout.write(f"# fragment counts in the database for {input_seq}{os.linesep}")
             _ = os.linesep.join(','.join(map(str, pair)) for pair in to_save)
