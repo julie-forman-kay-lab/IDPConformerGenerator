@@ -266,6 +266,7 @@ def add_version(parser):
 
 # optional:
 # -c, --chunks            : number of chunks to process in memory
+# -cif, --mmcif           : prioritizes downloading mmCIF files
 # -d, --destination       : destination folder
 # -deg, --degrees         : degrees
 # -dec, --decimals        : decimal numbers
@@ -310,6 +311,16 @@ def add_argument_cmd(parser):
         'cmd',
         help='The path to the executable file used in this routine.',
         type=str,
+        )
+
+
+def add_argument_cif(parser):
+    """Add command to prioritize downloading CIF parser."""
+    parser.add_argument(
+        '-cif',
+        '--mmcif',
+        help="Prioritizes PDBx/mmCIF formatted structures.",
+        action='store_true',
         )
 
 

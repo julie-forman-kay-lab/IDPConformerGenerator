@@ -70,6 +70,7 @@ def download_pipeline(func, logfilename='.download'):
             destination=None,
             ncores=1,
             update=False,
+            **funckwargs,
             ):
         """Run main script logic."""
         init_files(log, LOGFILESNAME)
@@ -112,7 +113,7 @@ def download_pipeline(func, logfilename='.download'):
         if something_to_download and update:
 
             # the function to be used in multiprocessing
-            consume_func = partial(consume_iterable_in_list, func)
+            consume_func = partial(consume_iterable_in_list, func, **funckwargs)
 
             # context to perform a dedicated report in case function fails
             # partial is mandatory because decorators won't pickle

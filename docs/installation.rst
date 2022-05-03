@@ -1,6 +1,7 @@
 ============
 Installation
 ============
+
 IDPConformerGenerator v0.3.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and Graham@ComputeCanada.
 Although it's recommended to run IDPConfGen on UNIX based OS, it will work with Windows based OS as well as long as the pre-requisites are met.
 
@@ -10,6 +11,7 @@ Although it's recommended to run IDPConfGen on UNIX based OS, it will work with 
 
 Pre-installation Reqirements
 ----------------------------
+
 An up-to-date version of anaconda3, and pip are required
 For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
 
@@ -73,22 +75,24 @@ Install ``idpconfgen``::
 
 From source in Graham@ComputeCanada
 -----------------------------------
-Log-in and make sure you're in the /home directory
+
+Log-in and make sure you're in the /home directory::
 
     cd
 
-Load the required python packages and modules in ComputeCanada's servers.
-    
+Load the required python packages and modules in ComputeCanada's servers::
+
     module load scipy-stack dssp boost
 
-Create and activate a :code:`virtualenv` as ComputeCanada recommands anaconda3 not be installed in the home folder.
+Create and activate a :code:`virtualenv` as ComputeCanada recommands anaconda3
+not be installed in the home folder::
 
     virtualenv --no-download idpconfgen
     source idpconfgen/bin/activate
 
 For the first time installation, install dependencies manually using :code:`pip`.
 Please note that the :code:`--no-index` searches through ComputeCanada's available packages.
-If they're not available, it will install from the web.
+If they're not available, it will install from the web::
 
     pip install --no-index --upgrade pip
     pip install numba --no-index
@@ -96,11 +100,43 @@ If they're not available, it will install from the web.
     pip install tox
     pip install libfuncpy
 
-We are ready to clone from source and installation from here will be similar to local.
+We are ready to clone from source and installation from here will be similar to
+local::
 
     git clone https://github.com/julie-forman-kay-lab/IDPConformerGenerator
     cd IDPConformerGenerator
 
-Make sure you're in the :code:`idpconfgen` virtual environment before installing.
+Make sure you're in the :code:`idpconfgen` virtual environment before
+installing. Install with::
 
     python setup.py develop --no-deps
+
+Install MCSCE
+-------------
+
+IDPConformerGenerator can integrate MCSCE to generate sidechains on top of the
+backbone conformers it generates, on the fly. For that you need to install MCSCE
+on top of the `idpconfgen` Python environment. First, install IDPConfGen as
+described above. Next, follow these steps::
+
+    # clone MCSCE, navigate to a folder of your preference
+    git clone https://github.com/THGLab/MCSCE
+
+    # Install MCSCE on top of idpconfgen
+    cd MCSCE
+    conda env update --file requirements.yml --name idpconfgen
+
+    # deactivate the environment and come back
+    conda deactivate
+    conda activate idpconfgen
+
+    # install MCSCE within the `idpconfgen` environment
+    python setup.py develop --no-deps
+
+    # navigate back to the idpconfgen github folder and re-run
+    python setup.py develop --no-deps
+
+Now, if you choose the flag `-scm mcsce`, IDPConfGen will use MCSCE to build
+sidechains as backbone conformers are generated. You will see `idpconfgen build
+-h` has a specific group of parameters dedicated to MCSCE, you can explore those
+as well.
