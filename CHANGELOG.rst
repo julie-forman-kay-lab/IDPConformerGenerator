@@ -99,7 +99,7 @@ v0.0.23 (2021-07-01)
 v0.0.22 (2021-06-30)
 ------------------------------------------------------------
 
-* Users are now able to fully configure the size of chunks and probabilities,
+* Users are now able to fully configure the size of fragments and probabilities,
     via the flag `-xp` that expects a two column file.
 
 v0.0.21 (2021-06-28)
@@ -145,7 +145,7 @@ v0.0.15 (2021-06-09)
 v0.0.14 (2021-06-05)
 ------------------------------------------------------------
 
-* Users can now select single residue chunk size
+* Users can now select single residue fragment size
 * ``-xp`` parameter was updated with checks and completion
 
 v0.0.13 (2021-05-28)
@@ -171,7 +171,7 @@ v0.0.10 (2021-05-27)
 v0.0.9 (2021-05-27)
 ------------------------------------------------------------
 
-* user can now define the chunk size selection probabilities
+* user can now define the fragment size selection probabilities
 
 v0.0.8 (2021-05-09)
 ------------------------------------------------------------

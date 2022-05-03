@@ -41,7 +41,7 @@ def flat_results_from_chunk(execute, func, *args, **kwargs):
 
     func : callable
         The function to process each yielded result from the results
-        in the multiprocessing chunk.
+        in the multiprocessing fragment.
     """
     for chunk in execute():
         # each result is a list coming from consume_iterable_in_list
@@ -99,7 +99,7 @@ def pool_function_in_chunks(func, items, chunks=5_000, **kwargs):
     """
     Execute ``func`` in ``chunks`` of ``items`` using `Pool`.
 
-    Yields the results after each chunk.
+    Yields the results after each fragment.
 
     Parameters
     ----------
@@ -115,7 +115,7 @@ def pool_function_in_chunks(func, items, chunks=5_000, **kwargs):
         Additional positional arguments to send to ``func``.
 
     chunks : int
-        The size of each chunk processed multiprocessing before yielding.
+        The size of each fragment processed multiprocessing before yielding.
 
     **kwargs : any
         Additional keyword arguments to send to ``func``.
@@ -123,7 +123,7 @@ def pool_function_in_chunks(func, items, chunks=5_000, **kwargs):
     Yields
     ------
     list
-        Containing the results after each chunk.
+        Containing the results after each fragment.
     """
     for i in range(0, len(items), chunks):
         task = items[i: i + chunks]
