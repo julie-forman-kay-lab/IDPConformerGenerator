@@ -2,7 +2,7 @@
 Installation
 ============
 
-IDPConformerGenerator v0.3.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and Graham@ComputeCanada.
+IDPConformerGenerator v0.4.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and Graham@ComputeCanada.
 Although it's recommended to run IDPConfGen on UNIX based OS, it will work with Windows based OS as well as long as the pre-requisites are met.
 
 **Remember** to update your Linux distribution prior to installation:
@@ -12,8 +12,13 @@ Although it's recommended to run IDPConfGen on UNIX based OS, it will work with 
 Pre-installation Reqirements
 ----------------------------
 
-An up-to-date version of anaconda3, and pip are required
-For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
+(Required) An up-to-date version of anaconda3, and pip.
+(Required) For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
+
+(Recommended) For MCSCE installation, please refer to below and: https://github.com/THGLab/MCSCE
+
+(Optional) To use CSSS with CheSPI, please refer to: https://github.com/protein-nmr/CheSPI
+(Optional) To use CSSS with delta2D, please refer to: https://github.com/carlocamilloni/d2D
 
 To install IDPConformerGenerator (idpconfgen for short) on your local machine:
 

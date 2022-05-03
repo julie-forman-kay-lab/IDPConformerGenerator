@@ -265,7 +265,7 @@ def add_version(parser):
 # pdbids
 
 # optional:
-# -c, --chunks            : number of chunks to process in memory
+# -c, --chunks            : number of fragments to process in memory
 # -cif, --mmcif           : prioritizes downloading mmCIF files
 # -d, --destination       : destination folder
 # -deg, --degrees         : degrees
@@ -292,14 +292,14 @@ def add_general_arg(parser, *args, **kwargs):
 
 def add_argument_chunks(parser):
     """
-    Add chunks argument.
+    Add fragments argument.
 
-    For those routines that are split into operative chunks.
+    For those routines that are split into operative fragments.
     """
     parser.add_argument(
         '-c',
         '--chunks',
-        help='Number of chunks to process in memory before saving to disk.',
+        help='Number of fragments to process in memory before saving to disk.',
         default=5_000,
         type=int,
         )

@@ -114,7 +114,7 @@ def main(
         Secondary structure characters to consider.
 
     chunks : int
-        The size of the chunk to process in memory before saving to
+        The size of the fragment to process in memory before saving to
         the disk.
 
     ncores : int

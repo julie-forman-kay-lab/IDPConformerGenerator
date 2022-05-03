@@ -33,7 +33,7 @@ class Structure:
     """
     Hold structural data from PDB/mmCIF files.
 
-    Run the ``.buil()`` method to read the structure.
+    Run the ``.build()`` method to read the structure.
 
     Cases for PDB Files:
     * If there are several MODELS only the first model is considered.

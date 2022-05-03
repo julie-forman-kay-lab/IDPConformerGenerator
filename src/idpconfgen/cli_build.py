@@ -110,7 +110,7 @@ BGEO_res = {}
 # SLICES and ANGLES will be populated in main() with the torsion angles.
 # it is not expected SLICES or ANGLES to be populated anywhere else.
 # The slice objects from where the builder will feed to extract torsion
-# chunks from ANGLES.
+# fragments from ANGLES.
 ANGLES = None
 SLICES = []
 SLICEDICT_XMERS = None
@@ -294,7 +294,7 @@ ap.add_argument(
     '-etbb',
     '--energy-threshold-backbone',
     help=(
-        'The energy threshold above which chunks will be rejected '
+        'The energy threshold above which fragments will be rejected '
         'when building the BACKBONE atoms. Defaults to 10.'
         ),
     default=10.0,
@@ -471,13 +471,13 @@ def main(
         f'{remaining_confs} remaining confs'
         )
 
-    # we use a dictionary because chunks will be evaluated to exact match
+    # we use a dictionary because fragments will be evaluated to exact match
     global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
     # reads regexes
-    # regexes will only be sampled for the chunk sizes selected.
+    # regexes will only be sampled for the fragment sizes selected.
     xmer_range = xmer_probs_tmp.sizes[0], xmer_probs_tmp.sizes[-1]
 
     # set up the information from CSSS.JSON files
@@ -487,7 +487,7 @@ def main(
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
     # There are four possibilities of sampling:
-    # 1) Sampling loops and/or helix and/or strands, where the found chunks are
+    # 1) Sampling loops and/or helix and/or strands, where the found fragments are
     #    all of the same secondary structure
     # 2) sample "any". Disregards any secondary structure annotated
     # 3) custom sample given by the user
@@ -548,7 +548,7 @@ def main(
         )
 
     remove_empty_keys(SLICEDICT_XMERS)
-    # updates user defined chunk sizes and probabilities to the ones actually
+    # updates user defined fragment sizes and probabilities to the ones actually
     # observed
     _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
     XMERPROBS = _.probs
@@ -822,7 +822,7 @@ def conformer_generator(
         angles during the building process.
 
         The builder expects this function to receive two parameters:
-            - `nres`, the residue chunk size to get angles from
+            - `nres`, the residue fragment size to get angles from
             - `cres`, the next residue being built. For example,
                 with cres=10, the builder will expect a minimum of three
                 torsion angles (phi, psi, omega) for residue 10.
@@ -1237,7 +1237,7 @@ def conformer_generator(
 
             if len(bbi0_register) == 1:
                 # places the N-terminal Hs only if it is the first
-                # chunk being built
+                # fragment being built
                 _ = PLACE_SIDECHAIN_TEMPLATE(bb_real[0:3, :], N_TERMINAL_H)
                 template_coords[TEMPLATE_MASKS.Hterm, :] = _[3:, :]
                 current_Hterm_coords = _[3:, :]
@@ -1272,10 +1272,10 @@ def conformer_generator(
             if ANY(total_energy > energy_threshold_backbone):
                 #print('---------- energy positive')
                 # reset coordinates to the original value
-                # before the last chunk added
+                # before the last fragment added
 
-                # reset the same chunk maximum 5 times,
-                # after that reset also the chunk before
+                # reset the same fragment maximum 5 times,
+                # after that reset also the fragment before
                 try:
                     if number_of_trials > 30:
                         bbi0_R_POP()
@@ -1307,7 +1307,7 @@ def conformer_generator(
                     broke_on_start_attempt = True
                     break  # conformer while loop, starts conformer from scratch
 
-                # clean previously built protein chunk
+                # clean previously built protein fragment
                 bb_real[_bbi0:bbi, :] = NAN
                 bb_CO[_COi0:COi, :] = NAN
 
@@ -1317,22 +1317,22 @@ def conformer_generator(
                 current_res_number = _resi0
 
                 # coords needs to be reset because size of protein next
-                # chunks may not be equal
+                # fragments may not be equal
                 template_coords[:, :] = NAN
                 template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
-                # this is required because the last chunk created may have been
+                # this is required because the last fragment created may have been
                 # the final part of the conformer
                 if backbone_done:
                     bond_lens = get_cycle_distances_backbone()
                     bond_type = get_cycle_bond_type()
 
-                # we do not know if the next chunk will finish the protein
+                # we do not know if the next fragment will finish the protein
                 # or not
                 backbone_done = False
                 number_of_trials += 1
-                continue  # send back to the CHUNK while loop
+                continue  # send back to the fragment while loop
 
             # if the conformer is valid
             number_of_trials = 0
@@ -1343,8 +1343,8 @@ def conformer_generator(
 
             if backbone_done:
                 # this point guarantees all protein atoms are built
-                break  # CHUNK while loop
-        # END of CHUNK while loop, go up and build the next CHUNK
+                break  # fragment while loop
+        # END of fragment while loop, go up and build the next fragment
 
         if broke_on_start_attempt:
             start_attempts += 1
@@ -1355,7 +1355,7 @@ def conformer_generator(
                     )
                 return
             broke_on_start_attempt = False
-            continue  # send back to the CHUNK while loop
+            continue  # send back to the fragment while loop
 
         # we do not want sidechains at this point
         all_atom_coords[ALL_ATOM_MASKS.bb4] = template_coords[TEMPLATE_MASKS.bb4]  # noqa: E501
@@ -1464,12 +1464,12 @@ def get_adjacent_angles(
         residue_replacements=None,
         ):
     """
-    Get angles to build the next adjacent protein chunk.
+    Get angles to build the next adjacent protein fragment.
 
     Parameters
     ----------
     options : list
-        The length of the possible chunk sizes.
+        The length of the possible fragment sizes.
 
     probs : list
         A list with the relative probabilites to select from `options`.
@@ -1481,7 +1481,7 @@ def get_adjacent_angles(
         The angle omega/phi/psi database.
 
     slice_dict : dict-like
-        A dictionary containing the chunks strings as keys and as values
+        A dictionary containing the fragments strings as keys and as values
         lists with slice objects.
 
     csss : dict-like
@@ -1508,9 +1508,9 @@ def get_adjacent_angles(
         # calculates the current residue number from the atom index
         cr = CRNFI(aidx)
 
-        # chooses the size of the chunk from pre-configured range of sizes
+        # chooses the size of the fragment from pre-configured range of sizes
         plen = RC(options, p=probs)
-        # defines the chunk identity accordingly
+        # defines the fragment identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
         _ori_template = primer_template
         next_residue = GSCNJIT(seq, cr + plen, 1)
@@ -1535,7 +1535,7 @@ def get_adjacent_angles(
                     lssprobsC()
 
                     # adds possible secondary structure for the residue
-                    # the first residue of the chunk
+                    # the first residue of the fragment
                     lssE(csss[cr_plus_1].keys())
                     # adds SS probabilities for the same residue
                     lssprobsE(csss[cr_plus_1].values())
@@ -1559,7 +1559,7 @@ def get_adjacent_angles(
             # raise AssertionError to avoid `python -o` silencing
             _emsg = (
                 "The code should not arrive here. "
-                "If it does, it may mean no matches were fund for chunk "
+                "If it does, it may mean no matches were fund for fragment "
                 f"{_ori_template!r} down to the single residue."
                 )
             raise AssertionError(_emsg)

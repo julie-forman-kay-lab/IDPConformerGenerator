@@ -521,7 +521,7 @@ def prepare_slice_dict(
         ncores=1,
         ):
     """
-    Prepare a dictionary mapping chunks to slices in `primary`.
+    Prepare a dictionary mapping fragments to slices in `primary`.
 
     Protocol
     --------
@@ -548,7 +548,7 @@ def prepare_slice_dict(
 
     3.1) For each slice found in 2) we inspect the `secondary` string if it
     matches any of the `dssp_regex`. If it matches we consider that slice to the
-    chunk-size, the XMER identify, the DSSP key. This allow us in the build
+    fragment-size, the XMER identify, the DSSP key. This allow us in the build
     process to specify which SS to sample for specific regions of the conformer.
 
     Parameters
@@ -574,7 +574,7 @@ def prepare_slice_dict(
         primary. In the form of "LLLL|HHHH", etc. Only needed if `csss` True.
 
     mers_size : iterable
-        A iterable of integers denoting the size of the chunks to search
+        A iterable of integers denoting the size of the fragments to search
         for. Defaults from 1 to 5.
 
     res_tolerance : dict
@@ -590,11 +590,11 @@ def prepare_slice_dict(
     dict
         A dict with the given mapping:
 
-            1) First key-level of the dict is the length of the chunks, hence,
+            1) First key-level of the dict is the length of the fragments, hence,
             integers.
 
-            2) The second key level are the residue chunks found in the
-            `primary`. A chunk in input_seq but not in `primary` is removed
+            2) The second key level are the residue fragments found in the
+            `primary`. A fragment in input_seq but not in `primary` is removed
             from the dict.
 
             3) only if `csss` is True. Adds a new layer organizing the slice
@@ -1117,7 +1117,7 @@ def get_indexes_from_primer_length(
         plen,
         current_residue,
         ):
-    """Get sequence chunk based on position and length."""
+    """Get sequence fragment based on position and length."""
     if plen == 1:
         return current_residue
     elif plen == 2:
@@ -1170,7 +1170,7 @@ def populate_dict_with_database(
     Parameters
     ----------
     xmers : list
-        The list of all protein chunks we want to search in the `primary`
+        The list of all protein fragments we want to search in the `primary`
         and `secondary` "database" strings. This list should contain only
         sequence of the same length.
 

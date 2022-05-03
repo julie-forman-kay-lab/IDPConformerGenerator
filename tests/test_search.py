@@ -48,7 +48,7 @@ class TestSearchWithMismatch:
         proteins = ProteinSearch()
         proteins.start_search("ACDDKC", "ACDMKC", 3, 10)
         # should never find any mismatches since the minimum percentage
-        # for this minimum chunk would be 25%
+        # for this minimum fragment would be 25%
         assert len(proteins.results[-1]) == 1
 
     def test_mismatch2(self):
