@@ -8,6 +8,7 @@ USAGE:
 import argparse
 import os
 import re
+import json
 from pathlib import Path
 
 from idpconfgen import log
@@ -163,7 +164,8 @@ def main(
     # Searches the input sequence fragments in the database.
     log.info(T("Creating fragments statistics for input sequence"))
     if residue_substitutions:
-        log.info(S("residue replacement map: {residue_substitutions}"))
+        sub_map = json.dumps(residue_substitutions)[1:-1]
+        log.info(S(f"residue replacement map: {sub_map}"))
     data_to_plot = {}
 
     for mer_len, set_of_mers in imers.items():
