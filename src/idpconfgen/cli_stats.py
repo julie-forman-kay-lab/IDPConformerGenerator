@@ -5,9 +5,10 @@ Calculate number of hits of keywords in the header from raw PDB files fetched.
 USAGE:
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ>
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ> -op <OUTPUT-PREFIX> -of <OUTPUT-FOLDER>
+    $ idpconfgen stats --search -fpdb <PDB-FILES> -kw <KEYWORDS>
     $ idpconfgen stats --search -fpdb <PDB-FILES> -kw <KEYWORDS> -o <OUTPUT> -n <CORES>
 """
-import argparse, os, re, json, time
+import argparse, os, re, json, shutil
 from pathlib import Path
 from functools import partial
 
@@ -112,7 +113,7 @@ ap.add_argument(
         "Defaults to dbHits.json, requires \'.json\' extension."
         ),
     type=Path,
-    default='dbHits.json',
+    default='search_hits.json',
     action=libcli.CheckExt({'.json'}),
     )
 
@@ -160,14 +161,69 @@ def main(
         output_prefix=OUTPUT_PREFIX,
         output_folder=None,
         search=False,
-        output="dbHits_output.json",
+        output="search_hits.json",
         tmpdir=TMPDIR,
         ncores=1,
         func=None):
-    """Perform main logic."""
+    """
+    Performs main client logic.
+    
+    The default function is to return the number/counts of hits
+    for different fragment sequences within the IDPConfGen database.
+    
+    A secondary function denoted with `--search` can search through
+    raw PDB files' headers for certain keywords and return the PDB IDs
+    that had hits to the keywords.  
+
+    Parameters
+    ----------
+    database : str or Path
+        Path to the database.JSON file for IDPConfGen.
+        Required for default func.
+        
+    input_seq : str or Path
+        Primary sequence or path to the FASTA file.
+        Required for default func.
+    
+    output_prefix : str
+        Prefix for the output files when comparing counts of fragment ID hits.
+        Defaults to `count_stats`. Optional for default func. 
+    
+    output_folder : str or Path
+        Path of the output folder to store stats.CSV.
+        Defaults to working directory. Optional for default func. 
+        
+    search : Bool
+        Enables the secondary function of stats.
+        Defaults to False.
+        
+    pdb_files : str or Path
+        Path to a .TAR or folder of PDB files.
+        Required for `--search`.
+    
+    keywords : str
+        String of keywords delimited by commas to search for.
+        Required for `--search`.
+    
+    output (str, optional): str or Path
+        Path to the file to store the number of search hits.
+        Defaults to "search_hits.json". Optional for `--search`.
+        
+    tmpdir : str or Path
+        Path to the temporary directory if working with .TAR files.
+        Defaults to TMPDIR. Optional for `--search`.
+    
+    ncores : int
+        The number of cores to use.
+        Defaults to 1. Optional for `--search`.
+    """
     init_files(log, LOGFILESNAME)
     
     if search:
+        if not pdb_files or not keywords:
+            log.info(S('To use the search function you must provide PDB files and a list of keywords.'))
+            return
+        
         log.info(T('reading input paths'))
         try:
             pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
@@ -181,7 +237,7 @@ def main(
         try:
             keywords = keywords.split(",")
         except:
-            log.info(S('ERROR: keywords must be delineated by commas.'))
+            log.info(S('ERROR: keywords must be delimited by commas.'))
             return
         
         execute = partial(
@@ -198,7 +254,7 @@ def main(
         for result in execute_pool:
             if result != None:
                 wd = result[0]
-                id = os.path.basename(os.path.normpath(result[1]))
+                id = os.path.basename(result[1])
                 matches[wd].append(id)
         
         for wd in keywords:
@@ -212,8 +268,15 @@ def main(
             fout.write(_output)
         log.info(S('done'))
         
+        if _istarfile:
+            shutil.rmtree(tmpdir)
+        
         return
 
+    if not database or not input_seq:
+        log.info(S('To use the default function for stats, you must provide a path to the database and an input sequence.'))
+        return
+        
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
     non_overlapping_parameters = (any_def_loops, dany, duser)  # noqa: E501
