@@ -179,66 +179,6 @@ blocked_ids = [
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
-#FAST sequences of frequently used protein systems
-seq_shortcuts = {
-    "*drknsh3*":"MEAIAKHDFSATADDELSFRKTQILKILNMEDDSNWYRAELDGKEGLIPSNYIEMKNHD",
-    "*sic1*":"GSMTPSTPPRSRGTRYLAQPSGNTSSSALMQGQKTPQKPSQNLVPVTPSTTKSFKNAPLLAPPNSNMGMTSPFNGLTSPQRSPFPKSSVKRT",
-    "*asyn*":"MDVFMKGLSKAKEGVVAAAEKTKQGVAEAAGKTKEGVLYVGSKTKEGVVHGVATVAEKTKEQVTNVGGAVVTGVTAVAQKTVEGAGSIAAATGFVKKDQLGKNEEGAPQEGILEDMPVDPDNEAYEMPSEEGYQDYEPEA",
-    "*i2*":"GHMPIKGILKNKTSTTSSMVASAEQPRGNVDEELSKKSQKWDEMNILATYHPADKDYGLMKIDEPSTPYHSMMGDDEDACSDTEATEAMAPDILARKLAAAEGLEPKYRIQEQESSGEEDSDLSPEEREKKRQFEMKRKLHYNEGLNIKLARQLISKDL",
-    "*tau*":"MAEPRQEFEVMEDHAGTYGLGDRKDQGGYTMHQDQEGDTDAGLKESPLQTPTEDGSEEPGSETSDAKSTPTAEDVTAPLVDEGAPGKQAAAQPHTEIPEGTTAEEAGIGDTPSLEDEAAGHVTQARMVSKSKDGTGSDDKKAKGADGKTKIATPRGAAPPGQKGQANATRIPAKTPPAPKTPPSSGEPPKSGDRSGYSSPGSPGTPGSRSRTPSLPTPPTREPKKVAVVRTPPKSPSSAKSRLQTAPVPMPDLKNVKSKIGSTENLKHQPGGGKVQIINKKLDLSNVQSKCGSKDNIKHVPGGGSVQIVYKPVDLSKVTSKCGSLGNIHHKPGGGQVEVKSEKLDFKDRVQSKIGSLDNITHVPGGGNKKIETHKLTFRENAKAKTDHGAEIVYKSPVVSGDTSPRHLSNVSSTGSIDMVDSPQLATLADEVSASLAKQGL",
-}
-
-"""
-Columns of the EDSSMat50 substitution matrix as shortcuts
-
-Trivedi, R., & Nagarajaram, H. A. (2019). 
-Amino acid substitution scoring matrices specific to intrinsically 
-disordered regions in proteins. Scientific reports, 9(1), 16380. 
-https://doi.org/10.1038/s41598-019-52532-8
-"""
-edssmat50_dict = {
-    5:{"F":"FY",
-       "Y":"YF"},
-    3:{"C":"CY",
-       "I":"IVM",
-       "M":"MI",
-       "Y":"YC"},
-    2:{"R":"RK",
-       "D":"DE",
-       "C":"CW",
-       "Q":"QH",
-       "E":"ED",
-       "H":"HYQ",
-       "I":"IL",
-       "K":"KR",
-       "M":"MVL",
-       "F":"FWL",
-       "W":"WYFC",
-       "Y":"YWH"},
-    1:{"A":"ATV",
-       "N":"NH",
-       "C":"CF",
-       "H":"HN",
-       "I":"IF",
-       "M":"MF",
-       "F":"FMIC",
-       "T":"TA"},
-    0:{"A":"ASG",
-       "R":"RHQW",
-       "N":"NSTD",
-       "Q":"QKR",
-       "G":"GA",
-       "H":"HFRC",
-       "I":"IT",
-       "K":"KQ",
-       "M":"MT",
-       "F":"FVH",
-       "S":"STCNA",
-       "T":"TVSMIN",
-       "W":"WR"},
-}
-
-
 # Builder Definitions  ###
 # average values of the backbone angles calculated from
 # Dunbrack PISCES
