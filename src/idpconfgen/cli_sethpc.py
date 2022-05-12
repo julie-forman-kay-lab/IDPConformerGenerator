@@ -154,15 +154,49 @@ def main(
     mem='32G',
     **kwargs,
     ):
+    """
+    Perform main logic of the the script.
+
+    Parameters
+    ----------
+    destination : string or path, optional
+        Path to saving the shell scripts to run the jobs.
+        
+    account : string, required
+        Account to run the jobs off of.
+    
+    job_name : string, required
+        Name of the set of jobs to run.
+    
+    time_per_node : string, required
+        Time for each job to run in parallel.
+    
+    mail_user : string, optional
+        E-mail address of the user to recieve job notifications.
+    
+    nodes : int, optional
+        Number of nodes required for job.
+        Defaults to 1.
+    
+    ntasks_per_node : int, optional
+        Number of cores/workers to use.
+        Defaults to 32.
+    
+    mem : string, optional.
+        Amount of RAM to use per node.
+        Defaults to '32G'.
+    """
     init_files(log, LOGFILESNAME)
     destination = make_folder_or_cwd(destination)
     log.info(T('Writing #SBATCH headers'))
     
-    if not re.search("\d*[-]\d*[:]\d*[:]\d*", time_per_node): 
+    # simple checking for common mistakes
+    if not re.fullmatch(r"\d*[-]\d*[:]\d*[:]\d*", time_per_node): 
         log.info(S(f'WARNING: the default format for `--time={time_per_node}` is d-hh:mm:ss.'))
     if not mem[-1].isalpha(): 
         log.info(S(f'WARNING: the default for `--mem={mem}` is MB, not GB.'))
     
+    # writes SBATCH headers
     _header = ("#!/bin/bash\n"
                f"#SBATCH --account={account}\n"
                f"#SBATCH --job-name={job_name}\n"
@@ -179,9 +213,16 @@ def main(
     
     log.info(T('Writing job file contents'))
     seeds = [kwargs['random_seed']]
+    remaining = 0
+    
     if nodes > 1:
         seeds = [kwargs['random_seed']+i for i in range(nodes)]
+        confs_per_node = int(kwargs['nconfs'] / nodes)
+        remaining = kwargs['nconfs'] % nodes
         log.info(S(f'Producing {nodes} job files with random seeds {seeds}...'))
+        log.info(S(f"Splitting {kwargs['nconfs']} conformers to {confs_per_node} "
+                   f"confs. per job with {remaining} additional confs. for the last job."))
+        kwargs['nconfs'] = confs_per_node
         
     # assumes you've followed the Graham installaion steps for idpconfgen
     _header += ("module load scipy-stack dssp boost\ncd\n"
@@ -196,10 +237,13 @@ def main(
     kwargs.clear()
     kwargs.update(filtered)
     
+    # organizing output information
     output=[]
     job_names=[]
     of = kwargs['output_folder']
     for s in seeds:
+        if s == seeds[-1]:
+            kwargs['nconfs'] += remaining
         kwargs['random_seed'] = s
         kwargs['output_folder'] += f'_rs{s}'
         job_names.append(f'{job_name}_rs{s}.sh')
@@ -215,6 +259,7 @@ def main(
         kwargs['output_folder'] = of
     log.info(S('done'))
     
+    # saving shell scripts
     log.info(T('Writing job files to working directory'))
     i=0
     for job in output:
