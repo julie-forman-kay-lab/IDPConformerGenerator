@@ -2,7 +2,7 @@
 Generates shell scripts for `idpconfgen build` job submission on SLURM 
 managed HPCs. Optimized for the ComputeCanada Graham cluster.
 
-Handle generation of job scripts/input for other management software 
+Handle generation of job scripts/input for other workload managers
 other than SLURM is possible upon request.
 
 Generate as many job-scripts as required by the user. Especially if
@@ -11,7 +11,8 @@ multiple nodes are required for scalable parallelization.
 Generates "all*" and "cancel*" shell scripts to submit or cancel all jobs.
 
 USAGE:
-    $ idpconfgen sethpc
+    $ idpconfgen sethpc \\
+        --destination <SAVE_DIRECTORY> \\
         --account <ACCOUNT> \\
         --job-name <NAME> \\
         --nodes <#> \\
@@ -19,12 +20,13 @@ USAGE:
         --mem <#> \\
         --time-per-node <d-hh:mm:ss> \\
         --mail-user <@> \\
-        <IDPConfGen Build>
+        <IDPConfGen Build> \\
 """
-import argparse
+import argparse, re
 
 from copy import deepcopy
 
+from idpconfgen.libs.libio import make_folder_or_cwd
 from idpconfgen.cli_build import ap as build_ap
 from idpconfgen.libs import libcli
 from idpconfgen import log
@@ -45,8 +47,17 @@ ap = libcli.CustomParser(
     )
 
 ap.add_argument(
+    '-des',
+    '--destination',
+    help=('Directory to save job files. Optional.'
+          ),
+    type=str,
+    default=None,
+)
+
+ap.add_argument(
     '--account',
-    help=('Account associated with cluster. Required'
+    help=('Account associated with cluster. Required.'
         ),
     required=True,
     type=str,
@@ -133,6 +144,7 @@ for action in build_ap._actions[1:]:
     build_ap_group.add_argument(*positional, **args)
 
 def main(
+    destination,
     account,
     job_name,
     time_per_node,
@@ -143,8 +155,13 @@ def main(
     **kwargs,
     ):
     init_files(log, LOGFILESNAME)
-    log.info(T('Initializing SBATCH job file(s)'))
-    log.info(S('Writing #SBATCH headers...'))
+    destination = make_folder_or_cwd(destination)
+    log.info(T('Writing #SBATCH headers'))
+    
+    if not re.search("\d*[-]\d*[:]\d*[:]\d*", time_per_node): 
+        log.info(S(f'WARNING: the default format for `--time={time_per_node}` is d-hh:mm:ss.'))
+    if not mem[-1].isalpha(): 
+        log.info(S(f'WARNING: the default for `--mem={mem}` is MB, not GB.'))
     
     _header = ("#!/bin/bash\n"
                f"#SBATCH --account={account}\n"
@@ -160,6 +177,7 @@ def main(
                     )
     log.info(S('done'))
     
+    log.info(T('Writing job file contents'))
     seeds = [kwargs['random_seed']]
     if nodes > 1:
         seeds = [kwargs['random_seed']+i for i in range(nodes)]
@@ -180,41 +198,44 @@ def main(
     
     output=[]
     job_names=[]
+    of = kwargs['output_folder']
     for s in seeds:
         kwargs['random_seed'] = s
+        kwargs['output_folder'] += f'_rs{s}'
         job_names.append(f'{job_name}_rs{s}.sh')
         _output = _header
+        
         for arg in kwargs:
             if isinstance(kwargs[arg], bool):
                 if kwargs[arg] == True: _output += f"--{arg} \ \n\t"
             else:
                 _output += f"--{arg} {kwargs[arg]} \ \n\t"
-        
+
         output.append(_output)
+        kwargs['output_folder'] = of
     log.info(S('done'))
     
-    
-    log.info(S('Writing job file(s) to working directory...'))
+    log.info(T('Writing job files to working directory'))
     i=0
     for job in output:
-        with open(job_names[i], mode="w") as wfile:
+        with open(f"{destination}/{job_names[i]}", mode="w") as wfile:
             wfile.write(job)
         i+=1
     
     if nodes > 1:
-        with open(f'run_{job_name}_all.sh', mode="w") as wfile:
+        with open(f'{destination}/run_{job_name}_all.sh', mode="w") as wfile:
             wfile.write("#!/bin/bash\n")
             for names in job_names:
-                wfile.write(f"bash {names}\n")
+                wfile.write(f"sbatch {names}\n")
         
-        with open(f'cancel_{job_name}_all.sh', mode="w") as wfile:
+        with open(f'{destination}/cancel_{job_name}_all.sh', mode="w") as wfile:
             wfile.write("#!/bin/bash\n")
             for names in job_names:
                 wfile.write(f"scancel -n {names}\n")
         log.info(S('done'))
-        log.info(S(f'Tip: to queue up {nodes} jobs, run: sbatch run_{job_name}_all.sh'))
+        log.info(S(f'Tip: to queue up {nodes} jobs, run: bash /{destination}/run_{job_name}_all.sh'))
     else:
         log.info(S('done'))
-        log.info(S(f'Tip: to queue up the job, run: sbatch {job_name}.sh'))
-    
+        log.info(S(f'Tip: to queue up the job, run: sbatch /{destination}/{job_name}.sh'))
+
     return
