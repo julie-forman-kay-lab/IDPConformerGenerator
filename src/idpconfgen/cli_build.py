@@ -111,6 +111,7 @@ BGEO_path = Path(_file, 'core', 'data', 'bgeo.tar')
 BGEO_full = {}
 BGEO_trimer = {}
 BGEO_res = {}
+Int2Cart_path = Path(_file, 'components', 'int2cart')
 int2cart = None
 
 # SLICES and ANGLES will be populated in main() with the torsion angles.
@@ -158,7 +159,7 @@ def are_globals(use_int2cart=False):
         TEMPLATE_LABELS,
         TEMPLATE_MASKS,
         TEMPLATE_EFUNC,
-        BGEO_int2cart
+        int2cart
         ))
     else:
         return all((
@@ -446,7 +447,7 @@ def main(
         dany=False,
         func=None,
         forcefield=None,
-        use_bgeo_int2cart=False,
+        bgeo_int2cart=False,
         bgeo_path=None,
         residue_substitutions=None,
         nconfs=1,
@@ -602,6 +603,7 @@ def main(
     populate_globals(
         input_seq=input_seq,
         bgeo_path=bgeo_path or BGEO_path,
+        use_bgeo_int2cart=bgeo_int2cart,
         forcefield=forcefields[forcefield],
         **kwargs)
 
@@ -629,6 +631,7 @@ def main(
         nconfs=conformers_per_core,  # int
         sidechain_parameters=sidechain_parameters,
         sidechain_method=sidechain_method,  # goes back to kwards
+        bgeo_int2cart=bgeo_int2cart,
         **kwargs,
         )
 
@@ -641,6 +644,8 @@ def main(
         )
 
     start = time()
+    # for debug purposes
+    # execute(conformers_per_core * ncores, nconfs=10)
     with Pool(ncores) as pool:
         imap = pool.imap(execute, range(ncores))
         for _ in imap:
@@ -686,23 +691,25 @@ def populate_globals(
             f'Expected string found {type(input_seq)}'
             )
 
+    global BGEO_full, BGEO_trimer, BGEO_res
+
+    BGEO_full.update(read_dictionary_from_disk(bgeo_path))
+    _1, _2 = bgeo_reduce(BGEO_full)
+    BGEO_trimer.update(_1)
+    BGEO_res.update(_2)
+    del _1, _2
+    assert BGEO_full
+    assert BGEO_trimer
+    assert BGEO_res
+    # this asserts only the first layer of keys
+    assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
+    
+    # Also prepare BGEO_int2cart when needed
     if use_bgeo_int2cart:
         global int2cart
         from idpconfgen.components.bgeo_int2cart import BGEO_Int2Cart
-        int2cart = BGEO_Int2Cart()
-    else:
-        global BGEO_full, BGEO_trimer, BGEO_res
+        int2cart = BGEO_Int2Cart(Int2Cart_path)
 
-        BGEO_full.update(read_dictionary_from_disk(bgeo_path))
-        _1, _2 = bgeo_reduce(BGEO_full)
-        BGEO_trimer.update(_1)
-        BGEO_res.update(_2)
-        del _1, _2
-        assert BGEO_full
-        assert BGEO_trimer
-        assert BGEO_res
-        # this asserts only the first layer of keys
-        assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
     # populates the labels
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
@@ -747,6 +754,7 @@ def _build_conformers(
         output_folder=None,
         nconfs=1,
         sidechain_parameters=None,
+        bgeo_int2cart=False,
         **kwargs,
         ):
     """Arrange building of conformers and saves them to PDB files."""
@@ -760,6 +768,7 @@ def _build_conformers(
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
         sidechain_parameters=sidechain_parameters,
+        bgeo_int2cart=bgeo_int2cart,
         **kwargs)
 
     atom_labels, residue_numbers, residue_labels = next(builder)
@@ -973,7 +982,7 @@ def conformer_generator(
     # populated yet. Global variables are populated through the main() function
     # if the script runs as CLI. Otherwise, if conformer_generator() is imported
     # and used directly, the global variables need to be configured here.
-    if not are_globals():
+    if not are_globals(bgeo_int2cart):
         if forcefield is not None:
             if forcefield not in forcefields:
                 raise ValueError(
@@ -1143,6 +1152,7 @@ def conformer_generator(
         # TODO: use or not to use number_of_trials2? To evaluate in future.
         number_of_trials2 = 0
         number_of_trials3 = 0
+        torsion_records = []
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
             #print(bbi)
@@ -1179,10 +1189,10 @@ def conformer_generator(
 
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
-            torsion_records = []
+            
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
-
+                    torsion_records.append((omg, phi, psi))
                     current_res_number = calc_residue_num_from_index(bbi - 1)
 
                     # assert the residue being built is of the same nature as the one in the angles
@@ -1196,10 +1206,17 @@ def conformer_generator(
                         )
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
-                    for torsion_angle in (omg, phi, psi):
+                    if bgeo_int2cart:
+                        seq = all_atom_input_seq[:current_res_number + 1]
+                        tors = np.array(torsion_records) # omega, phi, psi
+                        tors = np.hstack([tors[:, 1:], tors[:, :1]]) # phi, psi, omega
+                        d1, d2, d3, theta1, theta2, theta3 = int2cart.get_internal_coords(seq, tors)
+                        bend_angles = [theta3, theta1, theta2]
+                        bond_lens = [d1, d2, d3]
+                    for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):
                         if bgeo_int2cart:
-                            seq = all_atom_input_seq[:current_res_number + 1]
-                            _bond_lens = _ #?
+                            _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2 # needed for correctly calculating Q
+                            _bond_lens = bond_lens[torsion_idx]
                         else:
                             _bt = next(bond_type)
 
@@ -1376,6 +1393,9 @@ def conformer_generator(
                 bbi = _bbi0
                 COi = _COi0
                 current_res_number = _resi0
+
+                # remove torsion angle records for this chunk
+                torsion_records = torsion_records[:current_res_number + 1]
 
                 # coords needs to be reset because size of protein next
                 # chunks may not be equal

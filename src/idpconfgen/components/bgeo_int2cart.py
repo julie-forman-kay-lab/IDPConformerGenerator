@@ -4,9 +4,12 @@ from modelling.utils.predict import predict
 from modelling.models.builder import BackboneBuilder
 import yaml
 import torch
+import os
 
 class BGEO_Int2Cart:
-    def __init__(self, model_config="int2cart/int2cart.yml", model_addr="int2cart/model.tar") -> None:
+    def __init__(self, folder=None) -> None:
+        model_config = os.path.join(folder, "int2cart.yml")
+        model_addr = os.path.join(folder, "model.tar")
         settings = yaml.safe_load(open(model_config, "r"))
         builder = BackboneBuilder(settings)
         model_state = torch.load(model_addr)['model_state_dict']
@@ -14,11 +17,11 @@ class BGEO_Int2Cart:
         self.builder = builder
 
     def get_internal_coords(self, sequence, torsions):
-        predictions = predict(self.builder, sequence, torsions, build=False)
-        d1 = predictions['d1'][0, -1]
-        d2 = predictions['d2'][0, -1]
-        d3 = predictions['d3'][0, -1]
-        theta1 = predictions['theta1'][0, -1]
-        theta2 = predictions['theta2'][0, -1]
-        theta3 = predictions['theta3'][0, -1]
+        predictions = predict(self.builder, sequence, torsions, build=False, units="radian")
+        d1 = predictions['d1'][0, -1, 0]
+        d2 = predictions['d2'][0, -1, 0]
+        d3 = predictions['d3'][0, -1, 0]
+        theta1 = predictions['theta1'][0, -1, 0]
+        theta2 = predictions['theta2'][0, -1, 0]
+        theta3 = predictions['theta3'][0, -1, 0]
         return (d1, d2, d3, theta1, theta2, theta3)
