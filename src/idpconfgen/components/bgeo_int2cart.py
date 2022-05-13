@@ -12,7 +12,7 @@ class BGEO_Int2Cart:
         model_addr = os.path.join(folder, "model.tar")
         settings = yaml.safe_load(open(model_config, "r"))
         builder = BackboneBuilder(settings)
-        model_state = torch.load(model_addr, map_location=torch.device('cpu') )['model_state_dict']
+        model_state = torch.load(model_addr, map_location=torch.device('cuda') )['model_state_dict']
         builder.load_predictor_weights(model_state)
         self.builder = builder
 

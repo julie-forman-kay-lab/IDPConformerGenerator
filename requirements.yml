@@ -9,5 +9,7 @@ dependencies:
     - pybind11=2
     - scipy=1
     - matplotlib=3
+    - yaml=5
+    - pytorch=1
     - pip
     - tox=3
