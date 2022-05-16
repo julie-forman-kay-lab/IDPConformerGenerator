@@ -144,15 +144,15 @@ for action in build_ap._actions[1:]:
     build_ap_group.add_argument(*positional, **args)
 
 def main(
-    destination,
-    account,
-    job_name,
-    time_per_node,
-    mail_user,
-    nodes=1,
-    ntasks_per_node=32,
-    mem='32G',
-    **kwargs,
+        destination,
+        account,
+        job_name,
+        time_per_node,
+        mail_user,
+        nodes=1,
+        ntasks_per_node=32,
+        mem='32G',
+        **kwargs,
     ):
     """
     Perform main logic of the the script.

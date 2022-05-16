@@ -71,29 +71,29 @@ ap.add_argument(
 )
 
 def main(
-    target,
-    destination=None,
-    prefix='conformer',
-    delete=False,
-    **kwargs,
+        target,
+        destination=None,
+        prefix='conformer',
+        delete=False,
+        **kwargs,
     ):
     """
     Perform main logic of the script.
 
     Parameters
     ----------
-        target : str, required
-            Path to the directory with all of the subfolders.
-        
-        destination : str, optional
-            Path to the directory to save the collated conformers from the target.
-        
-        prefix : str, optional
-            Replace the default `conformer` name for each file.
-        
-        delete : bool, optional
-            Flag to turn on deletion of conformers and subfolders of interest.
-            Defaults to True.
+    target : str, required
+        Path to the directory with all of the subfolders.
+    
+    destination : str, optional
+        Path to the directory to save the collated conformers from the target.
+    
+    prefix : str, optional
+        Replace the default `conformer` name for each file.
+    
+    delete : bool, optional
+        Flag to turn on deletion of conformers and subfolders of interest.
+        Defaults to True.
     """
     init_files(log, LOGFILESNAME)
     
@@ -105,10 +105,9 @@ def main(
     log.info(T('Attempting to collate files'))
     log.info(S('Obtaining paths to all conformers...'))
     # get all the paths to the subfolders
-    pdbpaths=[]
-    subpaths=[]
-    for spath in glob.glob(f'{target}/*/'): subpaths.append(spath)
-    for fpath in glob.glob(f'{target}/*/*.pdb', recursive=True): pdbpaths.append(fpath)
+    subpaths = list(glob.glob(f'{target}/*/'))
+    pdbpaths = list(glob.glob(f'{target}/*/*.pdb', recursive=True))
+    
     log.info(S('done'))
     
     log.info(S(f'Copying {len(pdbpaths)} files with prefix {prefix}...'))
