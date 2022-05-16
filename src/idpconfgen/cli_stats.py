@@ -1,29 +1,20 @@
 """
 Calculate fragment statistics for the input sequence in the database.
-Calculate number of hits of keywords in the header from raw PDB files fetched.
 
 USAGE:
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ>
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ> -op <OUTPUT-PREFIX> -of <OUTPUT-FOLDER>
-    $ idpconfgen stats --search -fpdb <PDB-FILES> -kw <KEYWORDS>
-    $ idpconfgen stats --search -fpdb <PDB-FILES> -kw <KEYWORDS> -o <OUTPUT> -n <CORES>
 """
-import argparse, os, re, json, shutil
+import argparse, os, re, json
 from pathlib import Path
-from functools import partial
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import build_regex_substitutions, make_combined_regex
 from idpconfgen.libs.libfilter import regex_forward_no_overlap
-from idpconfgen.libs.libio import (
-    read_dict_from_json,
-    extract_from_tar,
-    read_path_bundle,
-)
+from idpconfgen.libs.libio import read_dict_from_json
 from idpconfgen.libs.libparse import get_mers
-from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
+from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = '.stats'
 
@@ -39,18 +30,8 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
-ap.add_argument(
-    '-db',
-    '--database',
-    help='Path to the IDPConfGen database.',
-    )
-ap.add_argument(
-    '-seq',
-    '--input_seq',
-    help="The conformer residue sequence. String or FASTA file.",
-    nargs='?',
-    action=libcli.SeqOrFasta,
-)
+libcli.add_argument_db(ap)
+libcli.add_argument_seq(ap)
 libcli.add_argument_dloopoff(ap)
 libcli.add_argument_dhelix(ap)
 libcli.add_argument_dstrand(ap)
@@ -71,87 +52,13 @@ ap.add_argument(
         ),
     default=OUTPUT_PREFIX,
     type=str,
-    )
-
-ap.add_argument(
-    '--search',
-    help=(
-        'Secondary function for `stats`. '
-        'Look for keywords in the header of PDB files. '
-        'Defaults to True.'
-    ),
-    action='store_true',
-    )
-
-ap.add_argument(
-    '-fpdb',
-    '--pdb_files',
-    help=(
-        'Paths to PDB files on the disk. '
-        'Accepts a TAR file.'
-    ),
-    nargs='*',
-    action=libcli.FolderOrTar,
-    )
-
-ap.add_argument(
-    '-kw',
-    '--keywords',
-    help=(
-        "Keywords to look for in the header of PDB files. "
-        "Delimited by commas, e.g. -kw 'pro,beta,elastin'"
-    ),
-    nargs='?',
-)
-
-ap.add_argument(
-    '-o',
-    '--output',
-    help=(
-        "A path to the file where the keyword hits in the PDB headers "
-        "dictionary will be saved. "
-        "Defaults to dbHits.json, requires \'.json\' extension."
-        ),
-    type=Path,
-    default='search_hits.json',
-    action=libcli.CheckExt({'.json'}),
-    )
-
-TMPDIR = '__tmpsscalc__'
-ap.add_argument(
-    '-tmpdir',
-    help=(
-        'Temporary directory to store data during calculation '
-        'if needed.'
-        ),
-    type=Path,
-    default=TMPDIR,
-    )
-
-libcli.add_argument_ncores(ap)
-
-def find_in_header(kwds, file):
-    with open(file) as r:
-        line = r.readline().lower()
-        if "header" not in line:
-            return None
-        while "expdta" not in line:
-            for word in kwds:
-                if word in line:
-                    return word, file
-            
-            line=r.readline().lower()
-            
-    return None
-    
+    )    
 
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
 def main(
         database,
         input_seq,
-        pdb_files,
-        keywords,
         dhelix=False,
         dstrand=False,
         dloop_off=False,
@@ -160,11 +67,9 @@ def main(
         residue_substitutions=None,
         output_prefix=OUTPUT_PREFIX,
         output_folder=None,
-        search=False,
-        output="search_hits.json",
-        tmpdir=TMPDIR,
-        ncores=1,
-        func=None):
+        func=None,
+        **kwargs
+    ):
     """
     Performs main client logic.
     
@@ -192,91 +97,9 @@ def main(
     output_folder : str or Path
         Path of the output folder to store stats.CSV.
         Defaults to working directory. Optional for default func. 
-        
-    search : Bool
-        Enables the secondary function of stats.
-        Defaults to False.
-        
-    pdb_files : str or Path
-        Path to a .TAR or folder of PDB files.
-        Required for `--search`.
-    
-    keywords : str
-        String of keywords delimited by commas to search for.
-        Required for `--search`.
-    
-    output (str, optional): str or Path
-        Path to the file to store the number of search hits.
-        Defaults to "search_hits.json". Optional for `--search`.
-        
-    tmpdir : str or Path
-        Path to the temporary directory if working with .TAR files.
-        Defaults to TMPDIR. Optional for `--search`.
-    
-    ncores : int
-        The number of cores to use.
-        Defaults to 1. Optional for `--search`.
     """
     init_files(log, LOGFILESNAME)
-    
-    if search:
-        if not pdb_files or not keywords:
-            log.info(S('To use the search function you must provide PDB files and a list of keywords.'))
-            return
-        
-        log.info(T('reading input paths'))
-        try:
-            pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
-            _istarfile = True
-        except (OSError, FileNotFoundError, TypeError):
-            pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
-            _istarfile = False
-        log.info(S('done'))
-        
-        log.info(T('preparing task execution'))
-        try:
-            keywords = keywords.split(",")
-        except:
-            log.info(S('ERROR: keywords must be delimited by commas.'))
-            return
-        
-        execute = partial(
-            report_on_crash,
-            find_in_header,
-            keywords,
-            )
-        execute_pool=pool_function(execute, pdbs2operate, ncores=ncores)
-        
-        matches={}
-        for word in keywords:
-            matches[word]=[]
-            
-        for result in execute_pool:
-            if result != None:
-                wd = result[0]
-                id = os.path.basename(result[1])
-                matches[wd].append(id)
-        
-        for wd in keywords:
-            log.info(S(f'total of {len(matches[wd])} instances of {wd}.'))
-        
-        log.info(S('done'))
-        
-        log.info(T('writing matches to disk'))
-        _output = json.dumps(matches, indent = 4)
-        with open(output, mode="w") as fout:
-            fout.write(_output)
-        log.info(S('done'))
-        
-        if _istarfile:
-            shutil.rmtree(tmpdir)
-        
-        return
-
-    if not database or not input_seq:
-        log.info(S('To use the default function for stats, you must provide a path to the database and an input sequence.'))
-        return
-        
+       
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
     non_overlapping_parameters = (any_def_loops, dany, duser)  # noqa: E501
@@ -400,7 +223,6 @@ def main(
         log.info(S(f"saved: {fpath}"))
 
     return
-
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
