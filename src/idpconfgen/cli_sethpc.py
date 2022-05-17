@@ -227,6 +227,7 @@ def main(
     # assumes you've followed the Graham installaion steps for idpconfgen
     _header += ("module load scipy-stack dssp boost\ncd\n"
                 "source idpconfgen/bin/activate\n"
+                'start_time="$(date -u +%s)"\n'
                 "idpconfgen build \ \n\t"                
                 )
     
@@ -254,7 +255,12 @@ def main(
                 if kwargs[arg] == True: _output += f"--{arg} \ \n\t"
             else:
                 _output += f"--{arg} {kwargs[arg]} \ \n\t"
-
+        _output = _output[:-4]
+        _output += "\n\n"
+        _output += ('end_time="$(date -u +%s)"\n'
+                    'elapsed="$(($end_time-$start_time))"\n'
+                    f'echo "Total of $elapsed seconds elapsed to process: {job_name} rs {s}."\n'                    
+                    )
         output.append(_output)
         kwargs['output_folder'] = of
     log.info(S('done'))
