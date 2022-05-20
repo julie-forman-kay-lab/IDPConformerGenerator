@@ -9,7 +9,6 @@ USAGE:
 
 """
 import argparse
-from importlib.resources import path
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -17,7 +16,6 @@ from random import randint
 from time import time
 
 import numpy as np
-from numba import njit
 
 from idpconfgen import Path, log
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
@@ -74,12 +72,10 @@ from idpconfgen.libs.libio import (
     make_folder_or_cwd,
     read_dict_from_json,
     read_dictionary_from_disk,
-    save_dict_to_pickle,
     )
 from idpconfgen.libs.libparse import (
     fill_list,
     get_seq_chunk_njit,
-    get_seq_next_residue_njit,
     get_trimer_seq_njit,
     remap_sequence,
     remove_empty_keys,
@@ -1559,7 +1555,7 @@ def get_adjacent_angles(
             # raise AssertionError to avoid `python -o` silencing
             _emsg = (
                 "The code should not arrive here. "
-                "If it does, it may mean no matches were fund for fragment "
+                "If it does, it may mean no matches were found for fragment "
                 f"{_ori_template!r} down to the single residue."
                 )
             raise AssertionError(_emsg)

@@ -1,6 +1,5 @@
 """Multi-core related objects."""
 import traceback
-from functools import partial
 from multiprocessing import Pool
 
 from idpconfgen import log

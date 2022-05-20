@@ -1,5 +1,5 @@
 """Functions and variables to download files and data."""
-import time, sys
+import time
 import urllib.request
 from urllib.error import URLError
 from functools import partial
