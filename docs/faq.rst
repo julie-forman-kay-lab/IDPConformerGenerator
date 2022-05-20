@@ -10,7 +10,7 @@ would benefit larger protein systems (e.g. for systems greater than 350 residues
 64GB of RAM is suggested). To use third-party integrations such as `Int2Cart <https://github.com/THGLab/int2cart>`_, 
 high performance CUDA compatible GPUs would be required.
 
-IDPConformerGenerator could also be run on HPC clusters with ease. Please refer to the `intallation <./installation.rst>`_
+IDPConformerGenerator could also be run on HPC clusters with ease. Please refer to the :ref:`installation <Installation>`
 instructions to set-up IDPConformerGenerator using :code:`conda` or :code:`virtualenv`.
 
 What are the best options for combination of conformers and cores to use?
@@ -23,6 +23,26 @@ For hyperthreadded systems, :code:`-n` will use the maximum number of THREADS - 
 we recommend running on the maximum number of physical cores for hyperthreadded CPUs.
 For example, a Threadripper 2990wx has 32 cores and 64 threads, it's best to use :code:`-n 32` to avoid overloading
 the system.
+
+What are some tips for optimizing the MC-SCE settings for longer protein systems?
+--------------------------------------------------------------------------------------------
+
+For longer protein systems such as Tau fragment (441 residues), we recommend running MC-SCE
+ after backbone generation from IDPConformerGenerator.
+
+During the backbone generation stage (i.e. ::code::`idpconfgen build ... -dsd`), speed could be
+improved by setting a higher backbone energy threshold (::code::`-etbb`). We recommend 250 as a minimum.
+
+For the MC-SCE sidechain step, we recommend doing a small benchmark with 128 trials to see what the median
+number of trials MC-SCE requires for a successful sidechain addition. For Tau-441, we observe that 32 trials
+drastically improved our speed (by 3-4 fold) while maintaining our percentage success rate.
+
+What's the difference between MC-SCE and FASPR?
+-----------------------------------------------
+
+Although MC-SCE is slower, it produces structures with no steric clashes. Furthermore,
+it also has many settings that can be tweaked for flexible in silico experiments
+ as opposed to the default settings of FASPR.
 
 How long does the database generation take?
 -------------------------------------------
