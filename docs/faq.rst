@@ -2,8 +2,19 @@
 Frequently Asked Questions (F.A.Q.s)
 ====================================
 
-What are the best options for number of conformers and cores to use?
---------------------------------------------------------------------
+What are the recommended hardware specifications?
+-------------------------------------------------
+
+IDPConformerGenerator was built with computational efficiency in mind. However, having more CPU cores and more RAM 
+would benefit larger protein systems (e.g. for systems greater than 350 residues, having more than 16 cores and
+64GB of RAM is suggested). To use third-party integrations such as `Int2Cart <https://github.com/THGLab/int2cart>`_, 
+high performance CUDA compatible GPUs would be required.
+
+IDPConformerGenerator could also be run on HPC clusters with ease. Please refer to the `intallation <./installation.rst>`_
+instructions to set-up IDPConformerGenerator using :code:`conda` or :code:`virtualenv`.
+
+What are the best options for combination of conformers and cores to use?
+-------------------------------------------------------------------------
 
 It is best to have the number of conformers/trials equal to an integer multiple of the number of cores/workers.
 For example, if you choose to use 32 cores via :code:`-n 32`, it's ideal to have :code:`-nc` as 32, 64, 128, etc.
