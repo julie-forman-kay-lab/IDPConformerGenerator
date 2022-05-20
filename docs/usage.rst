@@ -58,7 +58,8 @@ own from the the `Dr. Dunbrack PISCES database <http://dunbrack.fccc.edu/PISCES.
 
 Steps from now on will assume you're in the working directory of :code:`example/drksh3_ex_resources`.
 
-To initialize the database if you do not already have one, we must download the PDB files from our culled list::
+To initialize the database if you do not already have one, we must download the PDB files from our culled list
+(can be found in the supplemental package in the IDPConformerGenerator paper)::
 
     idpconfgen pdbdl cullpdb_pc90_res2.0_R0.25_d201015_chains24003 -u -n -d pdbs.tar
 
@@ -91,10 +92,10 @@ be 100 kJ and 250 kJ respectively, using default chunk sizes, no substitutions, 
         -n
 
 :code:`idpconfgen` is deterministic. Therefore, the random seed defines the sampling progression - 
-read :ref:`here <Frequently Asked Questions (F.A.Q.s)>` for more information.
+read :ref:`here <F.A.Q.s>` for more information.
 
 To switch the side chain building algorithm to MCSCE (recommended), you would first have to install MCSCE.
-Please re-visit the :code:`docs/installation.rst` to get MCSCE set up. Here's the following example::
+Please re-visit the :ref:`installation <Installation>` page to get MCSCE set up. Here's the following example::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -110,10 +111,10 @@ Please re-visit the :code:`docs/installation.rst` to get MCSCE set up. Here's th
 
 The defaults for :code:`--mcsce-n_trials` is 16 while using the :code:`--mcsce-mode exhaustive`, however
 we recommend trials larger than 100 for smaller conformer pools. In this exercise, we will be using the
-default MCSCE side chain building mode `simple`.
+default MCSCE side chain building mode :code:`simple`.
 
 As stated in the :code:`idpconfgen build -h`, sampling using other secondary structure
-parameters required :code:`--dloop` to be turned off `--dloop-off`. For example, if we'd like to 
+parameters required :code:`--dloop` to be turned off :code:`--dloop-off`. For example, if we'd like to 
 sample only helices and extended strands::
 
     idpconfgen build \
@@ -144,9 +145,9 @@ custom CSSS.JSON file that samples only helices for residues 15-25 of drkN SH3 a
     idpconfgen makecsss -cp 1-14 L 1.0|15-25 H 1.0|26-59 L 1.0 -o cust_csss_drk.json
 
 If chemical shift files are readily available, consider using CheSPI or delta2D to generate the CSSS.JSON.
-delta2D predictions have been included in the :code:`example/drksh3_ex_resources` folder as `drk_d2D.txt`.
-CheSPI `probs8_*` predictions have been included in the :code:`example/drksh3_ex_resources` folder
-as `probs8_25501_unfolded.txt`.
+delta2D predictions have been included in the :code:`example/drksh3_ex_resources` folder as :code:`drk_d2D.txt`.
+CheSPI :code:`probs8_*` predictions have been included in the :code:`example/drksh3_ex_resources` folder
+as :code:`probs8_25501_unfolded.txt`.
 
 To convert output from delta2D to CSSS, use the :code:`csssconv` subclient with flag :code:`-d2D`::
 
@@ -156,7 +157,7 @@ To convert output from CheSPI to CSSS, use the :code:`csssconv` subclient with f
 
     idpconfgen csssconv -p8 probs8_25501_unfolded.txt -o csss_drk_chespi.json
 
-The outputted `csss_*.json` files will be used for the :code:`-csss` flag in the :code:`build` subclient.
+The outputted :code:`csss_*.json` files will be used for the :code:`-csss` flag in the :code:`build` subclient.
 For example, constructing 100 conformers for drkN SH3 using the delta2D predictions and the same settings for
 energy and MCSCE as above::
 
@@ -176,7 +177,7 @@ energy and MCSCE as above::
 The default chunk size probabilities for building are (1, 1, 3, 3, 2) for chunk sizes of (1, 2, 3, 4, 5) respectively.
 To change this, we would have to create a :code:`.TXT` file with two columns, the first specifying what chunk sizes
 from lowest to highest, the second specifying their relative probabilities. We have provided an example in
-:code:`example/drksh3_ex_resources` as `customChunk.txt`. To use these custom chunk size probabilities with CSSS.::
+:code:`example/drksh3_ex_resources` as :code:`customChunk.txt`. To use these custom chunk size probabilities with CSSS.::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -251,7 +252,7 @@ After generating conformer ensembles with IDPConfGen, it is possible to do some 
 in the :code:`torsions` and :code:`sscalc` subclients. For :code:`torsions`, you can choose to plot either omega, phi, or psi dihedral
 angle distributions in a scatter plot format. For :code:`sscalc`, fractional secondary structure will be plotted in terms of DSSP codes
 as well as fractions from the alpha, beta, or other regions of the Ramachandran space for your conformers of choice. The following example
-plots the psi angle distributions and the fractional secondary structure of the `drk_CSSSd2D_nosub_mcsce` ensemble generated in the previous
+plots the psi angle distributions and the fractional secondary structure of the :code:`drk_CSSSd2D_nosub_mcsce` ensemble generated in the previous
 module.::
 
     idpconfgen torsions \
@@ -277,17 +278,17 @@ To plot the fractional secondary structure information.::
         -n \
         --plot filename=dssp_reduced_drk_.png
 
-To see which plotting parameters can be modified, please refer to `src/idpconfgen/plotfuncs.py`. We have given a short list of modifyable parameters here.::
+To see which plotting parameters can be modified, please refer to :code:`src/idpconfgen/plotfuncs.py`. We have given a short list of modifyable parameters here.::
 
     --plot title=<TITLE> title_fs=<TITLE FONT SIZE> xlabel=<X-AXIS LABEL> xlabel_fs=<X-AXIS LABEL FONT SIZE> colors=<LIST_OF_COLORS>
 
 Exploring MC-SCE and Int2Cart Integrations
 ------------------------------------------
 
-Integrating the functions from our collaborators at the `Head-Gordon Lab <https://thglab.berkeley.edu/>_`,
+Integrating the functions from our collaborators at the `Head-Gordon Lab <https://thglab.berkeley.edu/>`_,
 IDPConformerGenerator has the ability to build with bond geometries derived from a recurrent neural network
-machine learning model `Int2Cart <https://github.com/THGLab/int2cart>_`. Furthermore, as we introduced
-the `MC-SCE <https://github.com/THGLab/MCSCE>_` method for building sidechains in the previous modules,
+machine learning model `Int2Cart <https://github.com/THGLab/int2cart>`_. Furthermore, as we introduced
+the `MC-SCE <https://github.com/THGLab/MCSCE>`_ method for building sidechains in the previous modules,
 we would like to provide some examples on changing the default sidechain settings.
 
 To use the Int2Cart method for bond geometries, the :code:`-bgeo_int2cart` flag needs to be defined during

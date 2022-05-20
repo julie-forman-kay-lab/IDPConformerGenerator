@@ -2,7 +2,7 @@
 Installation
 ============
 
-IDPConformerGenerator v0.4.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and Graham@ComputeCanada.
+IDPConformerGenerator v0.4.X has been tested to work with Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and the Graham cluster (DRAC).
 Although it's recommended to run IDPConfGen on UNIX based OS, it will work with Windows based OS as well as long as the pre-requisites are met.
 
 **Remember** to update your Linux distribution prior to installation:
@@ -15,7 +15,7 @@ Pre-installation Reqirements
 (Required) An up-to-date version of anaconda3, and pip.
 (Required) For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
 
-(Recommended) For MCSCE installation, please refer to below and: https://github.com/THGLab/MCSCE
+(Recommended) For MCSCE installation, please refer to: https://github.com/THGLab/MCSCE
 
 (Optional) To use CSSS with CheSPI, please refer to: https://github.com/protein-nmr/CheSPI
 (Optional) To use CSSS with delta2D, please refer to: https://github.com/carlocamilloni/d2D
@@ -53,7 +53,10 @@ always up-to-date with the repository::
 **Remember** to active the ``idpconfgen`` environment every time you open a new
 terminal window, from within the repository folder, choose yours::
 
+    # Installation with Anaconda
     conda activate idpconfgen
+
+    # Installation with pip
     source idpconfgenvenv/bin/activate
 
 
@@ -78,8 +81,8 @@ Install ``idpconfgen``::
     pip install IDPConformerGenerator
 
 
-From source in Graham@ComputeCanada
------------------------------------
+From source on the Graham Cluster (DRAC)
+----------------------------------------
 
 Log-in and make sure you're in the /home directory::
 
@@ -141,7 +144,6 @@ described above. Next, follow these steps::
     # navigate back to the idpconfgen github folder and re-run
     python setup.py develop --no-deps
 
-Now, if you choose the flag `-scm mcsce`, IDPConfGen will use MCSCE to build
-sidechains as backbone conformers are generated. You will see `idpconfgen build
--h` has a specific group of parameters dedicated to MCSCE, you can explore those
-as well.
+Now, if you choose the flag :code:`-scm mcsce`, IDPConfGen will use MCSCE to build
+sidechains as backbone conformers are generated. You will see :code:`idpconfgen build -h`
+has a specific group of parameters dedicated to MCSCE, you can explore those as well.

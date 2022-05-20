@@ -1,6 +1,6 @@
-====================================
-Frequently Asked Questions (F.A.Q.s)
-====================================
+=======
+F.A.Q.s
+=======
 
 What are the recommended hardware specifications?
 -------------------------------------------------
@@ -25,10 +25,9 @@ For example, a Threadripper 2990wx has 32 cores and 64 threads, it's best to use
 the system.
 
 What are some tips for optimizing the MC-SCE settings for longer protein systems?
---------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------
 
-For longer protein systems such as Tau fragment (441 residues), we recommend running MC-SCE
- after backbone generation from IDPConformerGenerator.
+For longer protein systems such as Tau fragment (441 residues), we recommend running MC-SCE after backbone generation from IDPConformerGenerator.
 
 During the backbone generation stage (i.e. :code:`idpconfgen build ... -dsd`), speed could be
 improved by setting a higher backbone energy threshold (:code:`-etbb`). We recommend 250 as a minimum.
@@ -41,8 +40,7 @@ What's the difference between MC-SCE and FASPR?
 -----------------------------------------------
 
 Although MC-SCE is slower, it produces structures with no steric clashes. Furthermore,
-it also has many settings that can be tweaked for flexible in silico experiments
- as opposed to the default settings of FASPR.
+it also has many settings that can be tweaked for flexible in silico experiments as opposed to the default settings of FASPR.
 
 How long does the database generation take?
 -------------------------------------------
@@ -52,9 +50,9 @@ IDPConformerGenerator on any system, including HPC clusters, we recommend local 
 largest number of workers and the fastest read-write times. Due to the quantity of PDB files downloaded,
 many read-write requests will slow down the login node for other users on HPC resources as well as create
 errors in file I/O processing in IDPConfGen. For reference, generating a database using 24,002 PDB files
-takes 1 hour 13 minutes (using 31 workers) as a job on Graham@ComputeCanada, an HPC resource. Generating
+takes 1 hour 13 minutes (using 31 workers) as a job on the Graham cluster (DRAC), an HPC resource. Generating
 this same database locally (using 63 workers of an AMD Threadripper 2990wx) takes only 37 minutes
-(approximately half the time compared to 31 workers on Graham@ComputeCanada) since the bulk of the time
+(approximately half the time compared to 31 workers on the Graham cluster (DRAC)) since the bulk of the time
 is the PDB downloading process. Importantly, this database can then be transferred onto HPC clusters and
 can be reused for all future calculations.
 
