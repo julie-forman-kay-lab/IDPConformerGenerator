@@ -30,8 +30,8 @@ What are some tips for optimizing the MC-SCE settings for longer protein systems
 For longer protein systems such as Tau fragment (441 residues), we recommend running MC-SCE
  after backbone generation from IDPConformerGenerator.
 
-During the backbone generation stage (i.e. ::code::`idpconfgen build ... -dsd`), speed could be
-improved by setting a higher backbone energy threshold (::code::`-etbb`). We recommend 250 as a minimum.
+During the backbone generation stage (i.e. :code:`idpconfgen build ... -dsd`), speed could be
+improved by setting a higher backbone energy threshold (:code:`-etbb`). We recommend 250 as a minimum.
 
 For the MC-SCE sidechain step, we recommend doing a small benchmark with 128 trials to see what the median
 number of trials MC-SCE requires for a successful sidechain addition. For Tau-441, we observe that 32 trials
