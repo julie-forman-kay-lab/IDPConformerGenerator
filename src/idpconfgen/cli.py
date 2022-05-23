@@ -29,6 +29,8 @@ from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
     cli_sscalc,
     cli_ssext,
+    cli_stats,
+    cli_search,
     cli_torsions,
     cli_torsionsJ,
     cli_validate,
@@ -61,6 +63,8 @@ Other useful routines:
     * {cli_dssppii._name}
     * {cli_makecsss._name}
     * {cli_csssconv._name}
+    * {cli_stats._name}
+    * {cli_search._name}
 """
 
 ap = libcli.CustomParser(
@@ -94,6 +98,8 @@ libcli.add_subparser(subparsers, cli_validate)
 libcli.add_subparser(subparsers, cli_dssppii)
 libcli.add_subparser(subparsers, cli_makecsss)
 libcli.add_subparser(subparsers, cli_csssconv)
+libcli.add_subparser(subparsers, cli_stats)
+libcli.add_subparser(subparsers, cli_search)
 
 
 def load_args():
