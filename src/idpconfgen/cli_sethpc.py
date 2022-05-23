@@ -26,6 +26,7 @@ import argparse
 import os
 import re
 from copy import deepcopy
+from pathlib import Path
 
 from idpconfgen import log
 from idpconfgen.cli_build import ap as build_ap
