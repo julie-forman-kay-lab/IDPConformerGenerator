@@ -90,18 +90,18 @@ Log-in and make sure you're in the /home directory::
 
     cd
 
-Load the required python packages and modules in ComputeCanada's servers::
+Load the required python packages and modules on Graham's servers::
 
     module load scipy-stack dssp boost
 
-Create and activate a :code:`virtualenv` as ComputeCanada recommands anaconda3
+Create and activate a :code:`virtualenv` as DRAC recommands anaconda3
 not be installed in the home folder::
 
     virtualenv --no-download idpconfgen
     source idpconfgen/bin/activate
 
 For the first time installation, install dependencies manually using :code:`pip`.
-Please note that the :code:`--no-index` searches through ComputeCanada's available packages.
+Please note that the :code:`--no-index` searches through DRAC's available packages.
 If they're not available, it will install from the web::
 
     pip install --no-index --upgrade pip

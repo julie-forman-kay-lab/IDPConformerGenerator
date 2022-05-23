@@ -37,7 +37,7 @@ number of trials MC-SCE requires for a successful sidechain addition.
 
 What's the difference between MC-SCE and FASPR?
 -----------------------------------------------
-"FASPR generates structures with no side chain hydrogens,
+FASPR generates structures with no side chain hydrogens,
 so other tools are required to add hydrogens if they are desired.
 MC-SCE generates structures with complete coordinates including sidechain hydrogens.
 
