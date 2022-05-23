@@ -43,7 +43,6 @@ from idpconfgen.core.build_definitions import (
     )
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.core import help_docs
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
@@ -168,21 +167,8 @@ ap = libcli.CustomParser(
     )
 # https://stackoverflow.com/questions/24180527
 
-ap.add_argument(
-    '-db',
-    '--database',
-    help='The IDPConfGen database.',
-    required=True,
-    )
-
-ap.add_argument(
-    '-seq',
-    '--input_seq',
-    help='The Conformer residue sequence. String or FASTA file.',
-    required=True,
-    nargs='?',
-    action=libcli.SeqOrFasta,
-    )
+libcli.add_argument_idb(ap)
+libcli.add_argument_seq(ap)
 
 ap.add_argument(
     '-nc',
@@ -193,56 +179,11 @@ ap.add_argument(
     )
 
 #########################################
-ap.add_argument(
-    '--dloop-off',
-    help='Sampling loops is active by default. Use this flag to deactivate it.',
-    action="store_true",
-    )
-
-ap.add_argument(
-    '--dhelix',
-    help=(
-        'Samples the database also for helix segments. '
-        'This feature can be used in combination with --dstrand.'
-        'To explore the three secondary structures, activate --dhelix and '
-        '--dstrand, loop search is always active. '
-        'These features need to be used in combination with the `-rd` flag '
-        'in `idpconfgen sscalc`.'
-        ),
-    action="store_true",
-    )
-
-ap.add_argument(
-    '--dstrand',
-    help=(
-        'Samples the database also for strand segments. '
-        'See help for `--dhelix`.'
-        ),
-    action="store_true",
-    )
-
-ap.add_argument(
-    '--dany',
-    help=(
-        'Samples the database based on sequence identity only. '
-        'Activating this option disregards any secondary structure annotation. '
-        'Requires --dloop-off.'
-        ),
-    action="store_true",
-    )
-
-ap.add_argument(
-    '--duser',
-    help=(
-        'NOTE: Very advanced users only. Use this option to define your own '
-        'regular expressions for the database sampling process. '
-        'You only want to use this option if you know how the code works '
-        'internally. Use this option instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-off.'
-        ),
-    default=None,
-    nargs='+',
-    )
+libcli.add_argument_dloopoff(ap)
+libcli.add_argument_dhelix(ap)
+libcli.add_argument_dstrand(ap)
+libcli.add_argument_dany(ap)
+libcli.add_argument_duser(ap)
 #########################################
 
 ap.add_argument(
@@ -312,15 +253,7 @@ ap.add_argument(
 
 add_et_type_arg(ap)
 
-
-ap.add_argument(
-    '-subs',
-    '--residue-substitutions',
-    help=help_docs.residue_substitutions_cli_help,
-    default=None,
-    action=libcli.ReadDictionary,
-    )
-
+libcli.add_argument_subs(ap)
 
 add_xmer_arg(ap)
 

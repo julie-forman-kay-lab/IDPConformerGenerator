@@ -6,6 +6,7 @@ from os import cpu_count
 
 
 from idpconfgen import Path, __version__
+from idpconfgen.core import help_docs
 from idpconfgen.core.definitions import vdW_radii_dict
 from idpconfgen.libs.libparse import is_valid_fasta
 from idpconfgen.libs.libio import (
@@ -268,9 +269,11 @@ def add_version(parser):
 # -c, --chunks            : number of fragments to process in memory
 # -cif, --mmcif           : prioritizes downloading mmCIF files
 # -d, --destination       : destination folder
+# -db, -database          : the input database
 # -deg, --degrees         : degrees
 # -dec, --decimals        : decimal numbers
 # --no_hn_term                : has H of N-terminal
+# -seq, --input_seq       : the input sequence
 # -m, --minimum           : minimum size
 # -n, --ncores            : number of cores
 # -o, --ouput             : general output string
@@ -331,6 +334,97 @@ def add_argument_db(parser):
         help='The database being built. Must be JSON.',
         type=Path,
         action=CheckExt('.json'),
+        )
+
+
+def add_argument_idb(parser):
+    """Add argument for input database."""
+    parser.add_argument(
+        '-db',
+        '--database',
+        help='The IDPConfGen database.',
+        required=True,
+        )
+
+def add_argument_dloopoff(parser):
+    parser.add_argument(
+        '--dloop-off',
+        help='Sampling loops is active by default. Use this flag to deactivate it.',
+        action="store_true",
+        )
+
+def add_argument_dhelix(parser):
+    parser.add_argument(
+        '--dhelix',
+        help=(
+            'Samples the database also for helix segments. '
+            'This feature can be used in combination with --dstrand.'
+            'To explore the three secondary structures, activate --dhelix and '
+            '--dstrand, loop search is always active. '
+            'These features need to be used in combination with the `-rd` flag '
+            'in `idpconfgen sscalc`.'
+            ),
+        action="store_true",
+        )
+
+
+def add_argument_dstrand(parser):
+    parser.add_argument(
+        '--dstrand',
+        help=(
+            'Samples the database also for strand segments. '
+            'See help for `--dhelix`.'
+            ),
+        action="store_true",
+        )
+
+
+def add_argument_dany(parser):
+    parser.add_argument(
+        '--dany',
+        help=(
+            'Samples the database based on sequence identity only. '
+            'Activating this option disregards any secondary structure annotation. '
+            'Requires --dloop-off.'
+            ),
+        action="store_true",
+        )
+
+
+def add_argument_duser(parser):
+    parser.add_argument(
+        '--duser',
+        help=(
+            'NOTE: Very advanced users only. Use this option to define your own '
+            'regular expressions for the database sampling process. '
+            'You only want to use this option if you know how the code works '
+            'internally. Use this option instead of --dhelix, --dstrand, '
+            '--dany. Requires --dloop-off.'
+            ),
+        default=None,
+        nargs='+',
+        )
+
+
+def add_argument_subs(parser):
+    parser.add_argument(
+        '-subs',
+        '--residue-substitutions',
+        help=help_docs.residue_substitutions_cli_help,
+        default=None,
+        action=ReadDictionary,
+        )
+
+
+def add_argument_seq(parser):
+    """Add argument for input sequence."""
+    parser.add_argument(
+        '-seq',
+        '--input_seq',
+        help='The Conformer residue sequence. String or FASTA file.',
+        required=True,
+        nargs='?',
+        action=SeqOrFasta,
         )
 
 
