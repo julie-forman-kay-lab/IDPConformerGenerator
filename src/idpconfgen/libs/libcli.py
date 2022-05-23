@@ -140,9 +140,9 @@ class SeqOrFasta(argparse.Action):
 class ParamsToDict(argparse.Action):
     """
     Convert command-line parameters in an argument to a dictionary.
-    
+
     Adapted from https://github.com/joaomcteixeira/taurenmd
-    
+
     Example
     -------
     Where ``-x`` is an optional argument of the command-line client
@@ -154,11 +154,11 @@ class ParamsToDict(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
         """Execute."""
         param_dict = values_to_dict(values)
-        
+
         namespace.plotvars = param_dict
         setattr(namespace, self.dest, True)
-        
-        
+
+
 def minimum_value(minimum):
     """Define a minimum value for action."""
 
@@ -629,14 +629,14 @@ def add_argument_vdWb(parser):
 def add_argument_plot(parser):
     """
     Add argument for plotting parameters.
-    
+
     Plot kwargs that will be passed to the plotting function.
     If given, plot results. Additional arguments can be given to
     specify the plot parameters.
-    
+
     Adapted from:
     https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L539-L570
-        
+
     Defined by ``--plot``.
     """
     parser.add_argument(
@@ -645,11 +645,11 @@ def add_argument_plot(parser):
             'Plot results from same system ensembles. '
             'Additional arguments can be given to configure the '
             'plot style. '
-            'Example: --plot xlabel=Sic1_Res. type=omega color=[b,r]. '
+            'Example: --plot xlabel=Sic1_Res type=omega color=[b,r]. '
             'Accepted plot arguments are defined by the plotting function used. '
-            'Defaults to ``None``, no plot is produced.'
-        ),
+            'Defaults to False, no plot is produced.'
+            ),
         nargs='*',
         default=False,
         action=ParamsToDict,
-    )
+        )

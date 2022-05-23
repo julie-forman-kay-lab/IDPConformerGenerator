@@ -1,8 +1,6 @@
-"""
-Plots :o
-"""
-
+"""Plots."""
 from matplotlib import pyplot as plt
+
 
 def plot_distribution(
         data,
