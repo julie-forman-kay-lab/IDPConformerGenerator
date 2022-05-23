@@ -1,4 +1,4 @@
-"""
+r"""
 Collates and re-numbers conformers within subfolders of a given folder.
 Has the option to remove previous and rename current conformer files after processing.
 
@@ -8,10 +8,10 @@ destination dir.
 
 USAGE:
     $ idpconfgen merge --source <PATH_TO_SUBFOLDERS>
-    $ idpconfgen merge \\
-        --source <PATH_TO_SUBFOLDERS> \\
-        --destination <PATH_TO_OUTPUT> \\
-        --prefix <CUSTOM_NAME> \\
+    $ idpconfgen merge \
+        --source <PATH_TO_SUBFOLDERS> \
+        --destination <PATH_TO_OUTPUT> \
+        --prefix <CUSTOM_NAME> \
         --delete
 """
 import argparse
