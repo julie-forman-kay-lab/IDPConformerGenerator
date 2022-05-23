@@ -3,21 +3,25 @@ A real case scenario with drkSH3
 
 .. start-description
 
-The example with a small peptide in the :code:`example` folder is a good way to get introduced
-to IDPConfGen. Although building other IDP conformer ensembles use the same workflow as the 
-one provided in :code:`example/README.rst`, we will go over more detailed usage examples with
-a well studied IDP, the drkN SH3 domain.
+The example with a small peptide in the :code:`example` folder is a good way to
+get introduced to IDPConfGen. Although building other IDP conformer ensembles
+use the same workflow as the previous example, we will go over more detailed
+usage examples with a well studied IDP, the drkN SH3 domain.
 
 Chemical shift data for the unfolded state of the drkN SH3 domain (BMRB ID: 25501) has been already processed with
 δ2D and CheSPI and secondary structure propensity calculations can be found in 
-:code:`example/drksh3_ex_resources` as :code:`drk_d2D.txt` and :code:`probs8_25501_unfolded.txt`
+:code:`example/drksh3_example` as :code:`drk_d2D.txt` and :code:`probs8_25501_unfolded.txt`
 respectively for δ2D and CheSPI output.
 
-We have also provided a culled list of PDB IDs in the :code:`example` folder. 
-This is the same culled list used in the IDPConfGen `paper <link-to-DOI>`_. However feel free to choose your
-own from the the `Dunbrack PISCES database <http://dunbrack.fccc.edu/PISCES.php>`_.
+An extensive culled list is in ``cull.tar``. Unpack it with::
 
-Steps from now on will assume you're in the working directory of :code:`example/drksh3_ex_resources`.
+    tar -xf cull.tar
+
+This is the same culled list used in the IDPConfGen `main publication <link-to-DOI>`_.
+However feel free to choose your own from the `Dunbrack PISCES database
+<http://dunbrack.fccc.edu/PISCES.php>`_.
+
+Steps from now on will assume you're in the working directory of :code:`example/drksh3_examples`.
 
 To initialize the database if you do not already have one, we must download the PDB files from our culled list
 (can be found in the supplemental package in the IDPConformerGenerator paper)::

@@ -43,7 +43,7 @@ peptide.
 A real case scenario - drkSH3
 -----------------------------
 
-.. include:: ../example/drksh3-example/README.rst
+.. include:: ../example/drksh3_example/README.rst
    :start-after: .. start-description
 
 
