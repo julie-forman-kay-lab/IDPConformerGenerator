@@ -25,7 +25,8 @@ Installation instructions are described in ``docs/installation.rst``.
 How to Use
 ----------
 
-Usage instructions are described in the file ``docs/usage.rst``.
+Usage instructions are described in the file ``docs/usage.rst``. See also
+the example in the ``example/`` folder.
 
 Version
 -------
