@@ -2,8 +2,8 @@
 Calculate number of hits of keywords in the header from raw PDB files fetched.
 
 USAGE:
-    $ idpconfgen search -fpdb <PDB-FILES> -kw <KEYWORDS>
-    $ idpconfgen search -fpdb <PDB-FILES> -kw <KEYWORDS> -o <OUTPUT> -n <CORES>
+    $ idpconfgen search <PDB-FILES> -kw <KEYWORDS>
+    $ idpconfgen search <PDB-FILES> -kw <KEYWORDS> -o <OUTPUT> -n <CORES>
 """
 import argparse, os, json, shutil
 from functools import partial
