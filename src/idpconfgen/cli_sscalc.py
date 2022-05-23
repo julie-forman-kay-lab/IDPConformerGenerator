@@ -35,7 +35,8 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import mkdssp_w_split, split_pdb_by_dssp
 from idpconfgen.logger import S, T, init_files, report_on_crash
-from idpconfgen.plots.plotfuncs import plot_fracSS
+from idpconfgen.components.plots.plotfuncs import plot_fracSS
+
 
 LOGFILESNAME = '.idpconfgen_sscalc'
 TMPDIR = '__tmpsscalc__'

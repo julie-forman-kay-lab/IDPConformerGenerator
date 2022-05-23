@@ -42,7 +42,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
-from idpconfgen.plots.plotfuncs import plot_fracSS, plot_torsions
+from idpconfgen.components.plots.plotfuncs import plot_fracSS, plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
