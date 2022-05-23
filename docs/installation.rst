@@ -11,8 +11,8 @@ it will work with Windows based OS as well as long as the pre-requisites are met
     sudo apt-get update
     sudo apt-get upgrade
 
-Pre-installation Reqirements
-----------------------------
+Pre-installation Requirements
+-----------------------------
 
 (Required) An up-to-date version of anaconda3, and pip.
 (Required) For DSSP installation, please refer to: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
@@ -41,16 +41,24 @@ package manager::
     conda env create -f requirements.yml
     conda activate idpconfgen
 
-To install ``idpconfgen`` dependencies with ``pip``::
+.. note::
+    If you don't use Anaconda to manage your Python installations, you can use
+    ``venv`` and the ``requirements.txt`` file following the commands:
 
-    virtualenv idpconfgenenv --python=3.9
-    source idpconfgenvenv/bin/activate
-    pip install -r requirements.txt
+    | ``virtualenv idpcgenv --python=3.9``
+    | ``source venv/bin/activate``
+    | ``pip install -r requirements.txt``
+
+    If you have difficulties installing ``IDPConfGen``, raise an Issue in the
+    main GitHub repository, and we will help you.
 
 Install ``idpconfgen`` in development mode in order for your installation to be
 always up-to-date with the repository::
 
     python setup.py develop --no-deps
+
+.. note::
+    The above applies also if you used ``virtualenv`` instead of ``conda``.
 
 **Remember** to active the ``idpconfgen`` environment every time you open a new
 terminal window, from within the repository folder, choose yours::
@@ -64,6 +72,7 @@ terminal window, from within the repository folder, choose yours::
 
 To update to the latest version, navigate to the repository folder, activate the
 ``idpconfgen`` environment, and::
+
 
     git pull
     python setup.py develop --no-deps

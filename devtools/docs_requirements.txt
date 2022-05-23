@@ -1,5 +1,4 @@
-sphinx>=2.2
-sphinx-py3doc-enhanced-theme
-sphinx-argparse
-CommonMark
+sphinx>=4.5,<5
+sphinx-argparse==0.3.1
+sphinx-rtd-theme>=1.0.0
 mock
