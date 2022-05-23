@@ -24,6 +24,8 @@ from idpconfgen import (
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
+    cli_sethpc,
+    cli_merge,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
@@ -63,6 +65,8 @@ Other useful routines:
     * {cli_dssppii._name}
     * {cli_makecsss._name}
     * {cli_csssconv._name}
+    * {cli_sethpc._name}
+    * {cli_merge._name}
     * {cli_stats._name}
     * {cli_search._name}
 """
@@ -98,6 +102,8 @@ libcli.add_subparser(subparsers, cli_validate)
 libcli.add_subparser(subparsers, cli_dssppii)
 libcli.add_subparser(subparsers, cli_makecsss)
 libcli.add_subparser(subparsers, cli_csssconv)
+libcli.add_subparser(subparsers, cli_sethpc)
+libcli.add_subparser(subparsers, cli_merge)
 libcli.add_subparser(subparsers, cli_stats)
 libcli.add_subparser(subparsers, cli_search)
 
