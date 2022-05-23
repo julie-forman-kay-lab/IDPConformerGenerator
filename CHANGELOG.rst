@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* update CI methods
+* PR #205
+
 v0.4.6 (2022-04-22)
 ------------------------------------------------------------
 
