@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.9 (2022-05-23)
+------------------------------------------------------------
+
 * Add ``sethpc`` client.
 * Add ``merge`` client.
 * PR #202
