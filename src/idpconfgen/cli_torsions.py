@@ -137,7 +137,7 @@ def main(
 
     else:
         save_dict_to_json(torsion_result, output=output)
-    
+        
     if plot:
         # Plotting torsion angle distributions
         log.info(T("Plotting torsion angle distribution"))
@@ -150,20 +150,26 @@ def main(
             'filename': 'plot_torsions.png'
         }
         tor_defaults.update(plotvars)
-        
         ttype = tor_defaults['type']
-        first = next(iter(torsion_result))
-        n_residues = len(torsion_result[first][ttype])+1
+        
+        max_residues=0
         n_confs = len(torsion_result)
         
-        angles = np.ndarray(shape=(n_confs, n_residues), dtype=float)
+        for key in torsion_result:
+            if len(torsion_result[key]['omega'])+1 > max_residues:
+                max_residues = len(torsion_result[key]['omega'])+1
+        
+        angles = np.ndarray(shape=(n_confs, max_residues), dtype=float)
         j=0
         for t in torsion_result:
-            for i in range(1, n_residues):
-                angles[j:,i-1] = torsion_result[t][ttype][i-1]
+            for i in range(1, max_residues):
+                try:
+                    angles[j:,i-1] = torsion_result[t][ttype][i-1]
+                except:
+                    angles[j:,i-1] = 0
             j+=1
                 
-        errs=plot_torsions(n_residues, angles, degrees, n_confs, **tor_defaults)
+        errs=plot_torsions(max_residues, angles, degrees, n_confs, **tor_defaults)
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {tor_defaults["filename"]}'))
@@ -173,27 +179,29 @@ def main(
         
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
         rama_defaults = {
-            'type': 'Rama.',
-            'filename': newfname,
+        'type': 'Rama.',
+        'filename': newfname,
         }
         
-        if ramaplot: 
+        if ramaplot:
             ramaplot = values_to_dict(ramaplot)
             rama_defaults.update(ramaplot)
         
         frac_rama={
-            'alpha':np.zeros(n_residues),
-            'beta':np.zeros(n_residues),
-            'other':np.zeros(n_residues),
+            'alpha':np.zeros(max_residues),
+            'beta':np.zeros(max_residues),
+            'other':np.zeros(max_residues),
             }
         p=np.ones(n_confs)
         p=p/len(p)           
-        
         c=0
         for conf in torsion_result:
-            for res in range(n_residues-1):
-                phi = torsion_result[conf]["phi"][res]
-                psi = torsion_result[conf]["psi"][res]
+            for res in range(max_residues-1):
+                try:
+                    phi = torsion_result[conf]["phi"][res]
+                    psi = torsion_result[conf]["psi"][res]
+                except:
+                    continue
                 if (-180.0 < phi and phi < 10.0) and (-120.0 < psi and psi < 45.0):
                     frac_rama['alpha'][res] += p[c]
                 elif (-180.0 < phi and phi < 0.0) and ((-180 < psi and psi < -120) or (45 < psi and psi < 180)):
@@ -201,13 +209,11 @@ def main(
                 else:
                     frac_rama['other'][res] += p[c]
             c+=1
-        
-        errs = plot_fracSS(n_residues, frac_rama, **rama_defaults)
+        errs = plot_fracSS(max_residues, frac_rama, **rama_defaults)
         for e in errs:
             log.info(S(f'{e}'))
-            
         log.info(S(f'saved plot: {rama_defaults["filename"]}'))
-             
+        
     return
 
 if __name__ == '__main__':
