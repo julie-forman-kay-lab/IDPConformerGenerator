@@ -15,21 +15,23 @@ Contributors
 
 All Authors
 -----------
-* `João M. C. Teixeira`
-* `Zi Hao (Nemo) Liu`
+* `João M. C. Teixeira`_
+* `Zi Hao (Nemo) Liu`_
 * `Ashley Namini`
-* `Jie (Jerry) Li`
-* `Robert M. Vernon`
+* `Jie (Jerry) Li`_
+* `Robert M. Vernon`_
 * `Mickaël Krzeminski`
-* `Alaa A. Shamandy`
+* `Alaa A. Shamandy`_
 * `Oufan Zhang`
-* `Mojtaba Haghighatlari`
+* `Mojtaba Haghighatlari`_
 * `Teresa Head-Gordon`_
 * `Julie D. Forman-Kay`_
 
-.. _Julie D. Forman-Kay: https://github.com/julie-forman-kay-lab
-.. _Teresa Head-Gordon: https://github.com/THGLab
-.. _João M. C. Teixeira: https://github.com/joaomcteixeira
-.. _Zi Hao (Nemo) Liu: https://github.com/menoliu
 .. _Alaa A. Shamandy: https://github.com/AlaaShamandy
 .. _Jie (Jerry) Li: https://github.com/JerryJohnsonLee
+.. _João M. C. Teixeira: https://joaomcteixeira.github.io/
+.. _Julie D. Forman-Kay: https://github.com/julie-forman-kay-lab
+.. _Rober M. Vernon: https://www.linkedin.com/in/robert-vernon-a6b49667/
+.. _Teresa Head-Gordon: https://github.com/THGLab
+.. _Zi Hao (Nemo) Liu: https://github.com/menoliu
+.. _Mojtaba Haghighatlari: https://www.linkedin.com/in/mojtabah/
