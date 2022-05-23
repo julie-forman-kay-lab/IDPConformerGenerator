@@ -10,4 +10,4 @@ dependencies:
     - scipy=1
     - matplotlib=3
     - pip
-    - tox=3
+    - tox>=3.25.0
