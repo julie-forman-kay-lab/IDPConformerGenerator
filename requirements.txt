@@ -1,6 +1,6 @@
-numpy==1
-numba>=0.53.0
-pybind11==2
-scipy==1
-matplotlib==3
-tox>=3.25.0
+numpy>=1.22.4, <2
+numba>=0.53.0, <1
+pybind11>=2.9.2, <3
+scipy>=1.8.1, <2
+matplotlib>=3.5.2, <4
+tox>=3.25.0, <4

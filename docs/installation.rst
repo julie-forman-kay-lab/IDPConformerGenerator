@@ -16,9 +16,16 @@ And navigate to the new ``IDPConformerGenerator`` folder::
 
     conda env create -f requirements.yml
 
-If you don't Anaconda to manage your Python installations, and have difficulties
-installing ``IDPConfGen``, raise an Issue in the main GitHub repository, and we
-will help you.
+.. note::
+    If you don't use Anaconda to manage your Python installations, you can use
+    ``venv`` and the ``requirements.txt`` file following the commands:
+
+    | ``virtualenv venv --python=3.9``
+    | ``source venv/bin/activate``
+    | ``pip install -r requirements.txt``
+
+    If you have difficulties installing ``IDPConfGen``, raise an Issue in the
+    main GitHub repository, and we will help you.
 
 3. Activate the new conda environment::
 
@@ -28,6 +35,10 @@ will help you.
 always up-to-date with the repository::
 
     python setup.py develop --no-deps
+
+
+.. note::
+    The above applies also if you used ``venv`` instead of ``conda``.
 
 5. To update to the latest version::
 
