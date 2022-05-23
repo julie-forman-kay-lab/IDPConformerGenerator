@@ -2,7 +2,17 @@
 from __future__ import unicode_literals
 
 import os
+import mock
+import sys
 
+mock_modules = [
+    'numba',
+    'scipy',
+    'scipy.spatial',
+    ]
+
+for modulename in mock_modules:
+    sys.modules[modulename] = mock.Mock()
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -33,7 +43,7 @@ if os.getenv('SPELLCHECK'):
 source_suffix = '.rst'
 master_doc = 'index'
 project = 'IDPConformerGenerator'
-year = '2019'
+year = '2022'
 author = 'Julie Forman-Kay Lab'
 copyright = '{0}, {1}'.format(year, author)
 version = release = '0.4.7'
@@ -41,8 +51,8 @@ version = release = '0.4.7'
 pygments_style = 'trac'
 templates_path = ['.']
 extlinks = {
-    'issue': ('https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader/issues/%s', '#'),
-    'pr': ('https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader/pulls/%s', 'PR #'),
+    'issue': ('https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/%s', '#'),
+    'pr': ('https://github.com/julie-forman-kay-lab/IDPConformerGenerator/pulls/%s', 'PR #'),
 }
 
 

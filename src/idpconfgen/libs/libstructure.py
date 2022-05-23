@@ -543,14 +543,14 @@ def get_datastr(data):
 
 def detect_structure_type(datastr):
     """
-    Detect Structure data parser.
+    Detect structure data parser.
 
-    Uses `structure_parsers`.
+    Uses ``structure_parsers``.
 
     Returns
     -------
-    func or class
-        That which can parse `datastr` to a :class:`Structure'.
+    parser
+        That which can parse `datastr` to a :py::class:`Structure'.
     """
     sp = structure_parsers
     for condition, parser in sp:
