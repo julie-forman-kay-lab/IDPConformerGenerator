@@ -179,7 +179,6 @@ blocked_ids = [
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
-
 # Builder Definitions  ###
 # average values of the backbone angles calculated from
 # Dunbrack PISCES
