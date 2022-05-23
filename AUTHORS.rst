@@ -31,7 +31,7 @@ All Authors
 .. _Jie (Jerry) Li: https://github.com/JerryJohnsonLee
 .. _João M. C. Teixeira: https://joaomcteixeira.github.io/
 .. _Julie D. Forman-Kay: https://github.com/julie-forman-kay-lab
-.. _Rober M. Vernon: https://www.linkedin.com/in/robert-vernon-a6b49667/
+.. _Robert M. Vernon: https://www.linkedin.com/in/robert-vernon-a6b49667/
 .. _Teresa Head-Gordon: https://github.com/THGLab
 .. _Zi Hao (Nemo) Liu: https://github.com/menoliu
 .. _Mojtaba Haghighatlari: https://www.linkedin.com/in/mojtabah/
