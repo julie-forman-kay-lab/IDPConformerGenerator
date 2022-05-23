@@ -3,7 +3,7 @@ IDPConfGen Small Peptide Example
 
 To build the torsion angle database you need to provide IDPConfGen with a list
 of PDB/mmCIF files. Our advice is that you use a culled list of your choice from
-the `Dr. Dunbrack PISCES database <http://dunbrack.fccc.edu/PISCES.php>`_.
+the `Dunbrack PISCES database <http://dunbrack.fccc.edu/PISCES.php>`_.
 
 The PDB chain id list should have the format of the :code:`cull100` file in this
 folder, which emulates the format provided by PISCES. Actually, the only column
@@ -72,16 +72,16 @@ Please note that searching for loops is enabled by default for :code:`--dloop`.
 Appending :code:`--dhelix --dstrand` will extend sampling to alpha-helicies and 
 beta-strands in addition to loops. For more information on usage, please view :code:`idpconfgen build -h`.
 
-If you would like to use a preliminary secondary-structure assignment tool (e.g. CheSPI or delta2D) to
+If you would like to use a program to assign secondary structure bias based on NMR chemical shifts (e.g. CheSPI or δ2D) to
 employ probabilistic custom secondary structure sampling (CSSS), the :code:`probs8_[ID].txt` output
-from CheSPI or .TXT output from delta2D would have to be standardized into a user-editable text file indicating the
+from CheSPI or .TXT output from δ2D would have to be standardized into a user-editable text file indicating the
 probability of secondary structures (based on DSSP codes) on a per residue basis.
 The following example will process CheSPI output and assign probabilities to L/H/E based on H/G/I/E/ /T/S/B
 structures on a per residue basis::
 
     idpconfgen csssconv -p8 probs8_ex.txt -o csss_ex.json
 
-For simplicity, secondary structures from CheSPI and delta2D are grouped into L/H/E as defined by idpconfgen.
+For simplicity, secondary structures from CheSPI and δ2D are grouped into L/H/E as defined by idpconfgen.
 If you do not want this grouping feature, please build the database above without :code:`-rd` 
 and run :code:`csssconv` with :code:`--full` to avoid grouping. 
 To build with the CSSS file, :code:`-csss` would have to point to the CSSS.JSON file::

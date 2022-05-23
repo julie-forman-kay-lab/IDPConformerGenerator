@@ -48,7 +48,7 @@ ap.add_argument(
 ap.add_argument(
     '-d2D',
     '--delta2D',
-    help="Path to the delta2D output file to operate on."
+    help="Path to the δ2D output file to operate on."
 )
 
 ap.add_argument(
@@ -138,12 +138,12 @@ def chespi_probs8_convert_grouped(p8):
 
 def d2D_convert_full(d2d):
     """
-    Parse the .TXT output from delta2D as user configurable input file for CSSS.
+    Parse the .TXT output from δ2D as user configurable input file for CSSS.
     
     Parameters
     ----------
     d2d : string
-        Path to the delta2D .TXT to operate on as indicated by the user
+        Path to the δ2D .TXT to operate on as indicated by the user
     
     Returns
     -------
@@ -184,7 +184,7 @@ def d2D_convert_full(d2d):
 
 def d2D_convert_grouped(d2d):
     """
-    Parse the .TXT output from delta2D as user configurable input file for CSSS.
+    Parse the .TXT output from δ2D as user configurable input file for CSSS.
     
     Groups together DSSP secondary structures as per idpconfgen definitions.
     If a residue has multiple SS probabilities, they are summative per L, H, E definition.
@@ -192,7 +192,7 @@ def d2D_convert_grouped(d2d):
     Parameters
     ----------
     d2d : string
-        Path to the delta2D .TXT to operate on as indicated by the user
+        Path to the δ2D .TXT to operate on as indicated by the user
     
     Returns
     -------
@@ -245,7 +245,7 @@ def main(
         A string to the path of probs8_[ID].TXT output from CheSPI.
         
     delta2D : string
-        A string to the path of the .TXT output from delta2D.
+        A string to the path of the .TXT output from δ2D.
     
     output : string, optional
         If given, prints output to that file (must be .JSON), else prints to console.

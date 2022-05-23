@@ -1,4 +1,4 @@
-IDP Conformer Generator
+IDPConformerGenerator
 =======================
 
 Generates Intrinsically Disordered Protein conformers.

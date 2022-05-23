@@ -1,5 +1,5 @@
 """
-IDP CONFORMER GENERATOR.
+IDPConformerGenerator
 
 Generates IDP Conformers by combining observed backbone angles
     and random distribution.
@@ -74,7 +74,7 @@ libcli.add_version(ap)
 
 # routines from the main DB creation pipeline
 subparsers = ap.add_subparsers(
-    title='IDP Conformer Generator routines',
+    title='IDPConformerGenerator routines',
     help='Short description:',
     )
 

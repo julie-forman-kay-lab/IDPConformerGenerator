@@ -1,7 +1,7 @@
 """
-Implement MCSCE sidechain packing algorithm logic.
+Implement MC-SCE sidechain packing algorithm logic.
 
-MCSCE repository at: https://github.com/THGLab/MCSCE
+MC-SCE repository at: https://github.com/THGLab/MCSCE
 """
 from functools import partial
 
@@ -22,11 +22,11 @@ only_H_mask = None
 
 
 def add_mcsce_subparser(ap):
-    """Add MCSCE related parameters to client."""
+    """Add MC-SCE related parameters to client."""
     group = ap.add_argument_group(
-        title="MCSCE related parameters",
+        title="MC-SCE related parameters",
         description=(
-            "Parameters configuring MCSCE sidechain sampling. "
+            "Parameters configuring MC-SCE sidechain sampling. "
             "Used only if `-scm mcsce` is selected."
             ),
         )
@@ -44,7 +44,7 @@ def add_mcsce_subparser(ap):
         )
     group.add_argument(
         '--mcsce-batch_size',
-        help=f'The MCSCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',
+        help=f'The MC-SCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',
         type=int,
         default=mcsce_defaults['batch_size'],
         )

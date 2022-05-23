@@ -18,8 +18,8 @@ v0.4.5 (2022-04-21)
 v0.4.4 (2022-03-29)
 ------------------------------------------------------------
 
-* Fixes MCSCE integration when sidechain packing fails
-* Corrects MCSCE installation
+* Fixes MC-SCE integration when sidechain packing fails
+* Corrects MC-SCE installation
 * #190
 
 v0.4.3 (2022-03-26)
@@ -36,7 +36,7 @@ v0.4.1 (2022-03-17)
 v0.4.0 (2022-03-15)
 ------------------------------------------------------------
 
-* Integrates the MCSCE protocol in the building process as part of the
+* Integrates the MC-SCE protocol in the building process as part of the
   sidechain packing method options.
 
 v0.3.3 (2022-03-14)

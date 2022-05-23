@@ -33,11 +33,13 @@ During the backbone generation stage (i.e. :code:`idpconfgen build ... -dsd`), s
 improved by setting a higher backbone energy threshold (:code:`-etbb`). We recommend 250 as a minimum.
 
 For the MC-SCE sidechain step, we recommend doing a small benchmark with 128 trials to see what the median
-number of trials MC-SCE requires for a successful sidechain addition. For Tau-441, we observe that 32 trials
-drastically improved our speed (by 3-4 fold) while maintaining our percentage success rate.
+number of trials MC-SCE requires for a successful sidechain addition.
 
 What's the difference between MC-SCE and FASPR?
 -----------------------------------------------
+"FASPR generates structures with no side chain hydrogens,
+so other tools are required to add hydrogens if they are desired.
+MC-SCE generates structures with complete coordinates including sidechain hydrogens.
 
 Although MC-SCE is slower, it produces structures with no steric clashes. Furthermore,
 it also has many settings that can be tweaked for flexible in silico experiments as opposed to the default settings of FASPR.
@@ -50,11 +52,11 @@ IDPConformerGenerator on any system, including HPC clusters, we recommend local 
 largest number of workers and the fastest read-write times. Due to the quantity of PDB files downloaded,
 many read-write requests will slow down the login node for other users on HPC resources as well as create
 errors in file I/O processing in IDPConfGen. For reference, generating a database using 24,002 PDB files
-takes 1 hour 13 minutes (using 31 workers) as a job on the Graham cluster (DRAC), an HPC resource. Generating
-this same database locally (using 63 workers of an AMD Threadripper 2990wx) takes only 37 minutes
-(approximately half the time compared to 31 workers on the Graham cluster (DRAC)) since the bulk of the time
-is the PDB downloading process. Importantly, this database can then be transferred onto HPC clusters and
-can be reused for all future calculations.
+takes 1 hour 13 minutes (using 31 workers) as a job on the Graham cluster, an HPC resource of the Digital 
+Research Alliance of Canada (DRAC), an HPC resource. Generating this same database locally (using 63 workers
+of an AMD Threadripper 2990wx) takes only 37 minutes (approximately half the time compared to 31 workers on 
+the Graham cluster (DRAC)) since the bulk of the time is the PDB downloading process. Importantly,
+this database can then be transferred onto HPC clusters and can be reused for all future calculations.
 
 What does it mean that IDPConfGen is deterministic?
 ---------------------------------------------------

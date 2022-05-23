@@ -32,7 +32,7 @@ if os.getenv('SPELLCHECK'):
 
 source_suffix = '.rst'
 master_doc = 'index'
-project = 'IDP Conformer Generator'
+project = 'IDPConformerGenerator'
 year = '2019'
 author = 'Julie Forman-Kay Lab'
 copyright = '{0}, {1}'.format(year, author)
