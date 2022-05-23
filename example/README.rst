@@ -1,6 +1,8 @@
 IDPConfGen Small Peptide Example
 ================================
 
+.. start-description
+
 To build the torsion angle database you need to provide IDPConfGen with a list
 of PDB/mmCIF files. Our advice is that you use a culled list of your choice from
 the `Dunbrack PISCES database <http://dunbrack.fccc.edu/PISCES.php>`_.
@@ -96,6 +98,8 @@ will use all available CPU threads except for one.
 
 This is all you need to know for a basic usage of IDPConfGen. Now you can use a
 larger PDB database to feed the conformational sampling.
+
+.. end-description
 
 We look forward to your feedback,
 The IDPConfGen Team
