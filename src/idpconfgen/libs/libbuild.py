@@ -76,11 +76,11 @@ ConfLabels = namedtuple(
 """
 Contain label information for a protein/conformer.
 
-Named indexes
--------------
-atom_labels
-res_nums
-res_labels
+Attributes
+----------
+atom_labels : np.array
+res_nums : np.array
+res_labels : np.array
 """
 
 
@@ -148,22 +148,22 @@ def init_confmasks(atom_labels):
 
     Notes
     -----
-    ConfMask attributes map to the following atom groups:
+    ConfMask attributes map to the following atom groups::
 
-    bb3 : N, CA, C
-    bb4 : N, CA, C, O
-    NHs : amide protons
-    Hterm : N-terminal protons
-    OXT1 : O atom of C-terminal carboxyl group
-    OXT2 : OXT atom of the C-terminal carboxyl group
-    cterm : (OXT2, OXT1)
-    non_Hs : all but hydrogens
-    non_Hs_non_OXT : all but hydrogens and the only OXT atom
-    non_NHs_non_OXT : all but NHs and OXT atom
-    H2_N_CA_CB : these four atoms from the first residue
-                 if Gly, uses HA3.
-    non_sidechains : all atoms except sidechains beyond CB
-    all_sidechain : all sidechain atoms including CB and HA
+        bb3 : N, CA, C
+        bb4 : N, CA, C, O
+        NHs : amide protons
+        Hterm : N-terminal protons
+        OXT1 : O atom of C-terminal carboxyl group
+        OXT2 : OXT atom of the C-terminal carboxyl group
+        cterm : (OXT2, OXT1)
+        non_Hs : all but hydrogens
+        non_Hs_non_OXT : all but hydrogens and the only OXT atom
+        non_NHs_non_OXT : all but NHs and OXT atom
+        H2_N_CA_CB : these four atoms from the first residue
+                     if Gly, uses HA3.
+        non_sidechains : all atoms except sidechains beyond CB
+        all_sidechain : all sidechain atoms including CB and HA
     """
     _all = np.ones(len(atom_labels), dtype=bool)
 
@@ -298,12 +298,12 @@ def create_conformer_labels(
         The three arrays have the same length.
     """
     input_seq_3_letters = transfunc(input_seq) # note HIS treated as HIP
-    
+
     # change "H" to "p" as idpconfgen builds histidines as HIP,
     # see `translate_seq_to_3l`
     # can be changed later after TODO for `translate_seq_to_3l` is completed
     input_seq = input_seq.replace("H", "p")
-    
+
     # /
     # prepares data based on the input sequence
     # considers sidechain all-atoms
@@ -488,28 +488,6 @@ def get_cycle_bond_type():
         ))
 
 
-# def read_db_to_slices(database, dssp_regexes, ncores=1):
-#    """Create database base of slice and angles."""
-#    # reads db dictionary from disk
-#    db = read_dictionary_from_disk(database)
-#    log.info(f'Read DB with {len(db)} entries')
-#
-#    # reads and prepares IDPConfGen data base
-#    timed = partial(timeme, aligndb)
-#    pdbs, angles, dssp, resseq = timed(db)
-#
-#    # searchs for slices in secondary structure, according to user requests
-#    timed = partial(timeme, regex_search, ncores=ncores)
-#    dssp_regexes = \
-#        [dssp_regexes] if isinstance(dssp_regexes, str) else dssp_regexes
-#    slices = []
-#    for dssp_regex_string in dssp_regexes:
-#        slices.extend(timed(dssp, dssp_regex_string))
-#    log.info(f'Found {len(slices)} indexes for {dssp_regexes}')
-#
-#    return slices, angles
-
-
 def prepare_slice_dict(
         primary,
         input_seq,
@@ -521,10 +499,9 @@ def prepare_slice_dict(
         ncores=1,
         ):
     """
-    Prepare a dictionary mapping chunks to slices in `primary`.
+    Prepare a dictionary mapping fragments to slices in `primary`.
 
-    Protocol
-    --------
+    Protocol:
 
     1) The input sequence is split into all different possible smaller peptides
     according to the `mers_size` tuple. Let's call these smaller peptides,
@@ -548,7 +525,7 @@ def prepare_slice_dict(
 
     3.1) For each slice found in 2) we inspect the `secondary` string if it
     matches any of the `dssp_regex`. If it matches we consider that slice to the
-    chunk-size, the XMER identify, the DSSP key. This allow us in the build
+    fragment-size, the XMER identify, the DSSP key. This allow us in the build
     process to specify which SS to sample for specific regions of the conformer.
 
     Parameters
@@ -574,7 +551,7 @@ def prepare_slice_dict(
         primary. In the form of "LLLL|HHHH", etc. Only needed if `csss` True.
 
     mers_size : iterable
-        A iterable of integers denoting the size of the chunks to search
+        A iterable of integers denoting the size of the fragments to search
         for. Defaults from 1 to 5.
 
     res_tolerance : dict
@@ -590,11 +567,11 @@ def prepare_slice_dict(
     dict
         A dict with the given mapping:
 
-            1) First key-level of the dict is the length of the chunks, hence,
+            1) First key-level of the dict is the length of the fragments, hence,
             integers.
 
-            2) The second key level are the residue chunks found in the
-            `primary`. A chunk in input_seq but not in `primary` is removed
+            2) The second key level are the residue fragments found in the
+            `primary`. A fragment in input_seq but not in `primary` is removed
             from the dict.
 
             3) only if `csss` is True. Adds a new layer organizing the slice
@@ -777,8 +754,8 @@ def create_bonds_apart_mask_for_ij_pairs(
 
     Inter residue bonds are only considered for consecutive residues.
 
-    Paramters
-    ---------
+    Parameters
+    ----------
     atom_labels : iterable, list or np.ndarray
         The protein atom labels. Ex: ['N', 'CA, 'C', 'O', 'CB', ...]
 
@@ -790,10 +767,10 @@ def create_bonds_apart_mask_for_ij_pairs(
         The protein residue labels per atom in `atom_labels`.
         Ex: ['Met', 'Met', 'Met', ...]
 
-    Depends
-    -------
-    `gen_ij_pairs_upper_diagonal`
-    `gen_atom_pair_connectivity_masks`
+    See Also
+    --------
+    :py:func:`gen_ij_pairs_upper_diagonal`
+    :py:func:`gen_atom_pair_connectivity_masks`
     """
     atom_labels_ij_gen = gen_ij_pairs_upper_diagonal(atom_labels)
     residue_numbers_ij_gen = gen_ij_pairs_upper_diagonal(residue_numbers)
@@ -964,10 +941,6 @@ def extract_ff_params_for_seq(
     """
     Extract a parameter from forcefield dictionary for a given sequence.
 
-    See Also
-    --------
-    create_conformer_labels
-
     Parameters
     ----------
     atom_labels, residue_numbers, residue_labels
@@ -977,6 +950,10 @@ def extract_ff_params_for_seq(
 
     param : str
         The param to extract from forcefield dictionary.
+
+    See Also
+    --------
+    :py:func:`create_conformer_labels`
     """
     params_l = []
     params_append = params_l.append
@@ -1117,7 +1094,7 @@ def get_indexes_from_primer_length(
         plen,
         current_residue,
         ):
-    """Get sequence chunk based on position and length."""
+    """Get sequence fragment based on position and length."""
     if plen == 1:
         return current_residue
     elif plen == 2:
@@ -1170,7 +1147,7 @@ def populate_dict_with_database(
     Parameters
     ----------
     xmers : list
-        The list of all protein chunks we want to search in the `primary`
+        The list of all protein fragments we want to search in the `primary`
         and `secondary` "database" strings. This list should contain only
         sequence of the same length.
 

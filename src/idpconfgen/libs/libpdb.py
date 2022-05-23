@@ -426,7 +426,7 @@ class PDBID:
         The chain identifier.
     """
 
-    # segment are chunks of the same chain
+    # segment are fragments of the same chain
     def __init__(self, name, chain=None, segment=None):
 
         self.name = name.upper()

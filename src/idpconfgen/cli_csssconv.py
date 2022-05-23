@@ -28,7 +28,7 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = 'idpconfgen_csssconv'
 _name = 'csssconv'
-_help = 'Standardizes secondary-structure prediction output for CSSS.'
+_help = 'Standardizes secondary-structure prediction output for custom secondary-structure sampling (CSSS).'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -48,13 +48,13 @@ ap.add_argument(
 ap.add_argument(
     '-d2D',
     '--delta2D',
-    help="Path to the delta2D output file to operate on."
+    help="Path to the δ2D output file to operate on."
 )
 
 ap.add_argument(
     '-f',
     '--full',
-    help="Parses the secondary structure prediction files as is, without grouping DSSP.",
+    help="Parses the secondary structure prediction files as is, without grouping DSSP codes.",
     action='store_true'
     )
 
@@ -67,7 +67,7 @@ def chespi_probs8_convert_full(p8):
     Parameters
     ----------
     p8 : string
-        Path to the probs8_[ID].txt to operate on as indicated by the user
+        Path to the probs8_[ID].txt to operate on as indicated by the user.
     
     Returns
     -------
@@ -104,7 +104,7 @@ def chespi_probs8_convert_grouped(p8):
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
     Groups together DSSP secondary structures as per idpconfgen definitions.
-    If a residue has multiple SS probabilities, they are summative per L, H, E, G definition.
+    If a residue has multiple SS probabilities, they are summative per L, H, E definition.
     
     Parameters
     ----------
@@ -115,7 +115,7 @@ def chespi_probs8_convert_grouped(p8):
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
-        and the second key later indicates grouped secondary structure (L, H, E, G) 
+        and the second key later indicates grouped secondary structure (L, H, E) 
         as defined in idpconfgen. Values are their respective probabilities.
     """
     dict_out = {}
@@ -127,7 +127,7 @@ def chespi_probs8_convert_grouped(p8):
             pline.pop(0)
             data = [float(i) for i in pline]
             resid = int(data[0])
-            
+            # adds up the probabilities for SS codes based on idpconfgen definitions
             dict_p8["L"] = round((data[3] + data[5] + data[6] + data[7] + data[8]), 4)
             dict_p8["H"] = round(data[1] + data[2], 4)
             dict_p8["E"] = data[4]
@@ -138,19 +138,20 @@ def chespi_probs8_convert_grouped(p8):
 
 def d2D_convert_full(d2d):
     """
-    Parse the .TXT output from delta2D as user configurable input file for CSSS.
+    Parse the .TXT output from δ2D as user configurable input file for CSSS.
     
     Parameters
     ----------
     d2d : string
-        Path to the delta2D .TXT to operate on as indicated by the user
+        Path to the δ2D .TXT to operate on as indicated by the user
     
     Returns
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
-        and the second key later indicates secondary structure (H/E/L/P) 
-        as defined in DSSP. Values are their respective probabilities.
+        and the second key later indicates secondary structure ( /H/E/P) 
+        as defined in DSSP. Values for the second key-layer are their
+        respective probabilities.
     """
     dict_out = {}
     dict_probs = {}
@@ -169,6 +170,7 @@ def d2D_convert_full(d2d):
                 dict_probs["P"] = data[4]
                 dict_out[resid] = dict_probs
                 dict_probs = {}
+            # if there aren't any predicted probabilities for this residue, make them all equal
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
@@ -182,7 +184,7 @@ def d2D_convert_full(d2d):
 
 def d2D_convert_grouped(d2d):
     """
-    Parse the .TXT output from delta2D as user configurable input file for CSSS.
+    Parse the .TXT output from δ2D as user configurable input file for CSSS.
     
     Groups together DSSP secondary structures as per idpconfgen definitions.
     If a residue has multiple SS probabilities, they are summative per L, H, E definition.
@@ -190,14 +192,15 @@ def d2D_convert_grouped(d2d):
     Parameters
     ----------
     d2d : string
-        Path to the delta2D .TXT to operate on as indicated by the user
+        Path to the δ2D .TXT to operate on as indicated by the user
     
     Returns
     -------
     dict_out : dictionary
         Nested dictionary where the first key layer indicates residue number
         and the second key later indicates grouped secondary structure (L, H, E) 
-        as defined in idpconfgen. Values are their respective probabilities.
+        as defined in idpconfgen. Values for the second key-layer are their
+        respective probabilities.
     """
     dict_out = {}
     dict_probs = {}
@@ -215,6 +218,7 @@ def d2D_convert_grouped(d2d):
                 dict_probs["L"] = round((data[3]+data[4]), 3)
                 dict_out[resid] = dict_probs
                 dict_probs = {}
+            # if there aren't any predicted probabilities for this residue, make them all equal
             elif re.match(r"\#+\d", line):
                 sline = line.split()
                 pline = sline[0].split("#")
@@ -238,10 +242,10 @@ def main(
     Parameters
     ----------
     chespi_p8 : string
-        A string to the path of probs8_[ID].txt output from CheSPI.
+        A string to the path of probs8_[ID].TXT output from CheSPI.
         
     delta2D : string
-        A string to the path of the .TXT output from delta2D.
+        A string to the path of the .TXT output from δ2D.
     
     output : string, optional
         If given, prints output to that file (must be .JSON), else prints to console.
@@ -256,6 +260,7 @@ def main(
     if chespi_p8:
         log.info(T('reading and processing CheSPI predictions...'))
         with open(chespi_p8) as reader:
+            # regex matching pattern for the format of CheSPI output files
             if not re.fullmatch(r"\s{3}[A-Z]{1}\d|\s|.{60,}\n", reader.readline()):
                 log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))
                 return
@@ -267,6 +272,7 @@ def main(
         
     if delta2D:
         log.info(T('reading and processing delta2D predictions...'))
+        #TODO: regex matching to see the format of alleged delta2D output files
         if full: converted_delta2D = d2D_convert_full(delta2D)
         else: converted_delta2D = d2D_convert_grouped(delta2D)
         

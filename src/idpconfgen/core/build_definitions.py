@@ -4,14 +4,13 @@ from collections import defaultdict
 from copy import copy
 from math import pi
 from pathlib import Path
-from pprint import pprint
 from statistics import mean, stdev
 
 import numpy as np
 from scipy import spatial
 
 from idpconfgen.libs.libstructure import Structure, col_name
-from idpconfgen.core.definitions import aa1to3, aa3to1
+from idpconfgen.core.definitions import aa3to1
 
 
 pdist = spatial.distance.pdist

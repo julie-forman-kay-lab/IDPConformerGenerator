@@ -1,12 +1,9 @@
 """
-Adds polyproline type-2 helix assignment to DSSP.
-
-The output will be printed to the terminal window. To save the output to
-a file use the `>` command.
+Adds polyproline type-2 helix assignment to DSSP. For DSSP v2-v3.
 
 USAGE:
-    $ idpconfgen dssppii [--pdb-file] [--horiz]
-    $ idpconfgen dssppii [--pdb-file] [--horiz] > [OUTPUT]
+    $ idpconfgen dssppii [--pdb-file]
+    $ idpconfgen dssppii [--pdb-file] [--horiz] [--output]
 """
 # Translated to Python3 by Nemo (Zi Hao @menoliu) Liu on Feb 3, 2022
 # Upgrades: no longer have to specify where DSSP is installed, updated CLI

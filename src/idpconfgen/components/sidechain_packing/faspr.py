@@ -17,7 +17,7 @@ def init_faspr_sidechains(
         **ignore,
         ):
     """
-    Instantiate dedicated function environment for FASPR sidehchain calculation.
+    Instantiate dedicated function environment for FASPR sidechain calculation.
 
     Examples
     --------

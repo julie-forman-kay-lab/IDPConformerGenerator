@@ -2,7 +2,6 @@
 from argparse import Namespace
 from collections import namedtuple
 from itertools import chain
-from math import pi
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
 

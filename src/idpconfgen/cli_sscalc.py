@@ -151,7 +151,7 @@ def main(
         results from the disk.
 
     reduced : Bool, optional
-        Whether to reduce secondary structure information to H/E/L
+        Whether to reduce secondary structure information to L/H/E
 
     ncores : int
         The numbers of cores to use.
@@ -195,7 +195,7 @@ def main(
         # generator
         execute_pool = pool_function_in_chunks(
             execute,
-            pdbs2operate,              # items to process
+            pdbs2operate, # items to process
             ncores=ncores,
             chunks=chunks,
             )
