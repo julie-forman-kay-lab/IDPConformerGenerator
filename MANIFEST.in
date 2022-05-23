@@ -23,7 +23,6 @@ include README.rst
 include tox.ini
 
 exclude PULLREQUEST.rst
-exclude REQUIREMENTS.md
 
 global-exclude *.py[cod] __pycache__/* *.so *.dylib .ipynb_checkpoints/*
 global-exclude tags
