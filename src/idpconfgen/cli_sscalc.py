@@ -11,6 +11,7 @@ Uses an external third party software.
 
 USAGE:
     $ idpconfgen sscalc [PDBS]
+    $ idpconfgen sscalc [PDBS] -o mysscalc.json -d splitsscalc.tar -cmd <DSSP EXEC> --plot -n
 """
 import argparse
 import os
@@ -144,8 +145,8 @@ def main(
     ss_cmd : str or Path
         The command to run with subprocess module.
 
-    pdbs : list
-        A list of paths to PDB files or PDB file lists.
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within a folder or inside .TAR file
 
     output : string or Path, optional
         If given prints output to that file, else prints to console.

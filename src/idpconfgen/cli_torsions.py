@@ -27,6 +27,7 @@ USAGE:
     $ idpconfgen torsions [PDBS] -sc file.json -n
     $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n
     $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n -deg
+    $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n -deg --plot
 """
 import argparse
 import numpy as np
@@ -90,7 +91,39 @@ def main(
         plotvars=None,
         ramaplot=None,
         ):
-    """Perform main script logic."""
+    """
+    Perform main script logic.
+    
+    Parameters
+    ----------
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within a folder or inside .TAR file
+    
+    source : string or Path, optional
+        If given, updates a preexisting torsions.JSON file.
+        Defaults to `None`.
+        
+    output : string or Path, optional
+        If given prints output to that file, else prints to console.
+        Defaults to `None`.
+    
+    degrees : Bool, optional
+        Whether to use degrees instead of radians.
+        Defaults to False, use radians.
+
+    ncores : int
+        The numbers of cores to use.
+    
+    plot : Bool, optional
+        Whether to plot the fractional secondary structure information.
+        Defaults to False, don't plot.
+    
+    plotvars : dictionary, optional
+        Parameters for creating the torsion angle distribution plot
+        
+    ramaplot : dictionary, optional
+        Parameters for creating the ramachandran fraction secondary structure plot   
+    """
     # validates before performing time consuming calculations
     if source and not source.suffix == '.json':
         raise ValueError('Source file should have `.json` extension.')
