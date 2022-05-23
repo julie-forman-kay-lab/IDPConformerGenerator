@@ -11,15 +11,15 @@ multiple nodes are required for scalable parallelization.
 Generates "all*" and "cancel*" shell scripts to submit or cancel all jobs.
 
 USAGE:
-    $ idpconfgen sethpc \
-        --destination <SAVE_DIRECTORY> \
-        --account <ACCOUNT> \
-        --job-name <NAME> \
-        --nodes <#> \
-        --ntasks-per-node <#> \
-        --mem <#> \
-        --time-per-node <d-hh:mm:ss> \
-        --mail-user <@> \
+    $ idpconfgen sethpc \\
+        --destination <SAVE_DIRECTORY> \\
+        --account <ACCOUNT> \\
+        --job-name <NAME> \\
+        --nodes <#> \\
+        --ntasks-per-node <#> \\
+        --mem <#> \\
+        --time-per-node <d-hh:mm:ss> \\
+        --mail-user <@> \\
         <IDPConfGen Build>
 """
 import argparse
