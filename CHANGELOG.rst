@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.4.10 (2022-05-23)
+------------------------------------------------------------
+
 * Add documentation RTD format
 * Add documentation for several features and examples
 * PR #171
