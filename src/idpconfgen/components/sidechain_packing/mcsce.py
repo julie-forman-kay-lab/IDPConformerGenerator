@@ -64,7 +64,39 @@ def init_mcsce_sidechains(
         user_parameters=None,
         **ignore,
         ):
-    """."""
+    """
+    Instantiate dedicated function environment for MC-SCE sidechain building.
+
+    Examples
+    --------
+    >>> calc_mcsce = init_mcsce_sidechains('MASFRTPKKLCVAGG', ...)
+    >>> # a (N, 3) array with the N,CA,C,O coordinates
+    >>> coords = np.array( ... )
+    >>> calc_mcsce(coords)
+
+    Parameters
+    ----------
+    input_seq : str
+        The FASTA sequence of the protein for which this function will
+        be used.
+
+    template_masks : `libbuil.ConfMasks` object
+        Related to the building template in `cli_build`.
+
+    all_atom_masks : `libbuil.ConfMasks` object
+        Related to the all atoom coordinate system in `cli_build`.
+
+    user_parameters : dict
+        Dictionary with additional parameters for the MC-SCE package.
+
+    Returns
+    -------
+    np.ndarray, dtype=bool, (M, 3)
+        Array mask for the builder.
+
+    np.ndarray (M, 3)
+        Heavy atom coordinates of the protein sequence.
+    """
     from mcsce.libs.libstructure import Structure
     from mcsce.libs.libenergy import prepare_energy_function
     from mcsce.core import build_definitions
