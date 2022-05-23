@@ -1,16 +1,17 @@
 graft docs
 graft src
+graft example
 
 prune alphas
 prune devtools
 prune tests
-prune example
 
 include .bumpversion.cfg
 include .coveragerc
 include .editorconfig
 include .readthedocs.yml
 include requirements.yml
+include requirements.txt
 include pyproject.toml
 
 include AUTHORS.rst
