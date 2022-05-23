@@ -117,8 +117,8 @@ functionalities, for example:
     tox -e lint  # code style
     tox -e build  # packaging
     tox -e docs  # only builds the documentation
-    tox -e py39  # runs code tests in Python 3.7 environment
-    tox -e py39 -- -vv  # for full verbosity
+    tox -e tests  # runs code unit tests for your python version
+    tox -e tests -- -vv  # for full verbosity
 
 
 .. _Fork this repository before contributing: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/network/members
