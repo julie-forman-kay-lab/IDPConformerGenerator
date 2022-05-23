@@ -1,12 +1,12 @@
-A real case scenario with drkSH3
-================================
+A Real Case Scenario
+====================
 
 .. start-description
 
 The example with a small peptide in the :code:`example` folder is a good way to
 get introduced to IDPConfGen. Although building other IDP conformer ensembles
 use the same workflow as the previous example, we will go over more detailed
-usage examples with a well studied IDP, the drkN SH3 domain.
+usage examples with a well studied IDP, the unfolded state of the drkN SH3 domain.
 
 Chemical shift data for the unfolded state of the drkN SH3 domain (BMRB ID: 25501) has been already processed with
 δ2D and CheSPI and secondary structure propensity calculations can be found in 
@@ -34,7 +34,7 @@ PDB file downloaded. Later to be processed for their torsion angles::
     idpconfgen sscalc pdbs.tar -rd -n -cmd <DSSP EXEC>
 
 Please note that since IDPConfGen is a toolkit, many of these modules can be used with
-custom folders or .tar files.
+custom folders or ``.tar`` files.
 
 Finally, torsion angles are extracted and the database we will use for future calculations
 can be created with the :code:`torsions` subclient::
@@ -43,7 +43,7 @@ can be created with the :code:`torsions` subclient::
 
 Now we're ready to construct multiple conformer ensembles for the unfolded states of the drkN SH3 domain. To build 100 conformers,
 sampling only the loop region, limiting the backbone and side chain L-J energy potentials to 
-be 100 kJ and 250 kJ respectively, using default chunk sizes, no substitutions, and to have side chains added with FASPR::
+be 100 kJ and 250 kJ respectively, using default fragment sizes, no substitutions, and to have side chains added with FASPR::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -105,7 +105,8 @@ To sample using custom secondary structure sampling (CSSS) a CSSS database (.JSO
 to be created specifying the secondary structure probabilities for each residue. This can be
 done using the :code:`makecsss` module if chemical shift data is not readily available, if you'd
 like to edit a pre-existing CSSS.JSON, or create a new file. Here's an example for making a 
-custom CSSS.JSON file that samples only helices for residues 15-25 of drkN SH3 and loops for everything else::
+custom CSSS.JSON file that samples only helices for residues 15-25 of the unfolded state of the drkN SH3 domain
+and loops for everything else::
 
     idpconfgen makecsss -cp 1-14 L 1.0|15-25 H 1.0|26-59 L 1.0 -o cust_csss_drk.json
 
@@ -139,10 +140,10 @@ energy and MC-SCE as above::
         -of ./drk_CSSSd2D_nosub_mcsce \
         -n
 
-The default chunk size probabilities for building are (1, 1, 3, 3, 2) for chunk sizes of (1, 2, 3, 4, 5) respectively.
-To change this, we would have to create a :code:`.TXT` file with two columns, the first specifying what chunk sizes
+The default fragment size probabilities for building are (1, 1, 3, 3, 2) for fragment sizes of (1, 2, 3, 4, 5) respectively.
+To change this, we would have to create a :code:`.TXT` file with two columns, the first specifying what fragment sizes
 from lowest to highest, the second specifying their relative probabilities. We have provided an example in
-:code:`example/drksh3_ex_resources` as :code:`customChunk.txt`. To use these custom chunk size probabilities with CSSS::
+:code:`example/drksh3_ex_resources` as :code:`customFragments.txt`. To use these custom fragment size probabilities with CSSS::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -150,12 +151,12 @@ from lowest to highest, the second specifying their relative probabilities. We h
         -etbb 100 \
         -etss 250 \
         -nc 100 \
-        -xp customChunk.txt \
+        -xp customFragments.txt \
         -csss csss_drk_d2D.txt \
         --dloop-off \
         -et 'pairs' \
         -scm mcsce \
-        -of ./drk_chunkN_CSSSd2D_nosub_mcsce \
+        -of ./drk_fragN_CSSSd2D_nosub_mcsce \
         -n
 
 Finally, to expand torsion angle sampling beyond the residue identity, we can provide a residue tolerance map using the :code:`-subs` flag in the

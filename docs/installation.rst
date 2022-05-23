@@ -170,11 +170,11 @@ parameters dedicated to MC-SCE, you can explore those as well.
 CheSPI
 ``````
 
-To use CSSS via the ``idpconfgen makecsss`` command you need CheSPI. Please
+To use CSSS via the ``idpconfgen csssconv`` command you need CheSPI. Please
 refer to https://github.com/protein-nmr/CheSPI to install CheSPI.
 
 δ2D
 ```
 
-The use δ2D via the ``idpconfgen makecss`` command you need δ2D.
+The use δ2D via the ``idpconfgen csssconv`` command you need δ2D.
 Please refer to https://github.com/carlocamilloni/d2D.

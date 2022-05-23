@@ -40,8 +40,8 @@ peptide.
    :end-before: .. end-description
 
 
-A real case scenario - drkSH3
------------------------------
+A Real Case Scenario
+--------------------
 
 .. include:: ../example/drksh3_example/README.rst
    :start-after: .. start-description
@@ -75,7 +75,7 @@ number of hits and their associated PDBIDs in .JSON format::
 
     idpconfgen search \
         -fpdb ./cull100pdbs/ \
-        -kw 'drk,beta' \
+        -kw 'thermococcus,pro,beta' \
         -n
 
 After generating conformer ensembles with IDPConfGen, it is possible to do some basic plotting with the integrated plotting flags
@@ -172,7 +172,7 @@ If multiple nodes are requested, at the end of all jobs, the :code:`merge` subcl
 merge all of the conformers generated into one folder with the option of modify the naming-pattern
 for each structure. Please see below for an example of running :code:`sethpc` and :code:`merge`.
 
-To request 3 nodes to generate 512,000 structures of drkN SH3 with 10 hours per node::
+To request 3 nodes to generate 512,000 structures of the unfolded state of the drkN SH3 domain with 10 hours per node::
     
     idpconfgen sethpc \
         -des ./drk_hpc_jobs/ \
