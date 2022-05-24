@@ -24,7 +24,7 @@ Failed PDBs are registered in `.rpr_on_crash` files and ignored.
 PLOTTING:
 
 The default torsion distribution plotted are "Phi" angles. To change this to
-Omega or Psi, simply `--plots type=omega` or `--plots type=psi`.
+Omega or Psi, simply `--plots angtype=omega` or `--plots angtype=psi`.
 
 USAGE:
     $ idpconfgen torsions [PDBS]
@@ -184,11 +184,11 @@ def main(
         plotvars = plotvars or dict()
 
         tor_defaults = {
-            'type': 'phi',
+            'angtype': 'phi',
             'filename': 'plot_torsions.png'
         }
         tor_defaults.update(plotvars)
-        ttype = tor_defaults['type']
+        ttype = tor_defaults['angtype']
 
         max_residues=0
         n_confs = len(torsion_result)
@@ -217,7 +217,7 @@ def main(
 
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
         rama_defaults = {
-        'type': 'Rama.',
+        'sstype': 'Rama.',
         'filename': newfname,
         }
 

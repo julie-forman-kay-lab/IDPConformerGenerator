@@ -43,7 +43,7 @@ def plot_torsions(
         degrees,
         n_conf,
         *,
-        type=None,
+        angtype=None,
         title=None,
         xlabel="Residues",
         colors='k',
@@ -114,7 +114,7 @@ def plot_torsions(
 
     if degrees: yunits="deg"
     else: yunits="rad"
-    if not ylabel: ylabel = f'{type} ({yunits})'
+    if not ylabel: ylabel = f'{angtype} ({yunits})'
 
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
@@ -129,7 +129,7 @@ def plot_fracSS(
         residues,
         frac_ss,
         *,
-        type="Generic",
+        sstype="Generic",
         title=None,
         xlabel="Residues",
         ylabel="Fraction Secondary Structure",
@@ -192,7 +192,7 @@ def plot_fracSS(
 
     clr=0
     for ss in frac_ss:
-        plt.plot(aa, frac_ss[ss], label=f'{type} {ss}', color=colors[clr])
+        plt.plot(aa, frac_ss[ss], label=f'{sstype} {ss}', color=colors[clr])
         clr+=1
     plt.legend(bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0)
     ax = plt.gca()
