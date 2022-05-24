@@ -168,7 +168,7 @@ generated. You will see :code:`idpconfgen build -h` has a specific group of
 parameters dedicated to MC-SCE, you can explore those as well.
 
 Install Int2Cart
-----------------
+````````````````
 
 IDPConformerGenerator can use Int2Cart on the fly to optimize bond geometries
 of the backbones calculated. For this feature, you must have a CUDA compatible
@@ -194,12 +194,14 @@ First, install IDPConfGen as described above. Next, follow these steps::
 Running Int2Cart on the Graham cluster requires GPU allocations and ``module load cuda``.
 Otherwise, installation is the same within the ``idpconfgen`` virtualenv.
 
-**Troubleshooting Int2Cart:** 
+Troubleshooting Int2Cart installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
 If IDPConfGen is still giving you an error that Int2Cart is not installed, please test this import
 in the ``idpconfgen`` environment::
 
     python
-    from modelling.models.builder import BackboneBuilder
+    >>> from modelling.models.builder import BackboneBuilder
 
 If you receieve this error: ``ImportError: TensorBoard logging requires TensorBoard version 1.15 or above``,
 do the following::
