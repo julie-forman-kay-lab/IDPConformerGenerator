@@ -19,6 +19,8 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
+    bgeo_int2cart_name,
+    bgeo_sampling_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -1111,7 +1113,7 @@ def conformer_generator(
                         )
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
-                    if bgeo_strategy == bgeo_strategies[1]:
+                    if bgeo_strategy == bgeo_int2cart_name:
                         torsion_records.append((omg, phi, psi))
                         seq = all_atom_input_seq[:current_res_number + 1]
                         tors = np.array(torsion_records) # omega, phi, psi
@@ -1122,11 +1124,11 @@ def conformer_generator(
 
                     for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):
 
-                        if bgeo_strategy == bgeo_strategies[1]:
+                        if bgeo_strategy == bgeo_int2cart_name:
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2 # needed for correctly calculating Q
                             _bond_lens = bond_lens[torsion_idx]
 
-                        elif bgeo_strategy == bgeo_strategies[0]:
+                        elif bgeo_strategy == bgeo_sampling_name:
                             _bt = next(bond_type)
 
                             try:
@@ -1300,7 +1302,7 @@ def conformer_generator(
                 current_res_number = _resi0
 
                 # remove torsion angle records for this chunk
-                if bgeo_strategy == bgeo_strategies[0]:
+                if bgeo_strategy == bgeo_sampling_name:
                     torsion_records = torsion_records[:current_res_number + 1]
 
                 # coords needs to be reset because size of protein next
