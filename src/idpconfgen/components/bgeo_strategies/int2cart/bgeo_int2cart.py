@@ -50,7 +50,7 @@ class BGEO_Int2Cart:
             sequence,
             torsions,
             build=False,
-            nits="radian",
+            units="radian",
             )
         d1 = predictions['d1'][0, -1, 0]
         d2 = predictions['d2'][0, -1, 0]
