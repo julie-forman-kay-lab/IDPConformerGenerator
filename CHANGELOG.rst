@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.6.0 (2022-05-24)
+------------------------------------------------------------
+
 * Add bond geometry option to build with `Int2Cart` software
 * PR #203
 
