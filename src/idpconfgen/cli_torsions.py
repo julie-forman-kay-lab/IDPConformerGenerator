@@ -93,36 +93,36 @@ def main(
         ):
     """
     Perform main script logic.
-    
+
     Parameters
     ----------
     pdb_files : str or Path, required
         Location for PDB files to operate on, can be within a folder or inside .TAR file
-    
+
     source : string or Path, optional
         If given, updates a preexisting torsions.JSON file.
         Defaults to `None`.
-        
+
     output : string or Path, optional
         If given prints output to that file, else prints to console.
         Defaults to `None`.
-    
+
     degrees : Bool, optional
         Whether to use degrees instead of radians.
         Defaults to False, use radians.
 
     ncores : int
         The numbers of cores to use.
-    
+
     plot : Bool, optional
         Whether to plot the fractional secondary structure information.
         Defaults to False, don't plot.
-    
+
     plotvars : dictionary, optional
         Parameters for creating the torsion angle distribution plot
-        
+
     ramaplot : dictionary, optional
-        Parameters for creating the ramachandran fraction secondary structure plot   
+        Parameters for creating the ramachandran fraction secondary structure plot
     """
     # validates before performing time consuming calculations
     if source and not source.suffix == '.json':
@@ -170,28 +170,28 @@ def main(
 
     else:
         save_dict_to_json(torsion_result, output=output)
-        
+
     if plot:
         # Plotting torsion angle distributions
         log.info(T("Plotting torsion angle distribution"))
         log.info(S("Reminder: PDBs must be conformers of the same protein-system."))
-        
+
         plotvars = plotvars or dict()
-        
+
         tor_defaults = {
             'type': 'phi',
             'filename': 'plot_torsions.png'
         }
         tor_defaults.update(plotvars)
         ttype = tor_defaults['type']
-        
+
         max_residues=0
         n_confs = len(torsion_result)
-        
+
         for key in torsion_result:
             if len(torsion_result[key]['omega'])+1 > max_residues:
                 max_residues = len(torsion_result[key]['omega'])+1
-        
+
         angles = np.ndarray(shape=(n_confs, max_residues), dtype=float)
         j=0
         for t in torsion_result:
@@ -201,32 +201,32 @@ def main(
                 except:
                     angles[j:,i-1] = 0
             j+=1
-                
+
         errs=plot_torsions(max_residues, angles, degrees, n_confs, **tor_defaults)
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {tor_defaults["filename"]}'))
-        
+
         # Plotting ramachandran frac sec. str.
         log.info(T("Plotting ramachandran fractional secondary structure"))
-        
+
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
         rama_defaults = {
         'type': 'Rama.',
         'filename': newfname,
         }
-        
+
         if ramaplot:
             ramaplot = values_to_dict(ramaplot)
             rama_defaults.update(ramaplot)
-        
+
         frac_rama={
             'alpha':np.zeros(max_residues),
             'beta':np.zeros(max_residues),
             'other':np.zeros(max_residues),
             }
         p=np.ones(n_confs)
-        p=p/len(p)           
+        p=p/len(p)
         c=0
         for conf in torsion_result:
             for res in range(max_residues-1):
@@ -246,7 +246,7 @@ def main(
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {rama_defaults["filename"]}'))
-        
+
     return
 
 if __name__ == '__main__':
