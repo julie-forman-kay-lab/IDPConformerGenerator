@@ -190,6 +190,8 @@ First, install IDPConfGen as described above. Next, follow these steps::
     # navigate back to the IDPConformerGenerator GitHub folder and re-run
     python setup.py develop --no-deps
 
+Running Int2Cart on the Graham cluster requires GPU allocations and ``module load cuda``.
+Otherwise, installation is the same within the ``idpconfgen`` virtualenv.
 
 CheSPI
 ``````
