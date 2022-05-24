@@ -176,22 +176,36 @@ GPU as well as install Int2Cart on top of the `idpconfgen` Python environment.
 First, install IDPConfGen as described above. Next, follow these steps::
 
     # Install a pre-requisite of Int2Cart, sidechainnet
-
     git clone https://github.com/THGLab/sidechainnet
     cd sidechainnet
     pip install -e .
 
     # Install Int2Cart
-
     git clone https://github.com/THGLab/int2cart
     cd int2cart
     pip install -e .
+
+    # Install PyYAML requirement for Int2Cart
+    pip install PyYAML
 
     # navigate back to the IDPConformerGenerator GitHub folder and re-run
     python setup.py develop --no-deps
 
 Running Int2Cart on the Graham cluster requires GPU allocations and ``module load cuda``.
 Otherwise, installation is the same within the ``idpconfgen`` virtualenv.
+
+**Troubleshooting Int2Cart:** 
+If IDPConfGen is still giving you an error that Int2Cart is not installed, please test this import
+in the ``idpconfgen`` environment::
+
+    python
+    from modelling.models.builder import BackboneBuilder
+
+If you receieve this error: ``ImportError: TensorBoard logging requires TensorBoard version 1.15 or above``,
+do the following::
+
+    conda uninstall tensorflow
+    conda install tensorboard
 
 CheSPI
 ``````
