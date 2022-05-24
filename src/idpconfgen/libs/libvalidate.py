@@ -52,9 +52,6 @@ def vdw_clash_by_threshold_common_preparation(
     `atoms_to_consider` and `elements_to_consider` are evaluated with
     logical AND, that is, only entries that satisfy both are considered.
 
-    .. see-also::
-        vdw_clash_by_threshold_calc
-
     Parameters
     ----------
     protein_atoms : np.array, of shape (N,), dtype string
@@ -72,6 +69,10 @@ def vdw_clash_by_threshold_common_preparation(
     elements_to_consider : sequence, optional
         A tuple of the element types to consider in the calculation.
         Defaults to FALSE, considers all elements.
+
+    See Also
+    --------
+        :py:func:`vdw_clash_by_threshold_calc`.
     """
     # uses all options if values evaluate to FALSE
     atoms_to_consider = atoms_to_consider or protein_atoms
@@ -255,8 +256,9 @@ def evaluate_vdw_clash_by_threshold_from_disk(
 
     Created to evaluate conformers from disk.
 
-    .. see-also::
-        validate_vdw_clashes
+    See Also
+    --------
+        :py:func:`validate_vdw_clashes`.
     """
     s = Structure(pdb_data)
     s.build()
@@ -393,9 +395,9 @@ def report_vdw_clash(data_array, pair1, pair2, distances, radii_sum, overlap):
 
     Parameters
     ----------
-    data_array : Numpy ndarray, shape (N, M)
+    data_array : np.ndarray, shape (N, M)
         A numpy data_array as given by
-        :attr:`idpconfgen.libs.libstructure.Structure.data_array`.
+        :py:attr:`idpconfgen.libs.libstructure.Structure.data_array`.
 
     pair1, pair2 : ordered iterable of integers
         The row indexes where to retrieve atom information from `data_array´.

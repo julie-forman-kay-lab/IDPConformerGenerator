@@ -1,10 +1,22 @@
-============
 Installation
 ============
 
-How to install the current beta-version:
+IDPConformerGenerator uses only Python-based APIs for which we expect it to run
+native on any system Python can run, as long as the third-party installation
+requirements are met.
 
-1. Clone this repository::
+We tested IDPConfGen on Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and
+the Graham cluster, an HPC resource of the Digital Research Alliance of Canada
+(DRAC).
+
+
+Follow the steps below to install IDPConformerGenerator (``idpconfgen`` or
+``IDPConfGen`` for short) on your local machine:
+
+From source
+-----------
+
+Clone from the official repository::
 
     git clone https://github.com/julie-forman-kay-lab/IDPConformerGenerator
 
@@ -12,40 +24,131 @@ And navigate to the new ``IDPConformerGenerator`` folder::
 
     cd IDPConformerGenerator
 
-2. Install the required dependencies manually, by creating a dedicated environment in your Anaconda::
+Run the following commands to install ``idpconfgen`` dependencies if you use
+Anaconda as your Python package manager::
 
     conda env create -f requirements.yml
-
-If you don't Anaconda to manage your Python installations, and have difficulties
-installing ``IDPConfGen``, raise an Issue in the main GitHub repository, and we
-will help you.
-
-3. Activate the new conda environment::
-
     conda activate idpconfgen
 
-4. Install IDPConfGen in development mode in order for your installation to be
+.. note::
+    If you don't use Anaconda to manage your Python installations, you can use
+    ``virtualenv`` and the ``requirements.txt`` file following the commands:
+
+    | ``virtualenv idpcgenv --python=3.9``
+    | ``source venv/bin/activate``
+    | ``pip install -r requirements.txt``
+
+    If you have difficulties installing ``idpconfgen``, raise an Issue in the
+    main GitHub repository, and we will help you.
+
+Install ``idpconfgen`` in development mode in order for your installation to be
 always up-to-date with the repository::
 
     python setup.py develop --no-deps
 
-5. To update to the latest version::
+.. note::
+    The above applies also if you used ``virtualenv`` instead of ``conda``.
+
+**Remember** to active the ``idpconfgen`` environment every time you open a new
+terminal window, from within the repository folder, choose yours::
+
+    # Installation with Anaconda
+    conda activate idpconfgen
+
+    # Installation with virtualenv
+    source idpcgenv/bin/activate
+
+
+To update to the latest version, navigate to the repository folder, activate the
+``idpconfgen`` python environment as described above, and run the commands::
 
     git pull
 
+    # if you used anaconda to create the python environment, run:
+    conda env update -f requirements.yml
 
-Install MCSCE
--------------
+    # if you used venv to create the python environment, run:
+    pip install -r requirements.txt  --upgrade
 
-IDPConformerGenerator can integrate MCSCE to generate sidechains on top of the
-backbone conformers it generates, on the fly. For that you need to install MCSCE
-on top of the `idpconfgen` Python environment. First, install IDPConfGen as
-described above. Next, follow these steps::
+    python setup.py develop --no-deps
 
-    # clone MCSCE, navigate to a folder of your preference
+Your installation will become up to date with the latest developments.
+
+From source on the Graham Cluster (DRAC)
+----------------------------------------
+
+Log-in and make sure you are in your user home directory::
+
+    cd
+
+Load the required python packages and modules on Graham's servers::
+
+    module load scipy-stack dssp boost
+
+Create and activate a ``virtualenv`` as DRAC recommends ``anaconda3``
+not be installed in the home folder::
+
+    virtualenv --no-download idpcgenv
+    source idpcgenv/bin/activate
+
+For the first time installation, install dependencies manually using :code:`pip`.
+Please note that the :code:`--no-index` searches through DRAC's available packages.
+If they're not available, it will install from the web::
+
+    pip install --no-index --upgrade pip
+    pip install numba --no-index
+    pip install pybind11 --no-index
+    pip install tox
+    pip install libfuncpy
+
+We are ready to clone from source and installation from here will be similar to
+local::
+
+    git clone https://github.com/julie-forman-kay-lab/IDPConformerGenerator
+    cd IDPConformerGenerator
+
+Make sure you're in the :code:`idpcgenv` virtual environment before
+installing. Install with::
+
+    python setup.py develop --no-deps
+
+When you login again to your cluster account remember to reactive the
+``idpconfgen`` environment before using ``idpconfgen``::
+
+    cd
+    source idpcgenv/bin/activate
+
+Installing third-party software
+-------------------------------
+
+Some functionalities of ``idpconfgen`` require third-party software. These
+are not mandatory to install unless you want to use such operations.
+
+DSSP
+````
+
+IDPConfGen uses `DSSP <https://github.com/cmbi/dssp>`_ to calculate secondary
+structures. However, you only need DSSP if you are generated the database from
+scratch. If you use a prepared database JSON file you don't need to install
+DSSP.
+
+To install DSSP, please refer to:
+https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
+
+Install MC-SCE
+``````````````
+
+IDPConformerGenerator can integrate MC-SCE to generate sidechains on top of the
+backbone conformers it generates, on the fly. For that you need to install
+MC-SCE on top of the `idpconfgen` Python environment. First, install IDPConfGen
+as described above. Next, follow these steps::
+
+    cd
+
+    # clone MC-SCE, navigate to a folder of your preference
     git clone https://github.com/THGLab/MCSCE
 
-    # Install MCSCE on top of idpconfgen
+    # Install MC-SCE on top of idpconfgen
     cd MCSCE
     conda env update --file requirements.yml --name idpconfgen
 
@@ -53,13 +156,25 @@ described above. Next, follow these steps::
     conda deactivate
     conda activate idpconfgen
 
-    # install MCSCE within the `idpconfgen` environment
+    # install MC-SCE within the `idpconfgen` environment
     python setup.py develop --no-deps
 
     # navigate back to the idpconfgen github folder and re-run
     python setup.py develop --no-deps
 
-Now, if you choose the flag `-scm mcsce`, IDPConfGen will use MCSCE to build
-sidechains as backbone conformers are generated. You will see `idpconfgen build
--h` has a specific group of parameters dedicated to MCSCE, you can explore those
-as well.
+Now, if you choose the flag :code:`-scm mcsce` in ``idpconfgen build`` command,
+IDPConfGen will use MC-SCE to build sidechains as backbone conformers are
+generated. You will see :code:`idpconfgen build -h` has a specific group of
+parameters dedicated to MC-SCE, you can explore those as well.
+
+CheSPI
+``````
+
+To use CSSS via the ``idpconfgen csssconv`` command you need CheSPI. Please
+refer to https://github.com/protein-nmr/CheSPI to install CheSPI.
+
+δ2D
+```
+
+The use δ2D via the ``idpconfgen csssconv`` command you need δ2D.
+Please refer to https://github.com/carlocamilloni/d2D.

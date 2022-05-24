@@ -1,5 +1,5 @@
 """
-IDP Conformer Generator.
+IDPConformerGenerator.
 
 Generates conformers for Intrinsically Disordered Proteins.
 """
@@ -67,4 +67,4 @@ def assert_subclass(objs, subclass):
 
 source_folder = Path(__file__).absparent
 
-__version__ = '0.4.4'
+__version__ = '0.4.10'

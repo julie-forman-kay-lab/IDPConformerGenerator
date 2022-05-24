@@ -2,7 +2,6 @@
 from argparse import Namespace
 from collections import namedtuple
 from itertools import chain
-from math import pi
 # does not import the Path from IDPConfgen to avoid circular imports
 from pathlib import Path
 
@@ -178,7 +177,6 @@ blocked_ids = [
 
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
-
 
 # Builder Definitions  ###
 # average values of the backbone angles calculated from

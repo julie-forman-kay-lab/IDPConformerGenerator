@@ -365,13 +365,13 @@ def get_mers(seq, size):
 
 # njit available
 def get_seq_chunk(seq, idx, size):
-    """Get a chunk from sequence at start at `idx` with `size`."""
+    """Get a fragment from sequence at start at `idx` with `size`."""
     return seq[idx: idx + size]
 
 
 # njit available
 def get_seq_next_residue(seq, idx, size):
-    """Get the next residue after the chunk."""
+    """Get the next residue after the fragment."""
     return seq[idx + size: idx + size + 1]
 
 
