@@ -41,6 +41,7 @@ def add_res_tolerance_groups(ap):
         default=None,
         type=int,
         action=EDSS50_indexes,
+        choices=(5,3,2,1,0),
         )
 
 
@@ -92,7 +93,7 @@ EDSSMat50_subs = {
 
 
 def make_EDSSMat50_subs(idx=(5, 3, 2, 1, 0)):
-    """Make EDSSMat50 table com column indexes."""
+    """Make EDSSMat50 table column indexes."""
     idxs = make_list_if_not(idx)
     subsd = {}
     for k, v in EDSSMat50_subs.items():
@@ -105,5 +106,6 @@ class EDSS50_indexes(argparse.Action):
 
     def __call__(self, parser, namespace, values, option_string=None):
         """Hello."""
+        
         subs = make_EDSSMat50_subs(values)
         setattr(namespace, self.dest, subs)
