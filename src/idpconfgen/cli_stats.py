@@ -9,7 +9,7 @@ import argparse, os, re, json
 from pathlib import Path
 
 from idpconfgen import log
-from idpconfgen.components.residue_tolerance import add_substitution_groups
+from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import build_regex_substitutions, make_combined_regex
 from idpconfgen.libs.libfilter import regex_forward_no_overlap
@@ -38,7 +38,7 @@ libcli.add_argument_dhelix(ap)
 libcli.add_argument_dstrand(ap)
 libcli.add_argument_dany(ap)
 libcli.add_argument_duser(ap)
-add_substitution_groups(ap)
+add_res_tolerance_groups(ap)
 libcli.add_argument_output_folder(ap)
 
 

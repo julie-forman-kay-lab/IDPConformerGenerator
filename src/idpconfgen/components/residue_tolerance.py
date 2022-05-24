@@ -5,7 +5,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libparse import make_list_if_not
 
 
-residue_substitutions_cli_help = \
+residue_tolerance_cli_help = \
 """Map residue replacements.
 
 Provide a dictionary mapping which residue exchange are allowed.
@@ -16,25 +16,25 @@ will consider Ala or Glycines when searching the database. When looking
 for "GHLAT" both "GHLAT" and "GHLGT" will be considered valid matches."""  # noqa: E122, E501
 
 
-def add_substitution_groups(ap):
+def add_res_tolerance_groups(ap):
     """Add parameters related to residue tolerance."""
     parser = ap.add_mutually_exclusive_group(required=False)
     parser.add_argument(
         '-usubs',
-        '--user-residue-substitutions',
+        '--user-residue-tolerance',
         dest='residue_tolerance',
-        help=residue_substitutions_cli_help,
+        help=residue_tolerance_cli_help,
         default=None,
         action=libcli.ReadDictionary,
         )
 
     parser.add_argument(
         '-edss50',
-        '--edss50-residue-substitutions',
+        '--edss50-residue-tolerance',
         dest='residue_tolerance',
         help=(
-            'Uses residue substitution matrix EDSS50. '
-            'Provide the indexes of the table columns to add up replacements. '
+            'Uses residue tolerance matrix EDSS50. '
+            'Provide the indexes of the table columns to add up tolerances. '
             'Example: -edss50 5 3 2'
             ),
         nargs='+',
