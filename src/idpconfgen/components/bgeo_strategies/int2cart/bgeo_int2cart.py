@@ -6,13 +6,17 @@ import yaml
 from modelling.utils.predict import predict
 from modelling.models.builder import BackboneBuilder
 
+_folder = Path(__file__).parent
+
 
 class BGEO_Int2Cart:
-    def __init__(self, folder=None) -> None:
-        model_config = os.path.join(folder, "int2cart.yml")
-        model_addr = os.path.join(folder, "model.tar")
-        with open(model_config, "r"), as fin:
+    def __init__(self) -> None:
+        model_config = os.path.join(_folder, "int2cart.yml")
+        model_addr = os.path.join(_folder, "model.tar")
+
+        with open(model_config, "r") as fin:
             settings = yaml.safe_load(fin)
+
         builder = BackboneBuilder(settings)
 
         _ = torch.load(model_addr, map_location=torch.device('cuda'))
