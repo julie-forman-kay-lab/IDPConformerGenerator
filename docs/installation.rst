@@ -187,7 +187,7 @@ First, install IDPConfGen as described above. Next, follow these steps::
     git clone https://github.com/THGLab/int2cart
     cd int2cart
     pip install -e .
-    pip install PyYAML
+    pip install pyyaml
     cd ..
 
     # you should be back in the IDPConformerGenerator GitHub folder
@@ -210,6 +210,7 @@ do the following::
 
     conda uninstall tensorflow
     conda install tensorboard
+    pip install pyyaml
 
 CheSPI
 ``````
