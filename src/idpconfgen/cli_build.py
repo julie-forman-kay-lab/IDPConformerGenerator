@@ -23,6 +23,7 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_int2cart_name,
     bgeo_sampling_name,
     bgeo_strategies_default,
+    bgeo_strategies,
     bgeo_error_msg,
     )
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
@@ -168,6 +169,9 @@ def are_globals(bgeo_strategy):
             TEMPLATE_LABELS,
             TEMPLATE_MASKS,
             TEMPLATE_EFUNC,
+            BGEO_full,
+            BGEO_trimer,
+            BGEO_res,
             INT2CART,
             ))
     else:
@@ -599,7 +603,10 @@ def populate_globals(
             f'Expected string found {type(input_seq)}'
             )
 
-    if bgeo_strategy == bgeo_sampling_name:
+    if bgeo_strategy not in bgeo_strategies:
+        raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
+
+    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path
 
         if bgeo_path is None:
@@ -618,7 +625,7 @@ def populate_globals(
         assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
     # Also prepare BGEO_int2cart when needed
-    elif bgeo_strategy == bgeo_int2cart_name:
+    if bgeo_strategy == bgeo_int2cart_name:
         global INT2CART
         from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import BGEO_Int2Cart
         try:
@@ -629,8 +636,6 @@ def populate_globals(
                 "--bgeo_strategy int2cart."
                 ))
             log.info(S(f"Error: {e}"))
-    else:
-        raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
     # populates the labels
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
