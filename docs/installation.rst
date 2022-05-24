@@ -143,23 +143,20 @@ backbone conformers it generates, on the fly. For that you need to install
 MC-SCE on top of the `idpconfgen` Python environment. First, install IDPConfGen
 as described above. Next, follow these steps::
 
-    cd
+    # deactivate idpconfgen environment
+    conda deactivate
 
-    # clone MC-SCE, navigate to a folder of your preference
+    # navigate to a folder of your preference and clone MC-SCE
+    # it can be inside the IDPCG github folder
     git clone https://github.com/THGLab/MCSCE
 
-    # Install MC-SCE on top of idpconfgen
+    # Install MC-SCE on top of idpconfgen enviroment
     cd MCSCE
     conda env update --file requirements.yml --name idpconfgen
 
-    # deactivate the environment and come back
-    conda deactivate
     conda activate idpconfgen
 
     # install MC-SCE within the `idpconfgen` environment
-    python setup.py develop --no-deps
-
-    # navigate back to the idpconfgen github folder and re-run
     python setup.py develop --no-deps
 
 Now, if you choose the flag :code:`-scm mcsce` in ``idpconfgen build`` command,

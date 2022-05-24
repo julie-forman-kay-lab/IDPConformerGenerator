@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* update installation for MC-SCE
+
 v0.5.1 (2022-05-24)
 ------------------------------------------------------------
 
