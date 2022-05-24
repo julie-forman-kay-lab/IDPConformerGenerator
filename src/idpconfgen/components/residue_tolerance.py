@@ -44,6 +44,7 @@ def add_res_tolerance_groups(ap):
         default=None,
         type=int,
         action=EDSS50_indexes,
+        choices=(5, 3, 2, 1, 0),
         )
 
 

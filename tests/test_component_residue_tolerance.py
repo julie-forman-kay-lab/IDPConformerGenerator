@@ -124,3 +124,15 @@ def test_argument_add_edss50_0(name):
     cmd = ap.parse_args(['-edss50', '0'])
     result = vars(cmd)
     assert result["residue_tolerance"] == option_0
+
+
+@pytest.mark.parametrize(
+    'name',
+    ['-edss50', '--edss50-residue-tolerance'],
+    )
+def test_argument_add_edss50_error(name):
+    """Test adding argument error."""
+    ap = argparse.ArgumentParser()
+    rt.add_res_tolerance_groups(ap)
+    with pytest.raises(SystemExit):
+        ap.parse_args(['-edss50', '10'])
