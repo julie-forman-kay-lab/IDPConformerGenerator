@@ -9,6 +9,7 @@ import argparse, os, re, json
 from pathlib import Path
 
 from idpconfgen import log
+from idpconfgen.components.residue_tolerance import add_substitution_groups
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import build_regex_substitutions, make_combined_regex
 from idpconfgen.libs.libfilter import regex_forward_no_overlap
@@ -37,7 +38,7 @@ libcli.add_argument_dhelix(ap)
 libcli.add_argument_dstrand(ap)
 libcli.add_argument_dany(ap)
 libcli.add_argument_duser(ap)
-libcli.add_argument_subs(ap)
+add_substitution_groups(ap)
 libcli.add_argument_output_folder(ap)
 
 
@@ -52,7 +53,7 @@ ap.add_argument(
         ),
     default=OUTPUT_PREFIX,
     type=str,
-    )    
+    )
 
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
@@ -72,34 +73,34 @@ def main(
     ):
     """
     Performs main client logic.
-    
+
     The default function is to return the number/counts of hits
     for different fragment sequences within the IDPConfGen database.
-    
+
     A secondary function denoted with `--search` can search through
     raw PDB files' headers for certain keywords and return the PDB IDs
-    that had hits to the keywords.  
+    that had hits to the keywords.
 
     Parameters
     ----------
     database : str or Path
         Path to the database.JSON file for IDPConfGen.
         Required for default func.
-        
+
     input_seq : str or Path
         Primary sequence or path to the FASTA file.
         Required for default func.
-    
+
     output_prefix : str
         Prefix for the output files when comparing counts of fragment ID hits.
-        Defaults to `count_stats`. Optional for default func. 
-    
+        Defaults to `count_stats`. Optional for default func.
+
     output_folder : str or Path
         Path of the output folder to store stats.CSV.
-        Defaults to working directory. Optional for default func. 
+        Defaults to working directory. Optional for default func.
     """
     init_files(log, LOGFILESNAME)
-       
+
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
     non_overlapping_parameters = (any_def_loops, dany, duser)  # noqa: E501
