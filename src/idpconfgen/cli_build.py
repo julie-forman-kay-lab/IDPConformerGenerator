@@ -461,8 +461,11 @@ def main(
     _, ANGLES, secondary, primary = aligndb(db)
     del db
 
-    _restol = str(residue_tolerance)[1:-1]
-    log.info(S(f"Building with residue tolerances: {_restol}"))
+    if residue_tolerance is not None:
+        _restol = str(residue_tolerance)[1:-1]
+        log.info(S(f"Building with residue tolerances: {_restol}"))
+        
+        
     # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
