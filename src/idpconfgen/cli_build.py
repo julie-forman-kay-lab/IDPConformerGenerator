@@ -19,10 +19,11 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
+    add_bgeo_strategy_arg,
     bgeo_int2cart_name,
     bgeo_sampling_name,
-    bgeo_strategies,
     bgeo_strategies_default,
+    bgeo_error_msg,
     )
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.components.sidechain_packing import (
@@ -170,7 +171,7 @@ def are_globals(bgeo_strategy):
             INT2CART,
             ))
     else:
-        raise AssertionError("Code shouldn't be here.")
+        raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
 
 # CLI argument parser parameters
@@ -239,13 +240,7 @@ ap.add_argument(
     )
 
 
-ap.add_argument(
-    '--bgeo_strategy',
-    help="Which strategy to use for bond geometries.",
-    choices=bgeo_strategies,
-    default=bgeo_strategies_default,
-    )
-
+add_bgeo_strategy_arg(ap)
 
 ap.add_argument(
     '-etbb',
@@ -628,7 +623,7 @@ def populate_globals(
                 ))
             log.info(S(f"Error: {e}"))
     else:
-        raise AssertionError("Code shouldn't be here.")
+        raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
     # populates the labels
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC

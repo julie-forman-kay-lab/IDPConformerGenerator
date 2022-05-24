@@ -1,11 +1,9 @@
-name: idpconfgen
+name: idpconfgenjerry
 channels:
     - conda-forge
     - defaults
 dependencies:
     - python>=3.7,<3.10
-    - pyyaml==6.0
-    - pytorch=1
     - numpy>=1.22.4,<2
     - numba>=0.53.0,<1
     - pybind11>=2.9.2,<3

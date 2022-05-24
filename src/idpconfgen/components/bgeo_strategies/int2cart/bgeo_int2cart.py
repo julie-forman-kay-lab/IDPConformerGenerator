@@ -12,20 +12,22 @@ try:
 except ImportError:
     has_int2cart = False
 
+_import_emsg = (
+    "Please install Int2Cart software to access this module. "
+    "See the INSTALL page of IDPConfGen documentation."
+    )
+
 
 _folder = Path(__file__).parent
 name = "int2cart"
+
 
 class BGEO_Int2Cart:
     """Prepara Int2Cart module."""
 
     def __init__(self) -> None:
         if not has_int2cart:
-            emsg = (
-                "Please install Int2Cart software to access this module. "
-                "See the INSTALL page of IDPConfGen documentation."
-                )
-            raise ImportError(emsg)
+            raise ImportError(_import_emsg)
 
         model_config = os.path.join(_folder, "int2cart.yml")
         model_addr = os.path.join(_folder, "model.tar")
