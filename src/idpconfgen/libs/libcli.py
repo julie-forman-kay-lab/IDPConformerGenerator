@@ -91,6 +91,7 @@ class ReadDictionary(argparse.Action):
                 valuedict = json.load(fin)
         except FileNotFoundError:
             valuedict = json.loads(value)
+            print(type(valuedict))
 
         setattr(namespace, self.dest, valuedict)
 
@@ -424,16 +425,6 @@ def add_argument_duser(parser):
             ),
         default=None,
         nargs='+',
-        )
-
-
-def add_argument_subs(parser):
-    parser.add_argument(
-        '-subs',
-        '--residue-substitutions',
-        help=help_docs.residue_substitutions_cli_help,
-        default=None,
-        action=ReadDictionary,
         )
 
 
