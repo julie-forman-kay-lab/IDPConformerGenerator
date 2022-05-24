@@ -8,7 +8,7 @@ from os import cpu_count
 from idpconfgen import Path, __version__
 from idpconfgen.core import help_docs
 from idpconfgen.core.definitions import vdW_radii_dict
-from idpconfgen.libs.libparse import is_valid_fasta
+from idpconfgen.libs.libparse import is_valid_fasta, values_to_dict
 from idpconfgen.libs.libio import (
     is_valid_fasta_file,
     read_FASTAS_from_file_to_strings,
@@ -138,6 +138,27 @@ class SeqOrFasta(argparse.Action):
             raise parser.error('Input sequence not valid.')
 
         setattr(namespace, self.dest, seq)
+
+class ParamsToDict(argparse.Action):
+    """
+    Convert command-line parameters in an argument to a dictionary.
+
+    Adapted from https://github.com/joaomcteixeira/taurenmd
+
+    Example
+    -------
+    Where ``-x`` is an optional argument of the command-line client
+    interface.
+        >>> par1=1 par2='my name' par3=[1,2,3]
+        >>> {'par1': 1, 'par2': 'my name', 'par3': [1, 2, 3]}
+    """
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        """Execute."""
+        param_dict = values_to_dict(values)
+
+        namespace.plotvars = param_dict
+        setattr(namespace, self.dest, True)
 
 
 def minimum_value(minimum):
@@ -699,4 +720,35 @@ def add_argument_vdWb(parser):
         default=3,
         action=minimum_value(3),
         type=int,
+        )
+
+def add_argument_plot(parser):
+    """
+    Add argument for plotting parameters.
+
+    Plot kwargs that will be passed to the plotting function.
+    If given, plot results. Additional arguments can be given to
+    specify the plot parameters.
+
+    Adapted from:
+    https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L539-L570
+
+    Defined by ``--plot``.
+    """
+    parser.add_argument(
+        '--plot',
+        help=(
+            'Plot torsion angles for ensembles of the same protein. '
+            'Using this plot for ensembles of different proteins is devoid '
+            'of meaning. '
+            'Additional arguments can be given to configure the '
+            'plot style. '
+            "Example: --plot xlabel=Sic1_Res type=omega color='b','r'. "
+            'Accepted plot arguments are defined by the plotting function used. '
+            'See ploting functions in the documentation pages. '
+            'Defaults to False, no plot is produced.'
+            ),
+        nargs='*',
+        default=False,
+        action=ParamsToDict,
         )

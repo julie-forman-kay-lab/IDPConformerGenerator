@@ -11,11 +11,13 @@ Uses an external third party software.
 
 USAGE:
     $ idpconfgen sscalc [PDBS]
+    $ idpconfgen sscalc [PDBS] -o mysscalc.json -d splitsscalc.tar -cmd <DSSP EXEC> --plot -n
 """
 import argparse
 import os
 import shutil
 import traceback
+import numpy as np
 from functools import partial
 
 from idpconfgen import Path, log
@@ -34,6 +36,7 @@ from idpconfgen.libs.libmulticore import (
     )
 from idpconfgen.libs.libparse import mkdssp_w_split, split_pdb_by_dssp
 from idpconfgen.logger import S, T, init_files, report_on_crash
+from idpconfgen.components.plots.plotfuncs import plot_fracSS
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -109,6 +112,7 @@ libcli.add_argument_reduced(ap)
 libcli.add_argument_minimum(ap)
 libcli.add_argument_chunks(ap)
 libcli.add_argument_ncores(ap)
+libcli.add_argument_plot(ap)
 
 
 def dssppi_helper(pdb_file, dssp_cmd, **kwargs):
@@ -130,6 +134,8 @@ def main(
         reduced=False,
         tmpdir=TMPDIR,
         update=None,
+        plot=False,
+        plotvars=None,
         ):
     """
     Run main cli logic.
@@ -139,8 +145,8 @@ def main(
     ss_cmd : str or Path
         The command to run with subprocess module.
 
-    pdbs : list
-        A list of paths to PDB files or PDB file lists.
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within a folder or inside .TAR file
 
     output : string or Path, optional
         If given prints output to that file, else prints to console.
@@ -155,6 +161,12 @@ def main(
 
     ncores : int
         The numbers of cores to use.
+    
+    plot : Bool, optional
+        Whether to plot the fractional secondary structure information
+    
+    plotvars : dictionary, optional
+        Parameters for creating the plot        
     """
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
@@ -228,6 +240,80 @@ def main(
         save_dictionary(previous.update(dssp_data), output)
     else:
         save_dictionary(dssp_data, output)
+    
+    if plot:
+        log.info(T("Plotting fractional secondary structure information"))
+        log.info(S("Tip: plotting is best for same protein-system ensembles."))
+        
+        max_residues=0
+        for key in dssp_data:
+            if len(dssp_data[key]["dssp"]) > max_residues:
+                max_residues = len(dssp_data[key]["dssp"])
+        n_confs = len(dssp_data)        
+        
+        plotvars = plotvars or dict()
+        plt_default = {
+            'type': 'DSSP',
+            'filename': 'plot_dssp_fracSS.png',
+        }
+        plt_default.update(plotvars)
+        
+        if reduced:
+            frac_dssp = {
+                'Loops': np.zeros(max_residues),
+                'Helices': np.zeros(max_residues),
+                'Strands': np.zeros(max_residues),
+            }
+            p=np.ones(n_confs)
+            p=p/len(p)
+
+            c=0
+            for conf in dssp_data:
+                r=0
+                for ss in dssp_data[conf]["dssp"]:
+                    if ss == "L": frac_dssp['Loops'][r] += p[c]
+                    elif ss == "H": frac_dssp['Helices'][r] += p[c]
+                    elif ss == "E": frac_dssp['Strands'][r] += p[c]
+                    r+=1
+
+                c+=1
+        else:
+            frac_dssp = {
+                'H': np.zeros(max_residues),
+                'B': np.zeros(max_residues),
+                'E': np.zeros(max_residues),
+                'G': np.zeros(max_residues),
+                'I': np.zeros(max_residues),
+                'T': np.zeros(max_residues),
+                'S': np.zeros(max_residues),
+                'P': np.zeros(max_residues),
+                '-': np.zeros(max_residues),
+            }
+            p=np.ones(n_confs)
+            p=p/len(p)
+
+            c=0
+            for conf in dssp_data:
+                r=0
+                for ss in dssp_data[conf]["dssp"]:
+                    if ss == "H": frac_dssp['H'][r] += p[c]
+                    elif ss == "B": frac_dssp['B'][r] += p[c]
+                    elif ss == "E": frac_dssp['E'][r] += p[c]
+                    elif ss == "G": frac_dssp['G'][r] += p[c]
+                    elif ss == "I": frac_dssp['I'][r] += p[c]
+                    elif ss == "T": frac_dssp['T'][r] += p[c]
+                    elif ss == "S": frac_dssp['S'][r] += p[c]
+                    elif ss == "P": frac_dssp['P'][r] += p[c]
+                    elif ss == "-": frac_dssp['-'][r] += p[c]
+                    r+=1
+
+                c+=1
+        
+        errs=plot_fracSS(max_residues, frac_dssp, **plt_default)
+        for e in errs:
+            log.info(S(f'{e}'))
+            
+        log.info(S(f'saved plot: {plt_default["filename"]}'))
 
     return
 
