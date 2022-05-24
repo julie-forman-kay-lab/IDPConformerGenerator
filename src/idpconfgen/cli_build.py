@@ -362,6 +362,7 @@ def main(
         func=None,
         forcefield=None,
         bgeo_strategy=bgeo_strategies_default,
+        bgeo_path=None,
         residue_substitutions=None,
         nconfs=1,
         ncores=1,
@@ -510,6 +511,7 @@ def main(
     populate_globals(
         input_seq=input_seq,
         bgeo_strategy=bgeo_strategy,
+        bgeo_path=bgeo_path,
         forcefield=forcefields[forcefield],
         **kwargs)
 
@@ -568,6 +570,7 @@ def populate_globals(
         *,
         input_seq=None,
         bgeo_strategy=bgeo_strategies_default,
+        bgeo_path=None,
         forcefield=None,
         **efunc_kwargs):
     """
@@ -598,6 +601,10 @@ def populate_globals(
 
     if bgeo_strategy == bgeo_sampling_name:
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path
+
+        if bgeo_path is None:
+            bgeo_path = bgeo_sampling_path
+
         global BGEO_full, BGEO_trimer, BGEO_res
         BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
         _1, _2 = bgeo_reduce(BGEO_full)
@@ -715,6 +722,7 @@ def conformer_generator(
         energy_threshold_backbone=10,
         energy_threshold_sidechains=1000,
         bgeo_strategy=bgeo_strategies_default,
+        bgeo_path=None,
         forcefield=None,
         random_seed=0,
         sidechain_parameters=None,
@@ -813,8 +821,9 @@ def conformer_generator(
         structure. Defaults to `faspr`.
         Expects a key in `components.sidechain_packing.sidechain_packing_methods`.
 
-    bgeo_int2cart : bool
-        Whether to use the Int2Cart algorithm to obtain bond lengths and bond angles
+    bgeo_strategy : str
+        The strategy used to generate the bond geometries. Available options are:
+        :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
 
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
@@ -900,6 +909,7 @@ def conformer_generator(
         populate_globals(
             input_seq=all_atom_input_seq,
             bgeo_strategy=bgeo_strategy,
+            bgeo_path=bgeo_path,
             forcefield=forcefields[forcefield]
             **energy_funcs_kwargs,
             )
