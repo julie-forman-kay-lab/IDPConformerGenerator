@@ -159,7 +159,7 @@ from lowest to highest, the second specifying their relative probabilities. We h
         -of ./drk_fragN_CSSSd2D_nosub_mcsce \
         -n
 
-Finally, to expand torsion angle sampling beyond the residue identity, we can provide a residue tolerance map using the :code:`-subs` flag in the
+Finally, to expand torsion angle sampling beyond the residue identity, we can provide a residue tolerance map using the :code:`-urestol` flag in the
 :code:`build` subclient. For this example, we will be using columns 5, 3, and 2 from the `EDSSMat50 <https://www.nature.com/articles/s41598-019-52532-8>`_
 substitution matrix::
 
@@ -171,7 +171,7 @@ substitution matrix::
         -nc 100 \
         --dany \
         --dloop-off \
-        -subs '{"R":"RK","D":"DE","C":"CY","C":"CW","Q":"QH","E":"ED","H":"HYQ","I":"IVM","I":"IL","K":"KR","M":"MI","M":"MVL","F":"FY","F":"FWL","W":"WYFC","Y":"YF","Y":"YC","Y":"YWH"}' \
+        -urestol '{"R":"RK","D":"DE","C":"CY","C":"CW","Q":"QH","E":"ED","H":"HYQ","I":"IVM","I":"IL","K":"KR","M":"MI","M":"MVL","F":"FY","F":"FWL","W":"WYFC","Y":"YF","Y":"YC","Y":"YWH"}' \
         -et 'pairs' \
         -scm mcsce \
         -of ./drk_ANY_sub532_mcsce \

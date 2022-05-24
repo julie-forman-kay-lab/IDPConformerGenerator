@@ -19,6 +19,7 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
+from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.components.sidechain_packing import (
     DEFAULT_SDM,
     add_mcsce_subparser,
@@ -250,13 +251,9 @@ ap.add_argument(
     type=float,
     )
 
-
 add_et_type_arg(ap)
-
-libcli.add_argument_subs(ap)
-
 add_xmer_arg(ap)
-
+add_res_tolerance_groups(ap)
 
 ap.add_argument(
     '-el',
@@ -347,7 +344,7 @@ def main(
         func=None,
         forcefield=None,
         bgeo_path=None,
-        residue_substitutions=None,
+        residue_tolerance=None,
         nconfs=1,
         ncores=1,
         random_seed=0,
@@ -464,6 +461,11 @@ def main(
     _, ANGLES, secondary, primary = aligndb(db)
     del db
 
+    if residue_tolerance is not None:
+        _restol = str(residue_tolerance)[1:-1]
+        log.info(S(f"Building with residue tolerances: {_restol}"))
+        
+        
     # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
@@ -472,7 +474,7 @@ def main(
         dssp_regexes=dssp_regexes,
         secondary=secondary,
         mers_size=xmer_probs_tmp.sizes,
-        res_tolerance=residue_substitutions,
+        res_tolerance=residue_tolerance,
         ncores=ncores,
         )
 
@@ -489,7 +491,7 @@ def main(
         ANGLES,
         SLICEDICT_XMERS,
         csss_dict,
-        residue_replacements=residue_substitutions,
+        residue_tolerance=residue_tolerance,
         )
 
     populate_globals(
@@ -1390,7 +1392,7 @@ def get_adjacent_angles(
         db,
         slice_dict,
         csss,
-        residue_replacements=None,
+        residue_tolerance=None,
         ):
     """
     Get angles to build the next adjacent protein fragment.
@@ -1417,7 +1419,7 @@ def get_adjacent_angles(
         A dictionary containing probabilities of secondary structures per
         amino acid residue position.
     """
-    residue_replacements = residue_replacements or {}
+    residue_tolerance = residue_tolerance or {}
     probs = fill_list(probs, 0, len(options))
 
     # prepares helper lists
@@ -1449,7 +1451,7 @@ def get_adjacent_angles(
         # residues until the end of the protein.
         plen = len(primer_template)
 
-        pt_sub = BRS(primer_template, residue_replacements)
+        pt_sub = BRS(primer_template, residue_tolerance)
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
@@ -1481,7 +1483,7 @@ def get_adjacent_angles(
                 plen -= 1
                 next_residue = primer_template[-1]
                 primer_template = primer_template[:-1]
-                pt_sub = BRS(primer_template, residue_replacements)
+                pt_sub = BRS(primer_template, residue_tolerance)
             else:
                 break
         else:
