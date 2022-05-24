@@ -1,8 +1,18 @@
 Reference
 =========
 
+Components
+----------
+
 .. toctree::
     :glob:
 
-    idpconfgen*
+    component*
+
+Core libraries
+--------------
+
+.. toctree::
+    :glob:
+
     lib*

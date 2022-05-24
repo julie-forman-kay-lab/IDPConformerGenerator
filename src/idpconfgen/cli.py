@@ -1,5 +1,5 @@
 """
-IDP CONFORMER GENERATOR.
+IDPConformerGenerator
 
 Generates IDP Conformers by combining observed backbone angles
     and random distribution.
@@ -24,11 +24,15 @@ from idpconfgen import (
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
+    cli_sethpc,
+    cli_merge,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
     cli_sscalc,
     cli_ssext,
+    cli_stats,
+    cli_search,
     cli_torsions,
     cli_torsionsJ,
     cli_validate,
@@ -61,6 +65,10 @@ Other useful routines:
     * {cli_dssppii._name}
     * {cli_makecsss._name}
     * {cli_csssconv._name}
+    * {cli_sethpc._name}
+    * {cli_merge._name}
+    * {cli_stats._name}
+    * {cli_search._name}
 """
 
 ap = libcli.CustomParser(
@@ -74,7 +82,7 @@ libcli.add_version(ap)
 
 # routines from the main DB creation pipeline
 subparsers = ap.add_subparsers(
-    title='IDP Conformer Generator routines',
+    title='IDPConformerGenerator routines',
     help='Short description:',
     )
 
@@ -94,6 +102,10 @@ libcli.add_subparser(subparsers, cli_validate)
 libcli.add_subparser(subparsers, cli_dssppii)
 libcli.add_subparser(subparsers, cli_makecsss)
 libcli.add_subparser(subparsers, cli_csssconv)
+libcli.add_subparser(subparsers, cli_sethpc)
+libcli.add_subparser(subparsers, cli_merge)
+libcli.add_subparser(subparsers, cli_stats)
+libcli.add_subparser(subparsers, cli_search)
 
 
 def load_args():

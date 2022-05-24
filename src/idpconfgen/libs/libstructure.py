@@ -33,7 +33,7 @@ class Structure:
     """
     Hold structural data from PDB/mmCIF files.
 
-    Run the ``.buil()`` method to read the structure.
+    Run the ``.build()`` method to read the structure.
 
     Cases for PDB Files:
     * If there are several MODELS only the first model is considered.
@@ -543,14 +543,14 @@ def get_datastr(data):
 
 def detect_structure_type(datastr):
     """
-    Detect Structure data parser.
+    Detect structure data parser.
 
-    Uses `structure_parsers`.
+    Uses ``structure_parsers``.
 
     Returns
     -------
-    func or class
-        That which can parse `datastr` to a :class:`Structure'.
+    parser
+        That which can parse `datastr` to a :py::class:`Structure'.
     """
     sp = structure_parsers
     for condition, parser in sp:

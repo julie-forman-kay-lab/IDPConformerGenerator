@@ -2,6 +2,7 @@
 import time
 import urllib.request
 from urllib.error import URLError
+from functools import partial
 
 from idpconfgen import log
 from idpconfgen.core.exceptions import DownloadFailedError
@@ -17,7 +18,7 @@ POSSIBLELINKS = [
     ]
 
 
-def download_structure(pdbid, **kwargs):
+def download_structure(pdbid, mmcif=False, **kwargs):
     """
     Download a PDB/CIF structure chains.
 
@@ -32,8 +33,10 @@ def download_structure(pdbid, **kwargs):
     pdbname = pdbid[0]
     chains = pdbid[1]
 
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
+    downloaded_data, _ = fetch_pdb_id_from_RCSB(pdbname, mmcif=mmcif)
 
+    # save_structure_by_chains is a specific function that always saves
+    # in PDB format.
     yield from save_structure_by_chains(
         downloaded_data,
         pdbname,
@@ -42,8 +45,19 @@ def download_structure(pdbid, **kwargs):
         )
 
 
-def fetch_pdb_id_from_RCSB(pdbid):
-    """Fetch PDBID from RCSB."""
+def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
+    """
+    Fetch PDBID from RCSB.
+
+    Returns
+    -------
+    tuple (str, str)
+        urllib.request.urlopen.response.read()
+        PDB file extension (.pdb, .cif, ...)
+    """
+    if mmcif:
+        POSSIBLELINKS.reverse()
+
     possible_links = (link.format(pdbid) for link in POSSIBLELINKS)
 
     attempts = 0
@@ -52,7 +66,7 @@ def fetch_pdb_id_from_RCSB(pdbid):
             for weblink in possible_links:
                 try:
                     response = urllib.request.urlopen(weblink)
-                    return response.read()
+                    return response.read(), weblink.rpartition(".")[-1]
                 except urllib.error.HTTPError:
                     continue
                 except (AttributeError, UnboundLocalError):  # response is None
@@ -70,9 +84,13 @@ def fetch_pdb_id_from_RCSB(pdbid):
     else:
         raise DownloadFailedError(f'Failed to download {pdbid}')
 
-
-def fetch_raw_PDBs(pdbid, **kwargs):
-    """Download raw PDBs without any filtering."""
+def fetch_raw_structure(pdbid, ext, **kwargs):
+    """Download raw structure from RCSB without any filtering."""
     pdbname = pdbid[0]
-    downloaded_data = fetch_pdb_id_from_RCSB(pdbname)
-    yield f'{pdbname}.pdb', downloaded_data.decode('utf-8')
+    mmcif = True if ext == "cif" else False
+    downloaded_data, ext = fetch_pdb_id_from_RCSB(pdbname, mmcif)
+    yield f'{pdbname}.{ext}', downloaded_data.decode('utf-8')
+
+
+fetch_raw_PDBs = partial(fetch_raw_structure, ext='pdb')
+fetch_raw_CIFs = partial(fetch_raw_structure, ext='cif')

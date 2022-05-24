@@ -1,15 +1,11 @@
-from pathlib import Path
 import sys
-from statistics import mean, stdev
 from functools import partial
 import numpy as np
 from collections import defaultdict
 
 from idpconfgen.libs.libstructure import Structure, col_name, cols_coords, col_resName
-from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libio import read_path_bundle
 
-from idpconfgen.libs.libtimer import ProgressCounter
 from idpconfgen.core.definitions import aa3to1
 
 

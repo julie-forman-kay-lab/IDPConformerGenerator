@@ -1,4 +1,4 @@
-"""Define chunk probability distribution for CLI and building."""
+"""Define fragment probability distribution for CLI and building."""
 from argparse import Action
 from collections import namedtuple
 from functools import partial
@@ -41,7 +41,7 @@ def read_xmer_probs_from_file(fpath):
 def logxmerprobs(
         xmerprobs,
         func=log.info,
-        title='Chunk size and probabilities selected',
+        title='Fragment size and probabilities selected',
         ):
     """Log XmerProbs object properties."""
     func(T(title))
@@ -80,18 +80,18 @@ class XmerProbsAction(Action):
             setattr(namespace, self.dest, result)
 
 
-xmers_prob_help = """Size of peptide building chunks and their respective
+xmers_prob_help = """Size of peptide building fragments and their respective
 selection probabilities.
 
-Provide a two column file where the first column is the size of the chunks you
+Provide a two column file where the first column is the size of the fragments you
 wish to allow **in order from smallest to largest** and the second column is 
 the relative probability to select each choice. Both columns must be integers.
 Use "#" to comment lines. If you don't provide any value, the default is 
-chunk sizes: 1 to 5 with relative probabilities (1, 1, 3, 3, 2). You can 
+fragment sizes: 1 to 5 with relative probabilities (1, 1, 3, 3, 2). You can 
 give any integer to define relativeprobabilities: 10 and 90 will results 
-10/(10+90) and 90/(10+90) percent. If a Proline residue follows the chunk 
+10/(10+90) and 90/(10+90) percent. If a Proline residue follows the fragment 
 being built, the additional Prolineangles will also be consider regardless
-of the selected chunk size. Chunk sizes will be ignored if no matches are 
+of the selected fragment size. Fragment sizes will be ignored if no matches are 
 found in the database and the probabilities renormalized."""
 
 xmer_probs_args = ['-xp', '--xmer-probs']
@@ -123,7 +123,7 @@ def compress_xmer_to_bool(xmobj, blist):
         compress(xmobj.sizes, blist),
         compress(xmobj.probs, blist),
         )
-    logxmerprobs(_, title='corrected chunk selection probabilities')
+    logxmerprobs(_, title='corrected fragment selection probabilities')
     return _
 
 

@@ -1,4 +1,4 @@
-"""IDP Conformer Generator shared libraries."""
+"""IDPConformerGenerator shared libraries."""
 
 def get_false():
     return False
