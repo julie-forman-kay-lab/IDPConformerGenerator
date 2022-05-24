@@ -569,8 +569,6 @@ def populate_globals(
         *,
         input_seq=None,
         bgeo_strategy=bgeo_strategies_default,
-        #use_bgeo_int2cart=False,
-        #bgeo_path=BGEO_path,
         forcefield=None,
         **efunc_kwargs):
     """
@@ -712,8 +710,6 @@ def conformer_generator(
         sidechain_method='faspr',
         energy_threshold_backbone=10,
         energy_threshold_sidechains=1000,
-        #bgeo_int2cart=False,
-        #bgeo_path=None,
         bgeo_strategy=bgeo_strategies_default,
         forcefield=None,
         random_seed=0,
@@ -1058,7 +1054,10 @@ def conformer_generator(
         # TODO: use or not to use number_of_trials2? To evaluate in future.
         number_of_trials2 = 0
         number_of_trials3 = 0
+
+        # used only if bgeo_strategy == int2cart
         torsion_records = []
+
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
             #print(bbi)
@@ -1098,7 +1097,7 @@ def conformer_generator(
 
             try:
                 for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
-                    torsion_records.append((omg, phi, psi))
+
                     current_res_number = calc_residue_num_from_index(bbi - 1)
 
                     # assert the residue being built is of the same nature as the one in the angles
@@ -1113,6 +1112,7 @@ def conformer_generator(
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
                     if bgeo_strategy == bgeo_int2cart_name:
+                        torsion_records.append((omg, phi, psi))
                         seq = all_atom_input_seq[:current_res_number + 1]
                         tors = np.array(torsion_records) # omega, phi, psi
                         tors = np.hstack([tors[:, 1:], tors[:, :1]]) # phi, psi, omega
@@ -1300,7 +1300,8 @@ def conformer_generator(
                 current_res_number = _resi0
 
                 # remove torsion angle records for this chunk
-                torsion_records = torsion_records[:current_res_number + 1]
+                if bgeo_strategy == bgeo_int2cart_name:
+                    torsion_records = torsion_records[:current_res_number + 1]
 
                 # coords needs to be reset because size of protein next
                 # fragments may not be equal
