@@ -20,7 +20,7 @@ def add_res_tolerance_groups(ap):
     """Add parameters related to residue tolerance."""
     parser = ap.add_mutually_exclusive_group(required=False)
     parser.add_argument(
-        '-usubs',
+        '-urestol',
         '--user-residue-tolerance',
         dest='residue_tolerance',
         help=residue_tolerance_cli_help,
@@ -88,6 +88,7 @@ EDSSMat50_subs = {
     'W': ['',  '',   'YFC',  '',    'R'     ],  # noqa: E241, E121, E202
     'Y': ['F', '',   'C',    '',    'WH'    ],  # noqa: E241, E121, E202
     }
+"""EDSSMat50 tolerance matrix."""
 
 
 def make_EDSSMat50_subs(idx=(5, 3, 2, 1, 0)):

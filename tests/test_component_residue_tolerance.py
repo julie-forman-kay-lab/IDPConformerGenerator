@@ -74,12 +74,12 @@ option_0 = {
 
 @pytest.mark.parametrize(
     'name',
-    ['-usubs', '--user-residue-tolerance'],
+    ['-urestol', '--user-residue-tolerance'],
     )
 def test_argument_add_usubs(name):
     """Test adding argument."""
     ap = argparse.ArgumentParser()
-    rt.add_substitution_groups(ap)
+    rt.add_res_tolerance_groups(ap)
     cmd = ap.parse_args([name, '{"A": "AC"}'])
     result = vars(cmd)
     assert "residue_tolerance" in result
@@ -93,7 +93,7 @@ def test_argument_add_usubs(name):
 def test_argument_add_edss50_5(name):
     """Test adding argument."""
     ap = argparse.ArgumentParser()
-    rt.add_substitution_groups(ap)
+    rt.add_res_tolerance_groups(ap)
     cmd = ap.parse_args([name, '5'])
     result = vars(cmd)
     assert "residue_tolerance" in result
@@ -107,7 +107,7 @@ def test_argument_add_edss50_5(name):
 def test_argument_add_edss50_5_3(name):
     """Test adding argument 0."""
     ap = argparse.ArgumentParser()
-    rt.add_substitution_groups(ap)
+    rt.add_res_tolerance_groups(ap)
     cmd = ap.parse_args(['-edss50', '5', '3'])
     result = vars(cmd)
     assert result["residue_tolerance"] == option_53
@@ -120,7 +120,7 @@ def test_argument_add_edss50_5_3(name):
 def test_argument_add_edss50_0(name):
     """Test adding argument 0."""
     ap = argparse.ArgumentParser()
-    rt.add_substitution_groups(ap)
+    rt.add_res_tolerance_groups(ap)
     cmd = ap.parse_args(['-edss50', '0'])
     result = vars(cmd)
     assert result["residue_tolerance"] == option_0
