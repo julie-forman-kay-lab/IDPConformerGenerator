@@ -175,21 +175,23 @@ of the backbones calculated. For this feature, you must have a CUDA compatible
 GPU as well as install Int2Cart on top of the `idpconfgen` Python environment.
 First, install IDPConfGen as described above. Next, follow these steps::
 
-    # Install a pre-requisite of Int2Cart, sidechainnet
+    # ensure you are in the IDPConformerGenerator GitHub folder
+
+    # Install a pre-requisite of Int2Cart: sidechainnet
     git clone https://github.com/THGLab/sidechainnet
     cd sidechainnet
     pip install -e .
+    cd ..
 
     # Install Int2Cart
     git clone https://github.com/THGLab/int2cart
     cd int2cart
     pip install -e .
-
-    # Install PyYAML requirement for Int2Cart
     pip install PyYAML
+    cd ..
 
-    # navigate back to the IDPConformerGenerator GitHub folder and re-run
-    python setup.py develop --no-deps
+    # you should be back in the IDPConformerGenerator GitHub folder
+
 
 Running Int2Cart on the Graham cluster requires GPU allocations and ``module load cuda``.
 Otherwise, installation is the same within the ``idpconfgen`` virtualenv.
