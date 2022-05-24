@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.5.0 (2022-05-24)
+------------------------------------------------------------
+
 * Add residue tolerance matrices: EDSS50
 * Update/improve parameters to residue tolerance options
 * PR #183
