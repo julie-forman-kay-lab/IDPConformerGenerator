@@ -21,6 +21,11 @@ For each PDB/mmCIF analyzed, fails if:
 
 Failed PDBs are registered in `.rpr_on_crash` files and ignored.
 
+PLOTTING:
+
+The default torsion distribution plotted are "Phi" angles. To change this to
+Omega or Psi, simply `--plots type=omega` or `--plots type=psi`.
+
 USAGE:
     $ idpconfgen torsions [PDBS]
     $ idpconfgen torsions [PDBS] -sc file.json
