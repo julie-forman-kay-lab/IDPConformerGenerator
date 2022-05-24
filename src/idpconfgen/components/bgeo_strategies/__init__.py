@@ -1,7 +1,8 @@
 """Bond geomtry strategies."""
-from idpconfgen.components.bgeo_strategy.bgeo_int2cart import \
+from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import \
     name as bgeo_int2cart_name
-from idpconfgen.components.bgeo_strategy.bgeo_sampling import \
+    
+from idpconfgen.components.bgeo_strategies.sampling import \
     name as bgeo_sampling_name
 
 

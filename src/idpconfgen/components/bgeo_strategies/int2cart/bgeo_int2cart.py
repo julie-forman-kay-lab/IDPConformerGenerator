@@ -9,7 +9,7 @@ from modelling.utils.predict import predict
 
 
 _folder = Path(__file__).parent
-
+name = "int2cart"
 
 class BGEO_Int2Cart:
     """Prepara Int2Cart module."""

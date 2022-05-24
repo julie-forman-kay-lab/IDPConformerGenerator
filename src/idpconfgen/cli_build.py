@@ -598,7 +598,7 @@ def populate_globals(
             )
 
     if bgeo_strategy == "sampling":
-        from idpconfgen.components.bgeo_strategies.bgeo_sampling import bgeo_sampling_path
+        from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path
         global BGEO_full, BGEO_trimer, BGEO_res
         BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
         _1, _2 = bgeo_reduce(BGEO_full)
@@ -614,7 +614,7 @@ def populate_globals(
     # Also prepare BGEO_int2cart when needed
     elif bgeo_strategy == "int2cart":
         global INT2CART
-        from idpconfgen.components.bgeo_strategy.int2cart.bgeo_int2cart import BGEO_Int2Cart
+        from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import BGEO_Int2Cart
         try:
             INT2CART = BGEO_Int2Cart()
         except RuntimeError as e:
@@ -1111,7 +1111,7 @@ def conformer_generator(
                         )
                     torpair = f'{RRD10(phi)},{RRD10(psi)}'
 
-                    if bgeo_strategy == bgeo_int2cart_name:
+                    if bgeo_strategy == bgeo_strategies[1]:
                         torsion_records.append((omg, phi, psi))
                         seq = all_atom_input_seq[:current_res_number + 1]
                         tors = np.array(torsion_records) # omega, phi, psi
@@ -1122,11 +1122,11 @@ def conformer_generator(
 
                     for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):
 
-                        if bgeo_strategy == bgeo_int2cart_name:
+                        if bgeo_strategy == bgeo_strategies[1]:
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2 # needed for correctly calculating Q
                             _bond_lens = bond_lens[torsion_idx]
 
-                        elif bgeo_strategy == bgeo_sampling_name:
+                        elif bgeo_strategy == bgeo_strategies[0]:
                             _bt = next(bond_type)
 
                             try:
@@ -1300,7 +1300,7 @@ def conformer_generator(
                 current_res_number = _resi0
 
                 # remove torsion angle records for this chunk
-                if bgeo_strategy == bgeo_int2cart_name:
+                if bgeo_strategy == bgeo_strategies[0]:
                     torsion_records = torsion_records[:current_res_number + 1]
 
                 # coords needs to be reset because size of protein next
