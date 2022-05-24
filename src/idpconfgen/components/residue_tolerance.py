@@ -10,10 +10,13 @@ residue_tolerance_cli_help = \
 
 Provide a dictionary mapping which residue exchange are allowed.
 Example:
--subs '{"A": "AG"}'
+-urestol '{"A": "AG"}'
+
 
 will consider Ala or Glycines when searching the database. When looking
-for "GHLAT" both "GHLAT" and "GHLGT" will be considered valid matches."""  # noqa: E122, E501
+for "GHLAT" both "GHLAT" and "GHLGT" will be considered valid matches.
+*Note*: use single quotes to deliniate the argument and double quotes to deliniate
+the strings, exactly as in the example."""  # noqa: E122, E501
 
 
 def add_res_tolerance_groups(ap):
