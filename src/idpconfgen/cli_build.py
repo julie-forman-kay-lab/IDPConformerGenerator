@@ -719,10 +719,7 @@ def populate_globals(
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
     global TEMPLATE_LABELS, TEMPLATE_MASKS, TEMPLATE_EFUNC
 
-    if forcefield is None:
-        topobj = forcefields['Amberff14SB'](add_OXT=True, add_Nterminal_H=True)
-    else:
-        topobj = forcefield(add_OXT=True, add_Nterminal_H=True)
+    topobj = forcefield(add_OXT=True, add_Nterminal_H=True)
 
     ALL_ATOM_LABELS = init_conflabels(input_seq, topobj.atom_names)
     TEMPLATE_LABELS = init_conflabels(remap_sequence(input_seq), topobj.atom_names)  # noqa: E501
@@ -730,20 +727,19 @@ def populate_globals(
     ALL_ATOM_MASKS = init_confmasks(ALL_ATOM_LABELS.atom_labels)
     TEMPLATE_MASKS = init_confmasks(TEMPLATE_LABELS.atom_labels)
 
-    if forcefield is not None:
-        ALL_ATOM_EFUNC = prepare_energy_function(
-            ALL_ATOM_LABELS.atom_labels,
-            ALL_ATOM_LABELS.res_nums,
-            ALL_ATOM_LABELS.res_labels,
-            topobj,
-            **efunc_kwargs)
-
-        TEMPLATE_EFUNC = prepare_energy_function(
-            TEMPLATE_LABELS.atom_labels,
-            TEMPLATE_LABELS.res_nums,
-            TEMPLATE_LABELS.res_labels,
-            topobj,
-            **efunc_kwargs)
+    ALL_ATOM_EFUNC = prepare_energy_function(
+        ALL_ATOM_LABELS.atom_labels,
+        ALL_ATOM_LABELS.res_nums,
+        ALL_ATOM_LABELS.res_labels,
+        topobj,
+        **efunc_kwargs)
+    
+    TEMPLATE_EFUNC = prepare_energy_function(
+        TEMPLATE_LABELS.atom_labels,
+        TEMPLATE_LABELS.res_nums,
+        TEMPLATE_LABELS.res_labels,
+        topobj,
+        **efunc_kwargs)
 
     del topobj
     return
@@ -1345,11 +1341,7 @@ def conformer_generator(
                     template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
             # ?
 
-
-            if TEMPLATE_EFUNC is None:
-                total_energy = 0
-            else:
-                total_energy = TEMPLATE_EFUNC(template_coords)
+            total_energy = TEMPLATE_EFUNC(template_coords)
 
             if ANY(total_energy > energy_threshold_backbone):
                 #print('---------- energy positive')
