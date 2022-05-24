@@ -208,9 +208,7 @@ in the ``idpconfgen`` environment::
 If you receieve this error: ``ImportError: TensorBoard logging requires TensorBoard version 1.15 or above``,
 do the following::
 
-    conda uninstall tensorflow
-    conda install tensorboard
-    pip install pyyaml
+    pip install tensorboard==1.15.0
 
 CheSPI
 ``````
