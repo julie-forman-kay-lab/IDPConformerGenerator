@@ -1,4 +1,4 @@
-name: idpconfgenjerry
+name: idpconfgen
 channels:
     - conda-forge
     - defaults

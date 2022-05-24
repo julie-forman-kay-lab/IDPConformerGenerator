@@ -2,10 +2,10 @@
 import os
 from pathlib import Path
 
-import torch
-import yaml
-
 try:
+    import torch
+    import yaml
+
     from modelling.models.builder import BackboneBuilder
     from modelling.utils.predict import predict
     has_int2cart = True
