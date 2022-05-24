@@ -167,6 +167,49 @@ IDPConfGen will use MC-SCE to build sidechains as backbone conformers are
 generated. You will see :code:`idpconfgen build -h` has a specific group of
 parameters dedicated to MC-SCE, you can explore those as well.
 
+Install Int2Cart
+````````````````
+
+IDPConformerGenerator can use Int2Cart on the fly to optimize bond geometries
+of the backbones calculated. For this feature, you must have a CUDA compatible
+GPU as well as install Int2Cart on top of the `idpconfgen` Python environment.
+First, install IDPConfGen as described above. Next, follow these steps::
+
+    # ensure you are in the IDPConformerGenerator GitHub folder
+
+    # Install a pre-requisite of Int2Cart: sidechainnet
+    git clone https://github.com/THGLab/sidechainnet
+    cd sidechainnet
+    pip install -e .
+    cd ..
+
+    # Install Int2Cart
+    git clone https://github.com/THGLab/int2cart
+    cd int2cart
+    pip install -e .
+    pip install pyyaml
+    cd ..
+
+    # you should be back in the IDPConformerGenerator GitHub folder
+
+
+Running Int2Cart on the Graham cluster requires GPU allocations and ``module load cuda``.
+Otherwise, installation is the same within the ``idpconfgen`` virtualenv.
+
+Troubleshooting Int2Cart installation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+If IDPConfGen is still giving you an error that Int2Cart is not installed, please test this import
+in the ``idpconfgen`` environment::
+
+    python
+    >>> from modelling.models.builder import BackboneBuilder
+
+If you receieve this error: ``ImportError: TensorBoard logging requires TensorBoard version 1.15 or above``,
+do the following::
+
+    pip install tensorboard==1.15.0
+
 CheSPI
 ``````
 
