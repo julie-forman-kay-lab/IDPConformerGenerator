@@ -624,7 +624,7 @@ def populate_globals(
     # Also prepare BGEO_int2cart when needed
     if use_bgeo_int2cart:
         global int2cart
-        from idpconfgen.components.bgeo_int2cart import BGEO_Int2Cart
+        from idpconfgen.components.int2cart.bgeo_int2cart import BGEO_Int2Cart
         try:
             int2cart = BGEO_Int2Cart(Int2Cart_path)
         except RuntimeError as e:
