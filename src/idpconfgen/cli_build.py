@@ -1304,7 +1304,7 @@ def conformer_generator(
                 current_res_number = _resi0
 
                 # remove torsion angle records for this chunk
-                if bgeo_strategy == bgeo_sampling_name:
+                if bgeo_strategy == bgeo_int2cart_name:
                     torsion_records = torsion_records[:current_res_number + 1]
 
                 # coords needs to be reset because size of protein next
