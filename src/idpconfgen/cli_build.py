@@ -147,7 +147,7 @@ class _BuildPreparation:
 
 def are_globals(bgeo_strategy):
     """Assess if global variables needed for building are populated."""
-    if bgeo_strategy == "sampling":
+    if bgeo_strategy == bgeo_sampling_name:
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
@@ -159,7 +159,7 @@ def are_globals(bgeo_strategy):
             BGEO_trimer,
             BGEO_res,
             ))
-    elif bgeo_strategy == "int2cart":
+    elif bgeo_strategy == bgeo_int2cart_name:
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
@@ -169,6 +169,8 @@ def are_globals(bgeo_strategy):
             TEMPLATE_EFUNC,
             INT2CART,
             ))
+    else:
+        raise AssertionError("Code shouldn't be here.")
 
 
 # CLI argument parser parameters
@@ -512,7 +514,7 @@ def main(
 
     populate_globals(
         input_seq=input_seq,
-        bgep_strategy=bgeo_strategy,
+        bgeo_strategy=bgeo_strategy,
         forcefield=forcefields[forcefield],
         **kwargs)
 
@@ -599,7 +601,7 @@ def populate_globals(
             f'Expected string found {type(input_seq)}'
             )
 
-    if bgeo_strategy == "sampling":
+    if bgeo_strategy == bgeo_sampling_name:
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path
         global BGEO_full, BGEO_trimer, BGEO_res
         BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
@@ -614,14 +616,19 @@ def populate_globals(
         assert list(BGEO_full.keys()) == list(BGEO_trimer.keys()) == list(BGEO_res.keys())  # noqa: E501
 
     # Also prepare BGEO_int2cart when needed
-    elif bgeo_strategy == "int2cart":
+    elif bgeo_strategy == bgeo_int2cart_name:
         global INT2CART
         from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import BGEO_Int2Cart
         try:
             INT2CART = BGEO_Int2Cart()
         except RuntimeError as e:
-            log.info(S("WARNING: please use CUDA compatible GPUs while running -bgeo_int2cart."))
+            log.info(S(
+                "WARNING: please use CUDA compatible GPUs while running"
+                "--bgeo_strategy int2cart."
+                ))
             log.info(S(f"Error: {e}"))
+    else:
+        raise AssertionError("Code shouldn't be here.")
 
     # populates the labels
     global ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC

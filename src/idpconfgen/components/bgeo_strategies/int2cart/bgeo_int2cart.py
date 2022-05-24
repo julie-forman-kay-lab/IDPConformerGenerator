@@ -4,8 +4,13 @@ from pathlib import Path
 
 import torch
 import yaml
-from modelling.models.builder import BackboneBuilder
-from modelling.utils.predict import predict
+
+try:
+    from modelling.models.builder import BackboneBuilder
+    from modelling.utils.predict import predict
+    has_int2cart = True
+except ImportError:
+    has_int2cart = False
 
 
 _folder = Path(__file__).parent
@@ -15,6 +20,13 @@ class BGEO_Int2Cart:
     """Prepara Int2Cart module."""
 
     def __init__(self) -> None:
+        if not has_int2cart:
+            emsg = (
+                "Please install Int2Cart software to access this module. "
+                "See the INSTALL page of IDPConfGen documentation."
+                )
+            raise ImportError(emsg)
+
         model_config = os.path.join(_folder, "int2cart.yml")
         model_addr = os.path.join(_folder, "model.tar")
 
