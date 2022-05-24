@@ -55,7 +55,7 @@ def plot_torsions(
         yticks=None,
         xticks_labels=None,
         yticks_labels=None,
-        increment=10,
+        increment=None,
         xticks_fs=15,
         yticks_fs=15,
         fig_size=(10, 6),
@@ -101,8 +101,11 @@ def plot_torsions(
         res_ang = [i]*n_conf
         plt.scatter(res_ang, angles[:,i-1], s=10, facecolors='none', edgecolors=colors)
 
-    increment = int(residues/fig_size[0])
-
+    if increment is None:
+        increment = int(residues/fig_size[0])
+        if increment == 0:
+            increment=1
+    
     if xticks == None:
         xticks = np.arange(0,residues, increment)
         xticks_labels = get_xtick_lbl(xticks)
@@ -137,7 +140,7 @@ def plot_fracSS(
         yticks=None,
         xticks_labels=None,
         yticks_labels=None,
-        increment=10,
+        increment=None,
         colors=['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b'],
         xticks_fs=15,
         yticks_fs=15,
@@ -194,7 +197,10 @@ def plot_fracSS(
     plt.legend(bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0)
     ax = plt.gca()
 
-    increment = int(residues/fig_size[0])
+    if increment is None:
+        increment = int(residues/fig_size[0])
+        if increment == 0:
+            increment=1
 
     if xticks == None:
         xticks = np.arange(0, residues, increment)
