@@ -1,15 +1,19 @@
 """Using the machine learning Int2Cart algorithm to provide bond geometries."""
 import os
+from pathlib import Path
+
 import torch
 import yaml
-
-from modelling.utils.predict import predict
 from modelling.models.builder import BackboneBuilder
+from modelling.utils.predict import predict
+
 
 _folder = Path(__file__).parent
 
 
 class BGEO_Int2Cart:
+    """Prepara Int2Cart module."""
+
     def __init__(self) -> None:
         model_config = os.path.join(_folder, "int2cart.yml")
         model_addr = os.path.join(_folder, "model.tar")
@@ -26,6 +30,7 @@ class BGEO_Int2Cart:
         self.builder = builder
 
     def get_internal_coords(self, sequence, torsions):
+        """Get internal coords."""
         predictions = predict(
             self.builder,
             sequence,

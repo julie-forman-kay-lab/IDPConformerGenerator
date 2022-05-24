@@ -1,4 +1,9 @@
-"""Sample bond geometries from a database created from high-resolution PDB structures."""
+"""
+Sample bond geometries from a database.
+
+This database was created from high-resolution PDB structures.
+"""
+from pathlib import Path
 
 
 _file = Path(__file__).parent
