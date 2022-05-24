@@ -96,7 +96,7 @@ EDSSMat50_subs = {
 
 
 def make_EDSSMat50_subs(idx=(5, 3, 2, 1, 0)):
-    """Make EDSSMat50 table com column indexes."""
+    """Make EDSSMat50 table column indexes."""
     idxs = make_list_if_not(idx)
     subsd = {}
     for k, v in EDSSMat50_subs.items():
