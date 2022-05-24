@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* add plot functions to ``sscalc`` and ``torsions``
+* PR #198
+
 v0.4.10 (2022-05-23)
 ------------------------------------------------------------
 
