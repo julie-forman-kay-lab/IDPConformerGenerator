@@ -1,5 +1,5 @@
 """
-Generates a CSSS.JSON file based on user specifications for secondary structure sampling on a per residue basis.
+Generates a CSSS.JSON file based on user specifications for probabilistic secondary structure sampling on a per residue basis.
 
 Has the ability to edit previously generated CSSS files as well with `--file-csss`.
 The output will be printed to the terminal window. To save the output to
@@ -40,13 +40,15 @@ ap.add_argument(
 ap.add_argument(
     '-cp',
     '--custom-pattern',
-    help="Specifies the probability of secondary structure sampling on a per-residue basis.\n"
-        "Please cover all residues in your sequence of interest.\n"
-        "Overlapping residues with the same DSSP_REGEX will be overwritten by subsequent entries.\n"
-        "E.g. -cp <RESIDUE or RANGE> <DSSP_REGEX> <PROBABILITY>|...",
+    help=(
+        'Specifies the probability of secondary structure sampling on a per-residue basis. '
+        'Please cover all residues in your sequence of interest. '
+        'Overlapping residues with the same DSSP_REGEX will be overwritten by subsequent entries. '
+        'E.g. -cp <RESIDUE or RANGE> <DSSP_REGEX> <PROBABILITY>|... '
+        'E.g. -cp 1-3 L 0.3|1-3 H 0.8|4-20 X 1.0'
+        ),
     required=True,
     )
-
 
 libcli.add_argument_output(ap)
 

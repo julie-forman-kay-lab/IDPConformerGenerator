@@ -534,8 +534,7 @@ def validate_coords_for_backbone_torsions(coords, minimum=2):
     Does NOT validate with values have physical sense. Validates only
     valid input for `:func:libcalc.calc_torsion_angles`.
 
-    Validations
-    -----------
+    *Validations performed:*
 
         * coords are two-dimensional arrays
         * coords have 3 values in the first dimension (XYZ) (shape[1])
@@ -606,22 +605,20 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
 
     1) reads each of its trimers, and for the middle residue:
     2) Calculates phi/psi and rounds them to the closest 10 degree bin
-    3) assigns the planar angles found for that residue to the
-        trimer/torsion key.
-    4) the planar angles are converted to the format needed by cli_build,
-        which is that of (pi - angle) / 2.
+    3) assigns the planar angles found for that residue to the trimer/torsion key.
+    4) the planar angles are converted to the format needed by cli_build, which is that of (pi - angle) / 2.
     5) updates that information in `bond_gemetry`.
 
-    Created key:values have the following form in `bond_geometry` dict:
+    Created key:values have the following form in `bond_geometry` dict::
 
-    {
-        'AAA:10,-30': {
-            'Cm1_N_Ca': [],
-            'N_Ca_C': [],
-            'Ca_C_Np1': [],
-            'Ca_C_O': [],
+        {
+            'AAA:10,-30': {
+                'Cm1_N_Ca': [],
+                'N_Ca_C': [],
+                'Ca_C_Np1': [],
+                'Ca_C_O': [],
+                }
             }
-        }
 
 
     Parameters

@@ -8,7 +8,6 @@ import argparse
 import sys
 from functools import partial
 from pathlib import Path
-from time import time
 
 import numpy as np
 

@@ -12,7 +12,7 @@ same types and have a compatible input api.
 All functions should return an array mask to be used in
 `all_atom_coords` and return the coordinate compatible with such a mask.
 
-For that, in general, the init_ functions receive the template and
+For that, in general, the ``init_`` functions receive the template and
 all_atom masks named tuples (see libbuild).
 """
 from idpconfgen.components.sidechain_packing.faspr import init_faspr_sidechains
@@ -25,6 +25,7 @@ sidechain_packing_methods = {
     'faspr': init_faspr_sidechains,
     'mcsce': init_mcsce_sidechains,
     }
+"""Sidechain packing algorithms."""
 _spm = tuple(sidechain_packing_methods.keys())
 
 

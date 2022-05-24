@@ -2,7 +2,17 @@
 from __future__ import unicode_literals
 
 import os
+import mock
+import sys
 
+mock_modules = [
+    'numba',
+    'scipy',
+    'scipy.spatial',
+    ]
+
+for modulename in mock_modules:
+    sys.modules[modulename] = mock.Mock()
 
 extensions = [
     'sphinx.ext.autodoc',
@@ -32,24 +42,24 @@ if os.getenv('SPELLCHECK'):
 
 source_suffix = '.rst'
 master_doc = 'index'
-project = 'IDP Conformer Generator'
-year = '2019'
+project = 'IDPConformerGenerator'
+year = '2022'
 author = 'Julie Forman-Kay Lab'
 copyright = '{0}, {1}'.format(year, author)
-version = release = '0.4.6'
+version = release = '0.4.10'
 
 pygments_style = 'trac'
 templates_path = ['.']
 extlinks = {
-    'issue': ('https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader/issues/%s', '#'),
-    'pr': ('https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader/pulls/%s', 'PR #'),
+    'issue': ('https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/%s', '#'),
+    'pr': ('https://github.com/julie-forman-kay-lab/IDPConformerGenerator/pulls/%s', 'PR #'),
 }
-import sphinx_py3doc_enhanced_theme
-html_theme = "sphinx_py3doc_enhanced_theme"
-html_theme_path = [sphinx_py3doc_enhanced_theme.get_html_theme_path()]
-html_theme_options = {
-    'githuburl': 'https://github.com/julie-forman-kay-lab/IDPCalcPDBDownloader'
-}
+
+
+# on_rtd is whether we are on readthedocs.org
+on_rtd = os.environ.get('READTHEDOCS', None) == 'True'
+if not on_rtd:  # only set the theme if we're building docs locally
+    html_theme = 'sphinx_rtd_theme'
 
 html_use_smartypants = True
 html_last_updated_fmt = '%b %d, %Y'
