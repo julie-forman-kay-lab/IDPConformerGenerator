@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update usage instructions for `bgeo`
+
 v0.6.1 (2022-05-25)
 ------------------------------------------------------------
 
