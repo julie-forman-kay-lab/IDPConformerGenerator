@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.6.4 (2022-05-25)
+------------------------------------------------------------
+
 * Re-licensed to Apache-2.0
 
 v0.6.3 (2022-05-25)
