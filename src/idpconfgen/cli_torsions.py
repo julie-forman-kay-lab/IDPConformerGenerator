@@ -80,7 +80,7 @@ ap.add_argument(
         "Change default parameters of fractional secondary structure plot "
         "using alpha, beta, and other regions of the ramachandran space. "
         "Optionally to be used with ``--plot``."
-        "Example: --ramaplot filename=fracRama.png colors='o', 'b', 'k'"
+        "Example: --ramaplot filename=fracRama.png colors=r,g,b"
     ),
     nargs='*',
 )
