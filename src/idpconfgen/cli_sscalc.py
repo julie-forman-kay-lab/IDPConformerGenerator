@@ -253,7 +253,7 @@ def main(
         
         plotvars = plotvars or dict()
         plt_default = {
-            'type': 'DSSP',
+            'sstype': 'DSSP',
             'filename': 'plot_dssp_fracSS.png',
         }
         plt_default.update(plotvars)
