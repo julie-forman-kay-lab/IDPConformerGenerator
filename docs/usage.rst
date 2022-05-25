@@ -89,7 +89,7 @@ module::
         ./drk_CSSSd2D_nosub_mcsce \
         -deg \
         -n \
-        --plot type=psi xlabel=drk_residues
+        --plot angtype=psi xlabel=drk_residues
     
 To plot the fractional Ramachandran space information::
 
@@ -121,8 +121,8 @@ machine learning model `Int2Cart <https://github.com/THGLab/int2cart>`_. Further
 the `MC-SCE <https://github.com/THGLab/MCSCE>`_ method for building sidechains in the previous modules,
 we would like to provide some examples on changing the default sidechain settings.
 
-To use the Int2Cart method for bond geometries, the :code:`-bgeo_int2cart` flag needs to be defined during
-the building stage::
+To use the Int2Cart method for bond geometries, the :code:`--bgeo-strategy` flag needs to be defined with
+``int2cart`` duringthe building stage::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -134,7 +134,7 @@ the building stage::
         --dloop-off \
         -et 'pairs' \
         -scm mcsce \
-        -bgeo_int2cart \
+        --bgeo-strategy int2cart \
         -of ./drk_CSSSd2D_nosub_int2cart_mcsce \
         -n
 
@@ -192,7 +192,7 @@ To request 3 nodes to generate 512,000 structures of the unfolded state of the d
         --dloop-off \
         -et 'pairs' \
         -scm mcsce \
-        -bgeo_int2cart \
+        --bgeo-strategy int2cart \
         -of /scratch/user/drk/ \
         -n 32 \
         -rs 12 
