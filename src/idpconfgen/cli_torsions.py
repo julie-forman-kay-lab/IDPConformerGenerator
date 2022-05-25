@@ -37,6 +37,7 @@ USAGE:
 import argparse
 import numpy as np
 from functools import partial
+from math import radians
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -80,7 +81,7 @@ ap.add_argument(
         "Change default parameters of fractional secondary structure plot "
         "using alpha, beta, and other regions of the ramachandran space. "
         "Optionally to be used with ``--plot``."
-        "Example: --ramaplot filename=fracRama.png colors=['o', 'b', 'k']"
+        "Example: --ramaplot filename=fracRama.png colors=r,g,b"
     ),
     nargs='*',
 )
@@ -233,6 +234,19 @@ def main(
         p=np.ones(n_confs)
         p=p/len(p)
         c=0
+        
+        deglimits = {
+            '-180':-180.0,
+            '-120':-120.0,
+            '10':10.0,
+            '45':45.0,
+            '180':180.0            
+        }
+        
+        if not degrees:
+            for deg in deglimits:
+                deglimits[deg] = radians(deglimits[deg])
+            
         for conf in torsion_result:
             for res in range(max_residues-1):
                 try:
@@ -240,9 +254,9 @@ def main(
                     psi = torsion_result[conf]["psi"][res]
                 except:
                     continue
-                if (-180.0 < phi and phi < 10.0) and (-120.0 < psi and psi < 45.0):
+                if (deglimits['-180'] < phi and phi < deglimits['10']) and (deglimits['-120']< psi and psi < deglimits['45']):
                     frac_rama['alpha'][res] += p[c]
-                elif (-180.0 < phi and phi < 0.0) and ((-180 < psi and psi < -120) or (45 < psi and psi < 180)):
+                elif (deglimits['-180'] < phi and phi < 0.0) and ((deglimits['-180'] < psi and psi < deglimits['-120']) or (deglimits['45'] < psi and psi < deglimits['180'])):
                     frac_rama['beta'][res] += p[c]
                 else:
                     frac_rama['other'][res] += p[c]
