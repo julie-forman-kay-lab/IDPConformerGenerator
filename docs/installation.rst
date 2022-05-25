@@ -99,7 +99,6 @@ If they're not available, it will install from the web::
     pip install numba --no-index
     pip install pybind11 --no-index
     pip install tox
-    pip install libfuncpy
 
 We are ready to clone from source and installation from here will be similar to
 local::

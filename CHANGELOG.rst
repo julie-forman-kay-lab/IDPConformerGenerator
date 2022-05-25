@@ -9,6 +9,11 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.6.1 (2022-05-25)
+------------------------------------------------------------
+
+* updated GRAHAM install instruction (#207)
+
 v0.6.0 (2022-05-24)
 ------------------------------------------------------------
 
