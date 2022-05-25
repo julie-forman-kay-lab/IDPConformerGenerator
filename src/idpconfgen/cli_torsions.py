@@ -80,7 +80,7 @@ ap.add_argument(
         "Change default parameters of fractional secondary structure plot "
         "using alpha, beta, and other regions of the ramachandran space. "
         "Optionally to be used with ``--plot``."
-        "Example: --ramaplot filename=fracRama.png colors=['o', 'b', 'k']"
+        "Example: --ramaplot filename=fracRama.png colors='o', 'b', 'k'"
     ),
     nargs='*',
 )
@@ -233,6 +233,28 @@ def main(
         p=np.ones(n_confs)
         p=p/len(p)
         c=0
+        
+        if degrees:
+            phiL = -180.0
+            alpha_phiU = 10.0
+            alpha_psiL = -120.0
+            alpha_psiU = 45.0
+            beta_phiU = 0.0
+            beta_psiL1 = -180
+            beta_psiU1 = -120
+            beta_psiL2 = 45.0
+            beta_psiU2 = 180.0
+        else:
+            phiL = -3.14159
+            alpha_phiU = 0.174533
+            alpha_psiL = -2.0944
+            alpha_psiU = 0.785398
+            beta_phiU = 0.0
+            beta_psiL1 = -3.14159
+            beta_psiU1 = -2.0944
+            beta_psiL2 = 0.785398
+            beta_psiU2 = 3.14159
+            
         for conf in torsion_result:
             for res in range(max_residues-1):
                 try:
@@ -240,9 +262,9 @@ def main(
                     psi = torsion_result[conf]["psi"][res]
                 except:
                     continue
-                if (-180.0 < phi and phi < 10.0) and (-120.0 < psi and psi < 45.0):
+                if (phiL < phi and phi < alpha_phiU) and (alpha_psiL< psi and psi < alpha_psiU):
                     frac_rama['alpha'][res] += p[c]
-                elif (-180.0 < phi and phi < 0.0) and ((-180 < psi and psi < -120) or (45 < psi and psi < 180)):
+                elif (phiL < phi and phi < beta_phiU) and ((beta_psiL1 < psi and psi < beta_psiU1) or (beta_psiL2 < psi and psi < beta_psiU2)):
                     frac_rama['beta'][res] += p[c]
                 else:
                     frac_rama['other'][res] += p[c]
