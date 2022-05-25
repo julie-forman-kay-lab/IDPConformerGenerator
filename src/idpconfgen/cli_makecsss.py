@@ -44,8 +44,8 @@ ap.add_argument(
         'Specifies the probability of secondary structure sampling on a per-residue basis. '
         'Please cover all residues in your sequence of interest. '
         'Overlapping residues with the same DSSP_REGEX will be overwritten by subsequent entries. '
-        'E.g. -cp <RESIDUE or RANGE> <DSSP_REGEX> <PROBABILITY>|... '
-        'E.g. -cp 1-3 L 0.3|1-3 H 0.8|4-20 X 1.0'
+        "E.g. -cp '<RESIDUE or RANGE> <DSSP_REGEX> <PROBABILITY>|...' "
+        "E.g. -cp '1-3 L 0.3|1-3 H 0.8|4-20 X 1.0'"
         ),
     required=True,
     )

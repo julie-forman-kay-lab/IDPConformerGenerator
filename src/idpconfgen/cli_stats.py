@@ -122,7 +122,7 @@ def main(
     del non_overlapping_parameters
 
     log.info(T(f"reading database"))
-    log.info(S(database))
+    log.info(S(f"{database}"))
     db = read_dict_from_json(database)
     log.info(S(f"The database as {len(db)} protein chains"))
 
