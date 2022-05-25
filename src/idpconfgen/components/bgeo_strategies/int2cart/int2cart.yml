@@ -1,0 +1,18 @@
+model:
+  n_gaussians: 180
+  gaussian_margin: 10
+  gaussian_normalize: True
+  gaussian_factor: 0.5
+
+  recurrent: gru
+  rec_neurons_num: 200
+  rec_stack_size: 3
+  rec_dropout: 0.1
+
+  n_filter_layers: 2
+  filter_size: 64
+  use_batchnorm: false
+
+  inputs: [phi, psi, omega, aa]
+  outputs: [d1, d2, d3, theta1, theta2, theta3]
+
