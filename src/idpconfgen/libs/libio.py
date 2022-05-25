@@ -11,7 +11,6 @@ from io import BytesIO
 from os import SEEK_END
 from pprint import pprint
 
-
 from idpconfgen import Path, log
 from idpconfgen.libs import get_false
 from idpconfgen.libs.libfunc import is_none
@@ -27,6 +26,18 @@ from idpconfgen.logger import S, T
 
 
 def make_folder_or_cwd(folder):
+    """
+    Make a folder or five CWD.
+
+    Parameters
+    ----------
+    folder : str or Path
+        Make the folder. If folder is None return the CWD.
+
+    Return
+    ------
+    Path
+    """
     log.info(T('setting up working directory'))
     if is_none(folder):
         ofolder = Path.cwd().resolve()
@@ -39,8 +50,9 @@ def make_folder_or_cwd(folder):
     except (ValueError, TypeError):
         ofolder = Path.cwd().resolve()
         log.info(S(f'Could not create folder from: {folder}.'))
+        ofolder = Path.cwd()
         log.info(S(f'Using current working directory: {os.fspath(ofolder)}.'))
-        return Path.cwd()
+        return ofolder
 
     try:
         ofolder.mkdir(parents=True, exist_ok=False)
@@ -50,8 +62,8 @@ def make_folder_or_cwd(folder):
         log.info(S('Previous data will be overwritten, if file names overlap.'))
     else:
         log.info(S(f'Created folder {os.fspath(ofolder.resolve())!r}.'))
-    finally:
-        return ofolder
+
+    return ofolder
 
 
 # NOT USED ANYWHERE
@@ -421,7 +433,7 @@ def read_dict_from_pickle(path):
 
 
 def read_dict_from_tar(path):
-    """Read dictionary from .tar"""
+    """Read dictionary from .tar file."""
     tar = tarfile.open(path)
     f = tar.extractfile(tar.getmembers()[0])
     d = json.loads(f.read())
@@ -457,6 +469,7 @@ def read_FASTAS_from_file_to_strings(fpath):
 
 
 def is_valid_fasta_file(path):
+    """Return True if FASTA file is valid."""
     is_valid = \
         file_exists(path) \
         and has_suffix_fasta(path)
@@ -464,12 +477,14 @@ def is_valid_fasta_file(path):
 
 
 def read_text(fpath):
+    """Read text from path."""
     return Path(fpath).read_text()
 
 
 def read_lines(fpath):
+    """Read lines from path."""
     text = read_text(fpath)
-    return text.strip().split('\n')
+    return text.strip().split(os.linesep)
 
 
 # USED OKAY
@@ -565,7 +580,7 @@ def save_dictionary(mydict, output='mydict.pickle'):
     try:
         suffix = Path(output).suffix
     except TypeError:
-        #pprint(mydict, indent=4, sort_dicts=True)  # disabled until 3.8
+        # pprint(mydict, indent=4, sort_dicts=True)  # disabled until 3.8
         pprint(mydict, indent=4)
         return
 
