@@ -1,13 +1,17 @@
-"Test cli_build."""
+# flake8: noqa: E122
+"""Test cli_build."""
 import numpy as np
 import pytest
 
-from idpconfgen.libs.libbuild import *
+from idpconfgen.libs.libbuild import (
+    build_regex_substitutions,
+    init_confmasks,
+    prepare_slice_dict,
+    )
 
 
 def test_conf_masks():
     """Test confmask creation."""
-
     atom_labels = np.array([
         #0     1     2
         'H1', 'H2', 'H3',
@@ -34,9 +38,8 @@ def test_conf_masks():
     assert confmask.OXT1 == 15
     assert confmask.OXT2 == 19
     assert np.array_equal(confmask.non_Hs, [3, 4, 5, 6, 7, 12, 13, 14, 15, 19])
-    assert np.array_equal(confmask.non_Hs_non_OXT, [3, 4, 5, 6, 7, 12, 13, 14, 15])
+    assert np.array_equal(confmask.non_Hs_non_OXT, [3, 4, 5, 6, 7, 12, 13, 14, 15])  # noqa: E501
     assert np.array_equal(confmask.H2_N_CA_CB, [1, 3, 4, 7])
-
 
 
 @pytest.mark.parametrize(

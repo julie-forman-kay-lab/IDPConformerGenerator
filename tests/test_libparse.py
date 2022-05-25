@@ -2,8 +2,8 @@
 import shutil
 from pathlib import Path as Path_
 
-import pytest
 import numpy as np
+import pytest
 
 from idpconfgen import Path
 from idpconfgen.core.exceptions import DSSPParserError
@@ -332,7 +332,7 @@ def test_get_next_residue(seq, i1, i2, expected):
     [
         ([1, 2], 5, 5, [1, 2, 5, 5, 5]),
         ([], 'a', 2, ['a', 'a']),
-        (np.array([1,2]), 5, 5, [1, 2, 5, 5 , 5]),
+        (np.array([1, 2]), 5, 5, [1, 2, 5, 5, 5]),
         ('aaa', 'b', 5, ['a', 'a', 'a', 'b', 'b']),
         ]
     )

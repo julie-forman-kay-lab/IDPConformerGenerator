@@ -10,6 +10,7 @@ from os.path import basename, dirname, join, splitext
 
 from setuptools import find_packages, setup
 
+
 if 'TOX_ENV_NAME' not in os.environ \
         or 'TOX_ENV_NAME' in os.environ and 'TOXTESTING' in os.environ:
 
@@ -18,11 +19,11 @@ if 'TOX_ENV_NAME' not in os.environ \
     ext_modules = [
         Pybind11Extension(
             "idpcpp",
-            #sorted(glob(join('src', 'idpconfgen', 'cpp', '*.cpp'))),
+            # sorted(glob(join('src', 'idpconfgen', 'cpp', '*.cpp'))),
             [join('src', 'idpconfgen', 'cpp', 'idpcpp.cpp')],
             )
         ]
-    cmdclass={'build_ext': build_ext}
+    cmdclass = {'build_ext': build_ext}
 
 else:
     ext_modules = []
@@ -84,20 +85,10 @@ setup(
         ],
     python_requires='>=3.7.*,<4',
     install_requires=[
-        #'libfuncpy>=0.0.3',
-        #'numpy>=1,<2',
-        #'numba>=0.53.0',
-        #'scipy>=1,<2',
-        #'pybind11>=2,<3',
         ],
     extras_require={
-        # eg:
-        #   'rst': ['docutils>=0.11'],
-        #   ':python_version=="2.6"': ['argparse'],
         },
     setup_requires=[
-        #   'pytest-runner',
-        #   'setuptools_scm>=3.3.1',
         ],
     entry_points={
         'console_scripts': [

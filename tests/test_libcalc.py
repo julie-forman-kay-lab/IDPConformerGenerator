@@ -229,18 +229,14 @@ def radians_to_degree_bins_data(request):
 
 
 def test_rrd10(radians_to_degree_bins_data):
-    """
-    Test rounding radians to nearest degree.
-    """
+    """Test rounding radians to nearest degree."""
     x0, expected = radians_to_degree_bins_data
     result = libcalc.round_radian_to_degree_bin_10(radians(x0))
     assert result == expected
 
 
 def test_rrd10_njit(radians_to_degree_bins_data):
-    """
-    Test rounding radians to nearest degree.
-    """
+    """Test rounding radians to nearest degree."""
     x0, expected = radians_to_degree_bins_data
     result = libcalc.rrd10_njit(radians(x0))
     assert result == expected
@@ -249,8 +245,8 @@ def test_rrd10_njit(radians_to_degree_bins_data):
 @pytest.mark.parametrize(
     "in1,reverse,expected",
     [
-        ([2, 3, 4, 5], False, [2/14, 3/14, 4/14, 5/14]),
-        ([2, 3, 4, 5], True, [5/14, 4/14, 3/14, 2/14]),
+        ([2, 3, 4, 5], False, [2 / 14, 3 / 14, 4 / 14, 5 / 14]),
+        ([2, 3, 4, 5], True, [5 / 14, 4 / 14, 3 / 14, 2 / 14]),
         ([1, 0], False, [1, 0]),
         ([1, 0], True, [0, 1]),
         ]
