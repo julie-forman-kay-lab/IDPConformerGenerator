@@ -26,7 +26,7 @@ from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 
-LOGFILESNAME = 'idpconfgen_csssconv'
+LOGFILESNAME = '.idpconfgen_csssconv'
 _name = 'csssconv'
 _help = 'Standardizes secondary-structure prediction output for custom secondary-structure sampling (CSSS).'
 

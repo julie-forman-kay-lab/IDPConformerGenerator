@@ -16,9 +16,9 @@ from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.logger import T, init_files, report_on_crash
 
 
-LOGFILESNAME = 'idpconfgen_fastaext'
+LOGFILESNAME = '.idpconfgen_fastaext'
 
-_name = 'fastaext'
+_name = '.fastaext'
 _help = 'Extract FASTA sequence from PDBs.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)

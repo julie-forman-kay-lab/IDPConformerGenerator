@@ -49,7 +49,7 @@ from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-LOGFILESNAME = 'idpconfgen_torsionJ'
+LOGFILESNAME = '.idpconfgen_torsionJ'
 
 _name = 'torsionsJ'
 _help = 'Calculate HN-CaHA torsion angles from PDB files.'

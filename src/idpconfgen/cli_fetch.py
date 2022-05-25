@@ -31,7 +31,7 @@ from idpconfgen.libs.libdownload import fetch_raw_CIFs, fetch_raw_PDBs
 from idpconfgen.libs.libhigherlevel import download_pipeline
 
 
-LOGFILESNAME = '.raw_pdbdl'
+LOGFILESNAME = '.idpconfgen_fetch'
 
 _name = 'fetch'
 _help = 'Fetch structures from RCSB.'

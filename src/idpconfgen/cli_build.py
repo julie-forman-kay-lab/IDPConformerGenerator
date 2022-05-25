@@ -94,7 +94,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
-LOGFILESNAME = 'idpconfgen_build'
+LOGFILESNAME = '.idpconfgen_build'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?

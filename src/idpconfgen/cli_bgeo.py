@@ -80,7 +80,7 @@ from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = 'idpconfgen_bgeo'
+LOGFILESNAME = '.idpconfgen_bgeo'
 
 _name = 'bgeo'
 _help = 'Create a database of covalent bond geometry.'

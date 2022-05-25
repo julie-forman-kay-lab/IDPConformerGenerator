@@ -61,7 +61,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = 'idpconfgen_dssppii'
+LOGFILESNAME = '.idpconfgen_dssppii'
 _name = 'dssppii'
 _help = 'Extracts DSSP-PPII secondary information from a PDB file.'
 
