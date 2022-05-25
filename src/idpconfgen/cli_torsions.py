@@ -37,6 +37,7 @@ USAGE:
 import argparse
 import numpy as np
 from functools import partial
+from math import radians
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -234,26 +235,17 @@ def main(
         p=p/len(p)
         c=0
         
-        if degrees:
-            phiL = -180.0
-            alpha_phiU = 10.0
-            alpha_psiL = -120.0
-            alpha_psiU = 45.0
-            beta_phiU = 0.0
-            beta_psiL1 = -180
-            beta_psiU1 = -120
-            beta_psiL2 = 45.0
-            beta_psiU2 = 180.0
-        else:
-            phiL = -3.14159
-            alpha_phiU = 0.174533
-            alpha_psiL = -2.0944
-            alpha_psiU = 0.785398
-            beta_phiU = 0.0
-            beta_psiL1 = -3.14159
-            beta_psiU1 = -2.0944
-            beta_psiL2 = 0.785398
-            beta_psiU2 = 3.14159
+        deglimits = {
+            '-180':-180.0,
+            '-120':-120.0,
+            '10':10.0,
+            '45':45.0,
+            '180':180.0            
+        }
+        
+        if not degrees:
+            for deg in deglimits:
+                deglimits[deg] = radians(deglimits[deg])
             
         for conf in torsion_result:
             for res in range(max_residues-1):
@@ -262,9 +254,9 @@ def main(
                     psi = torsion_result[conf]["psi"][res]
                 except:
                     continue
-                if (phiL < phi and phi < alpha_phiU) and (alpha_psiL< psi and psi < alpha_psiU):
+                if (deglimits['-180'] < phi and phi < deglimits['10']) and (deglimits['-120']< psi and psi < deglimits['45']):
                     frac_rama['alpha'][res] += p[c]
-                elif (phiL < phi and phi < beta_phiU) and ((beta_psiL1 < psi and psi < beta_psiU1) or (beta_psiL2 < psi and psi < beta_psiU2)):
+                elif (deglimits['-180'] < phi and phi < 0.0) and ((deglimits['-180'] < psi and psi < deglimits['-120']) or (deglimits['45'] < psi and psi < deglimits['180'])):
                     frac_rama['beta'][res] += p[c]
                 else:
                     frac_rama['other'][res] += p[c]
