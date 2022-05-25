@@ -18,7 +18,7 @@ from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.logger import S, T, init_files
 
-LOGFILESNAME = 'idpconfgen_makecsss'
+LOGFILESNAME = '.idpconfgen_makecsss'
 _name = 'makecsss'
 _help = 'Creates or edits a custom CSSS file per user specifications.'
 

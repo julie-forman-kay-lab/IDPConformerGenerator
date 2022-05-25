@@ -35,7 +35,7 @@ from idpconfgen.libs.libio import make_folder_or_cwd
 from idpconfgen.logger import S, T, init_files
 
 
-LOGFILESNAME = 'idpconfgen_sethpc'
+LOGFILESNAME = '.idpconfgen_sethpc'
 _name = 'sethpc'
 _help = 'Set up job scripts for SLURM managed HPC.'
 

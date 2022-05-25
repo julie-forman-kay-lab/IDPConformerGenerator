@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Correct typo bugs in ``fastext`` and ``bgeo``
+* General lints
+
 v0.6.4 (2022-05-25)
 ------------------------------------------------------------
 

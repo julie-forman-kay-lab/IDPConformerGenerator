@@ -528,7 +528,7 @@ def test_file_reader_iterator_tar(Iterator):
     fi = Iterator(str(tcommons.file_tar), ext='.txt')
     assert fi
     for n, data in fi:
-        assert data.decode() == pairs[n]
+        assert data.decode() == pairs[str(n)]
 
 
 def test_is_valid_fasta_file():

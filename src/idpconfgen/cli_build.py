@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+import os
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -20,11 +21,11 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
+    bgeo_error_msg,
     bgeo_int2cart_name,
     bgeo_sampling_name,
-    bgeo_strategies_default,
     bgeo_strategies,
-    bgeo_error_msg,
+    bgeo_strategies_default,
     )
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
@@ -46,8 +47,8 @@ from idpconfgen.core.build_definitions import (
     distance_C_O,
     distance_H_N,
     forcefields,
-    n_terminal_h_coords_at_origin,
     n_proline_h_coord_at_origin,
+    n_terminal_h_coords_at_origin,
     sidechain_templates,
     )
 from idpconfgen.core.definitions import dssp_ss_keys
@@ -55,13 +56,13 @@ from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
-    prepare_slice_dict,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
     init_conflabels,
     init_confmasks,
     prepare_energy_function,
+    prepare_slice_dict,
     )
 from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
@@ -94,7 +95,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
-LOGFILESNAME = 'idpconfgen_build'
+LOGFILESNAME = '.idpconfgen_build'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -113,12 +114,11 @@ BGEO_res = {}
 # int2cart globals
 INT2CART = None
 
-# SLICES and ANGLES will be populated in main() with the torsion angles.
+# ANGLES will be populated in main() with the torsion angles.
 # it is not expected SLICES or ANGLES to be populated anywhere else.
 # The slice objects from where the builder will feed to extract torsion
 # fragments from ANGLES.
 ANGLES = None
-SLICES = []
 SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
@@ -145,7 +145,6 @@ TEMPLATE_EFUNC = None
 
 class _BuildPreparation:
     pass
-
 
 
 def are_globals(bgeo_strategy):
@@ -299,12 +298,18 @@ class EnergyLogSaver:
     sent to the different processors, it is managed by the main()
     function.
     """
+
     def start(self, path):
+        """Open file for writing."""
         self.dest = open(path, 'w')
+
     def save(self, confname, energy):
+        """Save conformer name and energy to file."""
         self.dest.write(f'{confname},{energy}\n')
         self.dest.flush()
+
     def close(self):
+        """Close file."""
         self.dest.close()
 
 
@@ -313,7 +318,7 @@ ENERGYLOGSAVER = EnergyLogSaver()
 
 def parse_CSSS(path2csss):
     """
-    Prepares CSSS.JSON dictionary for the conformer building process.
+    Prepare CSSS.JSON dictionary for the conformer building process.
 
     The secondary structure keys are identified.
     The probabilities for each residue are normalized to 1, that is:
@@ -329,7 +334,8 @@ def parse_CSSS(path2csss):
     -------
     dict
         First key layer indicats residue number position, second key layer
-        indicates the DSSP regex to search for and the values are the probabilities.
+        indicates the DSSP regex to search for and the values are the
+        probabilities.
 
     set
         A set with all the different secondary structure keys identified in the
@@ -341,7 +347,7 @@ def parse_CSSS(path2csss):
     all_dssps = set()
 
     # we can use this implementation because dictionaries are sorted by default
-    for resid, dssps in csss_dict.items():
+    for _resid, dssps in csss_dict.items():
         probabilities = list(dssps.values())
         all_dssps.update(dssps.keys())
         prob_normalized = make_seq_probabilities(probabilities)
@@ -400,7 +406,8 @@ def main(
 
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
-    log.info(f'input sequence: {input_seq}')
+    log.info(T('starting the building process'))
+    log.info(S(f'input sequence: {input_seq}'))
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -422,10 +429,6 @@ def main(
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
-    # reads regexes
-    # regexes will only be sampled for the fragment sizes selected.
-    xmer_range = xmer_probs_tmp.sizes[0], xmer_probs_tmp.sizes[-1]
-
     # set up the information from CSSS.JSON files
     csss_dict = False
     csss_dssp_regexes = None
@@ -433,8 +436,8 @@ def main(
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
     # There are four possibilities of sampling:
-    # 1) Sampling loops and/or helix and/or strands, where the found fragments are
-    #    all of the same secondary structure
+    # 1) Sampling loops and/or helix and/or strands, where the found fragments
+    #    are all of the same secondary structure
     # 2) sample "any". Disregards any secondary structure annotated
     # 3) custom sample given by the user
     # 4) advanced sampling
@@ -450,7 +453,8 @@ def main(
         csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
 
         # If the user wants to sample "any" for some residues
-        # they can have "X" in the CSSS.JSON but that will be converted internally below
+        # users can have "X" in the CSSS.JSON but that will be converted
+        # internally below
         if "X" in csss_dssp_regexes:
             csss_dssp_regexes.remove("X")
             csss_dssp_regexes.add(all_valid_ss_codes)
@@ -463,12 +467,16 @@ def main(
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
-        if dloop: dssp_regexes.append("L")
-        if dhelix: dssp_regexes.append("H")
-        if dstrand: dssp_regexes.append("E")
+        if dloop:
+            dssp_regexes.append("L")
+        if dhelix:
+            dssp_regexes.append("H")
+        if dstrand:
+            dssp_regexes.append("E")
 
     elif duser:
-        # this is very advanced, users should know what they are doing :-)
+        # this is a very advanced option,
+        # users should know what they are doing :-)
         dssp_regexes = duser
 
     else:
@@ -484,8 +492,7 @@ def main(
     if residue_tolerance is not None:
         _restol = str(residue_tolerance)[1:-1]
         log.info(S(f"Building with residue tolerances: {_restol}"))
-        
-        
+
     # these are the slices with which to sample the ANGLES array
     SLICEDICT_XMERS = prepare_slice_dict(
         primary,
@@ -558,8 +565,6 @@ def main(
         )
 
     start = time()
-    # for debug purposes
-    # execute(conformers_per_core * ncores, nconfs=10)
     with Pool(ncores) as pool:
         imap = pool.imap(execute, range(ncores))
         for _ in imap:
@@ -594,7 +599,8 @@ def populate_globals(
     Parameters
     ----------
     bgeo_strategy : str
-        A key from the :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
+        A key from the
+        :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
 
     forcefield : str
         A key in the `core.build_definitions.forcefields` dictionary.
@@ -609,7 +615,7 @@ def populate_globals(
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
     if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
-        from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path
+        from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path  # noqa: E501  # isort:skip
 
         if bgeo_path is None:
             bgeo_path = bgeo_sampling_path
@@ -629,7 +635,7 @@ def populate_globals(
     # Also prepare BGEO_int2cart when needed
     if bgeo_strategy == bgeo_int2cart_name:
         global INT2CART
-        from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import BGEO_Int2Cart
+        from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import BGEO_Int2Cart  # noqa: E501  # isort:skip
         try:
             INT2CART = BGEO_Int2Cart()
         except RuntimeError as e:
@@ -683,7 +689,6 @@ def _build_conformers(
         ):
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
-
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
@@ -826,11 +831,12 @@ def conformer_generator(
     sidechain_method : str
         The method used to build/pack sidechains over the backbone
         structure. Defaults to `faspr`.
-        Expects a key in `components.sidechain_packing.sidechain_packing_methods`.
+        Expects a key in
+        `components.sidechain_packing.sidechain_packing_methods`.
 
     bgeo_strategy : str
-        The strategy used to generate the bond geometries. Available options are:
-        :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
+        The strategy used to generate the bond geometries. Available options
+        are: :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
 
     bgeo_path : str of Path
         Path to a bond geometry library as created by `bgeo` CLI.
@@ -885,8 +891,6 @@ def conformer_generator(
     RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
     SUM = np.nansum
-    angles = ANGLES
-    slices = SLICES
     global BGEO_full
     global BGEO_trimer
     global BGEO_res
@@ -917,7 +921,7 @@ def conformer_generator(
             input_seq=all_atom_input_seq,
             bgeo_strategy=bgeo_strategy,
             bgeo_path=bgeo_path,
-            forcefield=forcefields[forcefield]
+            forcefield=forcefields[forcefield],
             **energy_funcs_kwargs,
             )
 
@@ -1081,13 +1085,12 @@ def conformer_generator(
 
         # run this loop until a specific BREAK is triggered
         while 1:  # 1 is faster than True :-)
-            #print(bbi)
 
             # I decided to use an if-statement here instead of polymorph
             # the else clause to a `generative_function` variable because
             # the resulting overhead from the extra function call and
             # **kwargs handling was greater then the if-statement processing
-            # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html
+            # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html  # noqa: E501
             if generative_function:
                 primer_template, agls = generative_function(
                     nres=RINT(1, 6),
@@ -1095,18 +1098,6 @@ def conformer_generator(
                     )
 
             else:
-                # following `aligndb` function,
-                # `angls` will always be cyclic with:
-                # omega - phi - psi - omega - phi - psi - (...)
-                #agls = angles[RC(slices), :].ravel()
-                # agls = angles[:, :].ravel()
-
-                #primer_template = get_idx_primer_njit(
-                #    all_atom_input_seq,
-                #    RC(slices_dict_keys, p=XMERPROBS),
-                #    calc_residue_num_from_index(bbi - 1),
-                #    )
-
                 # algorithm for adjacent building
                 # TODO
                 # primer_template here is used temporarily, and needs to be
@@ -1121,10 +1112,12 @@ def conformer_generator(
 
                     current_res_number = calc_residue_num_from_index(bbi - 1)
 
-                    # assert the residue being built is of the same nature as the one in the angles
+                    # assert the residue being built is of the same nature as
+                    # the one in the angles
                     # TODO: remove this assert
                     n_ = next(PRIMER)
-                    assert all_atom_input_seq[current_res_number] == n_, (all_atom_input_seq[current_res_number], n_)
+                    assert all_atom_input_seq[current_res_number] == n_, \
+                        (all_atom_input_seq[current_res_number], n_)
 
                     curr_res, tpair = GET_TRIMER_SEQ(
                         all_atom_input_seq,
@@ -1135,16 +1128,23 @@ def conformer_generator(
                     if bgeo_strategy == bgeo_int2cart_name:
                         torsion_records.append((omg, phi, psi))
                         seq = all_atom_input_seq[:current_res_number + 1]
-                        tors = np.array(torsion_records) # omega, phi, psi
-                        tors = np.hstack([tors[:, 1:], tors[:, :1]]) # phi, psi, omega
-                        d1, d2, d3, theta1, theta2, theta3 = INT2CART.get_internal_coords(seq, tors)
+
+                        tors = np.array(torsion_records)  # omega, phi, psi
+
+                        # phi, psi, omega
+                        tors = np.hstack([tors[:, 1:], tors[:, :1]])
+
+                        _ = INT2CART.get_internal_coords(seq, tors)
+                        d1, d2, d3, theta1, theta2, theta3 = _
+
                         bend_angles = [theta3, theta1, theta2]
                         bond_lens = [d1, d2, d3]
 
-                    for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):
+                    for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):  # noqa: E501
 
                         if bgeo_strategy == bgeo_int2cart_name:
-                            _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2 # needed for correctly calculating Q
+                            # needed for correctly calculating Q
+                            _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
                             _bond_lens = bond_lens[torsion_idx]
 
                         elif bgeo_strategy == bgeo_sampling_name:
@@ -1274,7 +1274,6 @@ def conformer_generator(
             total_energy = TEMPLATE_EFUNC(template_coords)
 
             if ANY(total_energy > energy_threshold_backbone):
-                #print('---------- energy positive')
                 # reset coordinates to the original value
                 # before the last fragment added
 
@@ -1330,8 +1329,8 @@ def conformer_generator(
                 template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
 
                 # prepares cycles for building process
-                # this is required because the last fragment created may have been
-                # the final part of the conformer
+                # this is required because the last fragment created may have
+                # been the final part of the conformer
                 if backbone_done:
                     bond_lens = get_cycle_distances_backbone()
                     bond_type = get_cycle_bond_type()
@@ -1463,7 +1462,8 @@ def gen_PDB_from_conformer(
 
         atom_i += 1
 
-    return '\n'.join(lines)
+    return os.linesep.join(lines)
+
 
 def get_adjacent_angles(
         options,
@@ -1538,7 +1538,8 @@ def get_adjacent_angles(
 
             try:
                 if csss:
-                    #matches current residue to build with residue number in CSSS
+                    # matches current residue
+                    # to build with residue number in CSSS
                     cr_plus_1 = str(cr + 1)
 
                     # clear lists
@@ -1551,7 +1552,8 @@ def get_adjacent_angles(
                     # adds SS probabilities for the same residue
                     lssprobsE(csss[cr_plus_1].values())
 
-                    # based on the probabilities, select a SS for residue in question
+                    # based on the probabilities,
+                    # select a SS for residue in question
                     pcsss = RC(lss, p=lssprobs)
                     angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
 

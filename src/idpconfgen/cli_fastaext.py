@@ -16,7 +16,7 @@ from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.logger import T, init_files, report_on_crash
 
 
-LOGFILESNAME = 'idpconfgen_fastaext'
+LOGFILESNAME = '.idpconfgen_fastaext'
 
 _name = 'fastaext'
 _help = 'Extract FASTA sequence from PDBs.'
@@ -76,8 +76,8 @@ def main(
     execute = partial(
         report_on_crash,
         get_fasta_from_PDB,
-        EOC_exception=IDPConfGenException,
-        EOC_prefix=_name,
+        ROC_exception=IDPConfGenException,
+        ROC_prefix=_name,
         )
 
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)

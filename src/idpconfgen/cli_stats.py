@@ -17,7 +17,7 @@ from idpconfgen.libs.libio import read_dict_from_json
 from idpconfgen.libs.libparse import get_mers
 from idpconfgen.logger import S, T, init_files
 
-LOGFILESNAME = '.stats'
+LOGFILESNAME = '.idpconfgen_stats'
 
 _name = 'stats'
 _help = 'Gets statistics from DB and input sequence.'

@@ -1,12 +1,18 @@
-"""
-Test lib higher routines.
-"""
+"""Test lib higher routines."""
 from collections import defaultdict
 
+import numpy as np
 import pytest
 
-from idpconfgen.libs.libio import read_dictionary_from_disk, save_dictionary
-from idpconfgen.libs.libhigherlevel import *
+from idpconfgen.libs.libhigherlevel import (
+    bgeo_reduce,
+    convert_bond_geo_lib,
+    get_separate_torsions,
+    read_trimer_torsion_planar_angles,
+    validate_backbone_labels_for_torsion,
+    )
+from idpconfgen.libs.libio import read_dictionary_from_disk
+
 from . import tcommons
 
 
@@ -71,7 +77,6 @@ def test_bgeo_database_reduce():
                 for i, j in zip(e, r)
                 )
 
-
     assert list(etrimer.keys()) == list(rtrimer.keys())
     for btype in etrimer.keys():
         assert list(etrimer[btype].keys()) == list(rtrimer[btype].keys())
@@ -111,5 +116,4 @@ def test_separate_torsions():
     )
 def test_validate_backbone_labels_for_torsions(labels, expected):
     """Validate Backbone labels for torsions."""
-    assert bool(validate_backbone_labels_for_torsion(labels)) == expected  # noqa: E501
-
+    assert bool(validate_backbone_labels_for_torsion(labels)) == expected

@@ -53,7 +53,7 @@ from idpconfgen.components.plots.plotfuncs import plot_fracSS, plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-LOGFILESNAME = 'idpconfgen_torsion'
+LOGFILESNAME = '.idpconfgen_torsion'
 
 _name = 'torsions'
 _help = 'Calculate torsion angles for PDB files.'

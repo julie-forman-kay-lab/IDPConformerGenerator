@@ -49,7 +49,7 @@ from idpconfgen.libs.libvalidate import (
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-LOGFILESNAME = '.validate'
+LOGFILESNAME = '.idpconfgen_validate'
 VALIDATION_PROTOCOLS = ('vdw2', 'vdw', 'bbl', 'bbd')
 
 _name = 'validate'

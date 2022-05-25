@@ -19,7 +19,7 @@ from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-LOGFILESNAME = '.search'
+LOGFILESNAME = '.idpconfgen_search'
 _name = 'search'
 _help = 'Searches through PDB headers for keywords of interest.'
 
