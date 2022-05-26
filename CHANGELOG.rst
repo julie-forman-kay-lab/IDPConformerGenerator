@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add ``pr`` env to ``tox``
+
 v0.6.5 (2022-05-25)
 ------------------------------------------------------------
 
