@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.6.6 (2022-05-27)
+------------------------------------------------------------
+
 * Add ``pr`` env to ``tox``
 * Update CI workflows
 * Update ReadTheDocs python version to 3.8
