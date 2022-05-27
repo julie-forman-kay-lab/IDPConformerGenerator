@@ -27,5 +27,5 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install virtualenv tox
 
-    - name: test build package
-      run: tox -e build
+    - name: unit tests
+      run: tox -e test
