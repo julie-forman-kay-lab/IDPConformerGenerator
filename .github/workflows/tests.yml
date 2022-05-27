@@ -1,4 +1,4 @@
-name: docs
+name: tests
 
 on:
   push:
@@ -27,5 +27,5 @@ jobs:
         python -m pip install --upgrade pip setuptools wheel
         pip install virtualenv tox
 
-    - name: test docs
-      run: tox -e docs
+    - name: test build package
+      run: tox -e build
