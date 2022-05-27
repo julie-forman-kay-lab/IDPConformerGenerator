@@ -9,6 +9,11 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add ``pr`` env to ``tox``
+* Update CI workflows
+* Update ReadTheDocs python version to 3.8
+* Dropped python 3.7 after Numpy
+
 v0.6.5 (2022-05-25)
 ------------------------------------------------------------
 

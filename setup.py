@@ -83,7 +83,7 @@ setup(
     keywords=[
         # eg: 'keyword1', 'keyword2', 'keyword3',
         ],
-    python_requires='>=3.7.*,<4',
+    python_requires='>=3.8.*,<4',
     install_requires=[
         ],
     extras_require={
