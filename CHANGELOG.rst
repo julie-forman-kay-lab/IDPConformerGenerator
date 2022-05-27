@@ -9,8 +9,6 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* add ``pybind11`` to ReadTheDocs config
-
 v0.6.6 (2022-05-27)
 ------------------------------------------------------------
 
