@@ -192,9 +192,9 @@ Install Int2Cart
 
 IDPConformerGenerator can use Int2Cart on the fly to optimize bond geometries
 of the backbones calculated. For this feature, you must have a CUDA compatible
-GPU as well as install Int2Cart on top of the `idpconfgen` Python environment.
+GPU as well as install Int2Cart on top of the ``idpconfgen`` Python environment.
 First, install IDPConfGen as described above. Next, follow these steps. Please
-note that these steps are the same for installing in the idpcgenv::
+note that these steps are the same if you have installed idpconfgen through ``virtualenv``::
 
     # ensure you are in the IDPConformerGenerator GitHub folder
 
