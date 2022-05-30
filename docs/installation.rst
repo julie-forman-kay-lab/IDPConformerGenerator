@@ -167,13 +167,34 @@ IDPConfGen will use MC-SCE to build sidechains as backbone conformers are
 generated. You will see :code:`idpconfgen build -h` has a specific group of
 parameters dedicated to MC-SCE, you can explore those as well.
 
+For installation on a cluster via virtualenv, dependencies need to be manually installed
+as the following for MC-SCE::
+
+    # ensure you're in the idpcgenv and the IDPConformerGenerator GitHub folder
+    git clone https://github.com/THGLab/MCSCE
+
+    # MC-SCE also requires numba and tox but that's already handled in previous steps
+    pip install tensorflow --no-index
+    pip install keras --no-index
+    pip install tqdm --no-index
+    pip install pathos --no-index
+
+    # cd into the MCSCE GitHub folder and install MC-SCE
+    cd MCSCE
+    python setup.py develop --no-deps
+
+    # cd back into the IDPConformerGenerator GitHub folder and install idpconfgen on top of MC-SCE
+    cd ..
+    python setup.py develop --no-deps
+
 Install Int2Cart
 ````````````````
 
 IDPConformerGenerator can use Int2Cart on the fly to optimize bond geometries
 of the backbones calculated. For this feature, you must have a CUDA compatible
 GPU as well as install Int2Cart on top of the `idpconfgen` Python environment.
-First, install IDPConfGen as described above. Next, follow these steps::
+First, install IDPConfGen as described above. Next, follow these steps. Please
+note that these steps are the same for installing in the idpcgenv::
 
     # ensure you are in the IDPConformerGenerator GitHub folder
 
