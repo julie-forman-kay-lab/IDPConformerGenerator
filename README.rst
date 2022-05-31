@@ -30,4 +30,4 @@ the example in the ``example/`` folder.
 
 Version
 -------
-v0.6.6
+v0.6.7
