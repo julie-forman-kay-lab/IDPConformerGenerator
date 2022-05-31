@@ -13,8 +13,10 @@ from idpconfgen.components.bgeo_strategies.sampling import \
 bgeo_strategies_default = bgeo_sampling_name
 """The default bond geometry sampling strategy."""
 
+bgeo_fixed_name = "fixed"
 
 bgeo_strategies = (
+    bgeo_fixed_name,
     bgeo_sampling_name,
     bgeo_int2cart_name,
     )

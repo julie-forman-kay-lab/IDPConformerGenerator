@@ -24,6 +24,7 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_error_msg,
     bgeo_int2cart_name,
     bgeo_sampling_name,
+    bgeo_fixed_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -149,7 +150,7 @@ class _BuildPreparation:
 
 def are_globals(bgeo_strategy):
     """Assess if global variables needed for building are populated."""
-    if bgeo_strategy == bgeo_sampling_name:
+    if (bgeo_strategy == bgeo_sampling_name) or (bgeo_strategy == bgeo_fixed_name):
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
