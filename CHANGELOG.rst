@@ -9,6 +9,7 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* update actions from ``master`` to ``main``
 * update install instructions for MC-SCE in GRAHAM (#215)
 
 v0.6.6 (2022-05-27)
