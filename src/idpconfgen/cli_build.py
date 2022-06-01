@@ -45,6 +45,7 @@ from idpconfgen.components.xmer_probs import (
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
+    build_bend_CA_C_O,
     distance_C_O,
     distance_H_N,
     forcefields,
@@ -58,6 +59,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     create_sidechains_masks_per_residue,
+    get_cycle_bend_angles,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
     init_conflabels,
@@ -150,7 +152,7 @@ class _BuildPreparation:
 
 def are_globals(bgeo_strategy):
     """Assess if global variables needed for building are populated."""
-    if (bgeo_strategy == bgeo_sampling_name) or (bgeo_strategy == bgeo_fixed_name):
+    if bgeo_strategy == bgeo_sampling_name:
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
@@ -162,6 +164,15 @@ def are_globals(bgeo_strategy):
             BGEO_trimer,
             BGEO_res,
             ))
+    elif bgeo_strategy == bgeo_fixed_name:
+        return all ((
+            ALL_ATOM_LABELS,
+            ALL_ATOM_MASKS,
+            ALL_ATOM_EFUNC,
+            TEMPLATE_LABELS,
+            TEMPLATE_MASKS,
+            TEMPLATE_EFUNC,
+        ))
     elif bgeo_strategy == bgeo_int2cart_name:
         return all((
             ALL_ATOM_LABELS,
@@ -1048,6 +1059,9 @@ def conformer_generator(
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
         bond_type = get_cycle_bond_type()
+        
+        if bgeo_strategy == bgeo_fixed_name:
+            bend_angles = get_cycle_bend_angles()
 
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
@@ -1161,6 +1175,10 @@ def conformer_generator(
 
                             _bond_lens = next(bond_lens)[curr_res]
 
+                        elif bgeo_strategy == bgeo_fixed_name:
+                            _bend_angle = next(bend_angles)[curr_res]
+                            _bond_lens = next(bond_lens)[curr_res]
+                            
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
                             bb[bbi, :],
@@ -1171,13 +1189,17 @@ def conformer_generator(
                             )
                         bbi += 1
 
-                    try:
-                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
-                    except KeyError:
+                    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
                         try:
-                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                            co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
-                            co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+                            try:
+                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                            except KeyError:
+                                co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+                                
+                    elif bgeo_strategy == bgeo_fixed_name:
+                        co_bend = build_bend_CA_C_O
 
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],

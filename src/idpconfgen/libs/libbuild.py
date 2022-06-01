@@ -16,6 +16,9 @@ from idpconfgen.core.build_definitions import (
     distances_C_Np1,
     distances_CA_C,
     distances_N_CA,
+    build_bend_angles_CA_C_Np1,
+    build_bend_angles_Cm1_N_CA,
+    build_bend_angles_N_CA_C,
     )
 from idpconfgen.core.definitions import bgeo_CaCNp1, bgeo_Cm1NCa, bgeo_NCaC
 from idpconfgen.libs.libcalc import (
@@ -462,16 +465,16 @@ def get_cycle_distances_backbone():
         ))
 
 
-# deactivated after using bend library BGEO
-# def get_cycle_bend_angles():
-#     """
-#     Return an infinite iterator of the bend angles.
-#     """
-#     return cycle((
-#         build_bend_angles_Cm1_N_CA,  # used for OMEGA
-#         build_bend_angles_N_CA_C,  # used for PHI
-#         build_bend_angles_CA_C_Np1,  # used for PSI
-#         ))
+# re-activated for `fixed` bgeo strategy
+def get_cycle_bend_angles():
+    """
+    Return an infinite iterator of the bend angles.
+    """
+    return cycle((
+        build_bend_angles_Cm1_N_CA,  # used for OMEGA
+        build_bend_angles_N_CA_C,  # used for PHI
+        build_bend_angles_CA_C_Np1,  # used for PSI
+        ))
 
 
 def get_cycle_bond_type():
