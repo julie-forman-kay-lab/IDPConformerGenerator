@@ -63,10 +63,12 @@ Main keys for the bond types are exact.
 
 USAGE:
     $ idpconfgen bgeo [PDBS]
+    $ idpconfgen bgeo [PDBS] --plot
     $ idpconfgen bgeo [PDBS] -c
     $ idpconfgen bgeo [PDBS] --convert
 """
 import argparse
+import numpy as np
 from collections import defaultdict
 
 from idpconfgen import log
@@ -77,6 +79,7 @@ from idpconfgen.libs.libhigherlevel import (
     read_trimer_torsion_planar_angles,
     )
 from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
+from idpconfgen.components.plots.plotfuncs import plot_bend_angles
 from idpconfgen.logger import S, T, init_files
 
 
@@ -95,6 +98,7 @@ ap = libcli.CustomParser(
     )
 
 libcli.add_argument_pdb_files(ap)
+libcli.add_argument_plot(ap)
 
 ap.add_argument(
     '-c',
@@ -104,7 +108,13 @@ ap.add_argument(
     )
 
 
-def main(pdb_files, convert=False, func=None):
+def main(
+        pdb_files, 
+        convert=False, 
+        plot=False, 
+        plotvars=None, 
+        func=None
+        ):
     """Perform main logic."""
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
@@ -126,11 +136,42 @@ def main(pdb_files, convert=False, func=None):
     if convert:
         log.info(S('Converting'))
         converted = convert_bond_geo_lib(bond_geo_db)
+        log.info(S('done'))
         save_dict_to_json(converted, output='bgeo.json')
-
     else:
         save_dict_to_json(bond_geo_db, output='bgeo.json')
-
+    
+    if plot:
+        log.info(S('Plotting bond angle distributions in radians...'))
+        
+        #avoid hardcoding
+        bend_names = []
+        first = list(bond_geo_db.items())[0][1]
+        for key in first:
+            bend_names.append(key)
+        
+        bend_angles = np.ndarray(shape=(len(bond_geo_db), len(bend_names)))
+        for i, trimer in enumerate(bond_geo_db):
+            for j, angles in enumerate(bond_geo_db[trimer]):
+                _angles = bond_geo_db[trimer][angles]
+                if len(_angles) > 1:
+                    bend_angles[i][j] = float(sum(_angles) / len(_angles))
+                else:
+                    bend_angles[i][j] = _angles[0]
+                    
+        plt_defaults = {
+            'names': bend_names,
+            'filename':'plot_bgeo.png',
+        }
+        plt_defaults.update(plotvars)
+        
+        errs=plot_bend_angles(bend_angles, **plt_defaults)
+        for e in errs:
+            log.info(S(f'{e}'))
+        log.info(S(f'saved plot: {plt_defaults["filename"]}'))
+        
+        log.info(S('done'))
+    
     return
 
 

@@ -216,3 +216,67 @@ def plot_fracSS(
     plt.close("all")
 
     return errmsg
+
+def plot_bend_angles(
+        angles,
+        names,
+        *,
+        title=None,
+        xlabel="Bend Types",
+        colors=['#D55E00', '#0072B2', 'k', 'g'],
+        ylabel="Bend Angle (Radians)",
+        title_fs=20,
+        xlabel_fs=15,
+        ylabel_fs=15,
+        xticks=None,
+        yticks=None,
+        xticks_labels=None,
+        yticks_labels=None,
+        increment=None,
+        xticks_fs=15,
+        yticks_fs=15,
+        fig_size=(10, 6),
+        filename='plot_bgeo.png',
+        dpi=300,
+        ):
+    """
+    Plot all torsion angle distributions as a scatter plot.
+    Defaults to Phi torsion angles.
+
+    Parameters
+    ----------
+    names : string
+        Names of the bend types
+    angles : np.ndarray, shape=(names, n_trimers)
+        Container of the Y axis data.
+    filename : str, optional
+        The file name with which the plot figure will be saved
+        in disk. Defaults to plot_torsions.png
+        You can change the file type by specifying its extention in
+        the file name.
+
+    Returns
+    -------
+    errmsg : list
+        List of errors to print to the log while plotting.
+    """
+    errmsg=[]
+
+    path, ext = os.path.splitext(filename)
+    verExts = [".png", ".pdf", ".svg", ".eps"]
+    if ext.lower() not in verExts:
+        errmsg.append(f"File does not have a proper extension: `{ext}`.")
+        errmsg.append("Reverting to default `.png`...")
+        filename=path+'.png'
+
+    plt.figure(figsize=fig_size)
+    
+    plt.boxplot(angles, labels=names)
+
+    plt.ylabel(ylabel, fontsize=ylabel_fs)
+    plt.xlabel(xlabel, fontsize=xlabel_fs)
+    plt.title(title, fontsize=title_fs)
+    plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    plt.close("all")
+
+    return errmsg
