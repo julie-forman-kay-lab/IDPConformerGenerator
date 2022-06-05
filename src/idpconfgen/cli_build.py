@@ -28,6 +28,7 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_strategies,
     bgeo_strategies_default,
     )
+from idpconfgen.components.bgeo_strategies.fixed import get_cycle_bend_angles
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.components.sidechain_packing import (
@@ -59,7 +60,6 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     create_sidechains_masks_per_residue,
-    get_cycle_bend_angles,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
     init_conflabels,
@@ -165,14 +165,14 @@ def are_globals(bgeo_strategy):
             BGEO_res,
             ))
     elif bgeo_strategy == bgeo_fixed_name:
-        return all ((
+        return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
             ALL_ATOM_EFUNC,
             TEMPLATE_LABELS,
             TEMPLATE_MASKS,
             TEMPLATE_EFUNC,
-        ))
+            ))
     elif bgeo_strategy == bgeo_int2cart_name:
         return all((
             ALL_ATOM_LABELS,
@@ -1059,7 +1059,7 @@ def conformer_generator(
         # prepares cycles for building process
         bond_lens = get_cycle_distances_backbone()
         bond_type = get_cycle_bond_type()
-        
+
         if bgeo_strategy == bgeo_fixed_name:
             bend_angles = get_cycle_bend_angles()
 
@@ -1178,7 +1178,7 @@ def conformer_generator(
                         elif bgeo_strategy == bgeo_fixed_name:
                             _bend_angle = next(bend_angles)[curr_res]
                             _bond_lens = next(bond_lens)[curr_res]
-                            
+
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
                             bb[bbi, :],
@@ -1197,7 +1197,7 @@ def conformer_generator(
                                 co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
                             except KeyError:
                                 co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
-                                
+
                     elif bgeo_strategy == bgeo_fixed_name:
                         co_bend = build_bend_CA_C_O
 

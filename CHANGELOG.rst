@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add option to build backbone conformers with fixed bond angle and
+  distances. (#217)
+
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
 
