@@ -222,7 +222,7 @@ def plot_bend_angles(
         names,
         *,
         title=None,
-        xlabel="Bend Types",
+        xlabel="Backbone angles",
         colors=['#D55E00', '#0072B2', 'k', 'g'],
         ylabel="Bend Angle (Radians)",
         title_fs=20,

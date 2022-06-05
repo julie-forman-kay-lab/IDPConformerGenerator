@@ -147,8 +147,16 @@ def main(
         #avoid hardcoding
         bend_names = []
         first = list(bond_geo_db.items())[0][1]
+
+        styled_names = {
+            "Cm1_N_Ca": r"$C_{-1}-N-C_{\alpha}$",
+            "N_Ca_C": r"$N-C_{\alpha}-C$",
+            "Ca_C_Np1": r"$C_{\alpha}-C-N_{+1}$",
+            "Ca_C_O": r"$C_{\alpha}-C-O$",
+            }
+
         for key in first:
-            bend_names.append(key)
+            bend_names.append(styled_names.get(key, key))
         
         bend_angles = np.ndarray(shape=(len(bond_geo_db), len(bend_names)))
         for i, trimer in enumerate(bond_geo_db):
@@ -164,6 +172,7 @@ def main(
             'filename':'plot_bgeo.png',
         }
         plt_defaults.update(plotvars)
+        print(plt_defaults)
         
         errs=plot_bend_angles(bend_angles, **plt_defaults)
         for e in errs:
