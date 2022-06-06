@@ -68,7 +68,8 @@ USAGE:
     $ idpconfgen bgeo [PDBS] --convert
     $ idpconfgen bgeo [PDBS] --convert --output my_bgeo_library.json
 """
-import argparse, math
+import argparse
+import math
 import numpy as np
 from collections import defaultdict
 
@@ -113,21 +114,22 @@ libcli.add_argument_output(ap)
 
 
 def main(
-        pdb_files, 
+        pdb_files,
         convert=False,
         degrees=False,
-        plot=False, 
+        plot=False,
         plotvars=None,
         output=None,
-        func=None
+        func=None,
         ):
     """
-    Perform main script logic. 
+    Perform main script logic.
     
     Parameters
     ----------
     pdb_files : str or Path, required
-        Location for PDB files to operate on, can be within a filder or inside .TAR file
+        Location for PDB files to operate on, can be within
+        a filder or inside .TAR file.
     
     convert : Bool, optional
         Convert bgeo database to accomodate `build`. Angles must be in radians.
@@ -170,7 +172,8 @@ def main(
     if convert:
         log.info(S('Converting'))
         if degrees:
-            log.info(S('Please note that `build` only accepts radians, angles will not be converted to degrees.'))
+            log.info(S('Please note that `build` only accepts radians,'
+                       'angles will not be converted to degrees.'))
         converted = convert_bond_geo_lib(bond_geo_db)
         log.info(S('done'))
         save_dict_to_json(converted, output=output)
@@ -188,7 +191,6 @@ def main(
     if plot:
         log.info(S('Plotting bond angle distributions...'))
         
-        #avoid hardcoding
         bend_names = []
         first = list(bond_geo_db.items())[0][1]
 
@@ -213,13 +215,14 @@ def main(
                     
         plt_defaults = {
             'names': bend_names,
-            'filename':'plot_bgeo.png',
-        }
+            'filename': 'plot_bgeo.png',
+            }
+        
         if degrees:
-            plt_defaults['ylabel']='Bend Angle (Degrees)'
+            plt_defaults['ylabel'] = 'Bend Angle (Degrees)'
         plt_defaults.update(plotvars)
         
-        errs=plot_bend_angles(bend_angles, **plt_defaults)
+        errs = plot_bend_angles(bend_angles, **plt_defaults)
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {plt_defaults["filename"]}'))
