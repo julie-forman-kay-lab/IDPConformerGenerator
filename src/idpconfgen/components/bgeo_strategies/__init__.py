@@ -30,7 +30,7 @@ def add_bgeo_strategy_arg(parse):
     parse.add_argument(
         _bgeo_arg_name,
         dest='bgeo_strategy',
-        help="Which strategy to use for bond geometries.",
+        help="Which strategy to use for bond geometries. Defaults to `sampling`.",
         choices=bgeo_strategies,
         default=bgeo_strategies_default,
         action=CheckBgeoInstallation,
