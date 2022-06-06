@@ -9,10 +9,7 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-v0.6.8 (2022-06-01)
-------------------------------------------------------------
-
-* correct CLI help for the ``--mem`` flag in the ``sethpc`` subclient (#218)
+* Correct CLI help for the ``--mem`` flag in the ``sethpc`` subclient (#218)
 
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
