@@ -63,11 +63,12 @@ Main keys for the bond types are exact.
 
 USAGE:
     $ idpconfgen bgeo [PDBS]
-    $ idpconfgen bgeo [PDBS] --plot
-    $ idpconfgen bgeo [PDBS] -c
+    $ idpconfgen bgeo [PDBS] --degrees
+    $ idpconfgen bgeo [PDBS] --plot --degrees
     $ idpconfgen bgeo [PDBS] --convert
+    $ idpconfgen bgeo [PDBS] --convert --output my_bgeo_library.json
 """
-import argparse
+import argparse, math
 import numpy as np
 from collections import defaultdict
 
@@ -98,6 +99,7 @@ ap = libcli.CustomParser(
     )
 
 libcli.add_argument_pdb_files(ap)
+libcli.add_argument_degrees(ap)
 libcli.add_argument_plot(ap)
 
 ap.add_argument(
@@ -107,15 +109,47 @@ ap.add_argument(
     action='store_true',
     )
 
+libcli.add_argument_output(ap)
+
 
 def main(
         pdb_files, 
-        convert=False, 
+        convert=False,
+        degrees=False,
         plot=False, 
-        plotvars=None, 
+        plotvars=None,
+        output=None,
         func=None
         ):
-    """Perform main logic."""
+    """
+    Perform main script logic. 
+    
+    Parameters
+    ----------
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within a filder or inside .TAR file
+    
+    convert : Bool, optional
+        Convert bgeo database to accomodate `build`. Angles must be in radians.
+        Defaults to False, don't convert.
+        
+    degrees : Bool, optional
+        Whether to use degrees instead of radians.
+        Defaults to False, use radians.
+        
+    plot : Bool, optional
+        Whether to plot the boxplot of bond angle distributions.
+        Defaults to False, don't plot.
+        
+    plotvars : dict like, optional
+        Parameters for creating the bond geometry distribution plot.
+        Defaults to None, use default plotting parameters.
+    """
+    
+    output = output or 'bgeo.json'
+    if not output.endswith('.json'):
+        raise ValueError('Output file should have `.json` extension.')
+    
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
 
@@ -132,17 +166,27 @@ def main(
         except PDBFormatError as err:
             log.info(str(err))
             continue
-
+    
     if convert:
         log.info(S('Converting'))
+        if degrees:
+            log.info(S('Please note that `build` only accepts radians, angles will not be converted to degrees.'))
         converted = convert_bond_geo_lib(bond_geo_db)
         log.info(S('done'))
-        save_dict_to_json(converted, output='bgeo.json')
+        save_dict_to_json(converted, output=output)
     else:
-        save_dict_to_json(bond_geo_db, output='bgeo.json')
+        log.info(S(f'Saving bgeo information to: {output}...'))
+        
+        if degrees:
+            for trimer in bond_geo_db:
+                for angles in bond_geo_db[trimer]:
+                    for i, angs in enumerate(bond_geo_db[trimer][angles]):
+                        bond_geo_db[trimer][angles][i] = math.degrees(angs)
+                        
+        save_dict_to_json(bond_geo_db, output=output)
     
     if plot:
-        log.info(S('Plotting bond angle distributions in radians...'))
+        log.info(S('Plotting bond angle distributions...'))
         
         #avoid hardcoding
         bend_names = []
@@ -171,8 +215,9 @@ def main(
             'names': bend_names,
             'filename':'plot_bgeo.png',
         }
+        if degrees:
+            plt_defaults['ylabel']='Bend Angle (Degrees)'
         plt_defaults.update(plotvars)
-        print(plt_defaults)
         
         errs=plot_bend_angles(bend_angles, **plt_defaults)
         for e in errs:

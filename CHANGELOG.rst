@@ -9,7 +9,11 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* Implement boxplot plotting feature for bond angle distributions (#219)
+* Implement boxplot plotting feature for bond angle distributions
+* Append documentation for ``bgeo`` subclient
+* Ability to use ``degrees`` for ``bgeo`` subclient
+* Ability to change the name of the ouput file for ``bgeo`` subclient
+* PR #219
 
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
