@@ -596,6 +596,100 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 
     return ''
 
+def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
+    """
+    Calculate bond angles from structure
+
+    Args:
+        fdata (_type_): _description_
+        degrees (bool, optional): _description_. Defaults to False.
+        decimals (int, optional): _description_. Defaults to 3.
+    """
+    s = Structure(fdata)
+    s.build()
+    s.add_filter_backbone(minimal=True)
+    
+    if s.data_array[0, col_name] != 'N':
+        raise PDBFormatError(
+            'PDB does not start with N. '
+            f'{s.data_array[0, col_name]} instead.'
+            )
+        
+    N_CA_C_coords = s.coords
+    s.clear_filters()
+
+    s.add_filter(lambda x: x[col_name] in ('CA', 'C', 'O'))
+    CA_C_O_coords = s.coords
+    co_minimal_names = s.filtered_atoms[:, col_name]
+    
+    for i in range(1, len(N_CA_C_coords) - 7, 3):
+        idx = list(range(i, i + 7))
+        
+        # calc bend angles
+        c = N_CA_C_coords[idx]
+        Cm1_N = c[1] - c[2]
+        Ca_N = c[3] - c[2]
+        N_Ca = c[2] - c[3]
+        C_Ca = c[4] - c[3]
+        Ca_C = c[3] - c[4]
+        Np1_C = c[5] - c[4]
+        assert Cm1_N.shape == (3,)
+        
+        co_idx = np.array(idx) - 1
+        c = CA_C_O_coords[co_idx]
+        Ca_C = c[3] - c[4]
+        O_C = c[5] - c[4]
+        
+        # the angles here are already corrected to the format needed by the
+        # builder, which is (pi - a) / 2
+        Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
+        N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
+        Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
+        Ca_C_O = calc_angle_njit(Ca_C, O_C)
+        
+        
+        
+
+def get_separate_bond_angles(angles_array):
+    """
+    Separate bond angles according to protein backbone concept.
+    
+    Considers bond angles for bonds in between the atom pairs:
+        * Ca - C - Np1 
+        * Ca - C - O
+        * Cm1 - N - Ca
+        * N - Ca - C
+
+    Backbone obeys the order: N-CA-C-N-CA-C(...)
+    
+    Given the trimer nature of bond angles, first and last residues
+    does not have bond angles.
+    """
+    assert angles_array.ndim == 1
+    assert angles_array.size % 3 == 0
+    
+    CA_C_NP1 = angles_array[::4].tolist()
+    CA_C_O = angles_array[1::4].tolist()
+    CM1_N_CA = angles_array[2::4].tolist()
+    N_CA_C = angles_array[3::4].tolist()
+    
+    assert len(CA_C_NP1) == len(CA_C_O) == len(CM1_N_CA) == len(N_CA_C)
+    return CA_C_NP1, CA_C_O, CM1_N_CA, N_CA_C
+    
+
+def cli_helper_calc_bgeo_angs(fname, fdata, **kwargs):
+    """
+    Help `cli_bgeodb` to operate
+    
+    Returns
+    -------
+    dict
+        key: `fname`
+        value -> dict, `Ca_C_Np1`, `Ca_C_O`, `Cm1_N_Ca`, `N_Ca_C`
+    """
+    bond_angles = get_bond_angles(fdata, **kwargs)
+    CA_C_NP1, CA_C_O, CM1_N_CA, N_CA_C = get_separate_bond_angles(bond_angles)
+    return fname, {'Ca_C_Np1': CA_C_NP1, 'Ca_C_O': CA_C_O, 'Cm1_N_Ca': CM1_N_CA, 'N_Ca_C': N_CA_C}
 
 def read_trimer_torsion_planar_angles(pdb, bond_geometry):
     """

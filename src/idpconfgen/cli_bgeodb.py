@@ -30,18 +30,15 @@ from idpconfgen.libs.libio import (
     read_dictionary_from_disk,
     save_dict_to_json,
 )
-from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libhigherlevel import (
-    read_trimer_torsion_planar_angles, 
-    convert_bond_geo_lib,
-)
+from idpconfgen.libs.libmulticore import pool_function, starunpack
+from idpconfgen.libs.libhigherlevel import cli_helper_calc_bgeo_angs
 from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 LOGFILESNAME = '.idpconfgen_bgeodb'
 
 _name = 'bgeodb'
-_help = 'Calculate bond lengths and angles for PDB files.'
+_help = 'Calculate bond lengths and angles per residue for PDB files.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -52,3 +49,69 @@ ap = libcli.CustomParser(
     formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
+libcli.add_argument_pdb_files(ap)
+libcli.add_argument_source(ap)
+libcli.add_argument_output(ap)
+libcli.add_argument_degrees(ap)
+libcli.add_argument_ncores(ap)
+
+def main(
+        pdb_files,
+        source=None,
+        output=None,
+        degrees=False,
+        ncores=1,
+        func=None,    
+        ):
+    
+    
+    if source and not source.suffix == '.json':
+        raise ValueError('Source file should have `.json` extension.')
+    
+    output = output or 'torsions.json'
+    if not output.endswith('.json'):
+        raise ValueError('Output file should have `.json` extension.')
+
+    init_files(log, LOGFILESNAME)
+    log.info(T('Extracting bond geometries'))
+    
+    if source:
+        database_dict = read_dictionary_from_disk(source)
+    
+    log.info(T('reading input paths'))
+    pdbs = FileReaderIterator(pdb_files, ext='.pdb')
+    log.info(S('done'))
+    
+    consume = partial(starunpack, cli_helper_calc_bgeo_angs, degrees=degrees, decimals=15)
+
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
+        )
+
+    execute_pool = pool_function(execute, pdbs, ncores=ncores)
+    
+    bgeo_result = {
+        Path(pdbid).stem: angles
+        for pdbid, angles in execute_pool
+    }
+    
+    if source:
+
+        pop_difference_with_log(database_dict, bgeo_result)
+
+        for key, value in bgeo_result.items():
+            # where value is a dictionary {'Ca_C_Np1':, 'Ca_C_O':, 'Cm1_N_Ca':, 'N_Ca_C':}
+            database_dict[key].update(value)
+
+        save_dict_to_json(database_dict, output=output)
+
+    else:
+        save_dict_to_json(bgeo_result, output=output)
+    
+    return
+
+if __name__ == '__main__':
+    libcli.maincli(ap, main)
