@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Implement boxplot plotting feature for bond angle distributions (#219)
+
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
 

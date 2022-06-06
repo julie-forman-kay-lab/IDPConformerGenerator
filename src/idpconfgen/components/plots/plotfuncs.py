@@ -13,7 +13,6 @@ are not listed in the paremeter list bellow. We hope these
 parameter names are self-explanatory and are listed in the function
 definition.
 """
-import os
 import numpy as np
 from matplotlib import pyplot as plt
 
@@ -70,15 +69,19 @@ def plot_torsions(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
+        
     angles : np.ndarray, shape=(n_confs, residues)
         Container of the Y axis data.
+        
     n_conf : integer
         Number of conformers we're processing.
+        
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
+        
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -88,13 +91,6 @@ def plot_torsions(
         List of errors to print to the log while plotting.
     """
     errmsg=[]
-
-    path, ext = os.path.splitext(filename)
-    verExts = [".png", ".pdf", ".svg", ".eps"]
-    if ext.lower() not in verExts:
-        errmsg.append(f"File does not have a proper extension: `{ext}`.")
-        errmsg.append("Reverting to default `.png`...")
-        filename=path+'.png'
 
     plt.figure(figsize=fig_size)
     for i in range(1, residues):
@@ -119,7 +115,13 @@ def plot_torsions(
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
     plt.title(title, fontsize=title_fs)
-    plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    try:
+        plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    except Exception as e:
+        errmsg.append("There was an issue with your figure saving parameters:")
+        errmsg.append(f"{e}")
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_torsions.png`...")
+        plt.savefig('plot_torsions.png', dpi=300, transparent=False, bbox_inches='tight')
     plt.close("all")
 
     return errmsg
@@ -156,15 +158,19 @@ def plot_fracSS(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
+        
     frac_ss : dictionary
         Contains fraction of each secondary structure per residue.
+        
     n_conf : integer
         Number of conformers we're processing.
+        
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
+        
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -174,13 +180,6 @@ def plot_fracSS(
         List of errors to print to the log while plotting.
     """
     errmsg=[]
-
-    path, ext = os.path.splitext(filename)
-    verExts = [".png", ".pdf", ".svg", ".eps"]
-    if ext.lower() not in verExts:
-        errmsg.append(f"File does not have a proper extension: `{ext}`.")
-        errmsg.append("Reverting to default `.png`...")
-        filename=path+'.png'
 
     aa = [x+1 for x in range(residues)]
     plt.figure(figsize=fig_size)
@@ -212,7 +211,13 @@ def plot_fracSS(
     plt.title(title, fontsize=title_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
     plt.ylabel(ylabel, fontsize=ylabel_fs)
-    plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    try:
+        plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    except Exception as e:
+        errmsg.append("There was an issue with your figure saving parameters:")
+        errmsg.append(f"{e}")
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_fracSS.png`...")
+        plt.savefig('plot_fracSS.png', dpi=300, transparent=False, bbox_inches='tight')
     plt.close("all")
 
     return errmsg
@@ -247,8 +252,10 @@ def plot_bend_angles(
     ----------
     names : string
         Names of the bend types
+        
     angles : np.ndarray, shape=(names, n_trimers)
         Container of the Y axis data.
+        
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
@@ -262,21 +269,19 @@ def plot_bend_angles(
     """
     errmsg=[]
 
-    path, ext = os.path.splitext(filename)
-    verExts = [".png", ".pdf", ".svg", ".eps"]
-    if ext.lower() not in verExts:
-        errmsg.append(f"File does not have a proper extension: `{ext}`.")
-        errmsg.append("Reverting to default `.png`...")
-        filename=path+'.png'
-
     plt.figure(figsize=fig_size)
-    
     plt.boxplot(angles, labels=names)
-
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
     plt.title(title, fontsize=title_fs)
-    plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    try:
+        plt.savefig(filename, dpi=dpi, transparent=False, bbox_inches='tight')
+    except Exception as e:
+        errmsg.append("There was an issue with your figure saving parameters:")
+        errmsg.append(f"{e}")
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_bgeo.png`...")
+        plt.savefig('plot_bgeo.png', dpi=300, transparent=False, bbox_inches='tight')
+        
     plt.close("all")
 
     return errmsg
