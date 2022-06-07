@@ -16,6 +16,7 @@ from idpconfgen.core.definitions import (
     bgeo_CaCNp1,
     bgeo_Cm1NCa,
     bgeo_NCaC,
+    bgeo_CaCO,
     blocked_ids,
     )
 from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
@@ -596,7 +597,7 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 
     return ''
 
-def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
+def get_bond_angles(fdata):
     """
     Calculate bond angles from structure
 
@@ -605,6 +606,10 @@ def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
         degrees (bool, optional): _description_. Defaults to False.
         decimals (int, optional): _description_. Defaults to 3.
     """
+    ALL = np.all
+    CEQ = np.char.equal
+    CO_LABELS = np.array(['CA', 'C', 'O', 'CA', 'C', 'O', 'CA'])
+    
     s = Structure(fdata)
     s.build()
     s.add_filter_backbone(minimal=True)
@@ -621,6 +626,13 @@ def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
     s.add_filter(lambda x: x[col_name] in ('CA', 'C', 'O'))
     CA_C_O_coords = s.coords
     co_minimal_names = s.filtered_atoms[:, col_name]
+    
+    bgeo_results = {
+        bgeo_Cm1NCa: [],
+        bgeo_NCaC: [],
+        bgeo_CaCNp1: [],
+        bgeo_CaCO: [],
+        }
     
     for i in range(1, len(N_CA_C_coords) - 7, 3):
         idx = list(range(i, i + 7))
@@ -640,6 +652,13 @@ def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
         Ca_C = c[3] - c[4]
         O_C = c[5] - c[4]
         
+        if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
+            log.info(S(
+                'Found not matching labels '
+                f'{",".join(co_minimal_names[co_idx])}'
+                ))
+            continue
+        
         # the angles here are already corrected to the format needed by the
         # builder, which is (pi - a) / 2
         Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
@@ -647,35 +666,15 @@ def get_bond_angles(fdata, bond_geo, degrees=False, decimals=3):
         Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
         Ca_C_O = calc_angle_njit(Ca_C, O_C)
         
+        bgeo_results[bgeo_Cm1NCa].append(Cm1_N_Ca)
+        bgeo_results[bgeo_NCaC].append(N_Ca_C)
+        bgeo_results[bgeo_CaCNp1].append(Ca_C_Np1)
+        bgeo_results[bgeo_CaCO].append(Ca_C_O)
+    
+    assert len(bgeo_results[bgeo_Cm1NCa]) == len(bgeo_results[bgeo_NCaC]) == len(bgeo_results[bgeo_CaCNp1]) == len(bgeo_results[bgeo_CaCO])
+    
+    return bgeo_results
         
-        
-
-def get_separate_bond_angles(angles_array):
-    """
-    Separate bond angles according to protein backbone concept.
-    
-    Considers bond angles for bonds in between the atom pairs:
-        * Ca - C - Np1 
-        * Ca - C - O
-        * Cm1 - N - Ca
-        * N - Ca - C
-
-    Backbone obeys the order: N-CA-C-N-CA-C(...)
-    
-    Given the trimer nature of bond angles, first and last residues
-    does not have bond angles.
-    """
-    assert angles_array.ndim == 1
-    assert angles_array.size % 3 == 0
-    
-    CA_C_NP1 = angles_array[::4].tolist()
-    CA_C_O = angles_array[1::4].tolist()
-    CM1_N_CA = angles_array[2::4].tolist()
-    N_CA_C = angles_array[3::4].tolist()
-    
-    assert len(CA_C_NP1) == len(CA_C_O) == len(CM1_N_CA) == len(N_CA_C)
-    return CA_C_NP1, CA_C_O, CM1_N_CA, N_CA_C
-    
 
 def cli_helper_calc_bgeo_angs(fname, fdata, **kwargs):
     """
@@ -688,8 +687,7 @@ def cli_helper_calc_bgeo_angs(fname, fdata, **kwargs):
         value -> dict, `Ca_C_Np1`, `Ca_C_O`, `Cm1_N_Ca`, `N_Ca_C`
     """
     bond_angles = get_bond_angles(fdata, **kwargs)
-    CA_C_NP1, CA_C_O, CM1_N_CA, N_CA_C = get_separate_bond_angles(bond_angles)
-    return fname, {'Ca_C_Np1': CA_C_NP1, 'Ca_C_O': CA_C_O, 'Cm1_N_Ca': CM1_N_CA, 'N_Ca_C': N_CA_C}
+    return fname, bond_angles
 
 def read_trimer_torsion_planar_angles(pdb, bond_geometry):
     """

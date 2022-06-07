@@ -14,6 +14,7 @@ core_folder = Path(__file__).parent
 bgeo_Cm1NCa = 'Cm1_N_Ca'
 bgeo_NCaC = 'N_Ca_C'
 bgeo_CaCNp1 = 'Ca_C_Np1'
+bgeo_CaCO = 'Ca_C_O'
 
 
 # Amino-acid 3 to 1 letter code dictionary

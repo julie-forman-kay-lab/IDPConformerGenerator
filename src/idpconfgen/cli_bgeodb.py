@@ -52,14 +52,12 @@ ap = libcli.CustomParser(
 libcli.add_argument_pdb_files(ap)
 libcli.add_argument_source(ap)
 libcli.add_argument_output(ap)
-libcli.add_argument_degrees(ap)
 libcli.add_argument_ncores(ap)
 
 def main(
         pdb_files,
         source=None,
         output=None,
-        degrees=False,
         ncores=1,
         func=None,    
         ):
@@ -68,7 +66,7 @@ def main(
     if source and not source.suffix == '.json':
         raise ValueError('Source file should have `.json` extension.')
     
-    output = output or 'torsions.json'
+    output = output or 'bgeodb.json'
     if not output.endswith('.json'):
         raise ValueError('Output file should have `.json` extension.')
 
@@ -82,7 +80,7 @@ def main(
     pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
     
-    consume = partial(starunpack, cli_helper_calc_bgeo_angs, degrees=degrees, decimals=15)
+    consume = partial(starunpack, cli_helper_calc_bgeo_angs)
 
     execute = partial(
         report_on_crash,
