@@ -16,6 +16,11 @@ bgeo_NCaC = 'N_Ca_C'
 bgeo_CaCNp1 = 'Ca_C_Np1'
 bgeo_CaCO = 'Ca_C_O'
 
+bgeo_NCa = 'N_Ca'
+bgeo_CaC = 'Ca_C'
+bgeo_CNp1 = 'C_Np1'
+bgeo_CO = 'C_O'
+
 
 # Amino-acid 3 to 1 letter code dictionary
 aa3to1 = {

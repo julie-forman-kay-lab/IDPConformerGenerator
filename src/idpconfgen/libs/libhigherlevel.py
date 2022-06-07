@@ -17,6 +17,10 @@ from idpconfgen.core.definitions import (
     bgeo_Cm1NCa,
     bgeo_NCaC,
     bgeo_CaCO,
+    bgeo_NCa,
+    bgeo_CaC,
+    bgeo_CNp1,
+    bgeo_CO,
     blocked_ids,
     )
 from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
@@ -597,7 +601,7 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 
     return ''
 
-def get_bond_angles(fdata):
+def get_bond_geos(fdata):
     """
     Calculate bond angles from structure
 
@@ -609,6 +613,7 @@ def get_bond_angles(fdata):
     ALL = np.all
     CEQ = np.char.equal
     CO_LABELS = np.array(['CA', 'C', 'O', 'CA', 'C', 'O', 'CA'])
+    NORM = partial(np.linalg.norm)
     
     s = Structure(fdata)
     s.build()
@@ -632,6 +637,10 @@ def get_bond_angles(fdata):
         bgeo_NCaC: [],
         bgeo_CaCNp1: [],
         bgeo_CaCO: [],
+        bgeo_NCa: [],
+        bgeo_CaC: [],
+        bgeo_CNp1: [],
+        bgeo_CO: [],
         }
     
     for i in range(1, len(N_CA_C_coords) - 7, 3):
@@ -647,10 +656,24 @@ def get_bond_angles(fdata):
         Np1_C = c[5] - c[4]
         assert Cm1_N.shape == (3,)
         
+        # calc bond lengths
+        # need float for json.dump else float32
+        NCa = float(NORM(N_Ca))
+        CaC = float(NORM(Ca_C))
+        CNp1 = float(NORM(Np1_C))
+        
+        # the angles here are already corrected to the format needed by the
+        # builder, which is (pi - a) / 2
+        Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
+        N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
+        Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
+        
         co_idx = np.array(idx) - 1
         c = CA_C_O_coords[co_idx]
         Ca_C = c[3] - c[4]
         O_C = c[5] - c[4]
+        
+        CO = float(NORM(O_C))
         
         if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
             log.info(S(
@@ -658,25 +681,24 @@ def get_bond_angles(fdata):
                 f'{",".join(co_minimal_names[co_idx])}'
                 ))
             continue
-        
-        # the angles here are already corrected to the format needed by the
-        # builder, which is (pi - a) / 2
-        Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
-        N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
-        Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
         Ca_C_O = calc_angle_njit(Ca_C, O_C)
         
         bgeo_results[bgeo_Cm1NCa].append(Cm1_N_Ca)
         bgeo_results[bgeo_NCaC].append(N_Ca_C)
         bgeo_results[bgeo_CaCNp1].append(Ca_C_Np1)
         bgeo_results[bgeo_CaCO].append(Ca_C_O)
+        
+        bgeo_results[bgeo_NCa].append(NCa)
+        bgeo_results[bgeo_CaC].append(CaC)
+        bgeo_results[bgeo_CNp1].append(CNp1)
+        bgeo_results[bgeo_CO].append(CO)
     
-    assert len(bgeo_results[bgeo_Cm1NCa]) == len(bgeo_results[bgeo_NCaC]) == len(bgeo_results[bgeo_CaCNp1]) == len(bgeo_results[bgeo_CaCO])
+    assert len(set(map(len, bgeo_results.values()))) == 1
     
     return bgeo_results
         
 
-def cli_helper_calc_bgeo_angs(fname, fdata, **kwargs):
+def cli_helper_calc_bgeo(fname, fdata, **kwargs):
     """
     Help `cli_bgeodb` to operate
     
@@ -686,8 +708,8 @@ def cli_helper_calc_bgeo_angs(fname, fdata, **kwargs):
         key: `fname`
         value -> dict, `Ca_C_Np1`, `Ca_C_O`, `Cm1_N_Ca`, `N_Ca_C`
     """
-    bond_angles = get_bond_angles(fdata, **kwargs)
-    return fname, bond_angles
+    bond_geometries = get_bond_geos(fdata, **kwargs)
+    return fname, bond_geometries
 
 def read_trimer_torsion_planar_angles(pdb, bond_geometry):
     """

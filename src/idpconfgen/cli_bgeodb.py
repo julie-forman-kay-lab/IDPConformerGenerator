@@ -31,7 +31,7 @@ from idpconfgen.libs.libio import (
     save_dict_to_json,
 )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
-from idpconfgen.libs.libhigherlevel import cli_helper_calc_bgeo_angs
+from idpconfgen.libs.libhigherlevel import cli_helper_calc_bgeo
 from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -80,7 +80,7 @@ def main(
     pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
     
-    consume = partial(starunpack, cli_helper_calc_bgeo_angs)
+    consume = partial(starunpack, cli_helper_calc_bgeo)
 
     execute = partial(
         report_on_crash,
@@ -92,8 +92,8 @@ def main(
     execute_pool = pool_function(execute, pdbs, ncores=ncores)
     
     bgeo_result = {
-        Path(pdbid).stem: angles
-        for pdbid, angles in execute_pool
+        Path(pdbid).stem: lengths_and_angles
+        for pdbid, lengths_and_angles in execute_pool
     }
     
     if source:
@@ -101,7 +101,7 @@ def main(
         pop_difference_with_log(database_dict, bgeo_result)
 
         for key, value in bgeo_result.items():
-            # where value is a dictionary {'Ca_C_Np1':, 'Ca_C_O':, 'Cm1_N_Ca':, 'N_Ca_C':}
+            # where value is a dictionary {'Ca_C_Np1':, 'Ca_C_O':, ...}
             database_dict[key].update(value)
 
         save_dict_to_json(database_dict, output=output)
