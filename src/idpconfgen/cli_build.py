@@ -24,6 +24,7 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_error_msg,
     bgeo_int2cart_name,
     bgeo_sampling_name,
+    bgeo_exact_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -51,7 +52,17 @@ from idpconfgen.core.build_definitions import (
     n_terminal_h_coords_at_origin,
     sidechain_templates,
     )
-from idpconfgen.core.definitions import dssp_ss_keys
+from idpconfgen.core.definitions import (
+        dssp_ss_keys,
+        bgeo_Cm1NCa,
+        bgeo_NCaC,
+        bgeo_CaCNp1,
+        bgeo_CaCO,
+        bgeo_NCa,
+        bgeo_CaC,
+        bgeo_CNp1,
+        bgeo_CO,
+    )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
@@ -160,6 +171,15 @@ def are_globals(bgeo_strategy):
             BGEO_full,
             BGEO_trimer,
             BGEO_res,
+            ))
+    elif bgeo_strategy == bgeo_exact_name:
+        return all((
+            ALL_ATOM_LABELS,
+            ALL_ATOM_MASKS,
+            ALL_ATOM_EFUNC,
+            TEMPLATE_LABELS,
+            TEMPLATE_MASKS,
+            TEMPLATE_EFUNC,
             ))
     elif bgeo_strategy == bgeo_int2cart_name:
         return all((
@@ -614,7 +634,7 @@ def populate_globals(
     if bgeo_strategy not in bgeo_strategies:
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
-    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
+    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name, bgeo_exact_name):
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path  # noqa: E501  # isort:skip
 
         if bgeo_path is None:
