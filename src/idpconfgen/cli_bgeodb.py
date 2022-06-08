@@ -6,11 +6,21 @@ PROTOCOL:
 1. Reads bacbkone coordinates (N, CA, C) from PDB/mmCIF files.
 2. Calculates bond lengths and bend angles from the backbone.
 3. Saves results to a JSON dictionary where keys are the input file names
-    and the value is a dictionary containing 'N_CA', 'CA_C', 'C_Np1' for 
-    bond lengths and 'Cm1_N_CA', 'N_CA_C', 'CA_C_Np1' for bond angles 
-    with the order of usage in OMEGA, PHI, PSI, respectively per residue.
+    and the value is a dictionary containing 'N_CA', 'CA_C', 'C_Np1', 'C_O' 
+    for bond lengths and 'Cm1_N_CA', 'N_CA_C', 'CA_C_Np1', 'Ca_C_O' 
+    for bond angles.
 4. If `source` JSON file is given, updates that file with the 
     new information. Pre-existing keys are deleted.
+    
+CONTROLLED CHECKS:
+
+For each PDB/mmCIF analyzed, fails if:
+
+1. The PDB does not start with an N atom.
+2. Carbonyl backbone atoms do not follow
+    'CA', 'C', 'O', 'CA', 'C', 'O', 'CA' pattern.
+
+Failed PDBs are registered in `.rpr_on_crash` files and ignored.
     
 USAGE:
     $ idpconfgen bgeodb [PDBS]
@@ -114,17 +124,23 @@ def main(
         }
     
     if source:
-
         pop_difference_with_log(database_dict, bgeo_result)
-
+        popped_prior = []
         for key, value in bgeo_result.items():
             # where value is a dictionary {'Ca_C_Np1':, 'Ca_C_O':, ...}
-            database_dict[key].update(value)
-
+            try:
+                database_dict[key].update(value)
+            except KeyError as e:
+                popped_prior.append(str(e)[1:-1])
+                
+        log.info(S(f'PDB IDs popped during previous steps to initialize the database: {popped_prior}'))
+        
         save_dict_to_json(database_dict, output=output)
-
+        
     else:
         save_dict_to_json(bgeo_result, output=output)
+    
+    log.info(S('done'))
     
     return
 
