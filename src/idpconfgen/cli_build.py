@@ -130,6 +130,8 @@ INT2CART = None
 # The slice objects from where the builder will feed to extract torsion
 # fragments from ANGLES.
 ANGLES = None
+BEND_ANGS = None
+BOND_LENS = None
 SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
@@ -543,6 +545,7 @@ def main(
         XMERPROBS,
         input_seq,
         ANGLES,
+        bgeo_strategy,
         SLICEDICT_XMERS,
         csss_dict,
         residue_tolerance=residue_tolerance,
@@ -1129,7 +1132,10 @@ def conformer_generator(
                 # TODO
                 # primer_template here is used temporarily, and needs to be
                 # removed when get_adj becomes an option
-                primer_template, agls = GET_ADJ(bbi - 1)
+                if bgeo_strategy == bgeo_exact_name:
+                    primer_template, agls, bangs, blens  = GET_ADJ(bbi - 1)
+                else:
+                    primer_template, agls = GET_ADJ(bbi - 1)
 
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
@@ -1186,7 +1192,7 @@ def conformer_generator(
                                     _bend_angle = RC(BGEO_res[_bt][curr_res])
 
                             _bond_lens = next(bond_lens)[curr_res]
-
+                            
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
                             bb[bbi, :],
@@ -1496,7 +1502,8 @@ def get_adjacent_angles(
         options,
         probs,
         seq,
-        db,
+        dihedrals_db,
+        bgeo_strategy,
         slice_dict,
         csss,
         residue_tolerance=None,
@@ -1515,8 +1522,11 @@ def get_adjacent_angles(
     seq : str
         The conformer sequence.
 
-    db : dict-like
+    dihedrals_db : dict-like
         The angle omega/phi/psi database.
+    
+    bgeo_strategy : string
+        Bond geometry strategy.
 
     slice_dict : dict-like
         A dictionary containing the fragments strings as keys and as values
@@ -1559,6 +1569,7 @@ def get_adjacent_angles(
         plen = len(primer_template)
 
         pt_sub = BRS(primer_template, residue_tolerance)
+        
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
@@ -1582,11 +1593,23 @@ def get_adjacent_angles(
                     # based on the probabilities,
                     # select a SS for residue in question
                     pcsss = RC(lss, p=lssprobs)
-                    angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
+                    _slice = RC(slice_dict[plen][pt_sub][pcsss])
+                    
+                    dihedrals = dihedrals_db[_slice, :].ravel()
+                    
+                    if bgeo_strategy == bgeo_exact_name:
+                        bend_angs = BEND_ANGS[_slice, :].ravel()
+                        bond_lens = BOND_LENS[_slice, :].ravel()
 
                 else:
-                    angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
-
+                    _slice = RC(slice_dict[plen][pt_sub])
+                    
+                    dihedrals = dihedrals_db[_slice, :].ravel()
+                    
+                    if bgeo_strategy == bgeo_exact_name:
+                        bend_angs = BEND_ANGS[_slice, :].ravel()
+                        bond_lens = BOND_LENS[_slice, :].ravel()
+            
             except (KeyError, ValueError):
                 # walks back one residue
                 plen -= 1
@@ -1606,9 +1629,17 @@ def get_adjacent_angles(
 
         if next_residue == 'P':
             # because angles have the proline information
-            return primer_template + 'P', angles
+            
+            if bgeo_strategy == bgeo_exact_name:
+                return primer_template + 'P', dihedrals, bend_angs, bond_lens
+            
+            return primer_template + 'P', dihedrals
+        
         else:
-            return primer_template, angles
+            if bgeo_strategy == bgeo_exact_name:
+                return primer_template, dihedrals, bend_angs, bond_lens
+            
+            return primer_template, dihedrals
 
     return func
 
