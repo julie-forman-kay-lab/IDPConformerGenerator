@@ -8,7 +8,16 @@ import numpy as np
 from idpconfgen import log
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import make_list_if_not
-
+from idpconfgen.core.definitions import (
+        bgeo_Cm1NCa,
+        bgeo_NCaC,
+        bgeo_CaCNp1,
+        bgeo_CaCO,
+        bgeo_NCa,
+        bgeo_CaC,
+        bgeo_CNp1,
+        bgeo_CO,
+    )
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
 # read comments bellow
@@ -36,7 +45,7 @@ make_strand_overlap_regex = partial(make_overlap_regex, "E")
 make_any_overlap_regex = partial(make_overlap_regex, "LHE")
 
 
-def aligndb(db):
+def aligndb(db, exact=False):
     """Aligns IDPConfGen DB."""
     NAN = np.nan
     phi, psi, omg, dssp, resseq = [], [], [], [], []
@@ -46,6 +55,19 @@ def aligndb(db):
     OMGE = omg.extend
     DA = dssp.append
     RA = resseq.append
+    
+    if exact:
+        cm1nca, ncac, cacnp1, caco = [], [], [], []
+        nca, cac, cnp1, co = [], [], [], []
+        CM1NCAE = cm1nca.extend
+        NCACE = ncac.extend
+        CACNP1E = cacnp1.extend
+        CACOE = caco.extend
+        NCAE = nca.extend
+        CACE = cac.extend
+        CNP1E = cnp1.extend
+        COE = co.extend
+        
     # +1 because NAN are added as spacers
     spacer = 1  # algorithm definition
 
@@ -90,13 +112,40 @@ def aligndb(db):
         psi_truncated = data['psi'][1:]
 
         len_segment = len(fasta_truncated)
-
-        lists_to_compare = [
-            dssp_truncated,
-            phi_truncated,
-            psi_truncated,
-            omg_truncated,
-            ]
+        
+        if exact:
+            _cm1nca = data[bgeo_Cm1NCa]
+            _ncac = data[bgeo_NCaC]
+            _cacnp1 = data[bgeo_CaCNp1]
+            _caco = data[bgeo_CaCO]
+            
+            _nca = data[bgeo_NCa]
+            _cac = data[bgeo_CaC]
+            _cnp1 = data[bgeo_CNp1]
+            _co = data[bgeo_CO]
+            
+            lists_to_compare = [
+                dssp_truncated,
+                phi_truncated,
+                psi_truncated,
+                omg_truncated,
+                _cm1nca,
+                _ncac,
+                _cacnp1,
+                _caco,
+                _nca,
+                _cac,
+                _cnp1,
+                _co,
+                ]
+            
+        else:
+            lists_to_compare = [
+                dssp_truncated,
+                phi_truncated,
+                psi_truncated,
+                omg_truncated,
+                ]
 
         if any(len(i) != len_segment for i in lists_to_compare):
             log.debug(
@@ -108,6 +157,17 @@ def aligndb(db):
         phi_truncated.append(NAN)
         psi_truncated.append(NAN)
         omg_truncated.append(NAN)
+        
+        if exact:
+            _cm1nca.append(NAN)
+            _ncac.append(NAN)
+            _cacnp1.append(NAN)
+            _caco.append(NAN)
+            
+            _nca.append(NAN)
+            _cac.append(NAN)
+            _cnp1.append(NAN)
+            _co.append(NAN)
 
         pdbs[pdb] = slice(current, current + len_segment)
         # +1 because resseq will be concatenated with '|'
@@ -120,13 +180,28 @@ def aligndb(db):
 
         DA(dssp_truncated)
         RA(fasta_truncated)
-
-    _resseq = '|'.join(resseq)
-    _dssp = '|'.join(dssp)
-    _angles = np.array((omg, phi, psi), dtype=np.float32).T
-
+        
+        _resseq = '|'.join(resseq)
+        _dssp = '|'.join(dssp)
+        _angles = np.array((omg, phi, psi), dtype=np.float32).T
+        
+        if exact:
+            CM1NCAE(_cm1nca)
+            NCACE(_ncac)
+            CACNP1E(_cacnp1)
+            CACOE(_caco)
+            
+            NCAE(_nca)
+            CACE(_cac)
+            CNP1E(_cnp1)
+            COE(_co)
+            
+            _bend_angs = np.array((cm1nca, ncac, cacnp1, caco), dtype=np.float32).T
+            _bond_lens = np.array((nca, cac, cnp1, co), dtype=np.float32).T
+            
+            return pdbs, _angles, _bend_angs, _bond_lens, _dssp, _resseq
+        
     return pdbs, _angles, _dssp, _resseq
-
 
 # # regex to compute
 # forward with overlap

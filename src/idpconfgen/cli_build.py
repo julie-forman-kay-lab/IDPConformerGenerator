@@ -445,7 +445,7 @@ def main(
         )
 
     # we use a dictionary because fragments will be evaluated to exact match
-    global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -506,7 +506,14 @@ def main(
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
 
     db = read_dictionary_from_disk(database)
-    _, ANGLES, secondary, primary = aligndb(db)
+    
+    if bgeo_strategy == bgeo_exact_name:
+        #TODO: check structure of database first to see if it contains
+        # all of the bond angles/lengths
+        _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)
+    else:
+        _, ANGLES, secondary, primary = aligndb(db)
+    
     del db
 
     if residue_tolerance is not None:
@@ -540,7 +547,7 @@ def main(
         csss_dict,
         residue_tolerance=residue_tolerance,
         )
-
+       
     populate_globals(
         input_seq=input_seq,
         bgeo_strategy=bgeo_strategy,
