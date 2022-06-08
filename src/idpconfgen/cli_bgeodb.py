@@ -1,17 +1,16 @@
 """
-Appends exact bond lengths (angstroms) and angles (radians) for each residue
-in the IDPConformerGenerator database.
+Calculates exact bond lengths (angstroms) and angles (radians) for the idpcg database.
 
 PROTOCOL:
 
 1. Reads bacbkone coordinates (N, CA, C) from PDB/mmCIF files.
 2. Calculates bond lengths and bend angles from the backbone.
 3. Saves results to a JSON dictionary where keys are the input file names
-    and the value is a dictionary containing 'N_CA', 'CA_C', 'C_Np1' for bond lengths
-    and 'Cm1_N_CA', 'N_CA_C', 'CA_C_Np1' for bond angles with the order of usage in
-    OMEGA, PHI, PSI, respectively per residue.
-4. If `source` JSON file is given, updates that file with the new information.
-    Pre-existing keys are deleted.
+    and the value is a dictionary containing 'N_CA', 'CA_C', 'C_Np1' for 
+    bond lengths and 'Cm1_N_CA', 'N_CA_C', 'CA_C_Np1' for bond angles 
+    with the order of usage in OMEGA, PHI, PSI, respectively per residue.
+4. If `source` JSON file is given, updates that file with the 
+    new information. Pre-existing keys are deleted.
     
 USAGE:
     $ idpconfgen bgeodb [PDBS]
@@ -20,7 +19,6 @@ USAGE:
     $ idpconfgen bgeodb [PDBS] -sc file.json -o my_new_bgeodb.json -n
 """
 import argparse
-import numpy as np
 from functools import partial
 
 from idpconfgen import Path, log
@@ -29,7 +27,7 @@ from idpconfgen.libs.libio import (
     FileReaderIterator,
     read_dictionary_from_disk,
     save_dict_to_json,
-)
+    )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libhigherlevel import cli_helper_calc_bgeo
 from idpconfgen.libs.libparse import pop_difference_with_log
@@ -54,15 +52,34 @@ libcli.add_argument_source(ap)
 libcli.add_argument_output(ap)
 libcli.add_argument_ncores(ap)
 
+
 def main(
         pdb_files,
         source=None,
         output=None,
         ncores=1,
-        func=None,    
+        func=None,
         ):
-    
-    
+    """
+    Run main script logic.
+
+    Parameters
+    ----------
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within a folder
+        or inside a .TAR file
+        
+    source : string or Path, optional
+        If given, updates a preexisting .JSON file.
+        Defaults to `None`.
+        
+    output : string or Path, optional
+        If given prints output to that file, else prints to console.
+        Defaults to `None`.
+        
+    ncores : int
+        The numbers of cores to use.
+    """
     if source and not source.suffix == '.json':
         raise ValueError('Source file should have `.json` extension.')
     
@@ -94,7 +111,7 @@ def main(
     bgeo_result = {
         Path(pdbid).stem: lengths_and_angles
         for pdbid, lengths_and_angles in execute_pool
-    }
+        }
     
     if source:
 
@@ -110,6 +127,7 @@ def main(
         save_dict_to_json(bgeo_result, output=output)
     
     return
+
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
