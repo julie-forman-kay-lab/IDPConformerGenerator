@@ -1136,7 +1136,7 @@ def conformer_generator(
                     primer_template, agls, bangs, blens  = GET_ADJ(bbi - 1)
                 else:
                     primer_template, agls = GET_ADJ(bbi - 1)
-
+                
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
 
@@ -1179,6 +1179,10 @@ def conformer_generator(
                             # needed for correctly calculating Q
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
                             _bond_lens = bond_lens[torsion_idx]
+                        
+                        elif bgeo_strategy == bgeo_exact_name:
+                            _bend_angle = bangs[torsion_idx]
+                            _bond_lens = blens[torsion_idx]
 
                         elif bgeo_strategy == bgeo_sampling_name:
                             _bt = next(bond_type)
@@ -1203,14 +1207,18 @@ def conformer_generator(
                             )
                         bbi += 1
 
-                    try:
-                        co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
-                    except KeyError:
+                    if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):
                         try:
-                            co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                            co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
-                            co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
-
+                            try:
+                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                            except KeyError:
+                                co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+                    else:
+                        co_bend = bangs[3] / 2
+                        DISTANCE_C_O = blens[3]
+                        
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],
                         bb_real[bbi - 2, :],
@@ -1526,7 +1534,7 @@ def get_adjacent_angles(
         The angle omega/phi/psi database.
     
     bgeo_strategy : string
-        Bond geometry strategy.
+        Bond geometry strategy to use.
 
     slice_dict : dict-like
         A dictionary containing the fragments strings as keys and as values
@@ -1594,21 +1602,15 @@ def get_adjacent_angles(
                     # select a SS for residue in question
                     pcsss = RC(lss, p=lssprobs)
                     _slice = RC(slice_dict[plen][pt_sub][pcsss])
-                    
-                    dihedrals = dihedrals_db[_slice, :].ravel()
-                    
-                    if bgeo_strategy == bgeo_exact_name:
-                        bend_angs = BEND_ANGS[_slice, :].ravel()
-                        bond_lens = BOND_LENS[_slice, :].ravel()
 
                 else:
                     _slice = RC(slice_dict[plen][pt_sub])
+                
+                dihedrals = dihedrals_db[_slice, :].ravel()
+                if bgeo_strategy == bgeo_exact_name:
+                    bend_angs = BEND_ANGS[_slice, :].ravel()
+                    bond_lens = BOND_LENS[_slice, :].ravel()
                     
-                    dihedrals = dihedrals_db[_slice, :].ravel()
-                    
-                    if bgeo_strategy == bgeo_exact_name:
-                        bend_angs = BEND_ANGS[_slice, :].ravel()
-                        bond_lens = BOND_LENS[_slice, :].ravel()
             
             except (KeyError, ValueError):
                 # walks back one residue
