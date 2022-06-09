@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+from multiprocessing.sharedctypes import Value
 import os
 from functools import partial
 from itertools import cycle
@@ -510,9 +511,17 @@ def main(
     db = read_dictionary_from_disk(database)
     
     if bgeo_strategy == bgeo_exact_name:
-        #TODO: check structure of database first to see if it contains
-        # all of the bond angles/lengths
-        _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)
+        try:
+            _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)
+        except KeyError:
+            log.info(S('!!!!!!!!!!!!!!!'))
+            log.info(S('DATABASE ERROR: '
+                'the `database` requested is invalid. Please give the database '
+                'generated with `bgeodb`. See the usage documentation for details '
+                'for using `--bgeo-strategy exact`.'
+            ))
+            return
+
     else:
         _, ANGLES, secondary, primary = aligndb(db)
     
