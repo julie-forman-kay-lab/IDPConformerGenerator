@@ -181,10 +181,6 @@ def aligndb(db, exact=False):
         DA(dssp_truncated)
         RA(fasta_truncated)
         
-        _resseq = '|'.join(resseq)
-        _dssp = '|'.join(dssp)
-        _angles = np.array((omg, phi, psi), dtype=np.float32).T
-        
         if exact:
             CM1NCAE(_cm1nca)
             NCACE(_ncac)
@@ -195,12 +191,17 @@ def aligndb(db, exact=False):
             CACE(_cac)
             CNP1E(_cnp1)
             COE(_co)
-            
-            _bend_angs = np.array((cm1nca, ncac, cacnp1, caco), dtype=np.float32).T
-            _bond_lens = np.array((nca, cac, cnp1, co), dtype=np.float32).T
-            
-            return pdbs, _angles, _bend_angs, _bond_lens, _dssp, _resseq
+    
+    _resseq = '|'.join(resseq)
+    _dssp = '|'.join(dssp)
+    _angles = np.array((omg, phi, psi), dtype=np.float32).T
+    
+    if exact:
+        _bend_angs = np.array((cm1nca, ncac, cacnp1, caco), dtype=np.float32).T
+        _bond_lens = np.array((nca, cac, cnp1, co), dtype=np.float32).T
         
+        return pdbs, _angles, _bend_angs, _bond_lens, _dssp, _resseq
+    
     return pdbs, _angles, _dssp, _resseq
 
 # # regex to compute
