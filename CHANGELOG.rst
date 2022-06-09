@@ -11,6 +11,7 @@ Changelog
 
 * Added new subclient ``bgeodb`` to append to the database exact bgeos
 * Implement ``exact`` bgeo-strategy
+* Add documentation regarding new features with ``exact`` and ``bgeodb``
 * PR #220
 
 v0.6.7 (2022-05-31)
