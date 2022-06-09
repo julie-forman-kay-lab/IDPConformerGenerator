@@ -9,7 +9,6 @@ USAGE:
 
 """
 import argparse
-from multiprocessing.sharedctypes import Value
 import os
 from functools import partial
 from itertools import cycle
@@ -53,17 +52,7 @@ from idpconfgen.core.build_definitions import (
     n_terminal_h_coords_at_origin,
     sidechain_templates,
     )
-from idpconfgen.core.definitions import (
-        dssp_ss_keys,
-        bgeo_Cm1NCa,
-        bgeo_NCaC,
-        bgeo_CaCNp1,
-        bgeo_CaCO,
-        bgeo_NCa,
-        bgeo_CaC,
-        bgeo_CNp1,
-        bgeo_CO,
-    )
+from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
@@ -515,11 +504,12 @@ def main(
             _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)
         except KeyError:
             log.info(S('!!!!!!!!!!!!!!!'))
-            log.info(S('DATABASE ERROR: '
+            log.info(S(
+                'DATABASE ERROR: '
                 'the `database` requested is invalid. Please give the database '
-                'generated with `bgeodb`. See the usage documentation for details '
-                'for using `--bgeo-strategy exact`.'
-            ))
+                'generated with `bgeodb`. See the usage documentation for '
+                'details while using `--bgeo-strategy exact`.'
+                ))
             return
 
     else:
@@ -1142,7 +1132,7 @@ def conformer_generator(
                 # primer_template here is used temporarily, and needs to be
                 # removed when get_adj becomes an option
                 if bgeo_strategy == bgeo_exact_name:
-                    primer_template, agls, bangs, blens  = GET_ADJ(bbi - 1)
+                    primer_template, agls, bangs, blens = GET_ADJ(bbi - 1)
                 else:
                     primer_template, agls = GET_ADJ(bbi - 1)
                 
@@ -1619,8 +1609,7 @@ def get_adjacent_angles(
                 if bgeo_strategy == bgeo_exact_name:
                     bend_angs = BEND_ANGS[_slice, :].ravel()
                     bond_lens = BOND_LENS[_slice, :].ravel()
-                    
-            
+
             except (KeyError, ValueError):
                 # walks back one residue
                 plen -= 1
