@@ -1216,7 +1216,7 @@ def conformer_generator(
                             except KeyError:
                                 co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
                     else:
-                        co_bend = bangs[3] / 2
+                        co_bend = bangs[3]
                         DISTANCE_C_O = blens[3]
                         
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(

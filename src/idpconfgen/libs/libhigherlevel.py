@@ -681,7 +681,7 @@ def get_bond_geos(fdata):
                 f'{",".join(co_minimal_names[co_idx])}'
                 ))
             continue
-        Ca_C_O = calc_angle_njit(Ca_C, O_C)
+        Ca_C_O = calc_angle_njit(Ca_C, O_C) / 2
         
         bgeo_results[bgeo_Cm1NCa].append(Cm1_N_Ca)
         bgeo_results[bgeo_NCaC].append(N_Ca_C)

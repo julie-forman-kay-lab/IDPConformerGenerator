@@ -9,6 +9,10 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Added new subclient ``bgeodb`` to append to the database exact bgeos
+* Implement ``exact`` bgeo-strategy
+* PR #220
+
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
 
