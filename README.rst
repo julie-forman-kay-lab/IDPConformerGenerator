@@ -31,11 +31,15 @@ the example in the ``example/`` folder.
 How to cite
 -----------
 
+.. start-citing
+
 If you use IDPConformerGenerator, please cite::
 
     João M.C. Teixeira, Zi Hao Liu, Ashley Namini, Jie Li, Robert M. Vernon, Mickaël Krzeminski, Alaa A. Shamandy, Oufan Zhang, Mojtaba Haghighatlari, Lei Yu, Teresa Head-Gordon, Julie D. Forman-Kay
     IDPConformerGenerator: A Flexible Software Suite for Sampling Conformational Space of Disordered Protein States.
     bioRxiv 2022.05.28.493726 (2022). doi:10.1101/2022.05.28.493726.
+
+.. end-citing
 
 Version
 -------
