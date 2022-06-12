@@ -4,7 +4,8 @@ Parsing routines for different data structure.
 All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
-import subprocess, ast
+import ast
+import subprocess
 from itertools import product, repeat
 from functools import partial
 from pathlib import Path as Path_
@@ -41,7 +42,7 @@ type2string = {
 
 
 def make_list_if_not(item):
-    """Put `item` into a list if item is not list or tuple-lik if item is not list or tuple-like."""
+    """Make a list from item."""
     if isinstance(item, (str, int, float)):
         return [item]
     return item
@@ -438,15 +439,15 @@ def remove_empty_keys(ddict):
 def values_to_dict(values):
     """
     Generalization of converting parameters to dict.
-    
+
     Adapted from:
     https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L94-L138
-    
+
     Parameters
     ----------
     values : string
         List of values with the format "par1=1 par2='string' par3=[1,2,3]
-    
+
     Returns
     -------
     param_dict : dictionary
@@ -479,7 +480,7 @@ def values_to_dict(values):
                     param_dict[k] = bool_value.get(v.lower(), v)
                 except (SyntaxError):
                     param_dict[k] = v
-                    
+
     return param_dict
 
 

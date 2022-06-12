@@ -13,8 +13,8 @@ from scipy.spatial import distance
 
 from idpconfgen import Path
 from idpconfgen.core.build_definitions import (
-    average_distance_CA_C,
     average_distance_C_Np1,
+    average_distance_CA_C,
     average_distance_N_CA,
     )
 from idpconfgen.core.definitions import vdW_radii_dict
@@ -354,9 +354,7 @@ def validate_bb_bonds_len_from_disk(
         pdb_data=None,
         tolerance=0.1,
         ):
-    """
-    Validate backbone bond lengths of a structure stored in disk.
-    """
+    """Validate backbone bond lengths of a structure stored in disk."""
     # read structure
     pdb = Path(name) if name else pdb_data
     s = Structure(pdb)
@@ -464,7 +462,6 @@ def validate_conformer_for_builder(
         ISNAN=np.isnan,
         ):
     """."""
-
     # no need to compute isnan in whole coordinates because coordinates
     # either are all nan or are all numbers, hence we use index 0
     coords_in_usagee = LOGICAL_NOT(ISNAN(coords[:, 0]))
@@ -485,11 +482,7 @@ def validate_conformer_for_builder(
         residues_apart=2,
         )
 
-    is_valid = all((
-        not np.any(rows),
-        ))
-
-    if np.any(rows): # not valid
-        return 1  # simulates positive energy
+    if np.any(rows):  # not valid
+        return 1   # simulates positive energy
     else:
-        return -1  # simulates negative energy
+        return -1   # simulates negative energy

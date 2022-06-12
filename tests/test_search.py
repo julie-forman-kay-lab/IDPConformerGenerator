@@ -54,7 +54,6 @@ class TestSearchWithMismatch:
     def test_mismatch2(self):
         proteins = ProteinSearch()
         proteins.start_search("ACDDKC", "ACDMKC", 3, 25)
-        print(proteins.results[-1])
         assert len(proteins.results[-1]) == 2
 
     def test_mismatch3(self):
