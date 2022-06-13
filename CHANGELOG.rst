@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add bioRxiv citation
+
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
 
