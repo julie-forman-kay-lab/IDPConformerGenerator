@@ -14,6 +14,12 @@ Changelog
 * Add documentation regarding new features with ``exact`` and ``bgeodb``
 * PR #220
 
+=======
+v0.6.8 (2022-06-13)
+------------------------------------------------------------
+
+* Add bioRxiv citation
+
 v0.6.7 (2022-05-31)
 ------------------------------------------------------------
 
