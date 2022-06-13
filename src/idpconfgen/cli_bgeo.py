@@ -70,10 +70,12 @@ USAGE:
 """
 import argparse
 import math
-import numpy as np
 from collections import defaultdict
 
+import numpy as np
+
 from idpconfgen import log
+from idpconfgen.components.plots.plotfuncs import plot_bend_angles
 from idpconfgen.core.exceptions import PDBFormatError
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import (
@@ -81,7 +83,6 @@ from idpconfgen.libs.libhigherlevel import (
     read_trimer_torsion_planar_angles,
     )
 from idpconfgen.libs.libio import FileReaderIterator, save_dict_to_json
-from idpconfgen.components.plots.plotfuncs import plot_bend_angles
 from idpconfgen.logger import S, T, init_files
 
 
@@ -122,7 +123,7 @@ def main(
         output=None,
         func=None,
         ):
-    """
+    """# noqa: D202, D205, D400
     Perform main script logic.
     
     Parameters
