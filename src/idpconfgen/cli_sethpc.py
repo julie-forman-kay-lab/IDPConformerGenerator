@@ -1,4 +1,4 @@
-r"""
+r"""# noqa: D205, D400
 Generates shell scripts for `idpconfgen build` job submission on SLURM
 managed HPCs. Optimized for the ComputeCanada Graham cluster.
 
@@ -123,7 +123,7 @@ build_ap_group = ap.add_argument_group(
 
 for action in build_ap._actions[1:]:
     args = deepcopy(action.__dict__)
-    positional= args.pop("option_strings")
+    positional = args.pop("option_strings")
     args.pop("container")
 
     if isinstance(action, argparse._StoreTrueAction):
@@ -215,7 +215,6 @@ def main(
         )
     _header = os.linesep.join(__header) + os.linesep
 
-
     if mail_user:
         _header += (
             f"#SBATCH --mail-user={mail_user}{os.linesep}"
@@ -229,7 +228,7 @@ def main(
     remaining = 0
 
     if nodes > 1:
-        seeds = [kwargs['random_seed']+i for i in range(nodes)]
+        seeds = [kwargs['random_seed'] + i for i in range(nodes)]
         confs_per_node = int(kwargs['nconfs'] / nodes)
         remaining = kwargs['nconfs'] % nodes
         log.info(S(f'Producing {nodes} job files with random seeds {seeds}...'))
@@ -246,7 +245,7 @@ def main(
         "cd",
         "source idpconfgen/bin/activate",
         'start_time="$(date -u +%s)"',
-        "idpconfgen build \ ",
+        "idpconfgen build \ ",  # noqa: W605
         "\t",
         )
 
@@ -260,8 +259,8 @@ def main(
     kwargs.update(filtered)
 
     # organizing output information
-    output=[]
-    job_names=[]
+    output = []
+    job_names = []
     of = kwargs['output_folder']
     for s in seeds:
         if s == seeds[-1]:
@@ -273,10 +272,10 @@ def main(
 
         for arg in kwargs:
             if isinstance(kwargs[arg], bool):
-                if kwargs[arg] == True:
-                    _output += f"--{arg} \ {os.linesep}\t"
+                if kwargs[arg]:
+                    _output += f"--{arg} \ {os.linesep}\t"  # noqa: W605
             else:
-                _output += f"--{arg} {kwargs[arg]} \ {os.linesep}\t"
+                _output += f"--{arg} {kwargs[arg]} \ {os.linesep}\t"  # noqa: W605, E501
         _output = _output[:-4]
         _output += os.linesep + os.linesep
         _output += (
@@ -291,26 +290,26 @@ def main(
 
     # saving shell scripts
     log.info(T('Writing job files to working directory'))
-    i=0
+    i = 0
     for job in output:
         with open(Path(destination, job_names[i]), mode="w") as wfile:
             wfile.write(job)
-        i+=1
+        i += 1
 
     if nodes > 1:
-        with open(Path(destination, f'run_{job_name}_all.sh'), mode="w") as wfile:
+        with open(Path(destination, f'run_{job_name}_all.sh'), mode="w") as wfile:  # noqa: E501
             wfile.write(f"#!/bin/bash{os.linesep}")
             for names in job_names:
                 wfile.write(f"sbatch {names}{os.linesep}")
 
-        with open(Path(destination, f'cancel_{job_name}_all.sh'), mode="w") as wfile:
+        with open(Path(destination, f'cancel_{job_name}_all.sh'), mode="w") as wfile:  # noqa: E501
             wfile.write(f"#!/bin/bash{os.linesep}")
             for names in job_names:
                 wfile.write(f"scancel -n {names}{os.linesep}")
         log.info(S('done'))
-        log.info(S(f'Tip: to queue up {nodes} jobs, run: bash /{destination}/run_{job_name}_all.sh'))
+        log.info(S(f'Tip: to queue up {nodes} jobs, run: bash /{destination}/run_{job_name}_all.sh'))  # noqa: E501
     else:
         log.info(S('done'))
-        log.info(S(f'Tip: to queue up the job, run: sbatch /{destination}/{job_name}.sh'))
+        log.info(S(f'Tip: to queue up the job, run: sbatch /{destination}/{job_name}.sh'))  # noqa: E501
 
     return
