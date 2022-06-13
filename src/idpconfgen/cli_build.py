@@ -22,9 +22,9 @@ from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
+    bgeo_exact_name,
     bgeo_int2cart_name,
     bgeo_sampling_name,
-    bgeo_exact_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -501,7 +501,7 @@ def main(
     
     if bgeo_strategy == bgeo_exact_name:
         try:
-            _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)
+            _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
         except KeyError:
             log.info(S('!!!!!!!!!!!!!!!'))
             log.info(S(
@@ -643,7 +643,7 @@ def populate_globals(
     if bgeo_strategy not in bgeo_strategies:
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
-    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name, bgeo_exact_name):
+    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name, bgeo_exact_name):  # noqa: E501
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path  # noqa: E501  # isort:skip
 
         if bgeo_path is None:
@@ -1206,12 +1206,12 @@ def conformer_generator(
                             )
                         bbi += 1
 
-                    if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):
+                    if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):  # noqa: E501
                         try:
                             co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
                             try:
-                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])  # noqa: E501
                             except KeyError:
                                 co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
                     else:
