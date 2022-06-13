@@ -91,7 +91,7 @@ ap.add_argument(
 ap.add_argument(
     '--mem',
     help=(
-        'Number of physical CPUs/node required. '
+        'Amount of RAM per node required. '
         'Defaults to 32 GB.'
         ),
     default='32G',
