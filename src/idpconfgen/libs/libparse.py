@@ -6,10 +6,10 @@ parse the information inside and return/yield the parsed information.
 """
 import ast
 import subprocess
-from itertools import product, repeat
 from functools import partial
-from pathlib import Path as Path_
+from itertools import product, repeat
 from operator import setitem
+from pathlib import Path as Path_
 
 from numba import njit
 
@@ -341,7 +341,7 @@ def get_trimer_seq(seq, idx):
     curr_res = seq[idx]
     try:
         pos = seq[idx + 1]
-    except:  # noqa: E722  IndexError in plain python
+    except:  # noqa: B001,E722  IndexError in plain python
         pos = 'G'
 
     return curr_res, pre + pos
@@ -455,9 +455,9 @@ def values_to_dict(values):
         E.g. {'par1': 1, 'par2':'string', 'par3': [1,2,3]}
     """
     bool_value = {
-            'true': True,
-            'false': False,
-            }
+        'true': True,
+        'false': False,
+        }
 
     param_dict = {}
     for kv in values:

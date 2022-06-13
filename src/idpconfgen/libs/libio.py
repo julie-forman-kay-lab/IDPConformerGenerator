@@ -581,7 +581,7 @@ def save_dictionary(mydict, output='mydict.pickle'):
         suffix = Path(output).suffix
     except TypeError:
         # pprint(mydict, indent=4, sort_dicts=True)  # disabled until 3.8
-        pprint(mydict, indent=4)
+        pprint(mydict, indent=4)  # noqa: T203
         return
 
     dispacher = save_dict_to_disk_dispacher

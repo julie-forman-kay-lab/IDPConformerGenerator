@@ -297,7 +297,7 @@ def create_conformer_labels(
         shape (N,) where N is the number of atoms.
         The three arrays have the same length.
     """
-    input_seq_3_letters = transfunc(input_seq) # note HIS treated as HIP
+    input_seq_3_letters = transfunc(input_seq)  # note HIS treated as HIP
 
     # change "H" to "p" as idpconfgen builds histidines as HIP,
     # see `translate_seq_to_3l`
@@ -567,8 +567,8 @@ def prepare_slice_dict(
     dict
         A dict with the given mapping:
 
-            1) First key-level of the dict is the length of the fragments, hence,
-            integers.
+            1) First key-level of the dict is the length of the fragments,
+            hence, integers.
 
             2) The second key level are the residue fragments found in the
             `primary`. A fragment in input_seq but not in `primary` is removed
