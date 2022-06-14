@@ -297,7 +297,7 @@ def create_conformer_labels(
         shape (N,) where N is the number of atoms.
         The three arrays have the same length.
     """
-    input_seq_3_letters = transfunc(input_seq) # note HIS treated as HIP
+    input_seq_3_letters = transfunc(input_seq)  # note HIS treated as HIP
 
     # change "H" to "p" as idpconfgen builds histidines as HIP,
     # see `translate_seq_to_3l`
@@ -462,18 +462,6 @@ def get_cycle_distances_backbone():
         ))
 
 
-# deactivated after using bend library BGEO
-# def get_cycle_bend_angles():
-#     """
-#     Return an infinite iterator of the bend angles.
-#     """
-#     return cycle((
-#         build_bend_angles_Cm1_N_CA,  # used for OMEGA
-#         build_bend_angles_N_CA_C,  # used for PHI
-#         build_bend_angles_CA_C_Np1,  # used for PSI
-#         ))
-
-
 def get_cycle_bond_type():
     """
     Return an infinite interator of the bond types.
@@ -567,8 +555,8 @@ def prepare_slice_dict(
     dict
         A dict with the given mapping:
 
-            1) First key-level of the dict is the length of the fragments, hence,
-            integers.
+            1) First key-level of the dict is the length of the fragments,
+            hence, integers.
 
             2) The second key level are the residue fragments found in the
             `primary`. A fragment in input_seq but not in `primary` is removed

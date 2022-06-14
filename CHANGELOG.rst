@@ -14,7 +14,26 @@ Changelog
 * Add documentation regarding new features with ``exact`` and ``bgeodb``
 * PR #220
 
-=======
+v0.6.11 (2022-06-14)
+------------------------------------------------------------
+
+* Add option to build backbone conformers with fixed bond angle and
+  distances. (#217)
+
+v0.6.10 (2022-06-14)
+------------------------------------------------------------
+
+* Implement boxplot plotting feature for bond angle distributions
+* Append documentation for ``bgeo`` subclient
+* Ability to use ``degrees`` for ``bgeo`` subclient
+* Ability to change the name of the ouput file for ``bgeo`` subclient
+* PR #219
+
+v0.6.9 (2022-06-13)
+------------------------------------------------------------
+
+* Correct CLI help for the ``--mem`` flag in the ``sethpc`` subclient (#218)
+
 v0.6.8 (2022-06-13)
 ------------------------------------------------------------
 

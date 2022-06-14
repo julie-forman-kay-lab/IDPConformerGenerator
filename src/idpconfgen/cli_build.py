@@ -25,9 +25,11 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_exact_name,
     bgeo_int2cart_name,
     bgeo_sampling_name,
+    bgeo_fixed_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
+from idpconfgen.components.bgeo_strategies.fixed import get_cycle_bend_angles
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
 from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.components.sidechain_packing import (
@@ -45,6 +47,7 @@ from idpconfgen.components.xmer_probs import (
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
     build_bend_H_N_C,
+    build_bend_CA_C_O,
     distance_C_O,
     distance_H_N,
     forcefields,
@@ -164,7 +167,8 @@ def are_globals(bgeo_strategy):
             BGEO_trimer,
             BGEO_res,
             ))
-    elif bgeo_strategy == bgeo_exact_name:
+
+    elif bgeo_strategy in (bgeo_exact_name, bgeo_fixed_name):
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
@@ -173,6 +177,7 @@ def are_globals(bgeo_strategy):
             TEMPLATE_MASKS,
             TEMPLATE_EFUNC,
             ))
+
     elif bgeo_strategy == bgeo_int2cart_name:
         return all((
             ALL_ATOM_LABELS,
@@ -186,6 +191,7 @@ def are_globals(bgeo_strategy):
             BGEO_res,
             INT2CART,
             ))
+
     else:
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
@@ -498,7 +504,7 @@ def main(
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
 
     db = read_dictionary_from_disk(database)
-    
+
     if bgeo_strategy == bgeo_exact_name:
         try:
             _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
@@ -514,7 +520,7 @@ def main(
 
     else:
         _, ANGLES, secondary, primary = aligndb(db)
-    
+
     del db
 
     if residue_tolerance is not None:
@@ -549,7 +555,7 @@ def main(
         csss_dict,
         residue_tolerance=residue_tolerance,
         )
-       
+
     populate_globals(
         input_seq=input_seq,
         bgeo_strategy=bgeo_strategy,
@@ -1077,6 +1083,9 @@ def conformer_generator(
         bond_lens = get_cycle_distances_backbone()
         bond_type = get_cycle_bond_type()
 
+        if bgeo_strategy == bgeo_fixed_name:
+            bend_angles = get_cycle_bend_angles()
+
         # in the first run of the loop this is unnecessary, but is better to
         # just do it once than flag it the whole time
         template_coords[:, :] = NAN
@@ -1135,7 +1144,7 @@ def conformer_generator(
                     primer_template, agls, bangs, blens = GET_ADJ(bbi - 1)
                 else:
                     primer_template, agls = GET_ADJ(bbi - 1)
-                
+
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
 
@@ -1178,7 +1187,7 @@ def conformer_generator(
                             # needed for correctly calculating Q
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
                             _bond_lens = bond_lens[torsion_idx]
-                        
+
                         elif bgeo_strategy == bgeo_exact_name:
                             _bend_angle = bangs[torsion_idx]
                             _bond_lens = blens[torsion_idx]
@@ -1195,7 +1204,11 @@ def conformer_generator(
                                     _bend_angle = RC(BGEO_res[_bt][curr_res])
 
                             _bond_lens = next(bond_lens)[curr_res]
-                            
+
+                        elif bgeo_strategy == bgeo_fixed_name:
+                            _bend_angle = next(bend_angles)[curr_res]
+                            _bond_lens = next(bond_lens)[curr_res]
+
                         bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
                             bb[bbi - 1, :],
                             bb[bbi, :],
@@ -1207,6 +1220,7 @@ def conformer_generator(
                         bbi += 1
 
                     if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):  # noqa: E501
+
                         try:
                             co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
@@ -1214,10 +1228,14 @@ def conformer_generator(
                                 co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])  # noqa: E501
                             except KeyError:
                                 co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+
+                    elif bgeo_strategy == bgeo_fixed_name:
+                        co_bend = build_bend_CA_C_O
+
                     else:
                         co_bend = bangs[3]
                         DISTANCE_C_O = blens[3]
-                        
+
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],
                         bb_real[bbi - 2, :],
@@ -1531,7 +1549,7 @@ def get_adjacent_angles(
 
     dihedrals_db : dict-like
         The angle omega/phi/psi database.
-    
+
     bgeo_strategy : string
         Bond geometry strategy to use.
 
@@ -1576,7 +1594,7 @@ def get_adjacent_angles(
         plen = len(primer_template)
 
         pt_sub = BRS(primer_template, residue_tolerance)
-        
+
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
@@ -1604,7 +1622,7 @@ def get_adjacent_angles(
 
                 else:
                     _slice = RC(slice_dict[plen][pt_sub])
-                
+
                 dihedrals = dihedrals_db[_slice, :].ravel()
                 if bgeo_strategy == bgeo_exact_name:
                     bend_angs = BEND_ANGS[_slice, :].ravel()
@@ -1629,16 +1647,16 @@ def get_adjacent_angles(
 
         if next_residue == 'P':
             # because angles have the proline information
-            
+
             if bgeo_strategy == bgeo_exact_name:
                 return primer_template + 'P', dihedrals, bend_angs, bond_lens
-            
+
             return primer_template + 'P', dihedrals
-        
+
         else:
             if bgeo_strategy == bgeo_exact_name:
                 return primer_template, dihedrals, bend_angs, bond_lens
-            
+
             return primer_template, dihedrals
 
     return func

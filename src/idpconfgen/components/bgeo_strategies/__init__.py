@@ -6,6 +6,8 @@ from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import (
     )
 from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import \
     name as bgeo_int2cart_name
+from idpconfgen.components.bgeo_strategies.fixed import \
+    name as bgeo_fixed_name
 from idpconfgen.components.bgeo_strategies.sampling import \
     name as bgeo_sampling_name
 from idpconfgen.components.bgeo_strategies.exact import \
@@ -14,8 +16,8 @@ from idpconfgen.components.bgeo_strategies.exact import \
 bgeo_strategies_default = bgeo_sampling_name
 """The default bond geometry sampling strategy."""
 
-
 bgeo_strategies = (
+    bgeo_fixed_name,
     bgeo_sampling_name,
     bgeo_exact_name,
     bgeo_int2cart_name,
@@ -30,7 +32,7 @@ def add_bgeo_strategy_arg(parse):
     parse.add_argument(
         _bgeo_arg_name,
         dest='bgeo_strategy',
-        help="Which strategy to use for bond geometries.",
+        help="Which strategy to use for bond geometries. Defaults to `sampling`.",
         choices=bgeo_strategies,
         default=bgeo_strategies_default,
         action=CheckBgeoInstallation,
