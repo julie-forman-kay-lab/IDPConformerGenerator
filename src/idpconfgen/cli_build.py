@@ -1138,14 +1138,14 @@ def conformer_generator(
                         d1, d2, d3, theta1, theta2, theta3 = _
 
                         bend_angles = [theta3, theta1, theta2]
-                        bond_lens = [d1, d2, d3]
+                        bond_lens_i2c_list = [d1, d2, d3]
 
                     for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):  # noqa: E501
 
                         if bgeo_strategy == bgeo_int2cart_name:
                             # needed for correctly calculating Q
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
-                            _bond_lens = bond_lens[torsion_idx]
+                            _bond_lens = bond_lens_i2c_list[torsion_idx]
 
                         elif bgeo_strategy == bgeo_sampling_name:
                             _bt = next(bond_type)
