@@ -63,13 +63,19 @@ Main keys for the bond types are exact.
 
 USAGE:
     $ idpconfgen bgeo [PDBS]
-    $ idpconfgen bgeo [PDBS] -c
+    $ idpconfgen bgeo [PDBS] --degrees
+    $ idpconfgen bgeo [PDBS] --plot --degrees
     $ idpconfgen bgeo [PDBS] --convert
+    $ idpconfgen bgeo [PDBS] --convert --output my_bgeo_library.json
 """
 import argparse
+import math
 from collections import defaultdict
 
+import numpy as np
+
 from idpconfgen import log
+from idpconfgen.components.plots.plotfuncs import plot_bend_angles
 from idpconfgen.core.exceptions import PDBFormatError
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import (
@@ -95,6 +101,8 @@ ap = libcli.CustomParser(
     )
 
 libcli.add_argument_pdb_files(ap)
+libcli.add_argument_degrees(ap)
+libcli.add_argument_plot(ap)
 
 ap.add_argument(
     '-c',
@@ -103,9 +111,48 @@ ap.add_argument(
     action='store_true',
     )
 
+libcli.add_argument_output(ap)
 
-def main(pdb_files, convert=False, func=None):
-    """Perform main logic."""
+
+def main(
+        pdb_files,
+        convert=False,
+        degrees=False,
+        plot=False,
+        plotvars=None,
+        output=None,
+        func=None,
+        ):
+    """# noqa: D202, D205, D400
+    Perform main script logic.
+    
+    Parameters
+    ----------
+    pdb_files : str or Path, required
+        Location for PDB files to operate on, can be within
+        a filder or inside .TAR file.
+    
+    convert : Bool, optional
+        Convert bgeo database to accomodate `build`. Angles must be in radians.
+        Defaults to False, don't convert.
+        
+    degrees : Bool, optional
+        Whether to use degrees instead of radians.
+        Defaults to False, use radians.
+        
+    plot : Bool, optional
+        Whether to plot the boxplot of bond angle distributions.
+        Defaults to False, don't plot.
+        
+    plotvars : dict like, optional
+        Parameters for creating the bond geometry distribution plot.
+        Defaults to None, use default plotting parameters.
+    """
+    
+    output = output or 'bgeo.json'
+    if not output.endswith('.json'):
+        raise ValueError('Output file should have `.json` extension.')
+    
     log.info(T('Creating bond geometry database.'))
     init_files(log, LOGFILESNAME)
 
@@ -122,15 +169,67 @@ def main(pdb_files, convert=False, func=None):
         except PDBFormatError as err:
             log.info(str(err))
             continue
-
+    
     if convert:
         log.info(S('Converting'))
+        if degrees:
+            log.info(S('Please note that `build` only accepts radians,'
+                       'angles will not be converted to degrees.'))
         converted = convert_bond_geo_lib(bond_geo_db)
-        save_dict_to_json(converted, output='bgeo.json')
-
+        log.info(S('done'))
+        save_dict_to_json(converted, output=output)
     else:
-        save_dict_to_json(bond_geo_db, output='bgeo.json')
+        log.info(S(f'Saving bgeo information to: {output}...'))
+        
+        if degrees:
+            for trimer in bond_geo_db:
+                for angles in bond_geo_db[trimer]:
+                    for i, angs in enumerate(bond_geo_db[trimer][angles]):
+                        bond_geo_db[trimer][angles][i] = math.degrees(angs)
+                        
+        save_dict_to_json(bond_geo_db, output=output)
+    
+    if plot:
+        log.info(S('Plotting bond angle distributions...'))
+        
+        bend_names = []
+        first = list(bond_geo_db.items())[0][1]
 
+        styled_names = {
+            "Cm1_N_Ca": r"$C_{-1}-N-C_{\alpha}$",
+            "N_Ca_C": r"$N-C_{\alpha}-C$",
+            "Ca_C_Np1": r"$C_{\alpha}-C-N_{+1}$",
+            "Ca_C_O": r"$C_{\alpha}-C-O$",
+            }
+
+        for key in first:
+            bend_names.append(styled_names.get(key, key))
+        
+        bend_angles = np.ndarray(shape=(len(bond_geo_db), len(bend_names)))
+        for i, trimer in enumerate(bond_geo_db):
+            for j, angles in enumerate(bond_geo_db[trimer]):
+                _angles = bond_geo_db[trimer][angles]
+                if len(_angles) > 1:
+                    bend_angles[i][j] = float(sum(_angles) / len(_angles))
+                else:
+                    bend_angles[i][j] = _angles[0]
+                    
+        plt_defaults = {
+            'names': bend_names,
+            'filename': 'plot_bgeo.png',
+            }
+        
+        if degrees:
+            plt_defaults['ylabel'] = 'Bend Angle (Degrees)'
+        plt_defaults.update(plotvars)
+        
+        errs = plot_bend_angles(bend_angles, **plt_defaults)
+        for e in errs:
+            log.info(S(f'{e}'))
+        log.info(S(f'saved plot: {plt_defaults["filename"]}'))
+        
+        log.info(S('done'))
+    
     return
 
 

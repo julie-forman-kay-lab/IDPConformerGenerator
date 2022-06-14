@@ -16,6 +16,7 @@ Contents
    faq
    reference/index
    contributing
+   citing
    authors
    changelog
 
