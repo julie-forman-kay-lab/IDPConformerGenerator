@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add option to build backbone conformers with fixed bond angle and
+  distances. (#217)
+
 v0.6.10 (2022-06-14)
 ------------------------------------------------------------
 
@@ -18,7 +21,6 @@ v0.6.10 (2022-06-14)
 * Ability to change the name of the ouput file for ``bgeo`` subclient
 * PR #219
 
-=======
 v0.6.9 (2022-06-13)
 ------------------------------------------------------------
 
