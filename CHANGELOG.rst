@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Improve variable names related to ``int2cart`` in ``build`` that were
+  prone to bugs.
+
 v0.6.11 (2022-06-14)
 ------------------------------------------------------------
 
