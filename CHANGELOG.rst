@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add tests to ``cli_build.main``.
+
 v0.6.11 (2022-06-14)
 ------------------------------------------------------------
 
