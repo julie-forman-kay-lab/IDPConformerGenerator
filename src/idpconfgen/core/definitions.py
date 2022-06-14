@@ -1,6 +1,5 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
-from math import pi
 from collections import namedtuple
 from itertools import chain
 # does not import the Path from IDPConfgen to avoid circular imports
