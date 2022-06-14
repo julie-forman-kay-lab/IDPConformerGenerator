@@ -462,18 +462,6 @@ def get_cycle_distances_backbone():
         ))
 
 
-# deactivated after using bend library BGEO
-# def get_cycle_bend_angles():
-#     """
-#     Return an infinite iterator of the bend angles.
-#     """
-#     return cycle((
-#         build_bend_angles_Cm1_N_CA,  # used for OMEGA
-#         build_bend_angles_N_CA_C,  # used for PHI
-#         build_bend_angles_CA_C_Np1,  # used for PSI
-#         ))
-
-
 def get_cycle_bond_type():
     """
     Return an infinite interator of the bond types.

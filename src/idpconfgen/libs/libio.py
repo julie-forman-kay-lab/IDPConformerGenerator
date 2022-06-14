@@ -816,7 +816,7 @@ class TarFileIterator(FileIteratorBase):
         f = self.origin.extractfile(member)
         txt = f.read()
         f.close()
-        return member.name, txt
+        return Path(member.name), txt
 
 
 # dispachers
