@@ -245,8 +245,7 @@ def plot_bend_angles(
         dpi=300,
         ):
     """
-    Plot all torsion angle distributions as a scatter plot.
-    Defaults to Phi torsion angles.
+    Plot backbone bond angle distribution as a boxplot.
 
     Parameters
     ----------
