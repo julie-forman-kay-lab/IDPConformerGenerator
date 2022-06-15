@@ -260,9 +260,9 @@ def main(
         
         if reduced:
             frac_dssp = {
-                'Loops': np.zeros(max_residues),
-                'Helices': np.zeros(max_residues),
-                'Strands': np.zeros(max_residues),
+                'L': np.zeros(max_residues),
+                'H': np.zeros(max_residues),
+                'E': np.zeros(max_residues),
             }
             p=np.ones(n_confs)
             p=p/len(p)
@@ -271,11 +271,8 @@ def main(
             for conf in dssp_data:
                 r=0
                 for ss in dssp_data[conf]["dssp"]:
-                    if ss == "L": frac_dssp['Loops'][r] += p[c]
-                    elif ss == "H": frac_dssp['Helices'][r] += p[c]
-                    elif ss == "E": frac_dssp['Strands'][r] += p[c]
+                    frac_dssp[ss][r] += p[c]
                     r+=1
-
                 c+=1
         else:
             frac_dssp = {
@@ -287,7 +284,7 @@ def main(
                 'T': np.zeros(max_residues),
                 'S': np.zeros(max_residues),
                 'P': np.zeros(max_residues),
-                '-': np.zeros(max_residues),
+                ' ': np.zeros(max_residues),
             }
             p=np.ones(n_confs)
             p=p/len(p)
@@ -296,17 +293,8 @@ def main(
             for conf in dssp_data:
                 r=0
                 for ss in dssp_data[conf]["dssp"]:
-                    if ss == "H": frac_dssp['H'][r] += p[c]
-                    elif ss == "B": frac_dssp['B'][r] += p[c]
-                    elif ss == "E": frac_dssp['E'][r] += p[c]
-                    elif ss == "G": frac_dssp['G'][r] += p[c]
-                    elif ss == "I": frac_dssp['I'][r] += p[c]
-                    elif ss == "T": frac_dssp['T'][r] += p[c]
-                    elif ss == "S": frac_dssp['S'][r] += p[c]
-                    elif ss == "P": frac_dssp['P'][r] += p[c]
-                    elif ss == "-": frac_dssp['-'][r] += p[c]
+                    frac_dssp[ss][r] += p[c]
                     r+=1
-
                 c+=1
         
         errs=plot_fracSS(max_residues, frac_dssp, **plt_default)
