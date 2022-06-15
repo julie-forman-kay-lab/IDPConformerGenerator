@@ -32,25 +32,25 @@ def add_mcsce_subparser(ap):
         )
     group.add_argument(
         '--mcsce-mode',
-        help=f'Sidechain sampling method. Defaults to {mcsce_defaults["mode"]!r}.',
+        help=f'Sidechain sampling method. Defaults to {mcsce_defaults["mode"]!r}.',  # noqa: E501
         choices=('simple', 'exhaustive'),
         default=mcsce_defaults['mode'],
         )
     group.add_argument(
         '--mcsce-n_trials',
-        help=f'Sampling trials in exhaustive mode. Defaults to {mcsce_defaults["n_trials"]}.',
+        help=f'Sampling trials in exhaustive mode. Defaults to {mcsce_defaults["n_trials"]}.',  # noqa: E501
         type=int,
         default=mcsce_defaults['n_trials'],
         )
     group.add_argument(
         '--mcsce-batch_size',
-        help=f'The MC-SCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',
+        help=f'The MC-SCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',  # noqa: E501
         type=int,
         default=mcsce_defaults['batch_size'],
         )
     group.add_argument(
         '--mcsce-temperature',
-        help=f'Sampling temperature. Defaults to {mcsce_defaults["temperature"]}.',
+        help=f'Sampling temperature. Defaults to {mcsce_defaults["temperature"]}.',  # noqa: E501
         type=int,
         default=mcsce_defaults['temperature'],
         )
@@ -97,11 +97,14 @@ def init_mcsce_sidechains(
     np.ndarray (M, 3)
         Heavy atom coordinates of the protein sequence.
     """
-    from mcsce.libs.libstructure import Structure
-    from mcsce.libs.libenergy import prepare_energy_function
     from mcsce.core import build_definitions
-    from mcsce.core.side_chain_builder import create_side_chain, initialize_func_calc
-
+    from mcsce.core.side_chain_builder import (
+        create_side_chain,
+        initialize_func_calc,
+        )
+    from mcsce.libs.libenergy import prepare_energy_function
+    from mcsce.libs.libstructure import Structure
+    
     _up = user_parameters or {}
     params = {**mcsce_defaults, **_up}
 
