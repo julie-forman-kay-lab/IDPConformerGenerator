@@ -1,10 +1,11 @@
 """Test logger."""
-import pytest
 from functools import partial
 
+import pytest
+
 from idpconfgen import Path, log
-from idpconfgen.logger import S, T, init_files, report_on_crash
 from idpconfgen.core.exceptions import ReportOnCrashError
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 def test_init_files():

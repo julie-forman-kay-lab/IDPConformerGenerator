@@ -5,7 +5,7 @@ import os
 import sys
 from time import time
 
-from idpconfgen import log, assert_subclass
+from idpconfgen import assert_subclass, log
 from idpconfgen.logger import S
 
 
