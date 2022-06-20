@@ -16,7 +16,11 @@ For that, in general, the ``init_`` functions receive the template and
 all_atom masks named tuples (see libbuild).
 """
 from idpconfgen.components.sidechain_packing.faspr import init_faspr_sidechains
-from idpconfgen.components.sidechain_packing.mcsce import init_mcsce_sidechains
+from idpconfgen.components.sidechain_packing.mcsce import (  # noqa: F401
+    add_mcsce_subparser,
+    init_mcsce_sidechains,
+    )
+
 
 sidechain_packing_methods = {
     'faspr': init_faspr_sidechains,
