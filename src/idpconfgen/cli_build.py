@@ -1148,7 +1148,11 @@ def conformer_generator(
 
                         # phi, psi, omega
                         tors = np.hstack([tors[:, 1:], tors[:, :1]])
-
+                        
+                        if len(seq) != len(tors):
+                            # Int2Cart requires lengths to match
+                            raise ValueError
+                        
                         _ = INT2CART.get_internal_coords(seq, tors)
                         d1, d2, d3, theta1, theta2, theta3 = _
 
@@ -1222,6 +1226,12 @@ def conformer_generator(
                 # add the carboxyls
                 template_coords[TEMPLATE_MASKS.cterm] = \
                     MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
+                    
+            except ValueError:
+                # Int2Cart requires length of seq to match length of torsions
+                # if there is a mismatch match is found, start from scratch
+                broke_on_start_attempt = True
+                break
 
             # Adds N-H Hydrogens
             # Not a perfect loop. It repeats for Hs already placed.
