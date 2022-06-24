@@ -2,7 +2,6 @@
 Interface for X-EISD logic to score and reweight conformer ensembles.
 """
 import argparse
-from calendar import c
 from functools import partial
 
 from idpconfgen import Path, log
@@ -52,7 +51,7 @@ ap.add_argument(
 ap.add_argument(
     '-eps',
     '--epochs',
-    help='Number of epochs to run main optimization. Defaults to 1000.',
+    help='Number of epochs to run main optimization, defaults to 1000.',
     type=int,
     default=1000,
     required=True,
