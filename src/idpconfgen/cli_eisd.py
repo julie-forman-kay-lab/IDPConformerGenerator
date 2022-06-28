@@ -25,7 +25,7 @@ from idpconfgen.components.eisd import (
 LOGFILESNAME = '.idpconfgen_eisd'
 
 _name = 'eisd'
-_help = 'Score and reweight generated ensembles.'  # noqa: E501
+_help = 'Score and reweight generated ensembles.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -55,7 +55,7 @@ ap.add_argument(
     type=int,
     default=1000,
     required=True,
-)
+    )
 
 ap.add_argument(
     '-opt',
@@ -63,7 +63,7 @@ ap.add_argument(
     help='If optimization is required, defaults to True.',
     action='store_true',
     required=False,
-)
+    )
 
 ap.add_argument(
     '-m',
@@ -72,7 +72,7 @@ ap.add_argument(
     choices=eisd_modes,
     default=default_mode,
     required=False,
-)
+    )
 
 ap.add_argument(
     '--optimization-type',
@@ -80,13 +80,36 @@ ap.add_argument(
     choices=eisd_optimization_types,
     default=default_type,
     required=False,
-)
+    )
+
+ap.add_argument(
+    '--beta',
+    help=('Hyperparameter for "mc" optimization type'
+          '(Metropolis Monte Carlo).'
+          'Defaults to 0.1.'         
+          ),
+    default=0.1,
+    type=float,
+    required=False,
+    )
 
 libcli.add_argument_output(ap)
 libcli.add_argument_ncores(ap)
 
 
-def main():
+def main(
+        filepath,
+        optimization=False,
+        optimization_type=default_type,
+        mode=default_mode,
+        epochs=1000,
+        beta=0.1,
+        output=None,
+        ncores=1,
+        func=None,
+        ):
+    init_files(log, LOGFILESNAME)
+    
     return
 
 
