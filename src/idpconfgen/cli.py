@@ -36,6 +36,7 @@ from idpconfgen import (
     cli_torsions,
     cli_torsionsJ,
     cli_validate,
+    cli_eisd,
     log,
     )
 from idpconfgen.libs import libcli
@@ -69,6 +70,7 @@ Other useful routines:
     * {cli_merge._name}
     * {cli_stats._name}
     * {cli_search._name}
+    * {cli_eisd._name}
 """
 
 ap = libcli.CustomParser(
@@ -106,6 +108,7 @@ libcli.add_subparser(subparsers, cli_sethpc)
 libcli.add_subparser(subparsers, cli_merge)
 libcli.add_subparser(subparsers, cli_stats)
 libcli.add_subparser(subparsers, cli_search)
+libcli.add_subparser(subparsers, cli_eisd)
 
 
 def load_args():
