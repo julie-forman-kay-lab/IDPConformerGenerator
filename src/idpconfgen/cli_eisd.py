@@ -37,13 +37,14 @@ from turtle import back
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libfunc import consume
 from idpconfgen.libs.libio import (
     extract_from_tar,
     read_path_bundle,
     FileReaderIterator,
     save_dict_to_json,
     )
-from idpconfgen.libs.libmulticore import pool_function, starunpack
+from idpconfgen.libs.libmulticore import consume_iterable_in_list, pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -53,7 +54,10 @@ from idpconfgen.components.eisd import (
     eisd_optimization_types,
     default_type,
     default_mode,
+    make_pairs,
+    modes,
     )
+from idpconfgen.components.eisd.optimizer import core_eisd
 
 LOGFILESNAME = '.idpconfgen_eisd'
 TMPDIR = '__tmpeisd__'
@@ -150,7 +154,7 @@ def main(
         mode=default_mode,
         epochs=250,
         beta=0.1,
-        output="./eisd_output",
+        output="./",
         tmpdir=TMPDIR,
         ncores=1,
         func=None,
@@ -190,7 +194,7 @@ def main(
         Defaults to 0.1.
     
     output : str or Path, optional
-        Path to the folder to store any files or conformers.
+        Path to the folder to store eisd outputs.
         Defaults to working directory.
         
     ncores : int, optional
@@ -209,7 +213,6 @@ def main(
     log.info(S('done'))
     
     log.info(T('Checking experimental data files'))
-    
     exp_paths=[]
     back_paths=[]
     valid_exp_modules=[]
@@ -244,14 +247,40 @@ def main(
             log.info(S('Note: found inconsistent experimental and back-calculation'
                        ' data pairs. Keeping only paths of matching pairs of data.'
                        ))
-    
     log.info(S('done'))
     
+    _ens_size = len(pdbs2operate)
+    _output = []
+    if mode == 'all':
+        _output.append(os.path.join(output, mode))
+    elif mode == 'pairs':
+        pairs = make_pairs()
+        for pair in pairs:
+            _output.append(os.path.join(output, "%s_%s_%s"%(mode, pair[0], pair[1])))
+    else:
+        for module in eisd_modules:
+            _output.append(os.path.join(output, "%s_%s"%(mode, module)))
+    
+    execute = partial (
+        report_on_crash,
+        core_eisd,
+        exp_data=exp_paths,
+        bc_data=back_paths,
+        ens_size=_ens_size,
+        epochs=epochs,
+        mode=mode,
+        beta=beta,
+        opt_type=optimization_type,
+        )
+    
+    execute_pool = pool_function(execute, structure=pdbs2operate, ncores=ncores)
     
     
     
     if _istarfile:
         shutil.rmtree(tmpdir)
+        
+    log.info(S('done'))
     
     return
 
