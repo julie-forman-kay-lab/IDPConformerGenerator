@@ -7,6 +7,7 @@ Inspired/imported from:
 * https://github.com/Oufan75/X-EISD/blob/master/eisd/scorers.py
 """
 import numpy as np
+import pandas as pd
 
 
 def calc_opt_params(beta, exp, exp_sig, sig):
@@ -38,7 +39,7 @@ def calc_score(beta, exp, exp_sig, sig, opt_params, gamma=1.0):
     return f, f_comps
 
 
-def get_gamma(exp_saxs, num_res, qmax, qmin):
+def calc_gamma(exp_saxs, num_res, qmax, qmin):
     # Generalizable way to calculate gamma parameter
     # 
     N_q = len(exp_saxs)
@@ -59,4 +60,61 @@ def saxs_optimization_ensemble(
     new_index=None,
     ):
     #TODO: complete SAXS module
-    return total_score, error, rmse, bc_saxs
+    # return total_score, error, rmse, bc_saxs
+    return
+
+
+def cs_optimization_ensemble(
+    exp_data,
+    bc_data,
+    ens_size,
+    indices,
+    old_vals=None,
+    popped_structure=None,
+    new_index=None,
+    ):
+    """
+    Main logic for chemical shift scoring.
+
+    Parameters
+    ----------
+    exp_data : dict
+        Dictionary of experimental values of chemical shifts.
+        First key-layer indicates type of CS (C, CA, CB, N, H, HA).
+        For each key, there exists 2 values, the CS assignment [0]
+        and the experimental error associated [1].
+    
+    bc_data : dict
+        Dictionary of back-calculated values of chemical shifts.
+        Format follows `exp_data`.
+    
+    indices : list
+        List of indices of experimental and back-calculated data
+        to include. Defaults to None.
+        # !!! note here, may not be required based on new logic
+    
+    """
+    # TODO: if incorrect shape, shave off values from bc_data
+    # to match exp_data
+    exp_cs = exp_data['cs'].data['value'].values
+    exp_sigma = exp_data['cs'].data['error'].values
+    atom_types = exp_data['cs'].data['atomname'].values
+    
+    if indices is None:
+        bc_cs = old_vals - (bc_data['cs'].data.values[popped_structure, :] - bc_data['cs'].data.values[new_index, :]) / ens_size
+    else:
+        bc_ensemble = bc_data['cs'].data.values[indices, :]
+        bc_cs = np.mean(bc_ensemble, axis=0)
+        
+    bc_sigma = np.array([bc_data['cs'].sigma[atom_type] for atom_type in atom_types])
+    
+    opt_params = calc_opt_params(bc_cs, exp_cs, exp_sigma, bc_sigma)
+    f, f_comps = calc_score(bc_cs, exp_cs, exp_sigma, bc_sigma, opt_params)
+    
+    error = (exp_cs - bc_cs) ** 2.0
+    rmse = np.mean(error) ** 0.5
+    total_score = np.sum(f)
+    
+    return total_score, error, rmse, bc_cs
+    
+    

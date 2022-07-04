@@ -4,31 +4,50 @@ miscellaneous utility functions to help the `eisd` subclient.
 
 Functions and logic inspired/imported from https://github.com/THGLab/X-EISD/
 """
+eisd_run_all = 'all'
+eisd_run_single = 'single'
+eisd_run_pairs = 'pairs'
 eisd_modes = (
-    'all',
-    'single',
-    'pairs',
+    eisd_run_all,
+    eisd_run_single,
+    eisd_run_pairs
     )
+default_mode = eisd_run_all
 
+opt_max = 'max'
+opt_mc = 'mc'
 eisd_optimization_types = (
-    'max',
-    'mc',
+    opt_max,
+    opt_mc,
     None,
     )
+default_type = opt_max
 
-eisd_modules = (
-    'saxs',
-    'cs',
-    'fret',
-    'jc',
-    'noe',
-    'pre',
-    'rdc',
-    'rh',
+parse_mode_exp = 'exp'
+parse_mode_back = 'bc'
+parse_modes = (
+    parse_mode_exp,
+    parse_mode_back,
     )
 
-default_mode = 'all'
-default_type = 'max'
+saxs_name = 'saxs'
+cs_name = 'cs'
+fret_name = 'fret'
+jc_name = 'jc'
+noe_name = 'noe'
+pre_name = 'pre'
+rdc_name = 'rdc'
+rh_name = 'rh'
+eisd_modules = (
+    saxs_name,
+    cs_name,
+    fret_name,
+    jc_name,
+    noe_name,
+    pre_name,
+    rdc_name,
+    rh_name,
+    )
 
 
 # The following two functions have been imported from:
