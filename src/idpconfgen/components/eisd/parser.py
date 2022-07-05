@@ -2,21 +2,20 @@
 Main logic for parsing experimental and back-calculated raw outputs.
 
 Currently accepting the following formats:
-    SAXS:
-    Chemical shift: NMR_STAR, SHIFTX2
-    FRET:
+    SAXS: SASBDB, CRYSOL
+    Chemical shift: NMR-STAR, SHIFTX2
+    FRET: (ask greg/claudiu for the "standard")
     J-Couplings:
-    NOE:
+    NOE: NMR-STAR
     PRE:
-    RDC:
-    Rh:
+    RDC: NMR-STAR
+    Rh: (single value)
 """
 import numpy as np
 import pandas as pd
 
 from idpconfgen.components.eisd import (
     parse_mode_exp,
-    parse_mode_back,
     saxs_name,
     cs_name,
     fret_name,
@@ -64,84 +63,39 @@ def parse_data(filenames, mode):
     parsed = {}
     errlogs = []
     
+    # Parse experimental data
     if mode == parse_mode_exp:
-        try:
-            saxs = pd.read_csv(filenames[saxs_name])
+        for module in filenames:
+            p = pd.read_csv(filenames[module])
             
-            parsed[saxs_name] = Stack(saxs_name, saxs, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {saxs_name} experimental data not found."
-            "Skipping this module"
-            )
-        
-        try:
-            cs = pd.read_csv(filenames[cs_name])
-            
-            parsed[cs_name] = Stack(cs_name, cs, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {cs_name} experimental data not found."
-            "Skipping this module"
-            )
-        
-        try:
-            fret = pd.read_csv(filenames[fret_name])
-            
-            parsed[fret_name] = Stack(fret_name, fret, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {fret_name} experimental data not found."
-            "Skipping this module"
-            )
-        
-        try:
-            jc = pd.read_csv(filenames[jc_name])
-            
-            parsed[jc_name] = Stack(jc_name, jc, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {jc_name} experimental data not found."
-            "Skipping this module"
-            )
-        
-        try:
-            noe = pd.read_csv(filenames[noe_name])
-            
-            parsed[noe_name] = Stack(noe_name, noe, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {noe_name} experimental data not found."
-            "Skipping this module"
-            )
-        try:
-            pre = pd.read_csv(filenames[pre_name])
-            
-            parsed[pre_name] = Stack(pre_name, pre, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {pre_name} experimental data not found."
-            "Skipping this module"
-            )
-        try:
-            rdc = pd.read_csv(filenames[rdc_name])
-            
-            parsed[rdc_name] = Stack(rdc_name, rdc, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {rdc_name} experimental data not found."
-            "Skipping this module"
-            )
-        
-        try:
-            rh = pd.read_csv(filenames[rh_name])
-            
-            parsed[rh_name] = Stack(rh_name, rh, None, None)
-        except FileNotFoundError:
-            errlogs.append
-            (f"Note: {rh_name} experimental data not found."
-            "Skipping this module"
-            )
-            
+            if module == saxs_name:
+                # do saxs parsing
+                None
+            elif module == cs_name:
+                # do cs parsing
+                None
+            elif module == fret_name:
+                # do fret parsing
+                None
+            elif module == jc_name:
+                # do JC parsing
+                None
+            elif module == noe_name:
+                # do NOE parsing
+                None
+            elif module == pre_name:
+                # no PRE parsing
+                None
+            elif module == rdc_name:
+                # do RDC parsing
+                None
+            elif module == rh_name:
+                # do Rh parsing
+                None
+                     
+            parsed[module] = Stack(module, p, None, None)
+    # Parse back calculated data
+    else:
+        None
 
     return parsed, errlogs

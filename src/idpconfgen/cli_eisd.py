@@ -33,7 +33,6 @@ import argparse
 import os
 import shutil
 from functools import partial
-from turtle import back
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -49,15 +48,21 @@ from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 from idpconfgen.components.eisd import (
+    eisd_run_all,
+    eisd_run_pairs,
     eisd_modes,
     eisd_modules,
     eisd_optimization_types,
     default_type,
     default_mode,
+    parse_mode_exp,
+    parse_mode_back,
     make_pairs,
+    meta_data,
     modes,
     )
 from idpconfgen.components.eisd.optimizer import core_eisd
+from idpconfgen.components.eisd.parser import parse_data
 
 LOGFILESNAME = '.idpconfgen_eisd'
 TMPDIR = '__tmpeisd__'
@@ -213,47 +218,23 @@ def main(
     log.info(S('done'))
     
     log.info(T('Checking experimental data files'))
-    exp_paths=[]
-    back_paths=[]
-    valid_exp_modules=[]
-    valid_back_modules=[]
-    all_files = [f for f in os.listdir(filepath) if os.path.isfile(os.path.join(filepath, f))]  # noqa: E501
-    for f in all_files:
-        if f.startswith('exp_'):
-            if f.endswith(eisd_modules):
-                exp_paths.append(os.path.join(filepath, f))
-                _ext = f[f.rindex('.')+1:]
-                valid_exp_modules.append(f'.{_ext}')
-        elif f.startswith('back_'):
-            if f.endswith(eisd_modules):
-                back_paths.append(os.path.join(filepath, f))
-                _ext = f[f.rindex('.')+1:]
-                valid_back_modules.append(f'.{_ext}')
-    
-    valid_exp_modules.sort()
-    valid_back_modules.sort()
-    
-    if valid_exp_modules == []:
-        log.info(S('WARNING: no valid experimental files found.'
-                   ' Please refer to the help documentation for'
-                   ' this module.'
-                   ))
-        return
-    else:
-        if valid_exp_modules != valid_back_modules:
-            _diff = tuple(set(valid_exp_modules) ^ (set(valid_back_modules)))
-            exp_paths = [exp for exp in exp_paths if not exp.endswith(_diff)]
-            back_paths = [bck for bck in back_paths if not bck.endswith(_diff)]
-            log.info(S('Note: found inconsistent experimental and back-calculation'
-                       ' data pairs. Keeping only paths of matching pairs of data.'
-                       ))
+    filenames, errs = meta_data(filepath)
+    if errs:
+        for e in errs:
+            log.info(S(e))
+        if filenames == {}:
+            log.info(S('done'))
+            return
     log.info(S('done'))
+    
+    exp_paths = parse_data(filenames[parse_mode_exp], mode=parse_mode_exp)
+    back_paths = parse_data(filenames[parse_mode_back], mode=parse_mode_back)
     
     _ens_size = len(pdbs2operate)
     _output = []
-    if mode == 'all':
+    if mode == eisd_run_all:
         _output.append(os.path.join(output, mode))
-    elif mode == 'pairs':
+    elif mode == eisd_run_pairs:
         pairs = make_pairs()
         for pair in pairs:
             _output.append(os.path.join(output, "%s_%s_%s"%(mode, pair[0], pair[1])))

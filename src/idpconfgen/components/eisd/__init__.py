@@ -4,6 +4,8 @@ miscellaneous utility functions to help the `eisd` subclient.
 
 Functions and logic inspired/imported from https://github.com/THGLab/X-EISD/
 """
+import os
+
 eisd_run_all = 'all'
 eisd_run_single = 'single'
 eisd_run_pairs = 'pairs'
@@ -80,3 +82,88 @@ def modes(mode):
 
     else:
         raise ValueError("The mode in the main function is not recognized.")
+    
+def meta_data(fpath):
+    """
+    Function filters through experimental and back-calculated
+    data files to return only the paths that exist in both cases.
+    
+    Automatically removes paths to datafiles if e.g. there are more
+    back-calculated data than experimental.
+    
+    Parameters
+    ----------
+    fpath : str or Path
+        Path to the directory containing both experimental
+        and 
+
+    Returns
+    -------
+    meta : dict
+        First layer keys of `exp` and `bc` having values of dictionaries
+        with keys being the module and the value being the path to the data.
+    
+    errlog : list
+        List of errors to relay to the user if there are any.
+    """
+    exp_paths=[]
+    back_paths=[]
+    valid_exp_modules=[]
+    valid_back_modules=[]
+    
+    meta = {}
+    errlog = []
+    
+    
+    all_files = [f for f in os.listdir(fpath) if os.path.isfile(os.path.join(fpath, f))]  # noqa: E501
+    for f in all_files:
+        if f.startswith('exp_'):
+            if f.endswith(eisd_modules):
+                exp_paths.append(os.path.join(fpath, f))
+                _ext = f[f.rindex('.')+1:]
+                valid_exp_modules.append(f'.{_ext}')
+        elif f.startswith('back_'):
+            if f.endswith(eisd_modules):
+                back_paths.append(os.path.join(fpath, f))
+                _ext = f[f.rindex('.')+1:]
+                valid_back_modules.append(f'.{_ext}')
+    
+    valid_exp_modules.sort()
+    valid_back_modules.sort()
+    
+    if valid_exp_modules == []:
+        errlog.append(
+            'WARNING: no valid experimental files found.'
+            ' Please refer to the help documentation for'
+            ' this module.'
+            )
+        return meta, errlog
+    else:
+        differences = tuple(set(valid_exp_modules) ^ (set(valid_back_modules)))
+        
+        if differences:
+            exp_paths = [exp for exp in exp_paths if not exp.endswith(differences)]
+            back_paths = [bck for bck in back_paths if not bck.endswith(differences)]
+            errlog.append(
+                'Note: found inconsistent experimental and back-calculation'
+                ' data pairs. Keeping only paths of matching pairs of data.'
+                )
+            errlog.append(f'Excluding: {differences}...')
+    
+    EXP_DATA_FILENAMES = {}
+    BACK_DATA_FILENAMES = {}
+    
+    for module in eisd_modules:
+        for exp in exp_paths:
+            if module in exp:
+                EXP_DATA_FILENAMES[module] = exp
+        for bc in back_paths:
+            if module in bc:
+                BACK_DATA_FILENAMES[module] = exp
+
+    meta = {
+        parse_mode_exp: EXP_DATA_FILENAMES,
+        parse_mode_back: BACK_DATA_FILENAMES,
+        }
+    
+    return meta, errlog
