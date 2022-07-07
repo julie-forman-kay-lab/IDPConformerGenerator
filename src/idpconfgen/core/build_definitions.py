@@ -9,8 +9,8 @@ from statistics import mean, stdev
 import numpy as np
 from scipy import spatial
 
-from idpconfgen.libs.libstructure import Structure, col_name
 from idpconfgen.core.definitions import aa3to1
+from idpconfgen.libs.libstructure import Structure, col_name
 
 
 pdist = spatial.distance.pdist
@@ -50,6 +50,7 @@ def _read_labels(pdbs):
 # https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3639364/figure/Fig1/
 atom_names_pdb = _read_labels(_sidechain_template_files)
 atom_names_amber = _read_labels(amber_pdbs)
+
 
 def read_ff14SB_params():
     """
@@ -99,7 +100,6 @@ def read_ff14SB_params():
     -------
     dict
     """
-
     with open(_amber14sb, 'r') as fin:
         ff14sb = ET.fromstring(fin.read())
 
@@ -221,7 +221,7 @@ def generate_residue_template_topology(
 
 def add_Nterm_H_connectivity(connectivity_dict):
     """
-    Adds protons for Nterm covalent bond connectivity.
+    Add protons for Nterm covalent bond connectivity.
 
     Adds H1, H2, and H3 protons to N connectivity.
     This maintains compatibility with XML forcefields obtained
@@ -344,7 +344,6 @@ def expand_topology_bonds_apart(cov_bond_dict, bonds_apart):
     return expanded_topology
 
 
-
 def topology_3_bonds_apart(covalent_bond_dict):
     """
     Map atom connectivity EXACTLY 3 bonds apart.
@@ -382,7 +381,7 @@ def topology_3_bonds_apart(covalent_bond_dict):
                     prevs.add(subatom2)
 
                     # for HB1, HB2 in CB... three bonds
-                    for subatom3 in set(residue_atoms[subatom2]).difference(prevs):
+                    for subatom3 in set(residue_atoms[subatom2]).difference(prevs):  # noqa: E501
                         xba.add(subatom3)
 
     return x_bonds_apart
@@ -437,28 +436,34 @@ bonds_le_3_inter = {
     }
 
 # interresidue 4-bonds connectivity
-#C_4_connectivities = [
-#    'N',  # 1 bond apart
-#    'H', 'CA',  # 2 bond apart
-#    'HA', 'CB', 'C',  # 3 bond apart
-#    'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
-#    ]
-#CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
-#N_HA_CB_4_connectivities = ['N', 'H', 'CA']
+# C_4_connectivities = [
+#     'N',  # 1 bond apart
+#     'H', 'CA',  # 2 bond apart
+#     'HA', 'CB', 'C',  # 3 bond apart
+#     'O', '1HB', '2HB', '3HB', 'CG',  # 4 bond apart
+#     ]
+# CA_O_4_connectivities = ['N', 'H', 'CA', 'HA', 'C', 'CB']
+# N_HA_CB_4_connectivities = ['N', 'H', 'CA']
 
-#    'C': C_4_connectivities,
-#    #
-#    'N': N_HA_CB_4_connectivities,
-#    'HA': N_HA_CB_4_connectivities,
-#    'CB': N_HA_CB_4_connectivities,
-#    #
-#    'CA': CA_O_4_connectivities,
-#    'O': CA_O_4_connectivities,
-#    #
-#    }
+#     'C': C_4_connectivities,
+#     #
+#     'N': N_HA_CB_4_connectivities,
+#     'HA': N_HA_CB_4_connectivities,
+#     'CB': N_HA_CB_4_connectivities,
+#     #
+#     'CA': CA_O_4_connectivities,
+#     'O': CA_O_4_connectivities,
+#     #
+#     }
 
 
 class Amber14SBForceField:
+    """
+    Amber14SB forcefield singleton.
+
+    This class represents the amber-14-sb forcefield with the methods
+    and attributes required for IDPConformerGenerator.
+    """
 
     __slots__ = [
         'atom_names',
@@ -471,7 +476,14 @@ class Amber14SBForceField:
     _state = None
 
     def __new__(cls, *args, **kwargs):
+        """
+        Singleton constructor.
 
+        Ensures only one instance of this class is created per run-time.
+
+        If an instance of this class already exists, returns that instance
+        instead of creating a new one.
+        """
         if cls._state:
             return cls._state
 
@@ -498,27 +510,22 @@ forcefields = {
     'Amberff14SB': Amber14SBForceField,
     }
 
-
-
-#_amber_res_topology = None
-#def generate_amber_residue_topology(**kwargs):
-#    global _amber_res_topology
+# _amber_res_topology = None
+# def generate_amber_residue_topology(**kwargs):
+#     global _amber_res_topology
 #
-#    if not _amber_res_topology:
-#        _amber_res_topology = generate_residue_template_topology(
-#            amber_pdbs,
-#            atom_names_amber,
-#            **kwargs)
+#     if not _amber_res_topology:
+#         _amber_res_topology = generate_residue_template_topology(
+#             amber_pdbs,
+#             atom_names_amber,
+#             **kwargs)
 #
-#    return _amber_res_topology
-
-
-
+#     return _amber_res_topology
 
 inter_residue_connectivities = {
     2: bonds_le_2_inter,
     3: bonds_le_3_inter,
-    #4: inter_4_connect,
+    # 4: inter_4_connect,
     }
 
 # bend angles are in radians
@@ -733,7 +740,7 @@ n_terminal_h_coords_at_origin = np.array([
 # created from the pro.pdb in sidechains/amber with the AmberTools21 command
 # pdb4amber -i pro.pdb -o hhpro.pdb --dry --reduce
 n_proline_h_coord_at_origin = np.array([
-    [-0.792,-1.234, 0.000],
+    [-0.792, -1.234,  0.000],
     [ 0.   ,  0.   ,  0.   ],
     [ 1.331, -0.182, -0.723],
     [-0.243, -1.990, -0.409],

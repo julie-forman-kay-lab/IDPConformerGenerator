@@ -605,8 +605,9 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
 
     1) reads each of its trimers, and for the middle residue:
     2) Calculates phi/psi and rounds them to the closest 10 degree bin
-    3) assigns the planar angles found for that residue to the trimer/torsion key.
-    4) the planar angles are converted to the format needed by cli_build, which is that of (pi - angle) / 2.
+    3) assign planar angles found for that residue to the trimer/torsion key.
+    4) the planar angles are converted to the format needed by cli_build,
+       which is that of (pi - angle) / 2.
     5) updates that information in `bond_gemetry`.
 
     Created key:values have the following form in `bond_geometry` dict::

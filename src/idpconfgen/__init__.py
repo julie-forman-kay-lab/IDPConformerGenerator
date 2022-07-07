@@ -7,6 +7,7 @@ import logging
 from os import fspath, get_terminal_size
 from pathlib import Path as _Path
 
+
 log = logging.getLogger(__name__)
 log.setLevel(logging.DEBUG)
 
@@ -25,13 +26,14 @@ else:
 
 class Path(type(_Path())):
     """
-    A Path object dedicated to this software.
+    Path object dedicated to this software.
 
     Inherits from pathlib.Path.
 
     This creates an interface so that if new methods are required
     the Path interface does not need to be refactored across.
     """
+
     def str(self):
         """
         Return string version of Path.
@@ -51,14 +53,12 @@ class Path(type(_Path())):
 
 
 def assert_type(obj, typ):
-    """Asserts an obj is of type."""
+    """Assert an obj is of type."""
     assert isinstance(obj, typ), f"Expected {typ} got {type(obj)}"
 
 
 def assert_subclass(objs, subclass):
-    """
-    Assert there is a object of subclass.
-    """
+    """Assert there is a object of subclass."""
     for obj in objs:
         if issubclass(subclass, type(obj)):
             return True
@@ -67,4 +67,4 @@ def assert_subclass(objs, subclass):
 
 source_folder = Path(__file__).absparent
 
-__version__ = '0.6.11'
+__version__ = '0.6.12'

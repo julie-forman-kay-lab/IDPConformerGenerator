@@ -162,12 +162,13 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
         result = regex_range(sequence, regex_string, **kwargs)
 
     else:
-        func = regex_forward_with_overlap if regex_has_overlap(regex_string) else regex_forward_no_overlap
+        func = regex_forward_with_overlap \
+            if regex_has_overlap(regex_string) \
+            else regex_forward_no_overlap
         result = func(sequence, regex_string)
 
     assert isinstance(result, list)
     assert all(isinstance(S, slice) for S in result)  # heavy and slow!!
-    print("len result, ", len(result))
     return result
 
 

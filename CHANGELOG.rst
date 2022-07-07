@@ -9,7 +9,12 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* Add tests to ``cli_build.main``.
+* Add tests to ``cli_build.main``. #225
+
+v0.6.12 (2022-07-07)
+------------------------------------------------------------
+
+* lint files
 
 v0.6.11 (2022-06-14)
 ------------------------------------------------------------
