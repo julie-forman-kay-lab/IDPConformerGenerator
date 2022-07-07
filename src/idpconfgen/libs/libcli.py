@@ -4,15 +4,13 @@ import json
 import sys
 from os import cpu_count
 
-
 from idpconfgen import Path, __version__
-from idpconfgen.core import help_docs
 from idpconfgen.core.definitions import vdW_radii_dict
-from idpconfgen.libs.libparse import is_valid_fasta, values_to_dict
 from idpconfgen.libs.libio import (
     is_valid_fasta_file,
     read_FASTAS_from_file_to_strings,
     )
+from idpconfgen.libs.libparse import is_valid_fasta, values_to_dict
 
 
 detailed = "detailed instructions:\n\n{}"
@@ -62,7 +60,14 @@ class AllParam(argparse.Action):
 
 
 class ListOfPositiveInts(argparse.Action):
+    """
+    Create list of positive integers from input string.
+
+    Raises error if non-positive integers are given.
+    """
+
     def __call__(self, parser, namespace, values, option_string=None):
+        """Call it."""
         try:
             iv = list(map(int, values))
         except Exception:
@@ -91,7 +96,6 @@ class ReadDictionary(argparse.Action):
                 valuedict = json.load(fin)
         except FileNotFoundError:
             valuedict = json.loads(value)
-            print(type(valuedict))
 
         setattr(namespace, self.dest, valuedict)
 
@@ -138,6 +142,7 @@ class SeqOrFasta(argparse.Action):
             raise parser.error('Input sequence not valid.')
 
         setattr(namespace, self.dest, seq)
+
 
 class ParamsToDict(argparse.Action):
     """
@@ -368,14 +373,21 @@ def add_argument_idb(parser):
         required=True,
         )
 
+
 def add_argument_dloopoff(parser):
+    """Add argument `--dloop-off`."""
     parser.add_argument(
         '--dloop-off',
-        help='Sampling loops is active by default. Use this flag to deactivate it.',
+        help=(
+            'Sampling loops is active by default. '
+            'Use this flag to deactivate it.'
+            ),
         action="store_true",
         )
 
+
 def add_argument_dhelix(parser):
+    """Add argument `--dhelix`."""
     parser.add_argument(
         '--dhelix',
         help=(
@@ -391,6 +403,7 @@ def add_argument_dhelix(parser):
 
 
 def add_argument_dstrand(parser):
+    """Add argument `--dstrand`."""
     parser.add_argument(
         '--dstrand',
         help=(
@@ -402,23 +415,25 @@ def add_argument_dstrand(parser):
 
 
 def add_argument_dany(parser):
+    """Add argument `--dany`."""
     parser.add_argument(
         '--dany',
         help=(
             'Samples the database based on sequence identity only. '
-            'Activating this option disregards any secondary structure annotation. '
-            'Requires --dloop-off.'
+            'Activating this option disregards any secondary structure '
+            'annotation. Requires --dloop-off.'
             ),
         action="store_true",
         )
 
 
 def add_argument_duser(parser):
+    """Add argument `--duser`."""
     parser.add_argument(
         '--duser',
         help=(
-            'NOTE: Very advanced users only. Use this option to define your own '
-            'regular expressions for the database sampling process. '
+            'NOTE: Very advanced users only. Use this option to define your own'
+            ' regular expressions for the database sampling process. '
             'You only want to use this option if you know how the code works '
             'internally. Use this option instead of --dhelix, --dstrand, '
             '--dany. Requires --dloop-off.'
@@ -722,6 +737,7 @@ def add_argument_vdWb(parser):
         type=int,
         )
 
+
 def add_argument_plot(parser):
     """
     Add argument for plotting parameters.
@@ -744,8 +760,8 @@ def add_argument_plot(parser):
             'Additional arguments can be given to configure the '
             'plot style. '
             "Example: --plot xlabel=Sic1_Res type=omega color='b','r'. "
-            'Accepted plot arguments are defined by the plotting function used. '
-            'See ploting functions in the documentation pages. '
+            'Accepted plot arguments are defined by the plotting function used.'
+            ' See ploting functions in the documentation pages. '
             'Defaults to False, no plot is produced.'
             ),
         nargs='*',

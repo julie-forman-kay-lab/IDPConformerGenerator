@@ -72,6 +72,7 @@ def test_pool_in_chunks_nested():
         assert isinstance(chunk[0][0], tuple)
         assert len(chunk[0][0]) == 3
 
+
 @pytest.mark.skip(reason="something is halting this")
 def test_pool_in_chunks_flatten():
     """Test pool in fragment from nested result."""

@@ -142,6 +142,7 @@ def report_on_crash(
 
 
 def pre_msg(msg, sep=']'):
+    """Pre log message."""
     def func(logmsg):
         return f'{msg}{sep}{logmsg}'
     return func

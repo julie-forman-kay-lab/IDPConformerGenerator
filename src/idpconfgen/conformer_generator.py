@@ -1,10 +1,12 @@
-from collections import defaultdict
+"""Recursively search through database for input pattern of interest."""
 import logging
 import math
+from collections import defaultdict
 
 
 class ProteinSearch:
-
+    """Protein search functions."""
+    
     def __init__(self):
         # both lists should be the same size
         self.proteins_sequences = []
@@ -17,13 +19,9 @@ class ProteinSearch:
             min_seq_chunk_size=3,
             max_mismatch=0
             ):
-        """ search every sequential combination of
-         sequences in pattern, inside of word """
-
+        """Search every sequential combination of sequences in pattern, inside of word."""  # noqa: E501
         def recursive_search(pattern_index, pattern_size):
-            """ recursively increase bracket_size
-             and search through the primary_seq_db"""
-
+            """Recursively increase bracket_size and search through the primary_seq_db."""   # noqa: E501
             # base case
             if pattern_index + pattern_size > input_pattern_length:
                 return
@@ -44,22 +42,21 @@ class ProteinSearch:
                 except IndexError:  # index is at the end of the sequence
                     continue
                 
-                mismatch = math.ceil(((prev_mismatch_num + 1)
-                                        / (pattern_size)) * 100)
+                mismatch = math.ceil(((prev_mismatch_num + 1) / (pattern_size)) * 100)  # noqa: E501
 
                 # check if the characters are the same,
                 # if they're not make sure we're still
                 # under the max_mismatch specified
                 if current_pattern[-1] == character or mismatch <= max_mismatch:
 
-                    same_char_bool = 0 if current_pattern[- 1] == character else 1
+                    same_char_bool = 0 if current_pattern[- 1] == character else 1  # noqa: E501
                     new_mismatch = prev_mismatch_num + same_char_bool
                     new_result = result[current_pattern]
                     if not new_result or index not in list(zip(*new_result))[0]:
                         result[current_pattern].append((index, new_mismatch))
 
                     # have we JUST reached the max because we found a mismatch?
-                    if mismatch == max_mismatch and new_mismatch != prev_mismatch_num:
+                    if mismatch == max_mismatch and new_mismatch != prev_mismatch_num:  # noqa: E501
                         continue
 
                     recursive_search(pattern_index, pattern_size + 1)
@@ -105,6 +102,8 @@ class ProteinSearch:
         self.proteins_sequences.append(primary_seq_db)
         self.results.append(result)
 
+
+"""# noqa: E501
 # -------------- FOR MANUAL TESTING ONLY USE BELOW --------------------
 
 # def string_generator():
@@ -159,3 +158,4 @@ class ProteinSearch:
 # over the max_mismatch and stop, we don't consider situations where there might be a match after,
 # and therefore the percentage of mismatches will lower. Reason for this is we shouldn't stop
 # at an alpha-helix, we should start and end inside of a loop
+"""

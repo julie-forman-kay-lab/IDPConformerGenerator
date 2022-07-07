@@ -48,5 +48,3 @@ def test_energy_calculator_ij():
     coords = np.arange(10)
     energy = calc(coords)
     assert energy == 79
-
-

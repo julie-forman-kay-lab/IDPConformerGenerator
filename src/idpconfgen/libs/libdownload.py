@@ -1,8 +1,8 @@
 """Functions and variables to download files and data."""
 import time
 import urllib.request
-from urllib.error import URLError
 from functools import partial
+from urllib.error import URLError
 
 from idpconfgen import log
 from idpconfgen.core.exceptions import DownloadFailedError
@@ -83,6 +83,7 @@ def fetch_pdb_id_from_RCSB(pdbid, mmcif=False):
             attempts += 1
     else:
         raise DownloadFailedError(f'Failed to download {pdbid}')
+
 
 def fetch_raw_structure(pdbid, ext, **kwargs):
     """Download raw structure from RCSB without any filtering."""

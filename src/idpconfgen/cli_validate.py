@@ -12,27 +12,18 @@ from pathlib import Path
 import numpy as np
 
 from idpconfgen import log
-#from idpconfgen.cli_build import generate_vdW_data
-from idpconfgen.core.definitions import (
-    aa1to3,
-    heavy_atoms,
-    vdW_radii_dict,
-    )
-
 from idpconfgen.core.build_definitions import (
     average_distance_C_Np1,
-    std_distance_C_Np1,
     average_distance_CA_C,
-    std_distance_CA_C,
     average_distance_N_CA,
+    std_distance_C_Np1,
+    std_distance_CA_C,
     std_distance_N_CA,
     )
-
+# from idpconfgen.cli_build import generate_vdW_data
+from idpconfgen.core.definitions import aa1to3, heavy_atoms, vdW_radii_dict
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libcalc import (
-    calc_MSMV,
-    calc_all_vs_all_dists_square,
-    )
+from idpconfgen.libs.libcalc import calc_all_vs_all_dists_square, calc_MSMV
 from idpconfgen.libs.libio import FileReaderIterator
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libplot import plot_distribution_list
@@ -244,7 +235,7 @@ def vdw2(pdb_files, vdwR):
         results = cva(coords)
         clash = logical_and(results < vdW_sums, vdw_valid)
         has_clash = count_nonzero(clash)
-        print(f'** Found {has_clash} clashes for {pdb}')
+        print(f'** Found {has_clash} clashes for {pdb}')  # noqa: T201
 
         # lazy operation
         if has_clash:
@@ -416,7 +407,7 @@ def eval_bb_bond_length_distribution_cli(pdb_files, ncores):
         'xlabel': r'bond length ($\AA$)',
         'ylabel': 'Bond',
         'vert': False,
-        'usermean': [average_distance_N_CA, average_distance_CA_C, average_distance_C_Np1],
+        'usermean': [average_distance_N_CA, average_distance_CA_C, average_distance_C_Np1],  # noqa: E501
         'userstd': [std_distance_N_CA, std_distance_CA_C, std_distance_C_Np1],
         }
 

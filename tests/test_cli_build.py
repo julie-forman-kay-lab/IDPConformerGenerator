@@ -21,7 +21,7 @@ def test_ap_dsecondary_structure_true(command):
     )
 def test_ap_dsecondary_structure_false(command):
     """Test dloop argument."""
-    cmd = ap.parse_args(f'-db dummy.json -seq AAAAA'.split())
+    cmd = ap.parse_args('-db dummy.json -seq AAAAA'.split())
     d = vars(cmd)
     assert d[command] is False
 

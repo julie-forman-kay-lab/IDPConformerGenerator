@@ -1,21 +1,28 @@
-"""
+"""# noqa: D205, D400, E501
 Calculate fragment statistics for the input sequence in the database.
 
 USAGE:
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ>
     $ idpconfgen stats -db <DATABASE> -seq <INPUTSEQ> -op <OUTPUT-PREFIX> -of <OUTPUT-FOLDER>
 """
-import argparse, os, re, json
+import argparse
+import json
+import os
+import re
 from pathlib import Path
 
 from idpconfgen import log
 from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libbuild import build_regex_substitutions, make_combined_regex
+from idpconfgen.libs.libbuild import (
+    build_regex_substitutions,
+    make_combined_regex,
+    )
 from idpconfgen.libs.libfilter import regex_forward_no_overlap
 from idpconfgen.libs.libio import read_dict_from_json
 from idpconfgen.libs.libparse import get_mers
 from idpconfgen.logger import S, T, init_files
+
 
 LOGFILESNAME = '.idpconfgen_stats'
 
@@ -55,6 +62,7 @@ ap.add_argument(
     type=str,
     )
 
+
 # the func=None receives the `func` attribute from the main CLI interface
 # defined at cli.py
 def main(
@@ -70,8 +78,8 @@ def main(
         output_folder=None,
         func=None,
         **kwargs
-    ):
-    """
+        ):
+    """# noqa: D205, D400, E501
     Performs main client logic.
 
     The default function is to return the number/counts of hits
@@ -121,20 +129,20 @@ def main(
     del _sum
     del non_overlapping_parameters
 
-    log.info(T(f"reading database"))
+    log.info(T("reading database"))
     log.info(S(f"{database}"))
     db = read_dict_from_json(database)
     log.info(S(f"The database as {len(db)} protein chains"))
 
     # joins all primary sequences together
     fastas = '|'.join(v["fasta"] for v in db.values())
-    log.info(S(f"The total number of residues in the database is {len(fastas)}."))
+    log.info(S(f"The total number of residues in the database is {len(fastas)}."))  # noqa: E501
 
     if any((dloop, dhelix, dstrand)):
         dssp_regexes = []
-        if dloop: dssp_regexes.append("L")
-        if dhelix: dssp_regexes.append("H")
-        if dstrand: dssp_regexes.append("E")
+        if dloop: dssp_regexes.append("L")    # noqa: E701
+        if dhelix: dssp_regexes.append("H")   # noqa: E701
+        if dstrand: dssp_regexes.append("E")  # noqa: E701
 
         dssps = '|'.join(v["dssp"] for v in db.values())
         dsspre = make_combined_regex(dssp_regexes)
@@ -160,16 +168,15 @@ def main(
                 )
         log.info(T("searching considering only primary structure"))
 
-
-    # Creates the statistics of the database. How many fragments of each size does the database has.
-    fasta_lists = [_f for _f in fastas.split("|") if not "X" in _f]
+    # Creates the statistics of the database.
+    # How many fragments of each size does the database has.
+    fasta_lists = [_f for _f in fastas.split("|") if not "X" in _f]  # noqa: E713, E501
     mers = {}
     for i in range(1, 8):
         iset = mers.setdefault(i, set())
         for v in fasta_lists:
             cset = get_mers(v, i)
             iset.update(cset)
-
 
     # Note that `X` residue exists in the database.
     log.info(T("In the dataset there are"))
@@ -185,7 +192,7 @@ def main(
 
     log.info(T("In the input sequence there are"))
     for k, v in imers.items():
-        log.info(S(f"{len(v)} different fragments of {k} residues, of {20**k} possible"))
+        log.info(S(f"{len(v)} different fragments of {k} residues, of {20**k} possible"))  # noqa: E501
 
     # Searches the input sequence fragments in the database.
     log.info(T("Creating fragments statistics for input sequence"))
@@ -204,7 +211,6 @@ def main(
 
     log.info(S("done"))
 
-
     # Saves to files.
     log.info(T("saving CSV files to disk"))
 
@@ -218,12 +224,13 @@ def main(
         to_save = sorted(zip(*labels_values), key=lambda x: x[1], reverse=True)
         fpath = Path(pof, f"{output_prefix}_{mer_len}.csv")
         with open(fpath, "w") as fout:
-            fout.write(f"# fragment counts in the database for {input_seq}{os.linesep}")
+            fout.write(f"# fragment counts in the database for {input_seq}{os.linesep}")  # noqa: E501
             _ = os.linesep.join(','.join(map(str, pair)) for pair in to_save)
             fout.write(_)
         log.info(S(f"saved: {fpath}"))
 
     return
+
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
