@@ -5,11 +5,11 @@ Currently accepting the following formats:
     SAXS: SASBDB, CRYSOL
     Chemical shift: NMR-STAR, SHIFTX2
     FRET: (ask greg/claudiu for the "standard")
-    J-Couplings:
-    NOE: NMR-STAR
-    PRE:
+    J-Couplings: NMR-STAR (coupling constants)
+    NOE: NMR-STAR (homonuclear - distances NMR-STAR)
+    PRE: (changes in R2 or as distance (use NOE) - NMR STAR)
     RDC: NMR-STAR
-    Rh: (single value)
+    Rh: (single values)
 """
 import numpy as np
 import pandas as pd
@@ -94,6 +94,7 @@ def parse_data(filenames, mode):
                 None
                      
             parsed[module] = Stack(module, p, None, None)
+    
     # Parse back calculated data
     else:
         None
