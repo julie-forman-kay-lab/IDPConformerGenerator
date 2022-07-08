@@ -94,10 +94,13 @@ ap.add_argument(
 ap.add_argument(
     '-eps',
     '--epochs',
-    help='Number of times to run main optimization, defaults to 250.',
+    help=(
+        'Number of times to run main optimization,'
+        ' recommended at least the size of your'
+        ' ensemble.'          
+        ),
     type=int,
-    default=250,
-    required=False,
+    required=True,
     )
 
 ap.add_argument(
@@ -153,11 +156,11 @@ libcli.add_argument_ncores(ap)
 
 def main(
         pdb_files,
+        epochs,
         filepath=None,
         optimization=False,
         optimization_type=default_type,
         mode=default_mode,
-        epochs=250,
         beta=0.1,
         output="./",
         tmpdir=TMPDIR,
@@ -190,9 +193,8 @@ def main(
         EISD scoring mode.
         Defaults to `all`.
         
-    epochs : int, optional
+    epochs : int, required
         Number of times to run main optimization.
-        Defaults to 250.
         
     beta : float, optional
         Hyperparameter for "mc" type optimization.

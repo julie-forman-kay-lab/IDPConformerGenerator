@@ -55,21 +55,24 @@ eisd_modules = (
 # The following two functions have been imported from:
 # https://github.com/THGLab/X-EISD/blob/master/eisd/utils/miscell.py
 def make_pairs():
-    all = ['saxs', 'cs', 'fret', 'jc', 'noe', 'pre', 'rdc', 'rh']
+    all = list(eisd_modules)
     pairs=[]
     for i in range(len(all)):
-        for j in range(i+1, len(all)):
-            pairs.append([all[i],all[j]])
+        for j in range(i + 1, len(all)):
+            pairs.append([all[i], all[j]])
     return pairs
 
 
 def modes(mode):
-    flags = {'saxs': False, 'cs': False, 'fret':False, 'jc': False,
-             'noe': False,  'pre': False, 'rdc':False, 'rh': False
-             }
+    flags = {
+        saxs_name: False, cs_name: False,
+        fret_name: False, jc_name: False,
+        noe_name: False,  pre_name: False,
+        rdc_name: False, rh_name: False
+        }
 
-    if mode is 'all':
-        return {flag:True for flag in flags}
+    if mode is eisd_run_all:
+        return {flag: True for flag in flags}
 
     elif type(mode) is list:
         for flag in mode:
@@ -106,26 +109,25 @@ def meta_data(fpath):
     errlog : list
         List of errors to relay to the user if there are any.
     """
-    exp_paths=[]
-    back_paths=[]
-    valid_exp_modules=[]
-    valid_back_modules=[]
+    exp_paths = []
+    back_paths = []
+    valid_exp_modules = []
+    valid_back_modules = []
     
     meta = {}
     errlog = []
-    
     
     all_files = [f for f in os.listdir(fpath) if os.path.isfile(os.path.join(fpath, f))]  # noqa: E501
     for f in all_files:
         if f.startswith('exp_'):
             if f.endswith(eisd_modules):
                 exp_paths.append(os.path.join(fpath, f))
-                _ext = f[f.rindex('.')+1:]
+                _ext = f[f.rindex('.') + 1:]
                 valid_exp_modules.append(f'.{_ext}')
         elif f.startswith('back_'):
             if f.endswith(eisd_modules):
                 back_paths.append(os.path.join(fpath, f))
-                _ext = f[f.rindex('.')+1:]
+                _ext = f[f.rindex('.') + 1:]
                 valid_back_modules.append(f'.{_ext}')
     
     valid_exp_modules.sort()
