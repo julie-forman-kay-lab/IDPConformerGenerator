@@ -51,12 +51,11 @@ def calc_score(beta, exp, exp_sig, sig, opt_params, gamma=1.0):
     return f, f_comps
 
 
-def calc_gamma(exp_saxs, num_res, qmax, qmin):
+def calc_gamma(len_saxs, num_res, qmax, qmin):
     # Generalizable way to calculate gamma parameter
-    # 
-    N_q = len(exp_saxs)
-    D_max = num_res
-    N_s = D_max * (qmax - qmin) / np.pi
+    # accournding to shannon theory
+    N_q = len_saxs
+    N_s = num_res * (qmax - qmin) / np.pi
     
     return N_s / N_q
 
@@ -134,8 +133,6 @@ def vect_calc_score_jc(
 
 
 def saxs_optimization_ensemble(
-    q_max,
-    q_min,
     exp_data,
     bc_data,
     indices,
@@ -150,21 +147,30 @@ def saxs_optimization_ensemble(
     exp_sigma = exp_data[saxs_name].data['error'].values
     
     if indices is None:
-        bc_saxs = old_vals - (bc_data[saxs_name].data.values[popped_structure, :] - bc_data['saxs'].data.values[new_index, :] ) / ens_size
+        bc_saxs = old_vals - \
+            (bc_data[saxs_name].data.values[popped_structure, :] - \
+            bc_data['saxs'].data.values[new_index, :] ) / ens_size
+        
     else:
         bc_ensemble = bc_data[saxs_name].data.values[indices, :]
         bc_saxs = np.mean(bc_ensemble, axis=0)
         
     # optimization
     opt_params = calc_opt_params(bc_saxs, exp_saxs, exp_sigma, bc_data[saxs_name].sigma)
-    g = calc_gamma(exp_saxs, nres, q_max, q_min)
+    
+    g = calc_gamma(
+        exp_data[saxs_name].data.shape[0],
+        nres,
+        np.max(exp_data[saxs_name].data['index']),
+        np.min(exp_data[saxs_name].data['index'])
+        )
+    
     f, f_comps = calc_score(bc_saxs, exp_saxs, exp_sigma, bc_data[saxs_name].sigma, opt_params, gamma=g)
 
     error = (exp_saxs - bc_saxs) ** 2 
     rmse = np.mean(error) ** 0.5
     total_score = np.sum(f)
     
-    # note, only the first 3 are required for X-EISD
     return rmse, total_score, bc_saxs, error
 
 
@@ -205,7 +211,9 @@ def cs_optimization_ensemble(
     atom_types = exp_data[cs_name].data['atomname'].values
     
     if indices is None:
-        bc_cs = old_vals - (bc_data[cs_name].data.values[popped_structure, :] - bc_data['cs'].data.values[new_index, :]) / ens_size
+        bc_cs = old_vals - \
+            (bc_data[cs_name].data.values[popped_structure, :] - \
+            bc_data['cs'].data.values[new_index, :]) / ens_size
     else:
         bc_ensemble = bc_data[cs_name].data.values[indices, :]
         bc_cs = np.mean(bc_ensemble, axis=0)
@@ -239,7 +247,9 @@ def fret_optimization_ensemble(
     exp_sigma = exp_data[fret_name].sigma
 
     if indices is None:
-        bc = old_vals - (bc_data[fret_name].data.values[popped_structure, :] - bc_data['fret'].data.values[new_index, :]) / ens_size
+        bc = old_vals - \
+            (bc_data[fret_name].data.values[popped_structure, :] - \
+            bc_data['fret'].data.values[new_index, :]) / ens_size
     else:
         bc_ensemble = bc_data[fret_name].data.values[indices, :]
         bc = np.mean(bc_ensemble, axis=0)
@@ -251,13 +261,13 @@ def fret_optimization_ensemble(
     f, f_comps = calc_score(bc, exp, exp_sigma, bc_sigma, opt_params)
 
     error = (exp - bc) ** 2.0
-    rmse = np.mean(error)**0.5
+    rmse = np.mean(error) ** 0.5
     total_score = np.sum(f)
 
-    return rmse, total_score, bc[0], error
+    return rmse, total_score, bc, error
 
     
-def jc_optmization_ensemble(
+def jc_optimization_ensemble(
     exp_data,
     bc_data,
     ens_size,
@@ -308,12 +318,13 @@ def jc_optmization_ensemble(
         bc_mu,
         bc_sigma
         )
+    
     error = (opt_params[:,0] * bc_alpha2 + opt_params[:,1] * bc_alpha1 + opt_params[:,2] - exp) ** 2.0
     rmse = np.mean(error) ** 0.5
     scores = np.sum(f)
     jcoup_vals = list(opt_params[:,0] * bc_alpha2 + opt_params[:,1] * bc_alpha1 + opt_params[:,2])
 
-    return rmse, scores, jcoup_vals, f, bc_alpha1
+    return rmse, scores, jcoup_vals, [bc_alpha1, bc_alpha2]
 
 
 def noe_optimization_ensemble(
@@ -328,24 +339,15 @@ def noe_optimization_ensemble(
     """
     Main logic for NOE scoring.
     """
-    dist_value = exp_data[noe_name].data['dist_value'].values
+    exp_distance = exp_data[noe_name].data['dist_value'].values
     upper_bound_value = exp_data[noe_name].data['upper'].values 
     lower_bound_value = exp_data[noe_name].data['lower'].values
     
-    assert dist_value.shape == upper_bound_value.shape == lower_bound_value.shape
+    assert exp_distance.shape == upper_bound_value.shape == lower_bound_value.shape
     
     # uncertainty range should be made a parameter; confirm if compatible with exp file
     range_val = upper_bound_value + lower_bound_value
     exp_sigma = range_val / 2.0
-    
-    # NOE exp dists for drksh3 comes in specific format; check if compatible with other
-    exp_distance = []
-    for k in range(len(dist_value)):
-        if dist_value[k] == upper_bound_value[k] or dist_value[k] == lower_bound_value[k]:
-            exp_distance.append((upper_bound_value[k] + lower_bound_value[k]) / 2.0)
-        else:
-            exp_distance.append(dist_value[k])
-    exp_distance = np.array(exp_distance)
     
     # load long range noe bc index
     # calculating inverse 6 average
@@ -360,8 +362,9 @@ def noe_optimization_ensemble(
         avg_distance = np.power(np.mean(bc_ensemble, axis=0), (-1. / 6.))
     
     # optimization
-    opt_params = calc_opt_params(avg_distance, exp_distance, exp_sigma, bc_data['noe'].sigma)
-    f, f_comps = calc_score(avg_distance, exp_distance, exp_sigma, bc_data['noe'].sigma, opt_params)
+    opt_params = calc_opt_params(avg_distance, exp_distance, exp_sigma, bc_data[noe_name].sigma)
+    f, f_comps = calc_score(avg_distance, exp_distance, exp_sigma, bc_data[noe_name].sigma, opt_params)
+    
     error = (exp_distance - avg_distance) ** 2.0
     rmse = np.mean(error) ** 0.5
     total_score = np.sum(f)
@@ -385,7 +388,9 @@ def pre_optimization_ensemble(
     exp_distance = exp_data[pre_name].data['dist_value'].values
     upper_bound_value = exp_data[pre_name].data['upper'].values
     lower_bound_value = exp_data[pre_name].data['lower'].values
+    
     assert exp_distance.shape == upper_bound_value.shape == lower_bound_value.shape
+    
     range_val = upper_bound_value + lower_bound_value
     exp_sigma = range_val / 2.0
     
@@ -399,8 +404,8 @@ def pre_optimization_ensemble(
         avg_distance = np.power(np.mean(bc_ensemble, axis=0), (-1./6.))
     
         # optimization
-    opt_params = calc_opt_params(avg_distance, exp_distance, exp_sigma, bc_data['pre'].sigma)
-    f, f_comps = calc_score(avg_distance, exp_distance, exp_sigma, bc_data['pre'].sigma, opt_params)
+    opt_params = calc_opt_params(avg_distance, exp_distance, exp_sigma, bc_data[pre_name].sigma)
+    f, f_comps = calc_score(avg_distance, exp_distance, exp_sigma, bc_data[pre_name].sigma, opt_params)
     
     error = (exp_distance - avg_distance) ** 2.0
     rmse = np.mean(error) ** 0.5
@@ -421,17 +426,20 @@ def rdc_optimization_ensemble(
     # prepare data
     exp = exp_data[rdc_name].data['value'].values
     exp_sigma = exp_data[rdc_name].data['error'].values
+    
     assert exp.shape == exp_sigma.shape
 
     if indices is None:
-        bc = old_vals - (bc_data[rdc_name].data.values[popped_structure, :] - bc_data[rdc_name].data.values[new_index, :]) / ens_size
+        bc = old_vals - \
+            (bc_data[rdc_name].data.values[popped_structure, :] - \
+            bc_data[rdc_name].data.values[new_index, :]) / ens_size
     else:
         bc_ensemble = bc_data[rdc_name].data.values[indices, :]
         bc = np.mean(bc_ensemble, axis=0)
 
     # optimization
-    opt_params = calc_opt_params(bc, exp, exp_sigma, bc_data['rdc'].sigma)
-    f, f_comps = calc_score(bc, exp, exp_sigma, bc_data['rdc'].sigma, opt_params)
+    opt_params = calc_opt_params(bc, exp, exp_sigma, bc_data[rdc_name].sigma)
+    f, f_comps = calc_score(bc, exp, exp_sigma, bc_data[rdc_name].sigma, opt_params)
     
     error = (exp - bc) ** 2.0
     rmse = np.mean(error) ** 0.5
@@ -454,7 +462,9 @@ def rh_optimization_ensemble(
     exp_sigma = exp_data[rh_name].sigma
 
     if indices is None:
-        bc = old_vals - (bc_data[rh_name].data.values[popped_structure, :] - bc_data[rh_name].data.values[new_index, :]) / ens_size
+        bc = old_vals - \
+            (bc_data[rh_name].data.values[popped_structure, :] - \
+            bc_data[rh_name].data.values[new_index, :]) / ens_size
     else:
         bc_ensemble = bc_data[rh_name].data.values[indices, :]
         bc = np.mean(bc_ensemble, axis=0)
@@ -464,6 +474,7 @@ def rh_optimization_ensemble(
     # optimization
     opt_params = calc_opt_params(bc, exp, exp_sigma, bc_sigma)
     f, f_comps = calc_score(bc, exp, exp_sigma, bc_sigma, opt_params)
+    
     error = (exp - bc) ** 2.0
     rmse = np.mean(error)**0.5
     total_score = np.sum(f)

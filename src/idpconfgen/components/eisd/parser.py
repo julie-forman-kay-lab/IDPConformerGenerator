@@ -33,8 +33,6 @@ class Stack():
         self.sigma = sigma
         self.mu = mu
     
-    def get_index(self):
-        pass
 
 def parse_data(filenames, mode):
     """

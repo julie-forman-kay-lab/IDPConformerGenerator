@@ -54,8 +54,8 @@ eisd_modules = (
 
 # The following two functions have been imported from:
 # https://github.com/THGLab/X-EISD/blob/master/eisd/utils/miscell.py
-def make_pairs():
-    all = list(eisd_modules)
+# https://github.com/Oufan75/X-EISD/blob/master/eisd/utils.py
+def make_pairs(all):
     pairs=[]
     for i in range(len(all)):
         for j in range(i + 1, len(all)):
@@ -63,16 +63,13 @@ def make_pairs():
     return pairs
 
 
-def modes(mode):
-    flags = {
-        saxs_name: False, cs_name: False,
-        fret_name: False, jc_name: False,
-        noe_name: False,  pre_name: False,
-        rdc_name: False, rh_name: False
-        }
+def modes(mode, all):
+    flags = {}
+    for prop in all:
+        flags[prop] = False
 
     if mode is eisd_run_all:
-        return {flag: True for flag in flags}
+        return {flag:True for flag in flags}
 
     elif type(mode) is list:
         for flag in mode:
@@ -85,7 +82,8 @@ def modes(mode):
 
     else:
         raise ValueError("The mode in the main function is not recognized.")
-    
+
+
 def meta_data(fpath):
     """
     Function filters through experimental and back-calculated
