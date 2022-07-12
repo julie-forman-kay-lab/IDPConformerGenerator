@@ -7,6 +7,7 @@ import numpy as np
 
 from idpconfgen.components.eisd import (
     modes,
+    eisd_run_all,
     opt_max,
     opt_mc,
     )
@@ -39,43 +40,47 @@ class XEISD(object):
     
     Parameters
     ----------
-    exp_data: dict
+    exp_data : dict
         Experimental data files with uncertainties.
-    bc_data: dict
+    bc_data : dict
         Back calculation files with uncertainties.
-    pool_size: int
+    ens_size : int
         number of candidate conformers.
     """
-    def __init__(self, exp_data, bc_data, nres, pool_size=None):
+    def __init__(self, exp_data, bc_data, nres, ens_size=None):
         self.exp_data = exp_data
         self.bc_data = bc_data
         self.resnum = nres
-        self.pool_size = pool_size
-        if pool_size is None:
-            # print('Pool size not provided. Uses the JC back-calc size.')
-            self.pool_size = bc_data[jc_name].data.shape[0]
+        self.ens_size = ens_size
+        if ens_size is None:
+            # If pool size not provided. Use the JC back-calc size
+            self.ens_size = bc_data[jc_name].data.shape[0]
 
 
     def calc_scores(self, dtypes, ens_size, indices=None):
         '''
         Parameters
         ----------
-        dtypes:
+        dtypes : list
             list of data types to score
         
-        ens_size: int
-            Only used when indices not specified, to randomly select subset to score.
+        ens_size : int
+            Only used when indices not specified.
+            Used to randomly select subset to score.
         
-        indices: ndarray, optional (default: None)
+        indices : ndarray, optional
             This is the fastest way to get the EISD score and RMSD of selected properties for a given set of indices.
             shape: (size_of_ensemble, )
+            Defaults to None.
         
         Return
         ----------
-        Dict of RMSDs, X-EISD scores and ensemble averages for selected conformers
+        scores : dict 
+            Dictionary of RMSDs.
+            X-EISD scores and ensemble averages for selected conformers.
         '''
         if indices is None:
-            indices = np.random.choice(np.arange(self.pool_size), ens_size, replace=False)
+            indices = np.random.choice(np.arange(self.ens_size), ens_size, replace=False)
 
         # initiate dict to store scores
         scores = {}
@@ -84,6 +89,7 @@ class XEISD(object):
             scores[prop] = [0, 0, 0]
             if prop == jc_name:
                 scores[prop] = [0, 0, 0, [0]]
+                
         if jc_name in dtypes:
             scores[jc_name] = list(jc_optimization_ensemble(self.exp_data, self.bc_data, indices))
         if saxs_name in dtypes:
@@ -108,35 +114,44 @@ class XEISD(object):
         self,
         epochs,
         ens_size,
-        opt_type='max',
-        mode='all',
+        opt_type=opt_max,
+        mode=eisd_run_all,
         beta=0.1,
         iters=100,
         ):
         """
         Parameters
         ----------        
-        opt_type: str, default 'max'
+        opt_type : str
             The optimization type should be 'mc' or 'max', 'mc' for Metropolis Monte Carlo, 
-            and 'max' for score maximization method.
+            Defaults to 'max' for score maximization method.
         
-        epochs: int
+        epochs : int
             Number of optimization trials.
         
-        ens_size: int
+        ens_size : int
             Number of conformers in the ensemble.
             
-        mode: str or list or dict
-            Data types to optimize
+        mode : str or list
+            Data types to optimize.
+            Defaults to "all".
             
-        beta: float
-            Temperature parameter for MC optimization
+        beta : float
+            Temperature parameter for MC optimization.
+            Defaults to 0.1.
             
-        iters: int
-            Number of conformer exchange attempts
+        iters : int
+            Number of conformer exchange attempts.
+            Defaults to 100.
             
         Returns
         -------
+        final_results : list
+        
+        final_indices : list
+        
+        final_best_jcoups : list
+        
         """
         # switch the property
         flags = modes(mode, self.exp_data.keys())
@@ -147,7 +162,7 @@ class XEISD(object):
 
         for it in range(epochs):
             # initial scores
-            indices = list(np.random.choice(np.arange(self.pool_size), ens_size, replace=False))
+            indices = list(np.random.choice(np.arange(self.ens_size), ens_size, replace=False))
             old_scores = self.calc_scores([key for key in flags if flags[key]], indices)    
 
             new_scores = {}
@@ -163,7 +178,7 @@ class XEISD(object):
                 indices.pop(pop_index)
                 struct_found = False
                 while not struct_found:
-                    new_index = np.random.randint(0, self.pool_size, 1)[0]
+                    new_index = np.random.randint(0, self.ens_size, 1)[0]
                     if new_index != popped_structure and new_index not in indices:
                         indices.append(new_index)
                         struct_found = True
@@ -241,16 +256,20 @@ class XEISD(object):
                 # calculate scores for unoptimized data types
                 if not flags[prop]:
                     if prop == pre_name:
-                        old_scores[pre_name][:2] = pre_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
+                        old_scores[pre_name][:2] = \
+                            pre_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
                     if prop == jc_name:
-                        old_scores[jc_name][:2] = jc_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
+                        old_scores[jc_name][:2] = \
+                            jc_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
                     if prop == cs_name:
-                        old_scores[cs_name][:2] = cs_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
+                        old_scores[cs_name][:2] = \
+                            cs_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
                     if prop == fret_name:
-                        old_scores[fret_name][:2] = fret_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
+                        old_scores[fret_name][:2] = \
+                            fret_optimization_ensemble(self.exp_data, self.bc_data, indices)[:2]
                     if prop == saxs_name:
-                        old_scores[saxs_name][:2] = saxs_optimization_ensemble(self.exp_data, self.bc_data, indices,
-                                                    nres=self.resnum)[:2]
+                        old_scores[saxs_name][:2] = \
+                            saxs_optimization_ensemble(self.exp_data, self.bc_data, indices, nres=self.resnum)[:2]  # noqa: E501
                 # aggregate results
                 s.extend(old_scores[prop][:2])
 
@@ -259,4 +278,3 @@ class XEISD(object):
             final_best_jcoups.append(old_scores[jc_name][2])
         
         return final_results, final_indices, final_best_jcoups
-    

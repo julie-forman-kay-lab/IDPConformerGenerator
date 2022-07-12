@@ -61,9 +61,9 @@ from idpconfgen.components.eisd import (
     parse_mode_back,
     make_pairs,
     meta_data,
-    modes,
     )
 from idpconfgen.components.eisd.optimizer import XEISD
+from idpconfgen.libs.libstructure import Structure
 from idpconfgen.components.eisd.parser import parse_data
 
 LOGFILESNAME = '.idpconfgen_eisd'
@@ -164,7 +164,7 @@ def main(
         optimization_type=default_type,
         mode=default_mode,
         beta=0.1,
-        output="./",
+        output=None,
         tmpdir=TMPDIR,
         ncores=1,
         func=None,
@@ -233,9 +233,10 @@ def main(
     
     exp_paths = parse_data(filenames[parse_mode_exp], mode=parse_mode_exp)
     back_paths = parse_data(filenames[parse_mode_back], mode=parse_mode_back)
+    ens_size = len(pdbs2operate)
     
-    _ens_size = len(pdbs2operate)
     _output = []
+    if output is None: output = './'
     if mode == eisd_run_all:
         _output.append(os.path.join(output, mode))
     elif mode == eisd_run_pairs:
@@ -246,21 +247,35 @@ def main(
         for module in eisd_modules:
             _output.append(os.path.join(output, "%s_%s"%(mode, module)))
     
-    execute = partial (
-        report_on_crash,
-        XEISD.optimize,
-        exp_data=exp_paths,
-        bc_data=back_paths,
-        ens_size=_ens_size,
-        epochs=epochs,
-        mode=mode,
-        beta=beta,
-        opt_type=optimization_type,
-        )
+    s = Structure(pdbs2operate[0])
+    s.build()
+    nres = len(s.residues)
     
-    execute_pool = pool_function(execute, structure=pdbs2operate, ncores=ncores)
+    eisd_ens = XEISD(exp_paths, back_paths, ens_size, nres)
     
-    
+    if optimization:
+        log.info(T(f'Starting X-EISD Optimization for: `{optimization_type}`'))
+        execute = partial (
+            report_on_crash,
+            eisd_ens.optimize,
+            epochs=epochs,
+            ens_size=ens_size,
+            opt_type=optimization_type,
+            mode=mode,
+            beta=beta,            
+            )
+        execute_pool = pool_function(execute, ncores=ncores)
+        log.info(S('done'))
+    else:
+        log.info(T(f'Starting X-EISD Scoring'))
+        execute = partial (
+            report_on_crash,
+            eisd_ens.calc_scores,
+            epochs=epochs,
+            ens_size=ens_size,        
+            )
+        execute_pool = pool_function(execute, ncores=ncores)
+        log.info(S('done'))
     
     if _istarfile:
         shutil.rmtree(tmpdir)
@@ -268,7 +283,6 @@ def main(
     log.info(S('done'))
     
     return
-
 
 
 if __name__ == '__main__':

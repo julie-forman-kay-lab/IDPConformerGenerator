@@ -34,7 +34,7 @@ class Stack():
         self.mu = mu
     
 
-def parse_data(filenames, mode):
+def parse_data(filenames, mode, bc_errors={}):
     """
     Main function to read/parse all experimental and back-calculated files.
 

@@ -51,6 +51,20 @@ eisd_modules = (
     rh_name,
     )
 
+# define back calculation uncertainties
+# refer to Lincoff et al. 2020 for details
+default_bc_errors = {
+    pre_name: 0.0001,
+    noe_name: 0.0001,
+    saxs_name: 0.006,
+    fret_name: 0.0074,
+    rh_name: 0.812,
+    rdc_name: 0.88,
+    # cs error reported from UCBShift
+    cs_name: {'C': 1.31, 'CA': 0.97, 'CB': 1.29, 'H': 0.38, 'HA': 0.29} 
+    # J-coupling errors set by default
+    }
+
 
 # The following two functions have been imported from:
 # https://github.com/THGLab/X-EISD/blob/master/eisd/utils/miscell.py
