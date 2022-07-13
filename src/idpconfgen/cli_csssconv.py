@@ -86,6 +86,7 @@ def chespi_probs8_convert_full(p8):
     """
     dict_out = {}
     dict_p8 = {}
+    dssp_keys = ["H", "G", "I", "E", " ", "T", "S", "B"]
     
     with open(p8) as reader:
         for line in reader:
@@ -93,16 +94,9 @@ def chespi_probs8_convert_full(p8):
             pline.pop(0)
             data = [float(i) for i in pline]
             resid = int(data[0])
-            for i in range(1, 9):
-                prob = data[i]
-                if i == 1: dict_p8["H"] = prob      # noqa: E701
-                elif i == 2: dict_p8["G"] = prob    # noqa: E701
-                elif i == 3: dict_p8["I"] = prob    # noqa: E701
-                elif i == 4: dict_p8["E"] = prob    # noqa: E701
-                elif i == 5: dict_p8[" "] = prob    # noqa: E701
-                elif i == 6: dict_p8["T"] = prob    # noqa: E701
-                elif i == 7: dict_p8["S"] = prob    # noqa: E701
-                elif i == 8: dict_p8["B"] = prob    # noqa: E701
+            data.pop(0)
+            for i, prob in enumerate(data):
+                dict_p8[dssp_keys[i]] = prob
             dict_out[resid] = dict_p8
             dict_p8 = {}
     return dict_out
@@ -166,6 +160,7 @@ def d2D_convert_full(d2d):
     """
     dict_out = {}
     dict_probs = {}
+    dssp_keys=["H", "E", " ", "P"]
     
     with open(d2d) as reader:
         for line in reader:
@@ -175,10 +170,9 @@ def d2D_convert_full(d2d):
                 pline.pop()
                 data = [float(i) for i in pline]
                 resid = int(data[0])
-                dict_probs["H"] = data[1]
-                dict_probs["E"] = data[2]
-                dict_probs[" "] = data[3]
-                dict_probs["P"] = data[4]
+                data.pop(0)
+                for i, prob in enumerate(data):
+                    dict_probs[dssp_keys[i]] = prob
                 dict_out[resid] = dict_probs
                 dict_probs = {}
             # if there aren't any predicted probabilities
@@ -187,10 +181,8 @@ def d2D_convert_full(d2d):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H"] = 0.25
-                dict_probs["E"] = 0.25
-                dict_probs[" "] = 0.25
-                dict_probs["P"] = 0.25
+                for key in dssp_keys:
+                    dict_probs[key] = 0.25
                 dict_out[resid] = dict_probs
     return dict_out
 
@@ -217,6 +209,7 @@ def d2D_convert_grouped(d2d):
     """
     dict_out = {}
     dict_probs = {}
+    dssp_rd_keys = ["H", "E", "L"]
     
     with open(d2d) as reader:
         for line in reader:
@@ -237,9 +230,8 @@ def d2D_convert_grouped(d2d):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H"] = 0.333
-                dict_probs["E"] = 0.333
-                dict_probs["L"] = 0.333
+                for key in dssp_rd_keys:
+                    dict_probs[key] = 0.333
                 dict_out[resid] = dict_probs
     return dict_out
 

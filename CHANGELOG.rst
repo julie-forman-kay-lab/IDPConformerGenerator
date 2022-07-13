@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Correct how some loops are written due to redundancies (#226)
+
 v0.6.12 (2022-07-07)
 ------------------------------------------------------------
 
