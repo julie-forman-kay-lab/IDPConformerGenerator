@@ -1,5 +1,5 @@
 """
-IDPConformerGenerator
+IDPConformerGenerator.
 
 Generates IDP Conformers by combining observed backbone angles
     and random distribution.
@@ -20,19 +20,19 @@ from idpconfgen import (
     cli_bgeo,
     cli_build,
     cli_csssconv,
-    cli_makecsss,
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
-    cli_sethpc,
+    cli_makecsss,
     cli_merge,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
+    cli_search,
+    cli_sethpc,
     cli_sscalc,
     cli_ssext,
     cli_stats,
-    cli_search,
     cli_torsions,
     cli_torsionsJ,
     cli_validate,

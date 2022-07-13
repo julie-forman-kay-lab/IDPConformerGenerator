@@ -5,7 +5,7 @@ import os
 import sys
 from time import time
 
-from idpconfgen import log, assert_subclass
+from idpconfgen import assert_subclass, log
 from idpconfgen.logger import S
 
 
@@ -31,17 +31,18 @@ def record_time(process_name='', *args, **kwargs):
     return decorator
 
 #
-#def timeme(func):
-#    @wraps(func)
-#    def wrapper(*args, **kwargs):
-#        s = time()
-#        result = func(*args, **kwargs)
-#        log.info(f'elapsed {func.__name__}: {time() - s:.3f} segs')
-#        return result
-#    return wrapper
+# def timeme(func):
+#     @wraps(func)
+#     def wrapper(*args, **kwargs):
+#         s = time()
+#         result = func(*args, **kwargs)
+#         log.info(f'elapsed {func.__name__}: {time() - s:.3f} segs')
+#         return result
+#     return wrapper
 
 
 def timeme(func, *args, **kwargs):
+    """Log the time taken to run a function."""
     s = time()
     result = func(*args, **kwargs)
     log.info(f'elapsed {func.__name__}: {time() - s:.3f} segs')

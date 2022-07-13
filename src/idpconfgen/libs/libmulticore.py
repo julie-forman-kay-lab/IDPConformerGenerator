@@ -8,6 +8,7 @@ from idpconfgen.libs.libtimer import ProgressWatcher
 
 
 def starunpack(func, *args, **kwargs):
+    """Unpack first argument of `args`."""
     return func(*args[0], **kwargs)
 
 

@@ -22,9 +22,9 @@ from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
+    bgeo_fixed_name,
     bgeo_int2cart_name,
     bgeo_sampling_name,
-    bgeo_fixed_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -45,8 +45,8 @@ from idpconfgen.components.xmer_probs import (
     )
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
-    build_bend_H_N_C,
     build_bend_CA_C_O,
+    build_bend_H_N_C,
     distance_C_O,
     distance_H_N,
     forcefields,
@@ -244,6 +244,7 @@ ap.add_argument(
     )
 
 _ffchoice = list(forcefields.keys())
+FFDEFAULT = _ffchoice[0]
 ap.add_argument(
     '-ff',
     '--forcefield',
@@ -252,7 +253,7 @@ ap.add_argument(
         f'Defaults to {_ffchoice[0]}.'
         ),
     choices=_ffchoice,
-    default=_ffchoice[0],
+    default=FFDEFAULT,
     )
 
 
@@ -379,7 +380,7 @@ def main(
         duser=False,
         dany=False,
         func=None,
-        forcefield=None,
+        forcefield=FFDEFAULT,
         bgeo_strategy=bgeo_strategies_default,
         bgeo_path=None,
         residue_tolerance=None,
@@ -1189,12 +1190,12 @@ def conformer_generator(
                             )
                         bbi += 1
 
-                    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
+                    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):  # noqa: E501
                         try:
                             co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
                             try:
-                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])
+                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])  # noqa: E501
                             except KeyError:
                                 co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
 

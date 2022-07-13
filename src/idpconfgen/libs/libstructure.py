@@ -146,7 +146,6 @@ class Structure:
         self.data_array[:, cols_coords] = \
             np.round(coords, decimals=3).astype('<U8')
 
-
     @property
     def consecutive_residues(self):
         """Consecutive residue groups from filtered atoms."""
