@@ -49,7 +49,7 @@ project = 'IDPConformerGenerator'
 year = '2022'
 author = 'Julie Forman-Kay Lab'
 copyright = '{0}, {1}'.format(year, author)
-version = release = '0.6.12'
+version = release = '0.6.13'
 
 pygments_style = 'trac'
 templates_path = ['.']
