@@ -341,7 +341,7 @@ def main(
             fout.write(output_)
         log.info(S('done'))
     else:
-        print(output_)
+        print(output_)  # noqa: T201
 
     log.info(S('done'))
 

@@ -496,7 +496,11 @@ def test_save_chain_does_not_exist():
 def test_generate_labels_1(fix_Structure_build):
     """Test generate labels function."""
     s = fix_Structure_build
-    label_cols = [libstructure.col_resSeq, libstructure.col_resName, libstructure.col_name]
+    label_cols = [
+        libstructure.col_resSeq,
+        libstructure.col_resName,
+        libstructure.col_name,
+        ]
     labels = s.data_array[:3, label_cols]
     results = list(libstructure.concatenate_residue_labels(labels))
     expected = [
@@ -511,7 +515,11 @@ def test_generate_labels_1(fix_Structure_build):
 def test_generate_labels_2(fix_Structure_build):
     """Test generate labels function."""
     s = fix_Structure_build
-    label_cols = [libstructure.col_resSeq, libstructure.col_resName, libstructure.col_name]
+    label_cols = [
+        libstructure.col_resSeq,
+        libstructure.col_resName,
+        libstructure.col_name,
+        ]
     labels = s.data_array[:3, label_cols]
     labels1 = s.data_array[-3:, label_cols]
     results = libstructure.generate_residue_labels(
@@ -527,4 +535,3 @@ def test_generate_labels_2(fix_Structure_build):
         ]
 
     assert results == expected
-

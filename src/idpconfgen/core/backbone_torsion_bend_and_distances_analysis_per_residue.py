@@ -1,12 +1,17 @@
 import sys
-from functools import partial
-import numpy as np
 from collections import defaultdict
+from functools import partial
 
-from idpconfgen.libs.libstructure import Structure, col_name, cols_coords, col_resName
-from idpconfgen.libs.libio import read_path_bundle
+import numpy as np
 
 from idpconfgen.core.definitions import aa3to1
+from idpconfgen.libs.libio import read_path_bundle
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    col_resName,
+    cols_coords,
+    )
 
 
 NORM = partial(np.linalg.norm, axis=1)

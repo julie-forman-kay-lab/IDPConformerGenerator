@@ -73,7 +73,6 @@ def test_args2tuple(args, expected):
     ap = argparse.ArgumentParser()
     ap.add_argument('-t', action=libcli.ArgsToTuple, nargs='+')
     result = ap.parse_args(['-t'] + args)
-    print(result)
     assert result.t == expected
 
 
@@ -220,7 +219,6 @@ USAGE:
             '    This is the description of the program.\n'
             '    In two lines.\n'
             )
-        print(self.des)
         assert expected == self.des
 
     def test_usage(self):

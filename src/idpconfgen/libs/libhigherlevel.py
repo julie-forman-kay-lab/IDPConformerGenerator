@@ -13,14 +13,14 @@ import numpy as np
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import (
     aa3to1,
-    bgeo_CaCNp1,
-    bgeo_Cm1NCa,
-    bgeo_NCaC,
-    bgeo_CaCO,
-    bgeo_NCa,
     bgeo_CaC,
+    bgeo_CaCNp1,
+    bgeo_CaCO,
+    bgeo_Cm1NCa,
     bgeo_CNp1,
     bgeo_CO,
+    bgeo_NCa,
+    bgeo_NCaC,
     blocked_ids,
     )
 from idpconfgen.core.exceptions import IDPConfGenException, PDBFormatError
@@ -246,7 +246,7 @@ def extract_secondary_structure(
 
         for counter, seg_slice in enumerate(minimum_size):
 
-            LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])
+            LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])  # noqa: E501, B023
             pdb = b'\n'.join(
                 line for line in pdbdata if all(f(line) for f in line_filters)
                 )
@@ -601,37 +601,43 @@ def validate_backbone_labels_for_torsion(labels, minimum=2):
 
     return ''
 
+
 def get_bond_geos(fdata):
     """
-    Calculate bond angles from structure
+    Calculate bond angles from structure.
 
-    Args:
-        fdata (_type_): _description_
-        degrees (bool, optional): _description_. Defaults to False.
-        decimals (int, optional): _description_. Defaults to 3.
+    Parameters
+    ----------
+    fdata : data to :pyclass:`idpconfgen.libstructure.Structure`
+
+    degrees : bool, optional
+        Defaults to False.
+
+    decimals : int, optional
+        Defaults to 3.
     """
     ALL = np.all
     CEQ = np.char.equal
     CO_LABELS = np.array(['CA', 'C', 'O', 'CA', 'C', 'O', 'CA'])
-    NORM = partial(np.linalg.norm)
-    
+    NORM = np.linalg.norm
+
     s = Structure(fdata)
     s.build()
     s.add_filter_backbone(minimal=True)
-    
+
     if s.data_array[0, col_name] != 'N':
         raise PDBFormatError(
             'PDB does not start with N. '
             f'{s.data_array[0, col_name]} instead.'
             )
-        
+
     N_CA_C_coords = s.coords
     s.clear_filters()
 
     s.add_filter(lambda x: x[col_name] in ('CA', 'C', 'O'))
     CA_C_O_coords = s.coords
     co_minimal_names = s.filtered_atoms[:, col_name]
-    
+
     bgeo_results = {
         bgeo_Cm1NCa: [],
         bgeo_NCaC: [],
@@ -642,10 +648,10 @@ def get_bond_geos(fdata):
         bgeo_CNp1: [],
         bgeo_CO: [],
         }
-    
+
     for i in range(1, len(N_CA_C_coords) - 7, 3):
         idx = list(range(i, i + 7))
-        
+
         # calc bend angles
         c = N_CA_C_coords[idx]
         Cm1_N = c[1] - c[2]
@@ -655,26 +661,26 @@ def get_bond_geos(fdata):
         Ca_C = c[3] - c[4]
         Np1_C = c[5] - c[4]
         assert Cm1_N.shape == (3,)
-        
+
         # calc bond lengths
         # need float for json.dump else float32
         NCa = float(NORM(N_Ca))
         CaC = float(NORM(Ca_C))
         CNp1 = float(NORM(Np1_C))
-        
+
         # the angles here are already corrected to the format needed by the
         # builder, which is (pi - a) / 2
         Cm1_N_Ca = (np.pi - calc_angle_njit(Cm1_N, Ca_N)) / 2
         N_Ca_C = (np.pi - calc_angle_njit(N_Ca, C_Ca)) / 2
         Ca_C_Np1 = (np.pi - calc_angle_njit(Ca_C, Np1_C)) / 2
-        
+
         co_idx = np.array(idx) - 1
         c = CA_C_O_coords[co_idx]
         Ca_C = c[3] - c[4]
         O_C = c[5] - c[4]
-        
+
         CO = float(NORM(O_C))
-        
+
         if not ALL(CEQ(co_minimal_names[co_idx], CO_LABELS)):
             log.info(S(
                 'Found not matching labels '
@@ -682,26 +688,27 @@ def get_bond_geos(fdata):
                 ))
             continue
         Ca_C_O = calc_angle_njit(Ca_C, O_C) / 2
-        
+
         bgeo_results[bgeo_Cm1NCa].append(Cm1_N_Ca)
         bgeo_results[bgeo_NCaC].append(N_Ca_C)
         bgeo_results[bgeo_CaCNp1].append(Ca_C_Np1)
         bgeo_results[bgeo_CaCO].append(Ca_C_O)
-        
+
         bgeo_results[bgeo_NCa].append(NCa)
         bgeo_results[bgeo_CaC].append(CaC)
         bgeo_results[bgeo_CNp1].append(CNp1)
         bgeo_results[bgeo_CO].append(CO)
-    
-    assert len(set(map(len, bgeo_results.values()))) == 1
-    
+
+    if len(set(map(len, bgeo_results.values()))) != 1:
+        raise AssertionError('something wrong here, this is a bug')
+
     return bgeo_results
-        
+
 
 def cli_helper_calc_bgeo(fname, fdata, **kwargs):
     """
-    Help `cli_bgeodb` to operate
-    
+    Help `cli_bgeodb` to operate.
+
     Returns
     -------
     dict
@@ -711,6 +718,7 @@ def cli_helper_calc_bgeo(fname, fdata, **kwargs):
     bond_geometries = get_bond_geos(fdata, **kwargs)
     return fname, bond_geometries
 
+
 def read_trimer_torsion_planar_angles(pdb, bond_geometry):
     """
     Create a trimer/torsion library of bend/planar angles.
@@ -719,8 +727,9 @@ def read_trimer_torsion_planar_angles(pdb, bond_geometry):
 
     1) reads each of its trimers, and for the middle residue:
     2) Calculates phi/psi and rounds them to the closest 10 degree bin
-    3) assigns the planar angles found for that residue to the trimer/torsion key.
-    4) the planar angles are converted to the format needed by cli_build, which is that of (pi - angle) / 2.
+    3) assign planar angles found for that residue to the trimer/torsion key.
+    4) the planar angles are converted to the format needed by cli_build,
+       which is that of (pi - angle) / 2.
     5) updates that information in `bond_gemetry`.
 
     Created key:values have the following form in `bond_geometry` dict::

@@ -4,11 +4,12 @@ Parsing routines for different data structure.
 All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
-import subprocess, ast
-from itertools import product, repeat
+import ast
+import subprocess
 from functools import partial
-from pathlib import Path as Path_
+from itertools import product, repeat
 from operator import setitem
+from pathlib import Path as Path_
 
 from numba import njit
 
@@ -41,7 +42,7 @@ type2string = {
 
 
 def make_list_if_not(item):
-    """Put `item` into a list if item is not list or tuple-lik if item is not list or tuple-like."""
+    """Make a list from item."""
     if isinstance(item, (str, int, float)):
         return [item]
     return item
@@ -340,7 +341,7 @@ def get_trimer_seq(seq, idx):
     curr_res = seq[idx]
     try:
         pos = seq[idx + 1]
-    except:  # noqa: E722  IndexError in plain python
+    except:  # noqa: B001,E722  IndexError in plain python
         pos = 'G'
 
     return curr_res, pre + pos
@@ -438,15 +439,15 @@ def remove_empty_keys(ddict):
 def values_to_dict(values):
     """
     Generalization of converting parameters to dict.
-    
+
     Adapted from:
     https://github.com/joaomcteixeira/taurenmd/blob/6bf4cf5f01df206e9663bd2552343fe397ae8b8f/src/taurenmd/libs/libcli.py#L94-L138
-    
+
     Parameters
     ----------
     values : string
         List of values with the format "par1=1 par2='string' par3=[1,2,3]
-    
+
     Returns
     -------
     param_dict : dictionary
@@ -454,9 +455,9 @@ def values_to_dict(values):
         E.g. {'par1': 1, 'par2':'string', 'par3': [1,2,3]}
     """
     bool_value = {
-            'true': True,
-            'false': False,
-            }
+        'true': True,
+        'false': False,
+        }
 
     param_dict = {}
     for kv in values:
@@ -479,7 +480,7 @@ def values_to_dict(values):
                     param_dict[k] = bool_value.get(v.lower(), v)
                 except (SyntaxError):
                     param_dict[k] = v
-                    
+
     return param_dict
 
 

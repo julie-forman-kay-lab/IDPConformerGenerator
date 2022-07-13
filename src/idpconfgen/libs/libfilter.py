@@ -9,14 +9,14 @@ from idpconfgen import log
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import make_list_if_not
 from idpconfgen.core.definitions import (
-        bgeo_Cm1NCa,
-        bgeo_NCaC,
-        bgeo_CaCNp1,
-        bgeo_CaCO,
-        bgeo_NCa,
-        bgeo_CaC,
-        bgeo_CNp1,
-        bgeo_CO,
+    bgeo_CaC,
+    bgeo_CaCNp1,
+    bgeo_CaCO,
+    bgeo_Cm1NCa,
+    bgeo_CNp1,
+    bgeo_CO,
+    bgeo_NCa,
+    bgeo_NCaC,
     )
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
@@ -55,7 +55,7 @@ def aligndb(db, exact=False):
     OMGE = omg.extend
     DA = dssp.append
     RA = resseq.append
-    
+
     if exact:
         cm1nca, ncac, cacnp1, caco = [], [], [], []
         nca, cac, cnp1, co = [], [], [], []
@@ -67,7 +67,7 @@ def aligndb(db, exact=False):
         CACE = cac.extend
         CNP1E = cnp1.extend
         COE = co.extend
-        
+
     # +1 because NAN are added as spacers
     spacer = 1  # algorithm definition
 
@@ -112,18 +112,18 @@ def aligndb(db, exact=False):
         psi_truncated = data['psi'][1:]
 
         len_segment = len(fasta_truncated)
-        
+
         if exact:
             _cm1nca = data[bgeo_Cm1NCa]
             _ncac = data[bgeo_NCaC]
             _cacnp1 = data[bgeo_CaCNp1]
             _caco = data[bgeo_CaCO]
-            
+
             _nca = data[bgeo_NCa]
             _cac = data[bgeo_CaC]
             _cnp1 = data[bgeo_CNp1]
             _co = data[bgeo_CO]
-            
+
             lists_to_compare = [
                 dssp_truncated,
                 phi_truncated,
@@ -138,7 +138,7 @@ def aligndb(db, exact=False):
                 _cnp1,
                 _co,
                 ]
-            
+
         else:
             lists_to_compare = [
                 dssp_truncated,
@@ -157,13 +157,13 @@ def aligndb(db, exact=False):
         phi_truncated.append(NAN)
         psi_truncated.append(NAN)
         omg_truncated.append(NAN)
-        
+
         if exact:
             _cm1nca.append(NAN)
             _ncac.append(NAN)
             _cacnp1.append(NAN)
             _caco.append(NAN)
-            
+
             _nca.append(NAN)
             _cac.append(NAN)
             _cnp1.append(NAN)
@@ -180,28 +180,28 @@ def aligndb(db, exact=False):
 
         DA(dssp_truncated)
         RA(fasta_truncated)
-        
+
         if exact:
             CM1NCAE(_cm1nca)
             NCACE(_ncac)
             CACNP1E(_cacnp1)
             CACOE(_caco)
-            
+
             NCAE(_nca)
             CACE(_cac)
             CNP1E(_cnp1)
             COE(_co)
-    
+
     _resseq = '|'.join(resseq)
     _dssp = '|'.join(dssp)
     _angles = np.array((omg, phi, psi), dtype=np.float32).T
-    
+
     if exact:
         _bend_angs = np.array((cm1nca, ncac, cacnp1, caco), dtype=np.float32).T
         _bond_lens = np.array((nca, cac, cnp1, co), dtype=np.float32).T
-        
+
         return pdbs, _angles, _bend_angs, _bond_lens, _dssp, _resseq
-    
+
     return pdbs, _angles, _dssp, _resseq
 
 # # regex to compute
@@ -238,12 +238,13 @@ def regex_search(sequence, regex_string, rex_range=REGEX_RANGE, **kwargs):
         result = regex_range(sequence, regex_string, **kwargs)
 
     else:
-        func = regex_forward_with_overlap if regex_has_overlap(regex_string) else regex_forward_no_overlap
+        func = regex_forward_with_overlap \
+            if regex_has_overlap(regex_string) \
+            else regex_forward_no_overlap
         result = func(sequence, regex_string)
 
     assert isinstance(result, list)
     assert all(isinstance(S, slice) for S in result)  # heavy and slow!!
-    print("len result, ", len(result))
     return result
 
 

@@ -77,7 +77,7 @@ ap.add_argument(
         'depending on the PDB input. '
         'Example: --hn_labels H H1 HN'
         ),
-    default=('H','H1'),
+    default=('H', 'H1'),
     nargs='+',
     )
 

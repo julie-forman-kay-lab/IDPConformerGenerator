@@ -23,9 +23,9 @@ from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
     bgeo_exact_name,
+    bgeo_fixed_name,
     bgeo_int2cart_name,
     bgeo_sampling_name,
-    bgeo_fixed_name,
     bgeo_strategies,
     bgeo_strategies_default,
     )
@@ -46,8 +46,8 @@ from idpconfgen.components.xmer_probs import (
     )
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
-    build_bend_H_N_C,
     build_bend_CA_C_O,
+    build_bend_H_N_C,
     distance_C_O,
     distance_H_N,
     forcefields,

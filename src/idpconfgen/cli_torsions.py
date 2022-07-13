@@ -35,11 +35,13 @@ USAGE:
     $ idpconfgen torsions [PDBS] -sc file.json -o mytorsions.json -n -deg --plot
 """
 import argparse
-import numpy as np
 from functools import partial
 from math import radians
 
+import numpy as np
+
 from idpconfgen import Path, log
+from idpconfgen.components.plots.plotfuncs import plot_fracSS, plot_torsions
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libhigherlevel import cli_helper_calc_torsions
 from idpconfgen.libs.libio import (
@@ -49,7 +51,6 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
-from idpconfgen.components.plots.plotfuncs import plot_fracSS, plot_torsions
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -82,22 +83,23 @@ ap.add_argument(
         "using alpha, beta, and other regions of the ramachandran space. "
         "Optionally to be used with ``--plot``."
         "Example: --ramaplot filename=fracRama.png colors=r,g,b"
-    ),
+        ),
     nargs='*',
-)
+    )
+
 
 def main(
         pdb_files,
         source=None,
         output=None,
-        degrees=False, #documentation for `add_argument_degrees()` specifies rad as default
+        degrees=False,  # documentation for `add_argument_degrees()` specifies rad as default # noqa: E501
         func=None,
         ncores=1,
         plot=False,
         plotvars=None,
         ramaplot=None,
         ):
-    """
+    """# noqa: D205, D400, E501
     Perform main script logic.
 
     Parameters
@@ -148,7 +150,11 @@ def main(
     pdbs = FileReaderIterator(pdb_files, ext='.pdb')
     log.info(S('done'))
 
-    consume = partial(starunpack, cli_helper_calc_torsions, degrees=degrees, decimals=10)
+    consume = partial(starunpack,
+                      cli_helper_calc_torsions,
+                      degrees=degrees,
+                      decimals=10
+                      )
 
     execute = partial(
         report_on_crash,
@@ -180,35 +186,35 @@ def main(
     if plot:
         # Plotting torsion angle distributions
         log.info(T("Plotting torsion angle distribution"))
-        log.info(S("Reminder: PDBs must be conformers of the same protein-system."))
+        log.info(S("Reminder: PDBs must be conformers of the same protein-system."))  # noqa: E501
 
         plotvars = plotvars or dict()
 
         tor_defaults = {
             'angtype': 'phi',
             'filename': 'plot_torsions.png'
-        }
+            }
         tor_defaults.update(plotvars)
         ttype = tor_defaults['angtype']
 
-        max_residues=0
+        max_residues = 0
         n_confs = len(torsion_result)
 
         for key in torsion_result:
-            if len(torsion_result[key]['omega'])+1 > max_residues:
-                max_residues = len(torsion_result[key]['omega'])+1
+            if len(torsion_result[key]['omega']) + 1 > max_residues:
+                max_residues = len(torsion_result[key]['omega']) + 1
 
         angles = np.ndarray(shape=(n_confs, max_residues), dtype=float)
-        j=0
+        j = 0
         for t in torsion_result:
             for i in range(1, max_residues):
                 try:
-                    angles[j:,i-1] = torsion_result[t][ttype][i-1]
-                except:
-                    angles[j:,i-1] = 0
-            j+=1
+                    angles[j:, i - 1] = torsion_result[t][ttype][i - 1]
+                except Exception:
+                    angles[j:, i - 1] = 0
+            j += 1
 
-        errs=plot_torsions(max_residues, angles, degrees, n_confs, **tor_defaults)
+        errs = plot_torsions(max_residues, angles, degrees, n_confs, **tor_defaults)  # noqa: E501
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {tor_defaults["filename"]}'))
@@ -218,55 +224,56 @@ def main(
 
         newfname = "_ramaSS.".join(tor_defaults['filename'].rsplit('.', 1))
         rama_defaults = {
-        'sstype': 'Rama.',
-        'filename': newfname,
-        }
+            'sstype': 'Rama.',
+            'filename': newfname,
+            }
 
         if ramaplot:
             ramaplot = values_to_dict(ramaplot)
             rama_defaults.update(ramaplot)
 
-        frac_rama={
-            'alpha':np.zeros(max_residues),
-            'beta':np.zeros(max_residues),
-            'other':np.zeros(max_residues),
+        frac_rama = {
+            'alpha': np.zeros(max_residues),
+            'beta': np.zeros(max_residues),
+            'other': np.zeros(max_residues),
             }
-        p=np.ones(n_confs)
-        p=p/len(p)
-        c=0
+        p = np.ones(n_confs)
+        p = p / len(p)
+        c = 0
         
         deglimits = {
-            '-180':-180.0,
-            '-120':-120.0,
-            '10':10.0,
-            '45':45.0,
-            '180':180.0            
-        }
+            '-180': -180.0,
+            '-120': -120.0,
+            '10': 10.0,
+            '45': 45.0,
+            '180': 180.0
+            }
         
         if not degrees:
             for deg in deglimits:
                 deglimits[deg] = radians(deglimits[deg])
             
         for conf in torsion_result:
-            for res in range(max_residues-1):
+            for res in range(max_residues - 1):
                 try:
                     phi = torsion_result[conf]["phi"][res]
                     psi = torsion_result[conf]["psi"][res]
-                except:
+                except Exception:
                     continue
-                if (deglimits['-180'] < phi and phi < deglimits['10']) and (deglimits['-120']< psi and psi < deglimits['45']):
+                if (deglimits['-180'] < phi and phi < deglimits['10']) and (deglimits['-120'] < psi and psi < deglimits['45']):  # noqa: E501
                     frac_rama['alpha'][res] += p[c]
-                elif (deglimits['-180'] < phi and phi < 0.0) and ((deglimits['-180'] < psi and psi < deglimits['-120']) or (deglimits['45'] < psi and psi < deglimits['180'])):
+                elif (deglimits['-180'] < phi and phi < 0.0) and ((deglimits['-180'] < psi and psi < deglimits['-120']) or (deglimits['45'] < psi and psi < deglimits['180'])):  # noqa: E501
                     frac_rama['beta'][res] += p[c]
                 else:
                     frac_rama['other'][res] += p[c]
-            c+=1
+            c += 1
         errs = plot_fracSS(max_residues, frac_rama, **rama_defaults)
         for e in errs:
             log.info(S(f'{e}'))
         log.info(S(f'saved plot: {rama_defaults["filename"]}'))
 
     return
+
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
