@@ -71,7 +71,7 @@ expl_a_bgeo = Path(data_folder, 'EXPL_A_bgeo.json')
 expl_a_bgeo_converted = Path(data_folder, 'EXPL_A_bgeo_converted.json')
 expl_a_bgeo_trimer = Path(data_folder, 'EXPL_A_bgeo_trimer.json')
 expl_a_bgeo_res = Path(data_folder, 'EXPL_A_bgeo_res.json')
-
+idp_db_test = Path(data_folder, 'idpconfgen_test_db.tgz')
 
 cif_example_headers = [
     '_atom_site.group_PDB',
