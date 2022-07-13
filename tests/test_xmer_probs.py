@@ -1,14 +1,23 @@
 """Test xmer_probs component."""
 import argparse
 import os
-from pathlib import Path
 from math import isclose
+from pathlib import Path
 
-import pytest
 import numpy as np
+import pytest
 
-from idpconfgen.components.xmer_probs import *
-from idpconfgen.libs.libcalc import make_seq_probabilities
+from idpconfgen.components.xmer_probs import (
+    add_xmer_arg,
+    compress_xmer_to_bool,
+    compress_xmer_to_key,
+    default_XmerProbs,
+    is_XmerProbs,
+    make_xmerprobs,
+    prepare_xmer_probs,
+    read_xmer_probs_file_or_default,
+    read_xmer_probs_from_file,
+    )
 
 from . import tcommons
 
@@ -59,9 +68,8 @@ def test_prepare_xmerprob3():
         ],
     )
 def test_prepare_xmerprob_error(value, error):
-    """."""
     with pytest.raises(error):
-        result = prepare_xmer_probs(value)
+        prepare_xmer_probs(value)
 
 
 def test_isXmer():

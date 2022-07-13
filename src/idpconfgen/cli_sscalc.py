@@ -1,4 +1,4 @@
-"""
+"""# noqa: D205, D400, E501
 Extracts secondary structure information from PDBs.
 
 This client is upgraded to DSSP-PPII according to:
@@ -17,11 +17,13 @@ import argparse
 import os
 import shutil
 import traceback
-import numpy as np
 from functools import partial
+
+import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.cli_dssppii import dssp_ppii_assignment
+from idpconfgen.components.plots.plotfuncs import plot_fracSS
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
     extract_from_tar,
@@ -34,9 +36,8 @@ from idpconfgen.libs.libmulticore import (
     consume_iterable_in_list,
     pool_function_in_chunks,
     )
-from idpconfgen.libs.libparse import mkdssp_w_split, split_pdb_by_dssp
+from idpconfgen.libs.libparse import split_pdb_by_dssp
 from idpconfgen.logger import S, T, init_files, report_on_crash
-from idpconfgen.components.plots.plotfuncs import plot_fracSS
 
 
 LOGFILESNAME = '.idpconfgen_sscalc'
@@ -118,7 +119,7 @@ libcli.add_argument_plot(ap)
 def dssppi_helper(pdb_file, dssp_cmd, **kwargs):
     """."""
     pf = pdb_file.resolve()
-    result = str.encode(os.linesep.join(dssp_ppii_assignment(str(pf), dssp_cmd)))
+    result = str.encode(os.linesep.join(dssp_ppii_assignment(str(pf), dssp_cmd)))  # noqa: E501
     yield from split_pdb_by_dssp(pf, result, **kwargs)
 
 
@@ -137,7 +138,7 @@ def main(
         plot=False,
         plotvars=None,
         ):
-    """
+    """# noqa: D205, D400, E501
     Run main cli logic.
 
     Parameters
@@ -161,12 +162,12 @@ def main(
 
     ncores : int
         The numbers of cores to use.
-    
+
     plot : Bool, optional
         Whether to plot the fractional secondary structure information
-    
+
     plotvars : dictionary, optional
-        Parameters for creating the plot        
+        Parameters for creating the plot
     """
     log.info(T('Extracting Secondary structure information'))
     init_files(log, LOGFILESNAME)
@@ -181,7 +182,7 @@ def main(
     try:
         pdbs2operate = extract_from_tar(pdb_files, output=tmpdir, ext='.pdb')
         _istarfile = True
-    except (OSError, FileNotFoundError, TypeError):
+    except (OSError, TypeError):
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
@@ -207,7 +208,7 @@ def main(
         # generator
         execute_pool = pool_function_in_chunks(
             execute,
-            pdbs2operate, # items to process
+            pdbs2operate,  # items to process
             ncores=ncores,
             chunks=chunks,
             )
@@ -240,40 +241,40 @@ def main(
         save_dictionary(previous.update(dssp_data), output)
     else:
         save_dictionary(dssp_data, output)
-    
+
     if plot:
         log.info(T("Plotting fractional secondary structure information"))
         log.info(S("Tip: plotting is best for same protein-system ensembles."))
-        
-        max_residues=0
+
+        max_residues = 0
         for key in dssp_data:
             if len(dssp_data[key]["dssp"]) > max_residues:
                 max_residues = len(dssp_data[key]["dssp"])
-        n_confs = len(dssp_data)        
-        
+        n_confs = len(dssp_data)
+
         plotvars = plotvars or dict()
         plt_default = {
             'sstype': 'DSSP',
             'filename': 'plot_dssp_fracSS.png',
-        }
+            }
         plt_default.update(plotvars)
-        
+
         if reduced:
             frac_dssp = {
                 'L': np.zeros(max_residues),
                 'H': np.zeros(max_residues),
                 'E': np.zeros(max_residues),
-            }
-            p=np.ones(n_confs)
-            p=p/len(p)
+                }
+            p = np.ones(n_confs)
+            p = p / len(p)
 
-            c=0
+            c = 0
             for conf in dssp_data:
-                r=0
+                r = 0
                 for ss in dssp_data[conf]["dssp"]:
                     frac_dssp[ss][r] += p[c]
-                    r+=1
-                c+=1
+                    r += 1
+                c += 1
         else:
             frac_dssp = {
                 'H': np.zeros(max_residues),
@@ -285,22 +286,22 @@ def main(
                 'S': np.zeros(max_residues),
                 'P': np.zeros(max_residues),
                 ' ': np.zeros(max_residues),
-            }
-            p=np.ones(n_confs)
-            p=p/len(p)
+                }
+            p = np.ones(n_confs)
+            p = p / len(p)
 
-            c=0
+            c = 0
             for conf in dssp_data:
-                r=0
+                r = 0
                 for ss in dssp_data[conf]["dssp"]:
                     frac_dssp[ss][r] += p[c]
-                    r+=1
-                c+=1
-        
-        errs=plot_fracSS(max_residues, frac_dssp, **plt_default)
+                    r += 1
+                c += 1
+
+        errs = plot_fracSS(max_residues, frac_dssp, **plt_default)
         for e in errs:
             log.info(S(f'{e}'))
-            
+
         log.info(S(f'saved plot: {plt_default["filename"]}'))
 
     return

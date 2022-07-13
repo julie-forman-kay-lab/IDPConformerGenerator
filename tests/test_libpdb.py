@@ -7,12 +7,7 @@ from hypothesis import strategies as st
 
 from idpconfgen.core import exceptions as EXCPTS
 from idpconfgen.libs import libpdb
-from idpconfgen.libs.libpdb import (
-    PDBID,
-    PDBIDFactory,
-    PDBList,
-    is_pdb,
-    )
+from idpconfgen.libs.libpdb import PDBID, PDBIDFactory, PDBList, is_pdb
 
 from .tcommons import pdb_example
 
