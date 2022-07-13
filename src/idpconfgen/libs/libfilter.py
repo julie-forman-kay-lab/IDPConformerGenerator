@@ -6,8 +6,6 @@ from functools import partial
 import numpy as np
 
 from idpconfgen import log
-from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libparse import make_list_if_not
 from idpconfgen.core.definitions import (
     bgeo_CaC,
     bgeo_CaCNp1,
@@ -18,6 +16,9 @@ from idpconfgen.core.definitions import (
     bgeo_NCa,
     bgeo_NCaC,
     )
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import make_list_if_not
+
 
 REGEX_OVERLAP = re.compile(r'\(\?\=\(.+\)')
 # read comments bellow
