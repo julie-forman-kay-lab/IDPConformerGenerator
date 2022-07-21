@@ -1,3 +1,5 @@
+# Note to self and devs: calculators will be done on a separate repository
+# to maintain modularity and flexibility, this script will be removed soon
 """
 Contains functions to back-calculate experimental
 data from generated conformer pools.
