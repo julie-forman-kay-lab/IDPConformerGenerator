@@ -4,8 +4,9 @@ Accepts primarily NMR-STAR formatted files for solution data.
 
 USAGE EXAMPLE:
     For NMR-STAR files, it must be the data between the `loop_` and 
-    `stop_` codes. Easiest is to just copy the block of data from 
-    NMR-STAR file from the BMRB to a new text file.
+    `stop_` codes without new lines. The easiest way is to just
+    copy the block of data from NMR-STAR file from the BMRB
+    to a new text file.
     
     For example an exerpt from entry 4155:
     _Atom_chem_shift.ID
@@ -21,7 +22,6 @@ USAGE EXAMPLE:
     _Atom_chem_shift.Atom_isotope_number
     _Atom_chem_shift.Val
     _Atom_chem_shift.Val_err
-
     1     .   2   .   1   2    2    MET   C    C   13   176.341   .
     2     .   2   .   1   2    2    MET   CA   C   13   55.634    .
     3     .   2   .   1   2    2    MET   CB   C   13   32.613    .
@@ -48,6 +48,11 @@ import numpy as np
 import pandas as pd
 
 from idpconfgen.components.eisd import (
+    star_val,
+    star_err,
+    star_atmID,
+    star_max,
+    star_min,
     parse_mode_exp,
     saxs_name,
     cs_name,
@@ -70,16 +75,17 @@ class Stack():
         name : string
             Name of experimental datatype.
         
-        data : pd.DataFrame
-            Containing values and errors for the 2 columns
+        pd.DataFrame
+            Containing atoms, values, and errors for the 3 columns
         """
         self.name = name
         self.data = data
         self.sigma = sigma
         self.mu = mu
 
+
 def parse_cs_data(fpath):
-    data = pd.DataFrame(dtype=np.float)
+    atoms = []
     values = []
     errors = []
     
@@ -88,16 +94,64 @@ def parse_cs_data(fpath):
         
         for i, line in enumerate(lines):
             if "_" in line:
-                dtype = line.split(".")[1]
-                if "Val" in dtype: data_idx = i
-                elif "Val_err" in dtype: error_idx = i
-                elif "Atom_ID" in dtype: atom_idx = i
+                dtype = line.split(".")[1].strip()
+                if dtype == "Val": data_idx = i
+                elif dtype == "Val_err": error_idx = i
+                elif dtype == "Atom_ID": atom_idx = i
             else:
+                start_idx = i
                 break
-        
-        None
-    return data
+            
+        for idx in range(start_idx, len(lines)):
+            splitted = lines[idx].split()
+            
+            atoms.append(splitted[atom_idx])
+            values.append(float(splitted[data_idx]))
+            errors.append(float(splitted[error_idx]))
+            
+    return pd.DataFrame({star_atmID: atoms, star_val: values, star_err: errors})
 
+
+# Good for NMR-STAR formatted JC, RDC, NOE, PRE
+def parse_nmrstar_data(fpath, type=None):
+    values = []
+    upper = []
+    lower = []
+    errors = []
+    
+    with open(fpath) as f:
+        lines = f.readlines()
+        
+        for i, line in enumerate(lines):
+            if "_" in line:
+                dtype = line.split(".")[1].strip()
+                if dtype == "Val": data_idx = i
+                elif dtype == "Val_err": error_idx = i
+                if type == noe_name or type == pre_name:
+                    if dtype == "Val_max": max_idx = i
+                    elif dtype == "Val_min": min_idx = i
+            else:
+                start_idx = i
+                break
+            
+        for idx in range(start_idx, len(lines)):
+            splitted = lines[idx].split()
+            
+            values.append(float(splitted[data_idx]))
+            errors.append(float(splitted[error_idx]))
+            
+            if type == noe_name or type == pre_name:
+                max = splitted[max_idx]
+                min = splitted[min_idx]
+                if max == ".": max = 0.0
+                if min == ".": min = 0.0
+                upper.append(float(max))
+                lower.append(float(min))
+    
+    if type == noe_name or type == pre_name:
+        return pd.DataFrame({star_val: values, star_max: upper, star_min: lower, star_err: errors})
+    
+    return pd.DataFrame({star_val: values, star_err: errors})
 
 def parse_data(filenames, mode, bc_errors={}):
     """
@@ -142,16 +196,16 @@ def parse_data(filenames, mode, bc_errors={}):
                 None
             elif module == jc_name:
                 # do JC parsing
-                None
+                data = parse_nmrstar_data(filenames[module])
             elif module == noe_name:
                 # do NOE parsing
-                None
+                data = parse_nmrstar_data(filenames[module], noe_name)
             elif module == pre_name:
                 # no PRE parsing
-                None
+                data = parse_nmrstar_data(filenames[module], pre_name)
             elif module == rdc_name:
                 # do RDC parsing
-                None
+                data = parse_nmrstar_data(filenames[module])
             elif module == rh_name:
                 # do Rh parsing
                 None

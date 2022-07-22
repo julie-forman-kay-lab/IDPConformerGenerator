@@ -6,6 +6,12 @@ Functions and logic inspired/imported from https://github.com/THGLab/X-EISD/
 """
 import os
 
+star_val = 'value'
+star_max = 'upper'
+star_atmID = 'atomname'
+star_min = 'lower'
+star_err = 'error'
+
 eisd_run_all = 'all'
 eisd_run_single = 'single'
 eisd_run_pairs = 'pairs'

@@ -6,9 +6,16 @@ Inspired/imported from:
 * https://github.com/THGLab/X-EISD/blob/master/eisd/scorers.py
 * https://github.com/Oufan75/X-EISD/blob/master/eisd/scorers.py
 """
+from asyncio import start_unix_server
+from re import A
 import numpy as np
 
 from idpconfgen.components.eisd import(
+    star_val,
+    star_err,
+    star_atmID,
+    star_max,
+    star_min,
     saxs_name,
     cs_name,
     fret_name,
@@ -141,13 +148,13 @@ def saxs_optimization_ensemble(
     new_index=None,
     ):
     # prepare data
-    exp_saxs = exp_data[saxs_name].data['value'].values
-    exp_sigma = exp_data[saxs_name].data['error'].values
+    exp_saxs = exp_data[saxs_name].data[star_val].values
+    exp_sigma = exp_data[saxs_name].data[star_err].values
     
     if indices is None:
         bc_saxs = old_vals - \
             (bc_data[saxs_name].data.values[popped_structure, :] - \
-            bc_data['saxs'].data.values[new_index, :] ) / ens_size
+            bc_data[saxs_name].data.values[new_index, :] ) / ens_size
         
     else:
         bc_ensemble = bc_data[saxs_name].data.values[indices, :]
@@ -204,9 +211,9 @@ def cs_optimization_ensemble(
     """
     # TODO: if incorrect shape, shave off values from bc_data
     # to match exp_data
-    exp_cs = exp_data[cs_name].data['value'].values
-    exp_sigma = exp_data[cs_name].data['error'].values
-    atom_types = exp_data[cs_name].data['atomname'].values
+    exp_cs = exp_data[cs_name].data[star_val].values
+    exp_sigma = exp_data[cs_name].data[star_err].values
+    atom_types = exp_data[cs_name].data[star_atmID].values
     
     if indices is None:
         bc_cs = old_vals - \
@@ -277,8 +284,8 @@ def jc_optimization_ensemble(
     """
     Main logic for J-coupling scoring.
     """
-    exp = exp_data[jc_name].data['value'].values
-    exp_sigma = exp_data[jc_name].data['error'].values
+    exp = exp_data[jc_name].data[star_val].values
+    exp_sigma = exp_data[jc_name].data[star_err].values
 
     if indices is None:
         pop_alpha = bc_data[jc_name].data.values[popped_structure, :]
@@ -337,9 +344,9 @@ def noe_optimization_ensemble(
     """
     Main logic for NOE scoring.
     """
-    exp_distance = exp_data[noe_name].data['dist_value'].values
-    upper_bound_value = exp_data[noe_name].data['upper'].values 
-    lower_bound_value = exp_data[noe_name].data['lower'].values
+    exp_distance = exp_data[noe_name].data[star_val].values
+    upper_bound_value = exp_data[noe_name].data[star_max].values 
+    lower_bound_value = exp_data[noe_name].data[star_min].values
     
     assert exp_distance.shape == upper_bound_value.shape == lower_bound_value.shape
     
@@ -383,9 +390,9 @@ def pre_optimization_ensemble(
     Main logic for PRE scoring function.
     """
     # prepare data
-    exp_distance = exp_data[pre_name].data['dist_value'].values
-    upper_bound_value = exp_data[pre_name].data['upper'].values
-    lower_bound_value = exp_data[pre_name].data['lower'].values
+    exp_distance = exp_data[pre_name].data[star_val].values
+    upper_bound_value = exp_data[pre_name].data[star_max].values
+    lower_bound_value = exp_data[pre_name].data[star_min].values
     
     assert exp_distance.shape == upper_bound_value.shape == lower_bound_value.shape
     
@@ -422,8 +429,8 @@ def rdc_optimization_ensemble(
     new_index=None,
     ):
     # prepare data
-    exp = exp_data[rdc_name].data['value'].values
-    exp_sigma = exp_data[rdc_name].data['error'].values
+    exp = exp_data[rdc_name].data[star_val].values
+    exp_sigma = exp_data[rdc_name].data[star_err].values
     
     assert exp.shape == exp_sigma.shape
 
