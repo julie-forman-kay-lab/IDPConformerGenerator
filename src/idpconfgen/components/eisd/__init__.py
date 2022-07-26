@@ -6,11 +6,13 @@ Functions and logic inspired/imported from https://github.com/THGLab/X-EISD/
 """
 import os
 
-star_val = 'value'
-star_max = 'upper'
-star_atmID = 'atomname'
-star_min = 'lower'
-star_err = 'error'
+exp_idx = 'index'
+exp_resnum = 'resnum'
+exp_val = 'value'
+exp_max = 'upper'
+exp_atmID = 'atomname'
+exp_min = 'lower'
+exp_err = 'error'
 
 eisd_run_all = 'all'
 eisd_run_single = 'single'

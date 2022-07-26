@@ -34,25 +34,45 @@ USAGE EXAMPLE:
     10    .   2   .   1   4    4    ALA   C    C   13   177.602   .
     11    .   2   .   1   4    4    ALA   CA   C   13   52.395    .
 
-Currently accepting the following formats:
-    SAXS: SASBDB, CRYSOL
+Currently accepting the following formats for experimental data:
+    SAXS: SASBDB (curve .DAT), CUSTOM
     Chemical shift: NMR-STAR
     FRET: (ask greg/claudiu for the "standard")
-    J-Couplings: NMR-STAR (coupling constants)
-    NOE: NMR-STAR (homonuclear - distances NMR-STAR)
-    PRE: (changes in R2 or as distance (use NOE) - NMR STAR)
-    RDC: NMR-STAR
-    Rh: (single values)
+    J-Couplings: NMR-STAR (coupling constants), CUSTOM
+    NOE: NMR-STAR (homonuclear/distances), CUSTOM
+    PRE: NMR STAR (changes in R2 or as distance (use NOE)), CUSTOM
+    RDC: NMR-STAR, CUSTOM
+    Rh: CUSTOM (single values)
+
+CUSTOM format:
+    For cases where experimental data is not found on BMRB/SASDB, the
+    formatting is delineated by comma (,) and the first line dictates
+    what each column represents (i.e. pandas DataFrame format).
+    
+    Examples for each data-type has been provided in the ``/exp_examples`` folder.
+    
+    SAXS: index,value,error
+    CS: index,resnum,atomname,value,error
+    FRET: TBD
+    JC: index,resnum,value,error
+    NOE: index,res1,atom1,atom1_multiple_assignments,res2,atom2,atom2_multiple_assignments,value,upper,lower
+    PRE: index,res1,atom1,res2,atom2,value,lower,upper
+    RDC: index,resnum,value,error
+    Rh: index,resnum,value,error
+    
+TODO: FRET and Rh have custom "sigma" values in the Stack, be advised.
+NOTE: misc. information such as res1, atom1, etc. are for back-calculations.
 """
 import numpy as np
 import pandas as pd
 
 from idpconfgen.components.eisd import (
-    star_val,
-    star_err,
-    star_atmID,
-    star_max,
-    star_min,
+    exp_idx,
+    exp_val,
+    exp_err,
+    exp_atmID,
+    exp_max,
+    exp_min,
     parse_mode_exp,
     saxs_name,
     cs_name,
@@ -63,6 +83,7 @@ from idpconfgen.components.eisd import (
     rdc_name,
     rh_name,
     )
+
 
 class Stack():
     def __init__(self, name, data, sigma=None, mu=None):
@@ -84,13 +105,39 @@ class Stack():
         self.mu = mu
 
 
+def parse_saxs_data(fpath):
+    # TODO: might have to change what index is
+    index = []
+    value = []
+    error = []
+    
+    with open(fpath) as f:
+        lines = f.readlines()
+        first = lines[0].split(',')
+        if first[0] == exp_idx:
+            raise TypeError
+        
+        for line in lines:
+            splitted = line.split()
+            if type(splitted[0]) is float:
+                index.append(splitted[0])
+                value.append(splitted[1])
+                error.append(splitted[2])
+    
+    return pd.DataFrame({exp_idx: index, exp_val: value, exp_err: error})
+                
+
 def parse_cs_data(fpath):
+    index = []
     atoms = []
     values = []
     errors = []
     
     with open(fpath) as f:
         lines = f.readlines()
+        first = lines[0].split(',')
+        if first[0] == exp_idx:
+            raise TypeError
         
         for i, line in enumerate(lines):
             if "_" in line:
@@ -101,19 +148,23 @@ def parse_cs_data(fpath):
             else:
                 start_idx = i
                 break
-            
+        
+        idx = 1
         for idx in range(start_idx, len(lines)):
             splitted = lines[idx].split()
             
+            index.append(idx)
             atoms.append(splitted[atom_idx])
             values.append(float(splitted[data_idx]))
             errors.append(float(splitted[error_idx]))
+            idx += 1
             
-    return pd.DataFrame({star_atmID: atoms, star_val: values, star_err: errors})
+    return pd.DataFrame({exp_idx: index, exp_atmID: atoms, exp_val: values, exp_err: errors})
 
 
 # Good for NMR-STAR formatted JC, RDC, NOE, PRE
 def parse_nmrstar_data(fpath, type=None):
+    index = []
     values = []
     upper = []
     lower = []
@@ -121,6 +172,9 @@ def parse_nmrstar_data(fpath, type=None):
     
     with open(fpath) as f:
         lines = f.readlines()
+        first = lines[0].split(',')
+        if first[0] == exp_idx:
+            raise TypeError
         
         for i, line in enumerate(lines):
             if "_" in line:
@@ -133,12 +187,15 @@ def parse_nmrstar_data(fpath, type=None):
             else:
                 start_idx = i
                 break
-            
+        
+        idx=1
         for idx in range(start_idx, len(lines)):
             splitted = lines[idx].split()
             
+            index.append(idx)
             values.append(float(splitted[data_idx]))
             errors.append(float(splitted[error_idx]))
+            idx += 1
             
             if type == noe_name or type == pre_name:
                 max = splitted[max_idx]
@@ -149,9 +206,10 @@ def parse_nmrstar_data(fpath, type=None):
                 lower.append(float(min))
     
     if type == noe_name or type == pre_name:
-        return pd.DataFrame({star_val: values, star_max: upper, star_min: lower, star_err: errors})
+        return pd.DataFrame({exp_idx: index, exp_val: values, exp_max: upper, exp_min: lower, exp_err: errors})
     
-    return pd.DataFrame({star_val: values, star_err: errors})
+    return pd.DataFrame({exp_idx: index, exp_val: values, exp_err: errors})
+
 
 def parse_data(filenames, mode, bc_errors={}):
     """
@@ -184,34 +242,28 @@ def parse_data(filenames, mode, bc_errors={}):
     # Parse experimental data
     if mode == parse_mode_exp:
         for module in filenames:
-            
-            if module == saxs_name:
-                # do saxs parsing
-                None
-            elif module == cs_name:
-                # do cs parsing
-                data = parse_cs_data(filenames[module])
-            elif module == fret_name:
-                # do fret parsing
-                None
-            elif module == jc_name:
-                # do JC parsing
-                data = parse_nmrstar_data(filenames[module])
-            elif module == noe_name:
-                # do NOE parsing
-                data = parse_nmrstar_data(filenames[module], noe_name)
-            elif module == pre_name:
-                # no PRE parsing
-                data = parse_nmrstar_data(filenames[module], pre_name)
-            elif module == rdc_name:
-                # do RDC parsing
-                data = parse_nmrstar_data(filenames[module])
-            elif module == rh_name:
-                # do Rh parsing
-                None
+            try:
+                if module == saxs_name:
+                    data = parse_saxs_data(filenames[module])
+                elif module == cs_name:
+                    data = parse_cs_data(filenames[module])
+                elif module == fret_name:
+                    # do fret parsing
+                    None
+                elif module == jc_name:
+                    data = parse_nmrstar_data(filenames[module])
+                elif module == noe_name:
+                    data = parse_nmrstar_data(filenames[module], noe_name)
+                elif module == pre_name:
+                    data = parse_nmrstar_data(filenames[module], pre_name)
+                elif module == rdc_name:
+                    data = parse_nmrstar_data(filenames[module])
+                elif module == rh_name:
+                    data = pd.read_csv(filenames[module], delimiter=',')
+            except TypeError:
+                data = pd.read_csv(filenames[module], delimiter=',')
                      
             parsed[module] = Stack(module, data, None, None)
-    
     # Parse back calculated data
     else:
         None
