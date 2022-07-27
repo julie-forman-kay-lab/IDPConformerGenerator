@@ -55,10 +55,12 @@ CUSTOM format:
     CS: index,resnum,atomname,value,error
     FRET: TBD
     JC: index,resnum,value,error
-    NOE: index,res1,atom1,atom1_multiple_assignments,res2,atom2,atom2_multiple_assignments,value,upper,lower
-    PRE: index,res1,atom1,res2,atom2,value,lower,upper
+    NOE: index,value,lower,upper,error*
+    PRE: index,value,lower,upper,error*
     RDC: index,resnum,value,error
     Rh: index,resnum,value,error
+    
+    For NOE and PRE, error* can be provided instead of lower+upper.
     
 TODO: FRET and Rh have custom "sigma" values in the Stack, be advised.
 NOTE: misc. information such as res1, atom1, etc. are for back-calculations.
@@ -125,7 +127,7 @@ def parse_saxs_data(fpath):
                 error.append(splitted[2])
     
     return pd.DataFrame({exp_idx: index, exp_val: value, exp_err: error})
-                
+
 
 def parse_cs_data(fpath):
     index = []

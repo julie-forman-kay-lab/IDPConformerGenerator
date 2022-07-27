@@ -4,7 +4,7 @@ Interface for X-EISD logic to score and reweight conformer ensembles.
 Has to ability to store and optimize conformer ensembles towards
 back-calculated and experimental data.
 
-Inspired and imported from: 
+Inspired from: 
 * https://github.com/THGLab/X-EISD/
 * https://github.com/Oufan75/X-EISD
 
@@ -57,6 +57,7 @@ from idpconfgen.components.eisd import (
     eisd_optimization_types,
     default_type,
     default_mode,
+    default_bc_errors,
     parse_mode_exp,
     parse_mode_back,
     make_pairs,
@@ -232,7 +233,7 @@ def main(
     log.info(S('done'))
     
     exp_paths = parse_data(filenames[parse_mode_exp], mode=parse_mode_exp)
-    back_paths = parse_data(filenames[parse_mode_back], mode=parse_mode_back)
+    back_paths = parse_data(filenames[parse_mode_back], parse_mode_back, default_bc_errors)
     ens_size = len(pdbs2operate)
     
     _output = []

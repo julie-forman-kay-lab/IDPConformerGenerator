@@ -1,5 +1,5 @@
 """
-Inspired/imported from 
+Inspired and imported from 
 https://github.com/THGLab/X-EISD/blob/master/eisd/optimizer.py
 https://github.com/Oufan75/X-EISD/blob/master/eisd/optimizer.py
 """
@@ -14,11 +14,7 @@ from idpconfgen.components.eisd import (
 from idpconfgen.components.eisd.scorers import *
 
 
-def monte_carlo(
-    beta,
-    old_total_score,
-    new_total_score,
-    ):
+def monte_carlo(beta, old_total_score, new_total_score):
     new_probability = np.exp(beta * new_total_score)
     old_probability = np.exp(beta * old_total_score)
     
@@ -85,11 +81,13 @@ class XEISD(object):
         # initiate dict to store scores
         scores = {}
             
-        for prop in self.exp_data.keys():
-            scores[prop] = [0, 0, 0]
-            if prop == jc_name:
-                scores[prop] = [0, 0, 0, [0]]
-                
+        for name in self.exp_data.keys():
+            scores[name] = [0, 0, 0]
+            if name == jc_name:
+                scores[name] = [0, 0, 0, [0]]
+        
+        # The first 3 items list[:3] is taken as the "rmse", "score", "back-calculation"
+        # last "error" return is not used for X-EISD
         if jc_name in dtypes:
             scores[jc_name] = list(jc_optimization_ensemble(self.exp_data, self.bc_data, indices))
         if saxs_name in dtypes:
@@ -166,10 +164,10 @@ class XEISD(object):
             old_scores = self.calc_scores([key for key in flags if flags[key]], indices)    
 
             new_scores = {}
-            for prop in flags:
-                new_scores[prop] = [0, 0, 0]
-                if prop == jc_name:
-                    new_scores[prop] = [0, 0, 0, [0]]
+            for name in flags:
+                new_scores[name] = [0, 0, 0]
+                if name == jc_name:
+                    new_scores[name] = [0, 0, 0, [0]]
             accepted = 0
             
             for iterations in range(iters):

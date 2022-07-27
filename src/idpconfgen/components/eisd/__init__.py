@@ -92,12 +92,10 @@ def modes(mode, all):
 
     if mode is eisd_run_all:
         return {flag:True for flag in flags}
-
     elif type(mode) is list:
         for flag in mode:
             flags[flag] = True
         return flags
-
     elif type(mode) is str:
         flags[mode] = True
         return flags
