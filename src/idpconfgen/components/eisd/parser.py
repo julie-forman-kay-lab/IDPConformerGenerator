@@ -267,7 +267,16 @@ def parse_data(filenames, mode, bc_errors={}):
                      
             parsed[module] = Stack(module, data, None, None)
     # Parse back calculated data
+    # NOTE: for these examples, the back-calculator interface saves
+    # data in .txt but CSV formatted
+    # TODO: in the future it may be worthwhile to consider one
+    # .JSON file to house all of the back-calculated data...
     else:
-        None
-
+        for module in filenames:
+            try:
+                data = pd.read_csv(filenames[module], delimiter=',')
+                parsed[module] = Stack(module, data, None, None)
+            except Exception as e:
+                errlogs.append(e)
+            
     return parsed, errlogs
