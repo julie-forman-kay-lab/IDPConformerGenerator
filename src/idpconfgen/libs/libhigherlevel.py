@@ -247,6 +247,7 @@ def extract_secondary_structure(
         for counter, seg_slice in enumerate(minimum_size):
 
             LF_append(lambda x: x[atom_resSeq].strip() in DR[seg_slice])  # noqa: E501, B023
+
             pdb = b'\n'.join(
                 line for line in pdbdata if all(f(line) for f in line_filters)
                 )

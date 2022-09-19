@@ -250,6 +250,7 @@ ap.add_argument(
     )
 
 _ffchoice = list(forcefields.keys())
+FFDEFAULT = _ffchoice[0]
 ap.add_argument(
     '-ff',
     '--forcefield',
@@ -258,7 +259,7 @@ ap.add_argument(
         f'Defaults to {_ffchoice[0]}.'
         ),
     choices=_ffchoice,
-    default=_ffchoice[0],
+    default=FFDEFAULT,
     )
 
 
@@ -385,7 +386,7 @@ def main(
         duser=False,
         dany=False,
         func=None,
-        forcefield=None,
+        forcefield=FFDEFAULT,
         bgeo_strategy=bgeo_strategies_default,
         bgeo_path=None,
         residue_tolerance=None,

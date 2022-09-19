@@ -14,6 +14,16 @@ Changelog
 * Add documentation regarding new features with ``exact`` and ``bgeodb``
 * PR #220
 
+v0.6.14 (2022-07-13)
+------------------------------------------------------------
+
+* Add tests to ``cli_build.main`` (#225)
+
+v0.6.13 (2022-07-13)
+------------------------------------------------------------
+
+* Correct how some loops are written due to redundancies (#226)
+
 v0.6.12 (2022-07-07)
 ------------------------------------------------------------
 

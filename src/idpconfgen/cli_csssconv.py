@@ -71,12 +71,12 @@ def chespi_probs8_convert_full(p8):
     """# noqa: D205, D400, E501
     Parse the probs8_[ID].txt output from CheSPI as user
     configurable input file for CSSS.
-    
+
     Parameters
     ----------
     p8 : string
         Path to the probs8_[ID].txt to operate on as indicated by the user.
-    
+
     Returns
     -------
     dict_out : dictionary
@@ -86,23 +86,17 @@ def chespi_probs8_convert_full(p8):
     """
     dict_out = {}
     dict_p8 = {}
-    
+    dssp_keys = ["H", "G", "I", "E", " ", "T", "S", "B"]
+
     with open(p8) as reader:
         for line in reader:
             pline = line.split()
             pline.pop(0)
             data = [float(i) for i in pline]
             resid = int(data[0])
-            for i in range(1, 9):
-                prob = data[i]
-                if i == 1: dict_p8["H"] = prob      # noqa: E701
-                elif i == 2: dict_p8["G"] = prob    # noqa: E701
-                elif i == 3: dict_p8["I"] = prob    # noqa: E701
-                elif i == 4: dict_p8["E"] = prob    # noqa: E701
-                elif i == 5: dict_p8[" "] = prob    # noqa: E701
-                elif i == 6: dict_p8["T"] = prob    # noqa: E701
-                elif i == 7: dict_p8["S"] = prob    # noqa: E701
-                elif i == 8: dict_p8["B"] = prob    # noqa: E701
+            data.pop(0)
+            for i, prob in enumerate(data):
+                dict_p8[dssp_keys[i]] = prob
             dict_out[resid] = dict_p8
             dict_p8 = {}
     return dict_out
@@ -111,15 +105,15 @@ def chespi_probs8_convert_full(p8):
 def chespi_probs8_convert_grouped(p8):
     """# noqa: D205, D400, E501
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
-    
+
     Groups together DSSP secondary structures as per idpconfgen definitions.
     If a residue has multiple SS probabilities, they are summative per L, H, E definition.
-    
+
     Parameters
     ----------
     p8 : string
         Path to the probs8_[ID].txt to operate on as indicated by the user
-    
+
     Returns
     -------
     dict_out : dictionary
@@ -129,7 +123,7 @@ def chespi_probs8_convert_grouped(p8):
     """
     dict_out = {}
     dict_p8 = {}
-    
+
     with open(p8) as reader:
         for line in reader:
             pline = line.split()
@@ -143,19 +137,19 @@ def chespi_probs8_convert_grouped(p8):
             dict_p8["E"] = data[4]
             dict_out[resid] = dict_p8
             dict_p8 = {}
-            
+
     return dict_out
 
 
 def d2D_convert_full(d2d):
     """# noqa: D205, D400, E501
     Parse the .TXT output from δ2D as user configurable input file for CSSS.
-    
+
     Parameters
     ----------
     d2d : string
         Path to the δ2D .TXT to operate on as indicated by the user
-    
+
     Returns
     -------
     dict_out : dictionary
@@ -166,7 +160,8 @@ def d2D_convert_full(d2d):
     """
     dict_out = {}
     dict_probs = {}
-    
+    dssp_keys = ["H", "E", " ", "P"]
+
     with open(d2d) as reader:
         for line in reader:
             if "#" not in line and line != "\n":
@@ -175,10 +170,9 @@ def d2D_convert_full(d2d):
                 pline.pop()
                 data = [float(i) for i in pline]
                 resid = int(data[0])
-                dict_probs["H"] = data[1]
-                dict_probs["E"] = data[2]
-                dict_probs[" "] = data[3]
-                dict_probs["P"] = data[4]
+                data.pop(0)
+                for i, prob in enumerate(data):
+                    dict_probs[dssp_keys[i]] = prob
                 dict_out[resid] = dict_probs
                 dict_probs = {}
             # if there aren't any predicted probabilities
@@ -187,10 +181,8 @@ def d2D_convert_full(d2d):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H"] = 0.25
-                dict_probs["E"] = 0.25
-                dict_probs[" "] = 0.25
-                dict_probs["P"] = 0.25
+                for key in dssp_keys:
+                    dict_probs[key] = 0.25
                 dict_out[resid] = dict_probs
     return dict_out
 
@@ -198,15 +190,15 @@ def d2D_convert_full(d2d):
 def d2D_convert_grouped(d2d):
     """# noqa: D205, D400, E501
     Parse the .TXT output from δ2D as user configurable input file for CSSS.
-    
+
     Groups together DSSP secondary structures as per idpconfgen definitions.
     If a residue has multiple SS probabilities, they are summative per L, H, E definition.
-    
+
     Parameters
     ----------
     d2d : string
         Path to the δ2D .TXT to operate on as indicated by the user
-    
+
     Returns
     -------
     dict_out : dictionary
@@ -217,7 +209,8 @@ def d2D_convert_grouped(d2d):
     """
     dict_out = {}
     dict_probs = {}
-    
+    dssp_rd_keys = ["H", "E", "L"]
+
     with open(d2d) as reader:
         for line in reader:
             if "#" not in line and line != "\n":
@@ -237,9 +230,8 @@ def d2D_convert_grouped(d2d):
                 sline = line.split()
                 pline = sline[0].split("#")
                 resid = int(pline[1].strip())
-                dict_probs["H"] = 0.333
-                dict_probs["E"] = 0.333
-                dict_probs["L"] = 0.333
+                for key in dssp_rd_keys:
+                    dict_probs[key] = 0.333
                 dict_out[resid] = dict_probs
     return dict_out
 
@@ -253,25 +245,25 @@ def main(
         ):
     """# noqa: D205, D400, E501
     Perform main logic of the script.
-    
+
     Parameters
     ----------
     chespi_p8 : string
         A string to the path of probs8_[ID].TXT output from CheSPI.
-        
+
     delta2D : string
         A string to the path of the .TXT output from δ2D.
-    
+
     output : string, optional
         If given, prints output to that file (must be .JSON), else prints to console.
         Defaults to `None`.
-    
+
     full : boolean, optional
         If given, defaults to true and all of the DSSP codes are used.
         Defaults to False.
     """
     init_files(log, LOGFILESNAME)
-    
+
     if chespi_p8:
         log.info(T('reading and processing CheSPI predictions...'))
         with open(chespi_p8) as reader:
@@ -279,18 +271,18 @@ def main(
             if not re.fullmatch(r"\s{3}[A-Z]{1}\d|\s|.{60,}\n", reader.readline()):     # noqa: E501
                 log.info(S('Incorrect CheSPI input file. Please use probs8_[ID].txt'))  # noqa: E501
                 return
-            
+
         if full: converted_chespi = chespi_probs8_convert_full(chespi_p8)   # noqa: E701, E501
         else: converted_chespi = chespi_probs8_convert_grouped(chespi_p8)   # noqa: E701, E501
-        
+
         _output = json.dumps(converted_chespi, indent=4)
-        
+
     if delta2D:
         log.info(T('reading and processing delta2D predictions...'))
         # TODO: regex matching to see the format of alleged delta2D output files
         if full: converted_delta2D = d2D_convert_full(delta2D)   # noqa: E701
         else: converted_delta2D = d2D_convert_grouped(delta2D)   # noqa: E701
-        
+
         _output = json.dumps(converted_delta2D, indent=4)
 
     if output:
@@ -299,10 +291,10 @@ def main(
             fout.write(_output)
     else:
         print(_output)   # noqa: T201
-    
+
     log.info(S('done'))
-    
+
 
 if __name__ == '__main__':
-    
+
     libcli.maincli(ap, main)
