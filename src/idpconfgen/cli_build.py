@@ -962,7 +962,7 @@ def conformer_generator(
             )
 
     # semantic exchange for speed al readibility
-    with_sidechains = not(disable_sidechains)
+    with_sidechains = not disable_sidechains
 
     if with_sidechains:
         log.info(S(f"configuring sidechain method: {sidechain_method}"))
