@@ -113,3 +113,5 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+idpconfgen.version
+.vscode/settings.json

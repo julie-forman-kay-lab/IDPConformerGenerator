@@ -69,19 +69,19 @@ def plot_torsions(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-        
+
     angles : np.ndarray, shape=(n_confs, residues)
         Container of the Y axis data.
-        
+
     n_conf : integer
         Number of conformers we're processing.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
-        
+
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -106,7 +106,7 @@ def plot_torsions(
         increment = int(residues / fig_size[0])
         if increment == 0:
             increment = 1
-    
+
     if xticks is None:
         xticks = np.arange(0, residues, increment)
         xticks_labels = get_xtick_lbl(xticks)
@@ -167,19 +167,19 @@ def plot_fracSS(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-        
+
     frac_ss : dictionary
         Contains fraction of each secondary structure per residue.
-        
+
     n_conf : integer
         Number of conformers we're processing.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
-        
+
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -258,18 +258,17 @@ def plot_bend_angles(
         filename='plot_bgeo.png',
         dpi=300,
         ):
-    """# noqa: D205, D400
-    Plot all torsion angle distributions as a scatter plot.
-    Defaults to Phi torsion angles.
+    """
+    Plot backbone bond angle distribution as a boxplot.
 
     Parameters
     ----------
     names : string
         Names of the bend types
-        
+
     angles : np.ndarray, shape=(names, n_trimers)
         Container of the Y axis data.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
@@ -299,7 +298,7 @@ def plot_bend_angles(
                     transparent=False,
                     bbox_inches='tight'
                     )
-        
+
     plt.close("all")
 
     return errmsg

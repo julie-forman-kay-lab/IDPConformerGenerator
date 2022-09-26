@@ -22,6 +22,7 @@ from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
+    bgeo_exact_name,
     bgeo_fixed_name,
     bgeo_int2cart_name,
     bgeo_sampling_name,
@@ -122,6 +123,8 @@ INT2CART = None
 # The slice objects from where the builder will feed to extract torsion
 # fragments from ANGLES.
 ANGLES = None
+BEND_ANGS = None
+BOND_LENS = None
 SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
@@ -164,7 +167,8 @@ def are_globals(bgeo_strategy):
             BGEO_trimer,
             BGEO_res,
             ))
-    elif bgeo_strategy == bgeo_fixed_name:
+
+    elif bgeo_strategy in (bgeo_exact_name, bgeo_fixed_name):
         return all((
             ALL_ATOM_LABELS,
             ALL_ATOM_MASKS,
@@ -173,6 +177,7 @@ def are_globals(bgeo_strategy):
             TEMPLATE_MASKS,
             TEMPLATE_EFUNC,
             ))
+
     elif bgeo_strategy == bgeo_int2cart_name:
         return all((
             ALL_ATOM_LABELS,
@@ -186,6 +191,7 @@ def are_globals(bgeo_strategy):
             BGEO_res,
             INT2CART,
             ))
+
     else:
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
@@ -438,7 +444,7 @@ def main(
         )
 
     # we use a dictionary because fragments will be evaluated to exact match
-    global ANGLES, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -499,7 +505,23 @@ def main(
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
 
     db = read_dictionary_from_disk(database)
-    _, ANGLES, secondary, primary = aligndb(db)
+
+    if bgeo_strategy == bgeo_exact_name:
+        try:
+            _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
+        except KeyError:
+            log.info(S('!!!!!!!!!!!!!!!'))
+            log.info(S(
+                'DATABASE ERROR: '
+                'the `database` requested is invalid. Please give the database '
+                'generated with `bgeodb`. See the usage documentation for '
+                'details while using `--bgeo-strategy exact`.'
+                ))
+            return
+
+    else:
+        _, ANGLES, secondary, primary = aligndb(db)
+
     del db
 
     if residue_tolerance is not None:
@@ -529,6 +551,7 @@ def main(
         XMERPROBS,
         input_seq,
         ANGLES,
+        bgeo_strategy,
         SLICEDICT_XMERS,
         csss_dict,
         residue_tolerance=residue_tolerance,
@@ -627,7 +650,7 @@ def populate_globals(
     if bgeo_strategy not in bgeo_strategies:
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
-    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):
+    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name, bgeo_exact_name):  # noqa: E501
         from idpconfgen.components.bgeo_strategies.sampling import bgeo_sampling_path  # noqa: E501  # isort:skip
 
         if bgeo_path is None:
@@ -939,7 +962,7 @@ def conformer_generator(
             )
 
     # semantic exchange for speed al readibility
-    with_sidechains = not(disable_sidechains)
+    with_sidechains = not disable_sidechains
 
     if with_sidechains:
         log.info(S(f"configuring sidechain method: {sidechain_method}"))
@@ -1118,7 +1141,10 @@ def conformer_generator(
                 # TODO
                 # primer_template here is used temporarily, and needs to be
                 # removed when get_adj becomes an option
-                primer_template, agls = GET_ADJ(bbi - 1)
+                if bgeo_strategy == bgeo_exact_name:
+                    primer_template, agls, bangs, blens = GET_ADJ(bbi - 1)
+                else:
+                    primer_template, agls = GET_ADJ(bbi - 1)
 
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
@@ -1163,6 +1189,10 @@ def conformer_generator(
                             _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
                             _bond_lens = bond_lens[torsion_idx]
 
+                        elif bgeo_strategy == bgeo_exact_name:
+                            _bend_angle = bangs[torsion_idx]
+                            _bond_lens = blens[torsion_idx]
+
                         elif bgeo_strategy == bgeo_sampling_name:
                             _bt = next(bond_type)
 
@@ -1190,7 +1220,8 @@ def conformer_generator(
                             )
                         bbi += 1
 
-                    if bgeo_strategy in (bgeo_sampling_name, bgeo_int2cart_name):  # noqa: E501
+                    if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):  # noqa: E501
+
                         try:
                             co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
                         except KeyError:
@@ -1201,6 +1232,10 @@ def conformer_generator(
 
                     elif bgeo_strategy == bgeo_fixed_name:
                         co_bend = build_bend_CA_C_O
+
+                    else:
+                        co_bend = bangs[3]
+                        DISTANCE_C_O = blens[3]
 
                     bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
                         bb_real[bbi - 3, :],
@@ -1493,7 +1528,8 @@ def get_adjacent_angles(
         options,
         probs,
         seq,
-        db,
+        dihedrals_db,
+        bgeo_strategy,
         slice_dict,
         csss,
         residue_tolerance=None,
@@ -1512,8 +1548,11 @@ def get_adjacent_angles(
     seq : str
         The conformer sequence.
 
-    db : dict-like
+    dihedrals_db : dict-like
         The angle omega/phi/psi database.
+
+    bgeo_strategy : string
+        Bond geometry strategy to use.
 
     slice_dict : dict-like
         A dictionary containing the fragments strings as keys and as values
@@ -1556,6 +1595,7 @@ def get_adjacent_angles(
         plen = len(primer_template)
 
         pt_sub = BRS(primer_template, residue_tolerance)
+
         while plen > 0:
             if next_residue == 'P':
                 pt_sub = f'{pt_sub}_P'
@@ -1579,10 +1619,15 @@ def get_adjacent_angles(
                     # based on the probabilities,
                     # select a SS for residue in question
                     pcsss = RC(lss, p=lssprobs)
-                    angles = db[RC(slice_dict[plen][pt_sub][pcsss]), :].ravel()
+                    _slice = RC(slice_dict[plen][pt_sub][pcsss])
 
                 else:
-                    angles = db[RC(slice_dict[plen][pt_sub]), :].ravel()
+                    _slice = RC(slice_dict[plen][pt_sub])
+
+                dihedrals = dihedrals_db[_slice, :].ravel()
+                if bgeo_strategy == bgeo_exact_name:
+                    bend_angs = BEND_ANGS[_slice, :].ravel()
+                    bond_lens = BOND_LENS[_slice, :].ravel()
 
             except (KeyError, ValueError):
                 # walks back one residue
@@ -1603,9 +1648,17 @@ def get_adjacent_angles(
 
         if next_residue == 'P':
             # because angles have the proline information
-            return primer_template + 'P', angles
+
+            if bgeo_strategy == bgeo_exact_name:
+                return primer_template + 'P', dihedrals, bend_angs, bond_lens
+
+            return primer_template + 'P', dihedrals
+
         else:
-            return primer_template, angles
+            if bgeo_strategy == bgeo_exact_name:
+                return primer_template, dihedrals, bend_angs, bond_lens
+
+            return primer_template, dihedrals
 
     return func
 

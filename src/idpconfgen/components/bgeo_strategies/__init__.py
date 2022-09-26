@@ -9,7 +9,8 @@ from idpconfgen.components.bgeo_strategies.int2cart.bgeo_int2cart import \
     name as bgeo_int2cart_name
 from idpconfgen.components.bgeo_strategies.sampling import \
     name as bgeo_sampling_name
-
+from idpconfgen.components.bgeo_strategies.exact import \
+    name as bgeo_exact_name
 
 bgeo_strategies_default = bgeo_sampling_name
 """The default bond geometry sampling strategy."""
@@ -17,6 +18,7 @@ bgeo_strategies_default = bgeo_sampling_name
 bgeo_strategies = (
     bgeo_fixed_name,
     bgeo_sampling_name,
+    bgeo_exact_name,
     bgeo_int2cart_name,
     )
 """Available bond geometry sampling strategies."""

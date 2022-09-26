@@ -1,8 +1,8 @@
 """Test I/O lib."""
-import collections
 import glob
 import os
 import tarfile
+from collections.abc import Iterable
 from multiprocessing import Manager
 
 import pytest
@@ -298,7 +298,7 @@ def test_save_pairs_to_tar(func):
 def test_paths_from_flist():
     """Test paths from list."""
     result = libio.paths_from_flist(tcommons.iofiles_folder / 'file.list')
-    assert isinstance(result, collections.Iterable)
+    assert isinstance(result, Iterable)
     assert list(result) == [Path(f'file{i}') for i in range(6, 9)]
 
 
@@ -321,7 +321,7 @@ def test_add_existent_files_2():
     files = []
     tpath = Path(tcommons.tests_folder, 'doesnotexist.py')
     libio.add_existent_files(files, [tpath])
-    assert not(files)
+    assert not files
 
 
 def test_has_suffix_1():

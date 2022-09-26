@@ -18,6 +18,7 @@ import sys
 from idpconfgen import (
     __version__,
     cli_bgeo,
+    cli_bgeodb,
     cli_build,
     cli_csssconv,
     cli_dssppii,
@@ -57,6 +58,7 @@ Individual routines for DB creation:
 Other useful routines:
 
     * {cli_bgeo._name}
+    * {cli_bgeodb._name}
     * {cli_fetch._name}
     * {cli_ssext._name}
     * {cli_fastaext._name}
@@ -95,6 +97,7 @@ libcli.add_subparser(subparsers, cli_build)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)
+libcli.add_subparser(subparsers, cli_bgeodb)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_ssext)
