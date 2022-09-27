@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Added new building feature ``--fld-structures`` to build certain domains of interest
+* Added building flag ``--fld-bounds`` to indicate where the folded region starts and ends
+
 v0.6.15 (2022-09-26)
 ------------------------------------------------------------
 
