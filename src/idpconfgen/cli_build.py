@@ -231,6 +231,23 @@ libcli.add_argument_duser(ap)
 #########################################
 
 ap.add_argument(
+    '-flds',
+    '--folded-structures',
+    help=(
+        'Input .JSON file for custom database containing folded domain '
+        'of interest.'
+        ),
+    default=None,
+    )
+
+ap.add_argument(
+    '-fldr',
+    '--folded-boundary',
+    help='Boundary of folded domain of interest.',
+    default=None,
+    )
+
+ap.add_argument(
     '-csss',
     '--custom-sampling',
     help=(
@@ -380,6 +397,8 @@ def main(
         input_seq,
         database,
         custom_sampling,
+        folded_structures,
+        folded_boundary,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
