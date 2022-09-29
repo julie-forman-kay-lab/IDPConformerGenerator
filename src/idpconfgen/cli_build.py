@@ -522,6 +522,28 @@ def main(
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
+        
+    if (folded_structures is None) or (folded_boundary is None):
+        log.info(S("To build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
+        return
+    else:
+        log.info(T('Initializing folded domain information'))
+        fldb = read_dictionary_from_disk(folded_structures)
+        _bounds = folded_boundary.split('-')
+        start_fld = int(_bounds[0])
+        end_fld = int(_bounds[1])
+        if start_fld > end_fld:
+            log.info(S(
+                'Folded boundaries must be in the format `START-END` inclusive.'
+                ' Where START < END.'
+                ))
+        log.info(S('done'))
+        
+        fldb
+        
+        # TODO: see where in the sequence folded domain lies
+        # between the boundaries and create slice objects based on
+        # that for all internal coordinates
 
     db = read_dictionary_from_disk(database)
 
