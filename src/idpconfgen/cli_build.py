@@ -129,6 +129,10 @@ SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
 
+FLD_ANGLES = None
+FLD_BEND_ANGS = None
+FLD_BOND_LENS = None
+
 # keeps a record of the conformer numbers written to disk across the different
 # cores
 CONF_NUMBER = Queue()
@@ -464,6 +468,9 @@ def main(
 
     # we use a dictionary because fragments will be evaluated to exact match
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    
+    # initializing global variables for folded region
+    global FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -530,16 +537,26 @@ def main(
         log.info(T('Initializing folded domain information'))
         fldb = read_dictionary_from_disk(folded_structures)
         _bounds = folded_boundary.split('-')
-        start_fld = int(_bounds[0])
-        end_fld = int(_bounds[1])
-        if start_fld > end_fld:
+        START_FLD = int(_bounds[0]) - 1  # subtracting 1 due to index behavior
+        END_FLD = int(_bounds[1])
+        if START_FLD > END_FLD:
             log.info(S(
                 'Folded boundaries must be in the format `START-END` inclusive.'
                 ' Where START < END.'
                 ))
+        fld_seq = input_seq[START_FLD: END_FLD]
+        _, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, fld_secondary, fld_primary = aligndb(fldb, True)  # noqa: E501
         log.info(S('done'))
         
-        fldb
+        FLD_SLICEDICT_XMERS = prepare_slice_dict(
+            fld_primary,
+            fld_seq,
+            dssp_regexes=dssp_regexes,  # TODO: need to fix to any
+            mers_size=len(fld_seq),
+            res_tolerance=residue_tolerance,
+            ncores=ncores,
+            )
+        remove_empty_keys(FLD_SLICEDICT_XMERS)
         
         # TODO: see where in the sequence folded domain lies
         # between the boundaries and create slice objects based on
