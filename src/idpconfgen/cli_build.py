@@ -470,7 +470,7 @@ def main(
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     
     # initializing global variables for folded region
-    global FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS
+    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -537,30 +537,30 @@ def main(
         log.info(T('Initializing folded domain information'))
         fldb = read_dictionary_from_disk(folded_structures)
         _bounds = folded_boundary.split('-')
-        START_FLD = int(_bounds[0]) - 1  # subtracting 1 due to index behavior
+        START_FLD = int(_bounds[0])
         END_FLD = int(_bounds[1])
         if START_FLD > END_FLD:
             log.info(S(
                 'Folded boundaries must be in the format `START-END` inclusive.'
                 ' Where START < END.'
                 ))
-        fld_seq = input_seq[START_FLD: END_FLD]
+        # subtracting 1 due to index behavior
+        fld_seq = input_seq[START_FLD - 1: END_FLD]
+        
         _, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, fld_secondary, fld_primary = aligndb(fldb, True)  # noqa: E501
-        log.info(S('done'))
         
         FLD_SLICEDICT_XMERS = prepare_slice_dict(
             fld_primary,
             fld_seq,
-            dssp_regexes=dssp_regexes,  # TODO: need to fix to any
-            mers_size=len(fld_seq),
+            dssp_regexes=[all_valid_ss_codes],
+            secondary=fld_secondary,
+            mers_size=xmer_probs_tmp.sizes,
             res_tolerance=residue_tolerance,
             ncores=ncores,
             )
         remove_empty_keys(FLD_SLICEDICT_XMERS)
         
-        # TODO: see where in the sequence folded domain lies
-        # between the boundaries and create slice objects based on
-        # that for all internal coordinates
+        log.info(S('done'))
 
     db = read_dictionary_from_disk(database)
 
@@ -612,6 +612,9 @@ def main(
         bgeo_strategy,
         SLICEDICT_XMERS,
         csss_dict,
+        FLD_SLICEDICT_XMERS,
+        FLD_ANGLES,
+        flds=folded_structures,
         residue_tolerance=residue_tolerance,
         )
 
@@ -1590,6 +1593,9 @@ def get_adjacent_angles(
         bgeo_strategy,
         slice_dict,
         csss,
+        fld_slice_dict,
+        fld_dihedrals_db,
+        flds=None,
         residue_tolerance=None,
         ):
     """
@@ -1619,6 +1625,20 @@ def get_adjacent_angles(
     csss : dict-like
         A dictionary containing probabilities of secondary structures per
         amino acid residue position.
+    
+    fld_slice_dict : dict-like
+        Dictionary containing fragments strings as keys and as values
+        lists with slice objects for folded domain.
+    
+    fld_dihedrals_db : dict-like
+        Folded angle omega/phi/psi database
+        
+    flds : str or Path
+        A string pointing to the path for secondary database of folded domains
+    
+    residue_tolerance : dict-like
+        A dictionary for possible residue tolerances to look for while sampling
+        torsion angles of amino acids.
     """
     residue_tolerance = residue_tolerance or {}
     probs = fill_list(probs, 0, len(options))
@@ -1659,33 +1679,39 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                if csss:
-                    # matches current residue
-                    # to build with residue number in CSSS
-                    cr_plus_1 = str(cr + 1)
-
-                    # clear lists
-                    lssC()
-                    lssprobsC()
-
-                    # adds possible secondary structure for the residue
-                    # the first residue of the fragment
-                    lssE(csss[cr_plus_1].keys())
-                    # adds SS probabilities for the same residue
-                    lssprobsE(csss[cr_plus_1].values())
-
-                    # based on the probabilities,
-                    # select a SS for residue in question
-                    pcsss = RC(lss, p=lssprobs)
-                    _slice = RC(slice_dict[plen][pt_sub][pcsss])
-
+                if flds and (START_FLD <= cr <= END_FLD):
+                    _slice = RC(fld_slice_dict[plen][pt_sub])
+                    dihedrals = fld_dihedrals_db[_slice, :].ravel()
+                    bend_angs = FLD_BEND_ANGS[_slice, :].ravel()
+                    bond_lens = FLD_BOND_LENS[_slice, :].ravel()
                 else:
-                    _slice = RC(slice_dict[plen][pt_sub])
+                    if csss:
+                        # matches current residue
+                        # to build with residue number in CSSS
+                        cr_plus_1 = str(cr + 1)
 
-                dihedrals = dihedrals_db[_slice, :].ravel()
-                if bgeo_strategy == bgeo_exact_name:
-                    bend_angs = BEND_ANGS[_slice, :].ravel()
-                    bond_lens = BOND_LENS[_slice, :].ravel()
+                        # clear lists
+                        lssC()
+                        lssprobsC()
+
+                        # adds possible secondary structure for the residue
+                        # the first residue of the fragment
+                        lssE(csss[cr_plus_1].keys())
+                        # adds SS probabilities for the same residue
+                        lssprobsE(csss[cr_plus_1].values())
+
+                        # based on the probabilities,
+                        # select a SS for residue in question
+                        pcsss = RC(lss, p=lssprobs)
+                        _slice = RC(slice_dict[plen][pt_sub][pcsss])
+                    else:
+                        _slice = RC(slice_dict[plen][pt_sub])
+                    
+                    dihedrals = dihedrals_db[_slice, :].ravel()
+
+                    if (bgeo_strategy == bgeo_exact_name) and (flds is None):
+                        bend_angs = BEND_ANGS[_slice, :].ravel()
+                        bond_lens = BOND_LENS[_slice, :].ravel()
 
             except (KeyError, ValueError):
                 # walks back one residue
