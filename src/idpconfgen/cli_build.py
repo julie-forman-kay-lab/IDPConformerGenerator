@@ -530,10 +530,8 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if (folded_structures is None) or (folded_boundary is None):
-        log.info(S("To build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
-        return
-    else:
+    if folded_structures or folded_boundary:
+        log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
         log.info(T('Initializing folded domain information'))
         fldb = read_dictionary_from_disk(folded_structures)
         _bounds = folded_boundary.split('-')
@@ -559,8 +557,10 @@ def main(
             ncores=ncores,
             )
         remove_empty_keys(FLD_SLICEDICT_XMERS)
-        
         log.info(S('done'))
+    else:
+        FLD_SLICEDICT_XMERS = None
+        FLD_ANGLES = None
 
     db = read_dictionary_from_disk(database)
 
@@ -1680,8 +1680,12 @@ def get_adjacent_angles(
 
             try:
                 if flds and (START_FLD <= cr <= END_FLD):
+                    # TODO can optimize for larger fragment sizes here so
+                    # we build most of the folded domain
                     _slice = RC(fld_slice_dict[plen][pt_sub])
+                    
                     dihedrals = fld_dihedrals_db[_slice, :].ravel()
+                    
                     bend_angs = FLD_BEND_ANGS[_slice, :].ravel()
                     bond_lens = FLD_BOND_LENS[_slice, :].ravel()
                 else:
@@ -1709,7 +1713,7 @@ def get_adjacent_angles(
                     
                     dihedrals = dihedrals_db[_slice, :].ravel()
 
-                    if (bgeo_strategy == bgeo_exact_name) and (flds is None):
+                    if bgeo_strategy == bgeo_exact_name:
                         bend_angs = BEND_ANGS[_slice, :].ravel()
                         bond_lens = BOND_LENS[_slice, :].ravel()
 
