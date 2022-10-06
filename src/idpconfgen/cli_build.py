@@ -470,7 +470,7 @@ def main(
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     
     # initializing global variables for folded region
-    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS
+    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, FLD_FRAG_SIZES  # noqa: E501
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -530,9 +530,9 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if folded_structures or folded_boundary:
-        log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
+    if folded_structures and folded_boundary:
         log.info(T('Initializing folded domain information'))
+        log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
         fldb = read_dictionary_from_disk(folded_structures)
         _bounds = folded_boundary.split('-')
         START_FLD = int(_bounds[0])
@@ -542,18 +542,22 @@ def main(
                 'Folded boundaries must be in the format `START-END` inclusive.'
                 ' Where START < END.'
                 ))
-        # subtracting 1 due to index behavior
-        fld_seq = input_seq[START_FLD - 1: END_FLD]
+            return
+        # subtracting 1 due to lack of first and last residue
+        # when calculating torsions/database
+        fld_seq = input_seq[START_FLD: END_FLD - 1]
+        fld_len = len(fld_seq)
+        log.info(S(f"Your folded region is: {fld_seq}"))  # noqa: E501
+        FLD_FRAG_SIZES = [fld_len - s for s in xmer_probs_tmp.sizes]
         
         _, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, fld_secondary, fld_primary = aligndb(fldb, True)  # noqa: E501
-        
+                
         FLD_SLICEDICT_XMERS = prepare_slice_dict(
             fld_primary,
             fld_seq,
             dssp_regexes=[all_valid_ss_codes],
             secondary=fld_secondary,
-            mers_size=xmer_probs_tmp.sizes,
-            res_tolerance=residue_tolerance,
+            mers_size=(FLD_FRAG_SIZES),
             ncores=ncores,
             )
         remove_empty_keys(FLD_SLICEDICT_XMERS)
@@ -561,6 +565,9 @@ def main(
     else:
         FLD_SLICEDICT_XMERS = None
         FLD_ANGLES = None
+        FLD_FRAG_SIZES = None
+        START_FLD = 0
+        END_FLD = 0
 
     db = read_dictionary_from_disk(database)
 
@@ -1660,18 +1667,23 @@ def get_adjacent_angles(
         # calculates the current residue number from the atom index
         cr = CRNFI(aidx)
 
-        # chooses the size of the fragment from pre-configured range of sizes
-        plen = RC(options, p=probs)
+        if flds and (START_FLD < cr < END_FLD):
+            # chooses size of fragment depending
+            # on where it is in the folded region
+            plen = END_FLD - cr
+        else:
+            # chooses the size of the fragment from
+            # pre-configured range of sizes
+            plen = RC(options, p=probs)
+            
         # defines the fragment identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
         _ori_template = primer_template
         next_residue = GSCNJIT(seq, cr + plen, 1)
-
         # recalculates the plen to avoid plen/template inconsistencies that
         # occur if the plen is higher then the number of
         # residues until the end of the protein.
         plen = len(primer_template)
-
         pt_sub = BRS(primer_template, residue_tolerance)
 
         while plen > 0:
@@ -1679,9 +1691,8 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                if flds and (START_FLD <= cr <= END_FLD):
-                    # TODO can optimize for larger fragment sizes here so
-                    # we build most of the folded domain
+                if flds and (START_FLD < cr < END_FLD):
+                    
                     _slice = RC(fld_slice_dict[plen][pt_sub])
                     
                     dihedrals = fld_dihedrals_db[_slice, :].ravel()
