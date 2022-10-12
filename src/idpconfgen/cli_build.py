@@ -80,6 +80,7 @@ from idpconfgen.libs.libcalc import (
     rrd10_njit,
     )
 from idpconfgen.libs.libfilter import aligndb
+from idpconfgen.libs.libfunc import find_inbetween
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
@@ -238,7 +239,7 @@ ap.add_argument(
     '-flds',
     '--folded-structures',
     help=(
-        'Input .JSON file for custom database containing folded domain '
+        'Input .JSON file for custom database containing all folded domains '
         'of interest.'
         ),
     default=None,
@@ -246,8 +247,12 @@ ap.add_argument(
 
 ap.add_argument(
     '-fldr',
-    '--folded-boundary',
-    help='Boundary of folded domain of interest.',
+    '--folded-region',
+    help=(
+        'Boundary of folded region of interest separated by dash and comma. '
+        'Ex. -fldr 12-36 OR -fldr 14-24,54-93,132-201'
+        'Note how multiple folded regions are entered from least to greatest.'
+        ),
     default=None,
     )
 
@@ -402,7 +407,7 @@ def main(
         database,
         custom_sampling,
         folded_structures=None,
-        folded_boundary=None,
+        folded_region=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -470,7 +475,7 @@ def main(
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     
     # initializing global variables for folded region
-    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, FLD_FRAG_SIZES  # noqa: E501
+    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, FLD_FRAG_SIZES, FLD_IDX  # noqa: E501
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -530,37 +535,47 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if folded_structures and folded_boundary:
+    if folded_structures and folded_region:
         log.info(T('Initializing folded domain information'))
         log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
         fldb = read_dictionary_from_disk(folded_structures)
-        _bounds = folded_boundary.split('-')
-        START_FLD = int(_bounds[0])
-        END_FLD = int(_bounds[1])
-        if START_FLD > END_FLD:
-            log.info(S(
-                'Folded boundaries must be in the format `START-END` inclusive.'
-                ' Where START < END.'
-                ))
-            return
-        # subtracting 1 due to lack of first and last residue
-        # when calculating torsions/database
-        fld_seq = input_seq[START_FLD: END_FLD - 1]
-        fld_len = len(fld_seq)
-        log.info(S(f"Your folded region is: {fld_seq}"))  # noqa: E501
-        FLD_FRAG_SIZES = [fld_len - s for s in xmer_probs_tmp.sizes]
+        _bounds = folded_region.split(',')
         
         _, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, fld_secondary, fld_primary = aligndb(fldb, True)  # noqa: E501
-                
-        FLD_SLICEDICT_XMERS = prepare_slice_dict(
-            fld_primary,
-            fld_seq,
-            dssp_regexes=[all_valid_ss_codes],
-            secondary=fld_secondary,
-            mers_size=(FLD_FRAG_SIZES),
-            ncores=ncores,
-            )
-        remove_empty_keys(FLD_SLICEDICT_XMERS)
+        
+        # FLD global variables will all align with order of
+        # folded regions in the order of residues
+        START_FLD = []
+        END_FLD = []
+        FLD_FRAG_SIZES = []
+        FLD_SLICEDICT_XMERS = []
+        for i, boundary in enumerate(_bounds):
+            _boundary = boundary.split('-')
+            START_FLD.append(int(_boundary[0]))
+            END_FLD.append(int(_boundary[1]))
+            if START_FLD[i] > END_FLD[i]:
+                log.info(S(
+                    'Folded boundaries must be in the format `START-END` '
+                    'inclusive. Where START < END.'
+                    ))
+            
+            fld_seq = input_seq[START_FLD[i]: END_FLD[i] - 1]
+            fld_len = len(fld_seq)
+            log.info(S(f"Folded region #{i + 1} is: {fld_seq}"))
+            
+            FLD_FRAG_SIZES.append([fld_len - s for s in xmer_probs_tmp.sizes])
+            
+            _fld_slicedict_xmers = prepare_slice_dict(
+                fld_primary,
+                fld_seq,
+                dssp_regexes=[all_valid_ss_codes],
+                secondary=fld_secondary,
+                mers_size=(FLD_FRAG_SIZES[i]),
+                ncores=ncores,
+                )
+            FLD_SLICEDICT_XMERS.append(_fld_slicedict_xmers)
+            remove_empty_keys(FLD_SLICEDICT_XMERS[i])
+        
         log.info(S('done'))
     else:
         FLD_SLICEDICT_XMERS = None
@@ -568,6 +583,7 @@ def main(
         FLD_FRAG_SIZES = None
         START_FLD = 0
         END_FLD = 0
+        FLD_IDX = False
 
     db = read_dictionary_from_disk(database)
 
@@ -1666,15 +1682,15 @@ def get_adjacent_angles(
 
         # calculates the current residue number from the atom index
         cr = CRNFI(aidx)
+        
+        # chooses the size of the fragment from
+        # pre-configured range of sizes
+        plen = RC(options, p=probs)
 
-        if flds and (START_FLD < cr < END_FLD):
-            # chooses size of fragment depending
-            # on where it is in the folded region
-            plen = END_FLD - cr
-        else:
-            # chooses the size of the fragment from
-            # pre-configured range of sizes
-            plen = RC(options, p=probs)
+        if flds:
+            FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
+            if FLD_IDX:
+                plen = END_FLD[FLD_IDX] - cr
             
         # defines the fragment identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
@@ -1691,9 +1707,8 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                if flds and (START_FLD < cr < END_FLD):
-                    
-                    _slice = RC(fld_slice_dict[plen][pt_sub])
+                if flds and FLD_IDX:
+                    _slice = RC(fld_slice_dict[FLD_IDX][plen][pt_sub])
                     
                     dihedrals = fld_dihedrals_db[_slice, :].ravel()
                     

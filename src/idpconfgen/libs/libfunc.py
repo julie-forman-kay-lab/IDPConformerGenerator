@@ -313,6 +313,33 @@ def raise_(exception, *ignore, **everything):
     raise exception
 
 
+def find_inbetween(num, a, b):
+    """
+    Find if number is between two lists of starting and ending numbers.
+    
+    Parameters
+    ----------
+    num : int
+        Number of interest
+        
+    a : list
+        List of starting numbers
+    
+    b : list
+        List of ending numbers
+    
+    Returns
+    -------
+    idx : int or Bool
+        Index of where the range should be.
+        False if not between any of the list items
+    """
+    for idx, _a in enumerate(a):
+        if a[idx] < num < b[idx]:
+            return idx
+    return False
+
+
 @contextmanager
 def context_engine(
         func,
