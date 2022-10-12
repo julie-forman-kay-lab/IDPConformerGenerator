@@ -551,15 +551,15 @@ def main(
         FLD_SLICEDICT_XMERS = []
         for i, boundary in enumerate(_bounds):
             _boundary = boundary.split('-')
-            START_FLD.append(int(_boundary[0]))
-            END_FLD.append(int(_boundary[1]))
+            START_FLD.append(int(_boundary[0]) - 1)
+            END_FLD.append(int(_boundary[1]) - 1)
             if START_FLD[i] > END_FLD[i]:
                 log.info(S(
                     'Folded boundaries must be in the format `START-END` '
                     'inclusive. Where START < END.'
                     ))
             
-            fld_seq = input_seq[START_FLD[i]: END_FLD[i] - 1]
+            fld_seq = input_seq[START_FLD[i]: END_FLD[i]]
             fld_len = len(fld_seq)
             log.info(S(f"Folded region #{i + 1} is: {fld_seq}"))
             
@@ -1688,6 +1688,7 @@ def get_adjacent_angles(
         plen = RC(options, p=probs)
 
         if flds:
+            # TODO check why FLD_IDX is returning false for 1-N folded domain
             FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
             if FLD_IDX:
                 plen = END_FLD[FLD_IDX] - cr

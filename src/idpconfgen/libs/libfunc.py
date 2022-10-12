@@ -335,7 +335,7 @@ def find_inbetween(num, a, b):
         False if not between any of the list items
     """
     for idx, _a in enumerate(a):
-        if a[idx] < num < b[idx]:
+        if a[idx] <= num < b[idx]:
             return idx
     return False
 
