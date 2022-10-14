@@ -575,7 +575,6 @@ def main(
                 )
             FLD_SLICEDICT_XMERS.append(_fld_slicedict_xmers)
             remove_empty_keys(FLD_SLICEDICT_XMERS[i])
-        
         log.info(S('done'))
     else:
         FLD_SLICEDICT_XMERS = None
@@ -583,7 +582,7 @@ def main(
         FLD_FRAG_SIZES = None
         START_FLD = 0
         END_FLD = 0
-        FLD_IDX = False
+        FLD_IDX = -1
 
     db = read_dictionary_from_disk(database)
 
@@ -1688,9 +1687,8 @@ def get_adjacent_angles(
         plen = RC(options, p=probs)
 
         if flds:
-            # TODO check why FLD_IDX is returning false for 1-N folded domain
             FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
-            if FLD_IDX:
+            if FLD_IDX >= 0:
                 plen = END_FLD[FLD_IDX] - cr
             
         # defines the fragment identity accordingly
@@ -1708,7 +1706,8 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                if flds and FLD_IDX:
+                FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
+                if flds and FLD_IDX >= 0:
                     _slice = RC(fld_slice_dict[FLD_IDX][plen][pt_sub])
                     
                     dihedrals = fld_dihedrals_db[_slice, :].ravel()

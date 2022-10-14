@@ -330,14 +330,14 @@ def find_inbetween(num, a, b):
     
     Returns
     -------
-    idx : int or Bool
+    idx : int
         Index of where the range should be.
-        False if not between any of the list items
+        -1 if not between any of the list items
     """
     for idx, _a in enumerate(a):
-        if a[idx] <= num < b[idx]:
+        if a[idx] < num < b[idx]:
             return idx
-    return False
+    return -1
 
 
 @contextmanager
