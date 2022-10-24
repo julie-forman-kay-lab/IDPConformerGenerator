@@ -4,7 +4,6 @@
 from contextlib import contextmanager
 from functools import partial, reduce
 from operator import is_, is_not
-from typing import Type
 
 
 def vartial(func, *args, **keywords):
