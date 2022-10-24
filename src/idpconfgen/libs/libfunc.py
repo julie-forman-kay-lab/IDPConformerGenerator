@@ -4,6 +4,7 @@
 from contextlib import contextmanager
 from functools import partial, reduce
 from operator import is_, is_not
+from typing import Type
 
 
 def vartial(func, *args, **keywords):
@@ -334,10 +335,13 @@ def find_inbetween(num, a, b):
         Index of where the range should be.
         -1 if not between any of the list items
     """
-    for idx, _a in enumerate(a):
-        if a[idx] < num < b[idx]:
-            return idx
-    return -1
+    try:
+        for idx, _a in enumerate(a):
+            if a[idx] < num < b[idx]:
+                return idx
+        return -1
+    except TypeError:
+        return False
 
 
 @contextmanager
