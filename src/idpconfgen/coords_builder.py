@@ -25,3 +25,56 @@ Ideas:
 - this can be very computationally expensive
 - can start with this?
 """
+
+from functools import partial
+
+from scipy.interpolate import interpn
+
+import numpy as np
+import pyvista as pv  # test 3D interpolation functions for mesh building
+
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
+
+from idpconfgen import Path, log
+from idpconfgen.libs.libstructure import (
+  Structure,
+  col_name,
+  col_resName,
+  col_resSeq,
+  cols_coords,
+)
+from idpconfgen.logger import S, T, init_files, report_on_crash
+
+# First step is to make a mesh of PDB structure from cartesian coords
+# (this will give boundaries for certain steric clashes)
+
+def get_mesh(pdb, alpha=2.):
+  """
+  Calculate interpolated 3D mesh coordinates from PDB file.
+  
+  Parameters
+  ----------
+  pdb : Path
+    Absolute path to folded protein
+  
+  Returns
+  -------
+  mesh : nd.array size 3
+    3D coordinates of mesh function
+  """
+  s = Structure(pdb)
+  s.build()
+  coords = s.data_array[:, cols_coords].astype(float)
+  
+  cloud = pv.PolyData(coords)
+  volume = cloud.delaunay_3d(alpha=alpha)
+  shell = volume.extract_geometry()
+  shell.plot()
+  # needs smoothing!
+  return shell
+
+
+INPUT = Path("/home/nemoliu/Documents/idpconfgenTest/fldrsTest/STAS/1merSTAS.pdb")
+mesh = get_mesh(INPUT)
