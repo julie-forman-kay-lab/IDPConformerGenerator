@@ -31,7 +31,6 @@ from functools import partial
 from scipy.interpolate import interpn
 
 import numpy as np
-import pyvista as pv  # test 3D interpolation functions for mesh building
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -49,8 +48,9 @@ from idpconfgen.logger import S, T, init_files, report_on_crash
 
 # First step is to make a mesh of PDB structure from cartesian coords
 # (this will give boundaries for certain steric clashes)
+# PyVista (tested, does not work for our purposes)
 
-def get_mesh(pdb, alpha=2.):
+def get_mesh(pdb):
   """
   Calculate interpolated 3D mesh coordinates from PDB file.
   
@@ -67,14 +67,7 @@ def get_mesh(pdb, alpha=2.):
   s = Structure(pdb)
   s.build()
   coords = s.data_array[:, cols_coords].astype(float)
-  
-  cloud = pv.PolyData(coords)
-  volume = cloud.delaunay_3d(alpha=alpha)
-  shell = volume.extract_geometry()
-  shell.plot()
-  # needs smoothing!
-  return shell
-
+  return coords
 
 INPUT = Path("/home/nemoliu/Documents/idpconfgenTest/fldrsTest/STAS/1merSTAS.pdb")
 mesh = get_mesh(INPUT)
