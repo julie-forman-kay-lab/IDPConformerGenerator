@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update citation to J Phys Chem A reference
+
 v0.6.15 (2022-09-26)
 ------------------------------------------------------------
 
