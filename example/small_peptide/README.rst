@@ -1,7 +1,12 @@
-IDPConfGen Small Peptide Example
-================================
+IDPConfGen Small Peptide Test
+=============================
 
 .. start-description
+
+.. note::
+    The purpose of this module is to test the installation of IDPConformerGenerator
+    on a small example peptide. The database you will procure here will not be used
+    further cases, much less in practice due to the database housing only 100 PDB IDs.
 
 To build the torsion angle database you need to provide IDPConfGen with a list
 of PDB/mmCIF files. Our advice is that you use a culled list of your choice from
