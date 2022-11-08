@@ -44,4 +44,4 @@ If you use IDPConformerGenerator, please cite::
 
 Version
 -------
-v0.6.15
+v0.6.16
