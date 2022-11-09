@@ -83,6 +83,7 @@ from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libfunc import find_inbetween
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
+    FileReaderIterator,
     make_folder_or_cwd,
     read_dict_from_json,
     read_dictionary_from_disk,
@@ -95,7 +96,7 @@ from idpconfgen.libs.libparse import (
     remove_empty_keys,
     translate_seq_to_3l,
     )
-from idpconfgen.libs.libpdb import atom_line_formatter
+from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
@@ -131,7 +132,7 @@ XMERPROBS = None
 GET_ADJ = None
 
 # Case of folded region (1, 2, or 3) determines strategy
-CASE = None
+FLD_CASE = None
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -238,17 +239,6 @@ ap.add_argument(
     '-flds',
     '--folded-structure',
     help="Input .PDB file for folded structure of interest.",
-    default=None,
-    )
-
-ap.add_argument(
-    '-fldr',
-    '--folded-region',
-    help=(
-        'Boundary of folded region of interest separated by dash and comma. '
-        'Ex. -fldr 12-36 OR -fldr 14-24,54-93,132-201'
-        'Note how multiple folded regions are entered from least to greatest.'
-        ),
     default=None,
     )
 
@@ -402,8 +392,7 @@ def main(
         input_seq,
         database,
         custom_sampling,
-        folded_structures=None,
-        folded_region=None,
+        folded_structure=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -528,28 +517,33 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if folded_structures.endswith('.pdb') and folded_region:        
+    if folded_structure.endswith('.pdb'):        
         log.info(T('Initializing folded domain information'))
-        log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
         
-        _bounds = folded_region.split(',')
-        # FLD global variables will all align with order of
-        # folded regions in the order of residues
+        # List of ranges for disordered regions
+        # disordered regions = anything not aligned in the 
+        #   folded structure to sequence
         START_FLD = []
         END_FLD = []
-        for i, boundary in enumerate(_bounds):
+        with open(folded_structure) as f:
+            pdb_raw = f.read()
+        _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
+        
+        # TODO: what to do about "X" within the sequence?
+        # find gaps = disordered regions that need to be filled
+        
+        '''
+        for i, boundary in enumerate(bounds):
             _boundary = boundary.split('-')
             START_FLD.append(int(_boundary[0]) - 1)
             END_FLD.append(int(_boundary[1]) - 1)
-            if START_FLD[i] > END_FLD[i]:
-                log.info(S(
-                    'Folded boundaries must be in the format `START-END` '
-                    'inclusive. Where START < END.'
-                    ))
+
             
             fld_seq = input_seq[START_FLD[i]: END_FLD[i]]
             fld_len = len(fld_seq)
-            log.info(S(f"Folded region #{i + 1} is: {fld_seq}"))
+            log.info(S(f"Disordered region #{i + 1} is: {fld_seq}"))
+        '''
+        
         log.info(S('done'))
 
     db = read_dictionary_from_disk(database)
@@ -602,7 +596,7 @@ def main(
         bgeo_strategy,
         SLICEDICT_XMERS,
         csss_dict,
-        flds=folded_structures,
+        flds=folded_structure,
         residue_tolerance=residue_tolerance,
         )
 
