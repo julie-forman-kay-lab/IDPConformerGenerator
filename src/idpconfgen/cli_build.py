@@ -535,11 +535,7 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if folded_structures and folded_region:
-        if folded_structures.endswith('.pdb'):
-            # TODO go to coordinate builder client
-            return
-        
+    if folded_structures and folded_region:        
         log.info(T('Initializing folded domain information'))
         log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
         fldb = read_dictionary_from_disk(folded_structures)
