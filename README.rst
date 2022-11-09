@@ -35,12 +35,13 @@ How to cite
 
 If you use IDPConformerGenerator, please cite::
 
-    João M.C. Teixeira, Zi Hao Liu, Ashley Namini, Jie Li, Robert M. Vernon, Mickaël Krzeminski, Alaa A. Shamandy, Oufan Zhang, Mojtaba Haghighatlari, Lei Yu, Teresa Head-Gordon, Julie D. Forman-Kay
-    IDPConformerGenerator: A Flexible Software Suite for Sampling Conformational Space of Disordered Protein States.
-    bioRxiv 2022.05.28.493726 (2022). doi:10.1101/2022.05.28.493726.
+    IDPConformerGenerator: A Flexible Software Suite for Sampling the Conformational Space of Disordered Protein States
+    João M. C. Teixeira, Zi Hao Liu, Ashley Namini, Jie Li, Robert M. Vernon, Mickaël Krzeminski, Alaa A. Shamandy, Oufan Zhang, Mojtaba Haghighatlari, Lei Yu, Teresa Head-Gordon, and Julie D. Forman-Kay
+    The Journal of Physical Chemistry A 2022 126 (35), 5985-6003
+    DOI: 10.1021/acs.jpca.2c03726
 
 .. end-citing
 
 Version
 -------
-v0.6.15
+v0.6.16
