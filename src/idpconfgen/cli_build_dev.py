@@ -1,11 +1,11 @@
 """
-Builds IDP conformers.
+Temporary developer client for building conformers.
 
 Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
 USAGE:
-    $ idpconfgen build -db torsions.json -seq MMMMMMM...
+    $ idpconfgen dbuild -db torsions.json -seq MMMMMMM...
 
 """
 import argparse
@@ -100,7 +100,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
-LOGFILESNAME = '.idpconfgen_build'
+LOGFILESNAME = '.idpconfgen_dbuild'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -202,8 +202,8 @@ def are_globals(bgeo_strategy):
 
 
 # CLI argument parser parameters
-_name = 'build'
-_help = 'Builds conformers from database.'
+_name = 'dbuild'
+_help = 'Developer version of build subclient.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 

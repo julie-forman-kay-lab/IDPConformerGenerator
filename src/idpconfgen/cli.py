@@ -26,6 +26,7 @@ from idpconfgen import (
     cli_fetch,
     cli_makecsss,
     cli_merge,
+    cli_build_dev,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
@@ -54,6 +55,7 @@ Individual routines for DB creation:
     * {cli_sscalc._name}
     * {cli_torsions._name}
     * {cli_build._name}
+    * {cli_build_dev._name}
 
 Other useful routines:
 
@@ -94,6 +96,7 @@ libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
 libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
+libcli.add_subparser(subparsers, cli_build_dev)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)
