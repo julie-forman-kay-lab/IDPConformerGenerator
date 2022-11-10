@@ -43,7 +43,9 @@ aa3to1 = {
     'PHE': 'F',
     'PRO': 'P',
     'SER': 'S',
+    'SEP': 'S', # phosphorylated Ser
     'THR': 'T',
+    'TPO': 'T', # phosphorylated Thr
     'TRP': 'W',
     'TYR': 'Y',
     'VAL': 'V'}

@@ -10,6 +10,7 @@ USAGE:
 """
 import argparse
 import os
+import re
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -99,6 +100,8 @@ from idpconfgen.libs.libparse import (
 from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
+
+from idpconfgen.fldrs_helper import break_check
 
 _file = Path(__file__).myparents()
 LOGFILESNAME = '.idpconfgen_dbuild'
@@ -520,17 +523,40 @@ def main(
     if folded_structure.endswith('.pdb'):        
         log.info(T('Initializing folded domain information'))
         
-        # List of ranges for disordered regions
-        # disordered regions = anything not aligned in the 
-        #   folded structure to sequence
-        START_FLD = []
-        END_FLD = []
         with open(folded_structure) as f:
             pdb_raw = f.read()
         _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
+        fld_fasta = fld_fasta.replace('X', '')
         
-        # TODO: what to do about "X" within the sequence?
-        # find gaps = disordered regions that need to be filled
+        # Find out what our disordered sequences are
+        # Can be C-term, N-term, in the middle, or all the above
+        disordered_seq = []
+        # Stores indicies in input seq where the disordered regions are
+        DISORDER_START = []
+        DISORDER_END = []
+        
+        breaks = break_check(pdb_raw)
+        mod_input_seq = input_seq
+        if breaks:
+            for gap in breaks:
+                disordered_seq.append(input_seq[gap[0]: gap[1]])
+                DISORDER_START.append(gap[0])
+                DISORDER_END.append(gap[1])
+            
+            # categorizes disordered residues as 'X'
+            # temporarily to see if there are straggling C-IDRs or N-IDRs
+            for seq in disordered_seq:
+                mod_input_seq = mod_input_seq.replace(seq, len(seq) * 'X')
+        
+        mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * 'X')
+        assert len(mod_input_seq) == len(input_seq)
+        
+        # TODO given a string with "X" embedded, return the 
+        # ranges of everything else (those are the disordered residues)
+        
+        
+        # matches = re.finditer(fld_fasta, mod_input_seq)
+        # folded_bounds = [(m.start(0), m.end(0)) for m in matches]
         
         '''
         for i, boundary in enumerate(bounds):
