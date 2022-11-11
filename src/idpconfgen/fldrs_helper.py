@@ -16,8 +16,7 @@ Plan of action:
     structure identities in context of protein of interest.
     - Case 1: append empty cells to array and build backwards by inverting torsions
     - Case 2: populate coordinate array then build CIDR as usual
-    - Case 3: apply loop-closure algorithms
-    (inverse kinematics: CCD, RCD, KIC, RLG, etc.)
+    - Case 3: generate disordered loops from tether regions and try to connect them
 
 Important note: do not perform clash check within folded region
 """
@@ -30,6 +29,7 @@ from functools import partial
 
 import numpy as np
 
+from idpconfgen.core.definitions import aa3to1
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen import Path, log
 from idpconfgen.libs.libstructure import (
@@ -42,20 +42,37 @@ from idpconfgen.libs.libstructure import (
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-def disorder_bounds(seq):
+def consecutive_grouper(seq):
     """
-    Find out where the disordered residues are given a special sequence.
+    Use negative indexing to group together consecutive numbers.
 
+    References:
+    https://stackoverflow.com/questions/70363072/group-together-consecutive-numbers-in-a-list
+    
     Parameters
     ----------
     seq : string
-        Special sequence where folded residues are marked as 'X'
+        Special sequence where indices of disordered residues are stored.
     
     Return
     ------
-    dis_bounds : list
-        List of ranges for boundaries of disordered sequences
+    bounds : list
+        List of ranges for boundaries of disordered sequences.
     """
+    grouped = [[seq[0]]]
+    for x in seq[1:]:
+        if x == grouped[-1][-1] + 1:
+            grouped[-1].append(x)
+        else:
+            grouped.append([x])
+            
+    bounds=[]
+    for group in grouped:
+        first = group[0]
+        last = group[len(group) - 1]
+        bounds.append((first, last))
+    
+    return bounds
 
 
 def break_check(fdata):
@@ -74,8 +91,8 @@ def break_check(fdata):
     
     Return
     ------
-    breaks : list
-        List of ranges of breaks in the sequence of fdata.
+    fld_seqs : list
+        List of FASTA sequence of folded regions in the sequence of fdata.
     """
     structure = Structure(fdata)
     structure.build()
@@ -109,17 +126,18 @@ def break_check(fdata):
     assert coords_distances.size == coords.shape[0] - 1
     
     if np.any(coords_distances > 2.1):
-        breaks = []
+        whole = []
         for i, dist in enumerate(coords_distances):
-            if dist > 2.1:
-                # The following normalizes residue numbers in case PDB doesn't start with 1
-                # then returns the index of the ranges of disordered regions
-                first = int(data[:, col_resSeq][0])
-                current = int(data[:, col_resSeq][i])
-                next = int(data[:, col_resSeq][i + 1])
-                # we add 1 because "first" is inclusive
-                breaks.append((current - first + 1, next - first))
-        return breaks
+            if dist < 2.1:
+                whole.append(i)
+        
+        whole = consecutive_grouper(whole)
+        fld_seqs = []
+        for idx in whole:
+            fld_idx = list(range(idx[0], idx[1], 3))
+            fld_seqs.append(''.join(aa3to1.get(f) for f in data[:, col_resName][fld_idx].tolist()))
+        
+        return fld_seqs
     
     return False
         

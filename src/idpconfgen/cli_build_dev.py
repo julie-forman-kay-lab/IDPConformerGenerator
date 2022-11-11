@@ -101,7 +101,7 @@ from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
-from idpconfgen.fldrs_helper import break_check
+from idpconfgen.fldrs_helper import break_check, consecutive_grouper
 
 _file = Path(__file__).myparents()
 LOGFILESNAME = '.idpconfgen_dbuild'
@@ -529,34 +529,22 @@ def main(
         fld_fasta = fld_fasta.replace('X', '')
         
         # Find out what our disordered sequences are
-        # Can be C-term, N-term, in the middle, or all the above
-        disordered_seq = []
-        # Stores indicies in input seq where the disordered regions are
-        DISORDER_START = []
-        DISORDER_END = []
-        
+        # Can be C-term, N-term, in the middle, or all the above        
         breaks = break_check(pdb_raw)
         mod_input_seq = input_seq
         if breaks:
-            for gap in breaks:
-                disordered_seq.append(input_seq[gap[0]: gap[1]])
-                DISORDER_START.append(gap[0])
-                DISORDER_END.append(gap[1])
-            
-            # categorizes disordered residues as 'X'
-            # temporarily to see if there are straggling C-IDRs or N-IDRs
-            for seq in disordered_seq:
-                mod_input_seq = mod_input_seq.replace(seq, len(seq) * 'X')
-        
-        mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * 'X')
+            for seq in breaks:
+                mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
+                
+        mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
         assert len(mod_input_seq) == len(input_seq)
+        # Treats folded residues as "*" to ignore in IDP building process
+        disordered_res = []
+        for i, res in enumerate(mod_input_seq):
+            if res != "*":
+                disordered_res.append(i)
         
-        # TODO given a string with "X" embedded, return the 
-        # ranges of everything else (those are the disordered residues)
-        
-        
-        # matches = re.finditer(fld_fasta, mod_input_seq)
-        # folded_bounds = [(m.start(0), m.end(0)) for m in matches]
+        DISORDER_BOUNDS = consecutive_grouper(disordered_res)
         
         '''
         for i, boundary in enumerate(bounds):
