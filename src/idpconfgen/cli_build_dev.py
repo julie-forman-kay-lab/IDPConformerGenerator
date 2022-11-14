@@ -788,6 +788,13 @@ def _build_conformers(
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
 
+    # TODO: strategy for FLDR/S
+    # - generate each disordered region independently and try to glue back on
+    #   folded PDB using `psurgeon`
+    # - we want to minimize modification of `conformer_generator` to retain
+    #   native sampling diversity
+    # - use coordinates of atoms on folded protein instead of "dummy atoms"
+    
     builder = conformer_generator(
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
