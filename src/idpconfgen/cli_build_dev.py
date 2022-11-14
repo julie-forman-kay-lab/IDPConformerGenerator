@@ -135,7 +135,10 @@ XMERPROBS = None
 GET_ADJ = None
 
 # Case of folded region (1, 2, or 3) determines strategy
+# also set default for disordered bounds to be none, assuming full IDP
 FLD_CASE = None
+DISORDER_BOUNDS = None
+
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -461,6 +464,9 @@ def main(
 
     # we use a dictionary because fragments will be evaluated to exact match
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
+    
+    # set the boundaries of disordered regions for folded proteins
+    global DISORDER_BOUNDS
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
@@ -520,7 +526,9 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    if folded_structure.endswith('.pdb'):        
+    if folded_structure:
+        assert folded_structure.endswith('.pdb')
+        
         log.info(T('Initializing folded domain information'))
         
         with open(folded_structure) as f:
@@ -545,19 +553,13 @@ def main(
                 disordered_res.append(i)
         
         DISORDER_BOUNDS = consecutive_grouper(disordered_res)
-        
-        '''
-        for i, boundary in enumerate(bounds):
-            _boundary = boundary.split('-')
-            START_FLD.append(int(_boundary[0]) - 1)
-            END_FLD.append(int(_boundary[1]) - 1)
-
-            
-            fld_seq = input_seq[START_FLD[i]: END_FLD[i]]
-            fld_len = len(fld_seq)
-            log.info(S(f"Disordered region #{i + 1} is: {fld_seq}"))
-        '''
-        
+        for i, bounds in enumerate(DISORDER_BOUNDS):
+            first = bounds[0]
+            last = bounds[1]
+            log.info(S(
+                f'Disordered region #{i + 1} = residue {first + 1} to {last} '
+                f'with the sequence {input_seq[first:last]}.'
+            ))
         log.info(S('done'))
 
     db = read_dictionary_from_disk(database)

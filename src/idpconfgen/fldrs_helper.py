@@ -70,7 +70,7 @@ def consecutive_grouper(seq):
     for group in grouped:
         first = group[0]
         last = group[len(group) - 1]
-        bounds.append((first, last))
+        bounds.append((first, last + 1))
     
     return bounds
 
