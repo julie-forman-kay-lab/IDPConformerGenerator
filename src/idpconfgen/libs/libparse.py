@@ -382,7 +382,7 @@ def translate_seq_to_3l(input_seq):
     Translate 1-letter sequence to 3-letter sequence.
 
     # Currently translates 'H' to 'HIP', to accommodate double protonation.
-    Edited translates 'H' to 'HIS' for standardization purposes - @menoliu.
+    Editing to 'HIS' causes issues with libbuild.
     """
     return [
         'HIP' if _res == 'H' else aa1to3[_res]

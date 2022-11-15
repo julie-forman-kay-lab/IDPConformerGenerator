@@ -625,8 +625,9 @@ def main(
         else:
             DISORDER_CASE = disorder_cases[1]
         
-        print(DISORDER_CASE)
-        continue
+        # TODO create the temporary folders housing the PDBs like savepoints
+        # this folder will be deleted when everything is grafted together
+        
         # prepares execution function
         consume = partial(
             _build_conformers,
@@ -655,7 +656,7 @@ def main(
 
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
-    return
+
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
     ENERGYLOGSAVER.close()
 
