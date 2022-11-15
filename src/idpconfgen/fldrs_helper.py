@@ -20,10 +20,12 @@ Plan of action:
 
 Important note: do not perform clash check within folded region
 """
-# Definitions of cases (subject to change)
-n_idr = 1
-c_idr = 2
-break_idr = 3
+
+disorder_cases = {
+    0: "nidr",
+    1: "break",
+    2: "cidr",
+    }
 
 from functools import partial
 
@@ -142,31 +144,37 @@ def break_check(fdata):
     return False
         
 
-def psurgeon(case, fld_struc, idp_coords):
+def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
     Parameters
     ----------
     case : int
-        Case number 1 = N-IDR, 2 = C-IDR, 3 = break-IDR
+        Case number 1 = N-IDR, 2 = C-IDR, 3 = break-IDR.
+    
+    fl_seq : string
+        Full length sequence of requested protein to build.
+    
+    bounds : tuple
+        Starting and ending indicies of where disordered region is.
     
     fld_struc : Structure
-        IDPConformerGenerator Structure class of folded structure
+        IDPConformerGenerator Structure class of folded structure.
     
     idp_coords : np.ndarray
-        Array of coordinates for IDP generated
+        Array of coordinates for IDP generated.
     
     Returns
     -------
     pdb_coords : np.ndarray
         Array of final coordinates 
     """
-    if case == n_idr:
+    if case == disorder_cases[0]:
         None
-    elif case == c_idr:
+    elif case == disorder_cases[1]:
         None
-    elif case == break_idr:
+    elif case == disorder_cases[2]:
         None
     else:
         # code should not reach here
