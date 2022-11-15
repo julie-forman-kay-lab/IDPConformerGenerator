@@ -385,7 +385,7 @@ def translate_seq_to_3l(input_seq):
     Edited translates 'H' to 'HIS' for standardization purposes - @menoliu.
     """
     return [
-        'HIS' if _res == 'H' else aa1to3[_res]
+        'HIP' if _res == 'H' else aa1to3[_res]
         for _res in input_seq
         ]
 
