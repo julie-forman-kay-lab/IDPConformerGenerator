@@ -1706,14 +1706,15 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
-                if flds and FLD_IDX >= 0:
-                    _slice = RC(fld_slice_dict[FLD_IDX][plen][pt_sub])
-                    
-                    dihedrals = fld_dihedrals_db[_slice, :].ravel()
-                    
-                    bend_angs = FLD_BEND_ANGS[_slice, :].ravel()
-                    bond_lens = FLD_BOND_LENS[_slice, :].ravel()
+                if flds:
+                    FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
+                    if FLD_IDX >= 0:
+                        _slice = RC(fld_slice_dict[FLD_IDX][plen][pt_sub])
+                        
+                        dihedrals = fld_dihedrals_db[_slice, :].ravel()
+                        
+                        bend_angs = FLD_BEND_ANGS[_slice, :].ravel()
+                        bond_lens = FLD_BOND_LENS[_slice, :].ravel()
                 else:
                     if csss:
                         # matches current residue

@@ -20,7 +20,6 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.cli_build import (
-    conformer_generator,
     get_adjacent_angles,
     gen_PDB_from_conformer,
     parse_CSSS,
@@ -112,7 +111,7 @@ from idpconfgen.fldrs_helper import (
 
 _file = Path(__file__).myparents()
 LOGFILESNAME = '.idpconfgen_fldrs'
-TEMP_DIRNAME = '.fldrs_temp'
+TEMP_DIRNAME = '.fldrs_temp/'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -146,6 +145,7 @@ GET_ADJ = None
 # also set defaults to be none assuming full IDP
 DISORDER_CASE = None
 DISORDER_BOUNDS = None
+DISORDER_INDEX = None
 DISORDER_SEQS = None
 
 # keeps a record of the conformer numbers written to disk across the different
@@ -250,7 +250,7 @@ libcli.add_argument_duser(ap)
 #########################################
 
 ap.add_argument(
-    '-flds',
+    '-fld',
     '--folded-structure',
     help="Input .PDB file for folded structure of interest.",
     required=True,
@@ -619,20 +619,27 @@ def main(
             **kwargs)
         
         if DISORDER_BOUNDS[i][0] == 0:
-            DISORDER_CASE = disorder_cases[0] 
+            DISORDER_CASE = disorder_cases[0]
         elif DISORDER_BOUNDS[i][1] == len(input_seq):
             DISORDER_CASE = disorder_cases[2]
         else:
             DISORDER_CASE = disorder_cases[1]
         
-        # TODO create the temporary folders housing the PDBs like savepoints
+        # create the temporary folders housing the disordered PDBs
         # this folder will be deleted when everything is grafted together
+
+        temp_of = make_folder_or_cwd(
+            output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE)
+            )
+        
+        log.info(S(f"Generating temporary disordered conformers for: {seq}"))
         
         # prepares execution function
         consume = partial(
             _build_conformers,
+            index=i,
             input_seq=seq,  # string
-            output_folder=output_folder,
+            output_folder=temp_of,
             nconfs=conformers_per_core,  # int
             sidechain_parameters=sidechain_parameters,
             sidechain_method=sidechain_method,  # goes back to kwards
@@ -656,8 +663,15 @@ def main(
 
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
+        
+        log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
+        
+        # reinitialize queues so reiteration doesn't crash
+        for i in range(ncores + bool(remaining_confs)):
+            RANDOMSEEDS.put(random_seed + i)
+        for i in range(1, nconfs + 1):
+            CONF_NUMBER.put(i)
 
-    log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
     ENERGYLOGSAVER.close()
 
 
@@ -670,24 +684,8 @@ def populate_globals(
         **efunc_kwargs):
     """
     Populate global variables needed for building.
-
-    Currently, global variables include:
-
-    BGEO_full
-    BGEO_trimer
-    BGEO_res
-    ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
-    TEMPLATE_LABELS, TEMPLATE_MASKS, TEMPLATE_EFUNC
-    INT2CART
-
-    Parameters
-    ----------
-    bgeo_strategy : str
-        A key from the
-        :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
-
-    forcefield : str
-        A key in the `core.build_definitions.forcefields` dictionary.
+    
+    Refer to `cli_build.py` for documentation.
     """
     if not isinstance(input_seq, str):
         raise ValueError(
@@ -763,6 +761,7 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
+        index=None,
         input_seq=None,
         conformer_name='conformer',
         output_folder=None,
@@ -777,7 +776,7 @@ def _build_conformers(
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
 
-    # TODO: strategy for FLDR/S
+    # Strategy for FLDR/S
     # - generate each disordered region independently and try to glue back on
     #   folded PDB using `psurgeon`
     # - we want to minimize modification of `conformer_generator` to retain
@@ -785,6 +784,7 @@ def _build_conformers(
     # - use coordinates of atoms on folded protein instead of "dummy atoms"
     
     builder = conformer_generator(
+        index=index,
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
         sidechain_parameters=sidechain_parameters,
@@ -813,6 +813,606 @@ def _build_conformers(
 
     del builder
     return
+
+
+def conformer_generator(
+        *,
+        index=None,
+        input_seq=None,
+        generative_function=None,
+        disable_sidechains=True,
+        sidechain_method='faspr',
+        energy_threshold_backbone=10,
+        energy_threshold_sidechains=1000,
+        bgeo_strategy=bgeo_strategies_default,
+        bgeo_path=None,
+        forcefield=None,
+        random_seed=0,
+        sidechain_parameters=None,
+        **energy_funcs_kwargs,
+        ):
+    """
+    Build conformers.
+
+    Refer to documentation in `cli_build.py`.
+    """
+    if not isinstance(input_seq, str):
+        raise ValueError(f'`input_seq` must be given! {input_seq}')
+    if sidechain_method not in sidechain_packing_methods:
+        raise ValueError(
+            f'{sidechain_method} not in `sidechain_packing_methods`. '
+            f'Expected {list(sidechain_packing_methods.keys())}.'
+            )
+
+    log.info(f'random seed: {random_seed}')
+    np.random.seed(random_seed)
+    seed_report = pre_msg(f'seed {random_seed}', sep=' - ')
+
+    # prepares protein sequences
+    all_atom_input_seq = input_seq
+    template_input_seq = remap_sequence(all_atom_input_seq)
+    template_seq_3l = translate_seq_to_3l(template_input_seq)
+
+    ANY = np.any
+    BUILD_BEND_H_N_C = build_bend_H_N_C
+    CALC_TORSION_ANGLES = calc_torsion_angles
+    DISTANCE_NH = distance_H_N
+    DISTANCE_C_O = distance_C_O
+    ISNAN = np.isnan
+    GET_TRIMER_SEQ = get_trimer_seq_njit
+    MAKE_COORD_Q_COO_LOCAL = make_coord_Q_COO
+    MAKE_COORD_Q_PLANAR = make_coord_Q_planar
+    MAKE_COORD_Q_LOCAL = make_coord_Q
+    NAN = np.nan
+    NORM = np.linalg.norm
+    # the N terminal Hs are three for all atoms but only two for Proline
+    # depending whether the first residue is a Proline, we use one template
+    # or another.
+    N_TERMINAL_H = n_proline_h_coord_at_origin if input_seq[0] == "P" else n_terminal_h_coords_at_origin  # noqa: E501
+    PI2 = np.pi * 2
+    PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
+    RAD_60 = np.radians(60)
+    RC = np.random.choice
+    RINT = randint
+    ROT_COORDINATES = rotate_coordinates_Q_njit
+    RRD10 = rrd10_njit
+    SIDECHAIN_TEMPLATES = sidechain_templates
+    SUM = np.nansum
+    global BGEO_full
+    global BGEO_trimer
+    global BGEO_res
+    global ALL_ATOM_LABELS
+    global ALL_ATOM_MASKS
+    global ALL_ATOM_EFUNC
+    global TEMPLATE_LABELS
+    global TEMPLATE_MASKS
+    global TEMPLATE_EFUNC
+    global XMERPROBS
+    global SLICEDICT_MONOMERS
+    global SLICEDICT_XMERS
+    global GET_ADJ
+
+    del input_seq
+
+    # these flags exist to populate the global variables in case they were not
+    # populated yet. Global variables are populated through the main() function
+    # if the script runs as CLI. Otherwise, if conformer_generator() is imported
+    # and used directly, the global variables need to be configured here.
+    if not are_globals(bgeo_strategy):
+        if forcefield not in forcefields:
+            raise ValueError(
+                f'{forcefield} not in `forcefields`. '
+                f'Expected {list(forcefields.keys())}.'
+                )
+        populate_globals(
+            input_seq=all_atom_input_seq,
+            bgeo_strategy=bgeo_strategy,
+            bgeo_path=bgeo_path,
+            forcefield=forcefields[forcefield],
+            **energy_funcs_kwargs,
+            )
+
+    # semantic exchange for speed al readibility
+    with_sidechains = not disable_sidechains
+
+    if with_sidechains:
+        log.info(S(f"configuring sidechain method: {sidechain_method}"))
+        # we use named arguments here to allow ignored non needed parameters
+        # with **kwargs
+        build_sidechains = sidechain_packing_methods[sidechain_method](
+            input_seq=all_atom_input_seq,
+            template_masks=TEMPLATE_MASKS,
+            all_atom_masks=ALL_ATOM_MASKS,
+            user_parameters=sidechain_parameters,
+            )
+
+    # tests generative function complies with implementation requirements
+    if generative_function:
+        try:
+            generative_function(nres=1, cres=0)
+        except Exception as err:  # this is generic Exception on purpose
+            errmsg = (
+                'The `generative_function` provided is not compatible with '
+                'the building process. Please read `build_conformers` docstring'
+                ' for more details.'
+                )
+            raise IDPConfGenException(errmsg) from err
+
+    # yields atom labels
+    # all conformers generated will share these labels
+    yield (
+        ALL_ATOM_LABELS.atom_labels,
+        ALL_ATOM_LABELS.res_nums,
+        ALL_ATOM_LABELS.res_labels,
+        )
+    all_atom_num_atoms = len(ALL_ATOM_LABELS.atom_labels)
+    template_num_atoms = len(TEMPLATE_LABELS.atom_labels)
+
+    all_atom_coords = np.full((all_atom_num_atoms, 3), NAN, dtype=np.float64)
+    template_coords = np.full((template_num_atoms, 3), NAN, dtype=np.float64)
+
+    # +2 because of the dummy coordinates required to start building.
+    # see later adding dummy coordinates to the structure seed
+    bb = np.full((TEMPLATE_MASKS.bb3.size + 2, 3), NAN, dtype=np.float64)
+    bb_real = bb[2:, :]  # backbone coordinates without the dummies
+
+    # coordinates for the carbonyl oxygen atoms
+    bb_CO = np.full((TEMPLATE_MASKS.COs.size, 3), NAN, dtype=np.float64)
+
+    # notice that NHydrogen_mask does not see Prolines
+    bb_NH = np.full((TEMPLATE_MASKS.NHs.size, 3), NAN, dtype=np.float64)
+    bb_NH_idx = np.arange(len(bb_NH))
+    # Creates masks and indexes for the `for` loop used to place NHs.
+    # The first residue has no NH, prolines have no NH.
+    non_pro = np.array(list(template_input_seq)[1:]) != 'P'
+    # NHs index numbers in bb_real
+    bb_NH_nums = np.arange(3, (len(template_input_seq) - 1) * 3 + 1, 3)[non_pro]
+    bb_NH_nums_p1 = bb_NH_nums + 1
+    assert bb_NH.shape[0] == bb_NH_nums.size == bb_NH_idx.size
+
+    # sidechain masks
+    # this is sidechain agnostic, works for every sidechain, yet here we
+    # use only ALA, PRO, GLY - Mon Feb 15 17:29:20 2021
+    ss_masks = create_sidechains_masks_per_residue(
+        TEMPLATE_LABELS.res_nums,
+        TEMPLATE_LABELS.atom_labels,
+        backbone_atoms,
+        )
+    # ?
+
+    # /
+    # creates seed coordinates:
+    # because the first torsion angle of a residue is the omega, we need
+    # to prepare 2 dummy atoms to simulate the residue -1, so that the
+    # first omega can be placed. There is no need to setup specific
+    # positions, just to create a place upon which the build atom
+    # routine can create a new atom from a torsion.
+    dummy_CA_m1_coord = np.array((0.0, 1.0, 1.0))
+    dummy_C_m1_coord = np.array((0.0, 1.0, 0.0))
+    n_terminal_N_coord = np.array((0.0, 0.0, 0.0))
+
+    # seed coordinates array
+    seed_coords = np.array((
+        dummy_CA_m1_coord,
+        dummy_C_m1_coord,
+        n_terminal_N_coord,
+        ))
+    # ?
+
+    # /
+    # prepares method binding
+    bbi0_register = []
+    bbi0_R_APPEND = bbi0_register.append
+    bbi0_R_POP = bbi0_register.pop
+    bbi0_R_CLEAR = bbi0_register.clear
+
+    COi0_register = []
+    COi0_R_APPEND = COi0_register.append
+    COi0_R_POP = COi0_register.pop
+    COi0_R_CLEAR = COi0_register.clear
+
+    res_R = []  # residue number register
+    res_R_APPEND = res_R.append
+    res_R_POP = res_R.pop
+    res_R_CLEAR = res_R.clear
+    # ?
+
+    # /
+    # required inits
+    broke_on_start_attempt = False
+    start_attempts = 0
+    max_start_attempts = 500  # maximum attempts to start a conformer
+    # because we are building from a experimental database there can be
+    # some angle combinations that fail on our validation process from start
+    # if this happens more than `max_start_attemps` the production is canceled.
+    # ?
+
+    # /
+    # STARTS BUILDING
+    conf_n = 1
+    while 1:
+        # prepares cycles for building process
+        bond_lens = get_cycle_distances_backbone()
+        bond_type = get_cycle_bond_type()
+
+        if bgeo_strategy == bgeo_fixed_name:
+            bend_angles = get_cycle_bend_angles()
+
+        # in the first run of the loop this is unnecessary, but is better to
+        # just do it once than flag it the whole time
+        template_coords[:, :] = NAN
+        bb[:, :] = NAN
+        bb_CO[:, :] = NAN
+        bb_NH[:, :] = NAN
+        for _mask, _coords in ss_masks:
+            _coords[:, :] = NAN
+
+        bb[:3, :] = seed_coords  # this contains a dummy coord at position 0
+
+        # add N-terminal hydrogens to the origin
+
+        bbi = 1  # starts at 1 because there are two dummy atoms
+        bbi0_R_CLEAR()
+        bbi0_R_APPEND(bbi)
+
+        COi = 0  # carbonyl atoms
+        COi0_R_CLEAR()
+        COi0_R_APPEND(COi)
+
+        # residue integer number
+        current_res_number = 0
+        res_R_CLEAR()
+        res_R_APPEND(current_res_number)
+
+        backbone_done = False
+        number_of_trials = 0
+        # TODO: use or not to use number_of_trials2? To evaluate in future.
+        number_of_trials2 = 0
+        number_of_trials3 = 0
+
+        # used only if bgeo_strategy == int2cart
+        torsion_records = []
+
+        # run this loop until a specific BREAK is triggered
+        while 1:  # 1 is faster than True :-)
+
+            # I decided to use an if-statement here instead of polymorph
+            # the else clause to a `generative_function` variable because
+            # the resulting overhead from the extra function call and
+            # **kwargs handling was greater then the if-statement processing
+            # https://pythonicthoughtssnippets.github.io/2020/10/21/PTS14-quick-in-if-vs-polymorphism.html  # noqa: E501
+            if generative_function:
+                primer_template, agls = generative_function(
+                    nres=RINT(1, 6),
+                    cres=calc_residue_num_from_index(bbi)
+                    )
+
+            else:
+                # algorithm for adjacent building
+                # TODO
+                # primer_template here is used temporarily, and needs to be
+                # removed when get_adj becomes an option
+                if bgeo_strategy == bgeo_exact_name:
+                    primer_template, agls, bangs, blens = GET_ADJ[index](bbi - 1)
+                else:
+                    primer_template, agls = GET_ADJ[index](bbi - 1)
+
+            # index at the start of the current cycle
+            PRIMER = cycle(primer_template)
+
+            try:
+                for (omg, phi, psi) in zip(agls[0::3], agls[1::3], agls[2::3]):
+
+                    current_res_number = calc_residue_num_from_index(bbi - 1)
+
+                    # assert the residue being built is of the same nature as
+                    # the one in the angles
+                    # TODO: remove this assert
+                    n_ = next(PRIMER)
+                    assert all_atom_input_seq[current_res_number] == n_, \
+                        (all_atom_input_seq[current_res_number], n_)
+
+                    curr_res, tpair = GET_TRIMER_SEQ(
+                        all_atom_input_seq,
+                        current_res_number,
+                        )
+                    torpair = f'{RRD10(phi)},{RRD10(psi)}'
+
+                    if bgeo_strategy == bgeo_int2cart_name:
+                        torsion_records.append((omg, phi, psi))
+                        seq = all_atom_input_seq[:current_res_number + 1]
+
+                        tors = np.array(torsion_records)  # omega, phi, psi
+
+                        # phi, psi, omega
+                        tors = np.hstack([tors[:, 1:], tors[:, :1]])
+
+                        _ = INT2CART.get_internal_coords(seq, tors)
+                        d1, d2, d3, theta1, theta2, theta3 = _
+
+                        bend_angles = [theta3, theta1, theta2]
+                        bond_lens = [d1, d2, d3]
+
+                    for torsion_idx, torsion_angle in enumerate((omg, phi, psi)):  # noqa: E501
+
+                        if bgeo_strategy == bgeo_int2cart_name:
+                            # needed for correctly calculating Q
+                            _bend_angle = (np.pi - bend_angles[torsion_idx]) / 2
+                            _bond_lens = bond_lens[torsion_idx]
+
+                        elif bgeo_strategy == bgeo_exact_name:
+                            _bend_angle = bangs[torsion_idx]
+                            _bond_lens = blens[torsion_idx]
+
+                        elif bgeo_strategy == bgeo_sampling_name:
+                            _bt = next(bond_type)
+
+                            try:
+                                _bend_angle = RC(BGEO_full[_bt][curr_res][tpair][torpair])  # noqa: E501
+                            except KeyError:
+                                try:
+                                    _bend_angle = RC(BGEO_trimer[_bt][curr_res][tpair])  # noqa: E501
+                                except KeyError:
+                                    _bend_angle = RC(BGEO_res[_bt][curr_res])
+
+                            _bond_lens = next(bond_lens)[curr_res]
+
+                        elif bgeo_strategy == bgeo_fixed_name:
+                            _bend_angle = next(bend_angles)[curr_res]
+                            _bond_lens = next(bond_lens)[curr_res]
+
+                        bb_real[bbi, :] = MAKE_COORD_Q_LOCAL(
+                            bb[bbi - 1, :],
+                            bb[bbi, :],
+                            bb[bbi + 1, :],
+                            _bond_lens,
+                            _bend_angle,
+                            torsion_angle,
+                            )
+                        bbi += 1
+
+                    if bgeo_strategy in (bgeo_int2cart_name, bgeo_sampling_name):  # noqa: E501
+
+                        try:
+                            co_bend = RC(BGEO_full['Ca_C_O'][curr_res][tpair][torpair])  # noqa: E501
+                        except KeyError:
+                            try:
+                                co_bend = RC(BGEO_trimer['Ca_C_O'][curr_res][tpair])  # noqa: E501
+                            except KeyError:
+                                co_bend = RC(BGEO_res['Ca_C_O'][curr_res])
+
+                    elif bgeo_strategy == bgeo_fixed_name:
+                        co_bend = build_bend_CA_C_O
+
+                    else:
+                        co_bend = bangs[3]
+                        DISTANCE_C_O = blens[3]
+
+                    bb_CO[COi, :] = MAKE_COORD_Q_PLANAR(
+                        bb_real[bbi - 3, :],
+                        bb_real[bbi - 2, :],
+                        bb_real[bbi - 1, :],
+                        distance=DISTANCE_C_O,
+                        bend=co_bend
+                        )
+                    COi += 1
+
+            except IndexError:
+                # IndexError happens when the backbone is complete
+                # in this protocol the last atom build was a carbonyl C
+                # bbi is the last index of bb + 1, and the last index of
+                # bb_real + 2
+
+                # activate flag to finish loop at the end
+                backbone_done = True
+
+                # add the carboxyls
+                template_coords[TEMPLATE_MASKS.cterm] = \
+                    MAKE_COORD_Q_COO_LOCAL(bb[-2, :], bb[-1, :])
+
+            # Adds N-H Hydrogens
+            # Not a perfect loop. It repeats for Hs already placed.
+            # However, was a simpler solution than matching the indexes
+            # and the time cost is not a bottle neck.
+            _ = ~ISNAN(bb_real[bb_NH_nums_p1, 0])
+            for k, j in zip(bb_NH_nums[_], bb_NH_idx[_]):
+
+                bb_NH[j, :] = MAKE_COORD_Q_PLANAR(
+                    bb_real[k + 1, :],
+                    bb_real[k, :],
+                    bb_real[k - 1, :],
+                    distance=DISTANCE_NH,
+                    bend=BUILD_BEND_H_N_C,
+                    )
+
+            # Adds sidechain template structures
+            for res_i in range(res_R[-1], current_res_number + 1):  # noqa: E501
+
+                _sstemplate, _sidechain_idxs = \
+                    SIDECHAIN_TEMPLATES[template_seq_3l[res_i]]
+
+                sscoords = PLACE_SIDECHAIN_TEMPLATE(
+                    bb_real[res_i * 3:res_i * 3 + 3, :],  # from N to C
+                    _sstemplate,
+                    )
+
+                ss_masks[res_i][1][:, :] = sscoords[_sidechain_idxs]
+
+            # Transfers coords to the main coord array
+            for _smask, _sidecoords in ss_masks[:current_res_number + 1]:
+                template_coords[_smask] = _sidecoords
+
+            # / Place coordinates for energy calculation
+            #
+            # use `bb_real` to do not consider the initial dummy atom
+            template_coords[TEMPLATE_MASKS.bb3] = bb_real
+            template_coords[TEMPLATE_MASKS.COs] = bb_CO
+            template_coords[TEMPLATE_MASKS.NHs] = bb_NH
+
+            if len(bbi0_register) == 1:
+                # places the N-terminal Hs only if it is the first
+                # fragment being built
+                _ = PLACE_SIDECHAIN_TEMPLATE(bb_real[0:3, :], N_TERMINAL_H)
+                template_coords[TEMPLATE_MASKS.Hterm, :] = _[3:, :]
+                current_Hterm_coords = _[3:, :]
+                del _
+
+                # rotating the N-term H's is not needed for G and P
+                if template_input_seq[0] not in ('G', 'P'):
+                    # rotates only if the first residue is not an
+                    # alanie
+
+                    # measure torsion angle reference H1 - HA
+                    _h1_ha_angle = CALC_TORSION_ANGLES(
+                        template_coords[TEMPLATE_MASKS.H2_N_CA_CB, :]
+                        )[0]
+
+                    # given any angle calculated along an axis, calculate how
+                    # much to rotate along that axis to place the
+                    # angle at 60 degrees
+                    _rot_angle = _h1_ha_angle % PI2 - RAD_60
+
+                    current_Hterm_coords = ROT_COORDINATES(
+                        template_coords[TEMPLATE_MASKS.Hterm, :],
+                        template_coords[1] / NORM(template_coords[1]),
+                        _rot_angle,
+                        )
+
+                    template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords  # noqa: E501
+            # ?
+
+            total_energy = TEMPLATE_EFUNC(template_coords)
+
+            if ANY(total_energy > energy_threshold_backbone):
+                # reset coordinates to the original value
+                # before the last fragment added
+
+                # reset the same fragment maximum 5 times,
+                # after that reset also the fragment before
+                try:
+                    if number_of_trials > 30:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials = 0
+                        number_of_trials2 += 1
+
+                    if number_of_trials2 > 5:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials2 = 0
+                        number_of_trials3 += 1
+
+                    if number_of_trials3 > 5:
+                        bbi0_R_POP()
+                        COi0_R_POP()
+                        res_R_POP()
+                        number_of_trials3 = 0
+
+                    _bbi0 = bbi0_register[-1]
+                    _COi0 = COi0_register[-1]
+                    _resi0 = res_R[-1]
+                except IndexError:
+                    # if this point is reached,
+                    # we erased until the beginning of the conformer
+                    # discard conformer, something went really wrong
+                    broke_on_start_attempt = True
+                    break  # conformer while loop, starts conformer from scratch
+
+                # clean previously built protein fragment
+                bb_real[_bbi0:bbi, :] = NAN
+                bb_CO[_COi0:COi, :] = NAN
+
+                # reset also indexes
+                bbi = _bbi0
+                COi = _COi0
+                current_res_number = _resi0
+
+                # remove torsion angle records for this chunk
+                if bgeo_strategy == bgeo_int2cart_name:
+                    torsion_records = torsion_records[:current_res_number + 1]
+
+                # coords needs to be reset because size of protein next
+                # fragments may not be equal
+                template_coords[:, :] = NAN
+                template_coords[TEMPLATE_MASKS.Hterm, :] = current_Hterm_coords
+
+                # prepares cycles for building process
+                # this is required because the last fragment created may have
+                # been the final part of the conformer
+                if backbone_done:
+                    bond_lens = get_cycle_distances_backbone()
+                    bond_type = get_cycle_bond_type()
+
+                # we do not know if the next fragment will finish the protein
+                # or not
+                backbone_done = False
+                number_of_trials += 1
+                continue  # send back to the fragment while loop
+
+            # if the conformer is valid
+            number_of_trials = 0
+            bbi0_R_APPEND(bbi)
+            COi0_R_APPEND(COi)
+            # the residue where the build process stopped
+            res_R_APPEND(current_res_number)
+
+            if backbone_done:
+                # this point guarantees all protein atoms are built
+                break  # fragment while loop
+        # END of fragment while loop, go up and build the next fragment
+
+        if broke_on_start_attempt:
+            start_attempts += 1
+            if start_attempts > max_start_attempts:
+                log.error(
+                    'Reached maximum amount of re-starts. Canceling... '
+                    f'Built a total of {conf_n} conformers.'
+                    )
+                return
+            broke_on_start_attempt = False
+            continue  # send back to the fragment while loop
+
+        # we do not want sidechains at this point
+        all_atom_coords[ALL_ATOM_MASKS.bb4] = template_coords[TEMPLATE_MASKS.bb4]  # noqa: E501
+        all_atom_coords[ALL_ATOM_MASKS.NHs] = template_coords[TEMPLATE_MASKS.NHs]  # noqa: E501
+        all_atom_coords[ALL_ATOM_MASKS.Hterm] = template_coords[TEMPLATE_MASKS.Hterm]  # noqa: E501
+        all_atom_coords[ALL_ATOM_MASKS.cterm, :] = template_coords[TEMPLATE_MASKS.cterm, :]  # noqa: E501
+
+        if with_sidechains:
+
+            # this is uniformed API for all build_sidechains
+            _mask, _new_sd_coords = build_sidechains(template_coords)
+
+            if _new_sd_coords is None:
+                _emsg = (
+                    "Could not find a solution for sidechains, "
+                    "discarding the conformer...")
+                log.info(seed_report(_emsg))
+                continue
+
+            all_atom_coords[_mask] = _new_sd_coords
+
+            if ALL_ATOM_EFUNC is None:
+                total_energy = 0
+            else:
+                total_energy = ALL_ATOM_EFUNC(all_atom_coords)
+
+            if ANY(total_energy > energy_threshold_sidechains):
+                _msg = (
+                    'Conformer with energy higher than allowed threshold '
+                    '- discarded.'
+                    )
+                log.info(seed_report(_msg))
+                continue
+
+        _total_energy = np.nansum(total_energy)
+        _msg = f'finished conf: {conf_n} with energy {_total_energy}'
+        log.info(seed_report(_msg))
+
+        yield SUM(total_energy), all_atom_coords
+        conf_n += 1
 
 
 if __name__ == "__main__":
