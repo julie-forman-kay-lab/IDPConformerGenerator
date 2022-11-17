@@ -9,7 +9,7 @@ USAGE:
 
 """
 import argparse
-import os
+import shutil
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -111,7 +111,6 @@ from idpconfgen.fldrs_helper import (
 
 _file = Path(__file__).myparents()
 LOGFILESNAME = '.idpconfgen_fldrs'
-TEMP_DIRNAME = '.fldrs_temp/'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -257,6 +256,15 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '-kt',
+    '--keep-temporary',
+    help=(
+        "Switch to keep temporary disordered fragments while building. "
+        ),
+    action='store_true',
+)
+
+ap.add_argument(
     '-csss',
     '--custom-sampling',
     help=(
@@ -365,6 +373,7 @@ def main(
         input_seq,
         database,
         custom_sampling,
+        keep_temporary=False,
         folded_structure=None,
         dloop_off=False,
         dstrand=False,
@@ -390,6 +399,11 @@ def main(
 
     Distributes over processors.
     """
+    if keep_temporary:
+        TEMP_DIRNAME = "fldrs_temp/" 
+    else:
+        TEMP_DIRNAME = '.fldrs_temp/'
+    
     # ensuring some parameters do not overlap
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
@@ -523,13 +537,24 @@ def main(
     DISORDER_BOUNDS = consecutive_grouper(disordered_res)
     DISORDER_SEQS = []
     for i, bounds in enumerate(DISORDER_BOUNDS):
-        first = bounds[0]
-        last = bounds[1]
-        dis_seq = input_seq[first:last]
+        lower = bounds[0]
+        upper = bounds[1]
+        dis_seq = input_seq[lower:upper]
         log.info(S(
-            f'Disordered region #{i + 1} = residue {first + 1} to {last} '
+            f'Disordered region #{i + 1} = residue {lower + 1} to {upper} '
             f'with the sequence {dis_seq}.'
         ))
+        
+        # Different than what we tell user due to internal processing for
+        # disordered bits (need 1 extra residue at the beginning or end)
+        # for `pshifter` function.
+        if lower == 0:
+            dis_seq = input_seq[lower : upper + 1]
+        elif upper == len(input_seq):
+            dis_seq = input_seq[lower - 1 : upper]
+        else:
+            dis_seq = input_seq[lower : upper]
+        
         DISORDER_SEQS.append(dis_seq)
     log.info(S('done'))
 
@@ -611,6 +636,15 @@ def main(
 
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
+        lower = DISORDER_BOUNDS[i][0]
+        upper = DISORDER_BOUNDS[i][1]
+        if lower == 0:
+            DISORDER_CASE = disorder_cases[0]  # N-IDR
+        elif upper == len(input_seq):
+            DISORDER_CASE = disorder_cases[2]  # C-IDR
+        else:
+            DISORDER_CASE = disorder_cases[1]  # Break
+        
         populate_globals(
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
@@ -618,21 +652,17 @@ def main(
             forcefield=forcefields[forcefield],
             **kwargs)
         
-        if DISORDER_BOUNDS[i][0] == 0:
-            DISORDER_CASE = disorder_cases[0]
-        elif DISORDER_BOUNDS[i][1] == len(input_seq):
-            DISORDER_CASE = disorder_cases[2]
-        else:
-            DISORDER_CASE = disorder_cases[1]
-        
         # create the temporary folders housing the disordered PDBs
         # this folder will be deleted when everything is grafted together
-
         temp_of = make_folder_or_cwd(
             output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE)
             )
         
         log.info(S(f"Generating temporary disordered conformers for: {seq}"))
+        log.info(S(
+            "Please note that sequence may contain an extra residue "
+            "to facilitate reconstruction later on."
+            ))
         
         # prepares execution function
         consume = partial(
@@ -664,6 +694,12 @@ def main(
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
         
+        log.info(S("Performing protein shifter function"))
+        
+        
+        
+        log.info(S("done"))
+        
         log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
         
         # reinitialize queues so reiteration doesn't crash
@@ -671,6 +707,9 @@ def main(
             RANDOMSEEDS.put(random_seed + i)
         for i in range(1, nconfs + 1):
             CONF_NUMBER.put(i)
+    
+    if not keep_temporary:
+        shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 
     ENERGYLOGSAVER.close()
 
