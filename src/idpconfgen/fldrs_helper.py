@@ -3,7 +3,7 @@ Client for building IDRs on PDB files in the cartesian coordinate space.
 
 Methodology deviates from traditional IDP or beads-on-a-string FLDR/S approach.
 
-Name: FLDR/S (Folded region/structure sampling)
+Name: FLDR/S (Folded disordered region/structure sampling)
 
 Plan of action:
 1. Create internal database of start/end point teathers
@@ -27,21 +27,21 @@ disorder_cases = {
     2: "cidr",
     }
 
-from functools import partial
-
 import numpy as np
+
+from idpconfgen import Path
 
 from idpconfgen.core.definitions import aa3to1
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen import Path, log
 from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
     col_resName,
-    col_resSeq,
     cols_coords,
+    col_x,
+    col_y,
+    col_z,
 )
-from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 def consecutive_grouper(seq):
@@ -141,8 +141,74 @@ def break_check(fdata):
         
         return fld_seqs
     
-    return False
+    return
+
+
+def pmover(case, fld_xyz, idp_path):
+    """
+    Protein cartesian space mover.
+    
+    Shifts entire protein chain based on one point.
+
+    Parameters
+    ----------
+    case : string
+        Case could be `nidr`, `cidr`, or `break` as defined above.
+    
+    fld_xyz : tuple
+        Backbone N(x, y, z) float coordinates of interest
+        where we want to move the IDP chain relative to.
+    
+    idp_path : Path
+        Path to the IDP conformer we want to move.
+    
+    Returns
+    -------
+    Overwrites PDB of IDP conformer with new coordinates.
+    """
+    Nx = fld_xyz[0]
+    Ny = fld_xyz[1]
+    Nz = fld_xyz[2]
+    
+    structure = Structure(idp_path)
+    structure.build()
+    atom_names = structure.data_array[:, col_name]
+    
+    if case == disorder_cases[0]:  # N-IDR
+        # In the case of N-IDR, we want to move relative to C-term
+        # A little bit complicated, need to calculate difference between
+        # C-term Nitrogen on IDP and N(x,y,z)
+        for i, atom in enumerate(atom_names):
+            if atom_names[len(atom_names) - 1 - i] == "N":
+                index = len(atom_names) - 1 - i
+                break
+    elif case == disorder_cases[1]:  # break
+        pass
+    elif case == disorder_cases[2]:  # C-IDR
+        # In the case of C-IDR, we want to move relative to carbonyl C
+        for i, atom in enumerate(atom_names):
+            if atom == "C":
+                index = i
+                break
+    
+    idp_xyz = structure.data_array[index][cols_coords]
+    dx = Nx - float(idp_xyz[0])
+    dy = Ny - float(idp_xyz[1])
+    dz = Nz - float(idp_xyz[2])
+    
+    for i, coords in enumerate(structure.data_array[:, cols_coords]):
+        x = str(round(dx + float(coords[0]), 3))
+        y = str(round(dy + float(coords[1]), 3))
+        z = str(round(dz + float(coords[2]), 3))
         
+        structure.data_array[i][col_x] = x
+        structure.data_array[i][col_y] = y
+        structure.data_array[i][col_z] = z
+    
+    structure.write_PDB(idp_path)
+    
+    return
+
 
 def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
     """
@@ -150,8 +216,8 @@ def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
 
     Parameters
     ----------
-    case : int
-        Case number 1 = N-IDR, 2 = C-IDR, 3 = break-IDR.
+    case : string
+        Case could be `nidr`, `cidr`, or `break` as defined above.
     
     fl_seq : string
         Full length sequence of requested protein to build.
@@ -170,13 +236,11 @@ def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
     pdb_coords : np.ndarray
         Array of final coordinates 
     """
-    if case == disorder_cases[0]:
-        None
-    elif case == disorder_cases[1]:
-        None
-    elif case == disorder_cases[2]:
-        None
-    else:
-        # code should not reach here
-        return
+    if case == disorder_cases[0]:  # N-IDR
+        pass
+    elif case == disorder_cases[1]:  # break
+        pass
+    elif case == disorder_cases[2]:  # C-IDR
+        pass
     
+    return

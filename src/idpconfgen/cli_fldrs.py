@@ -9,6 +9,7 @@ USAGE:
 
 """
 import argparse
+import os
 import shutil
 from functools import partial
 from itertools import cycle
@@ -100,6 +101,7 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
+from idpconfgen.libs.libstructure import Structure, cols_coords, col_name
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
@@ -107,6 +109,7 @@ from idpconfgen.fldrs_helper import (
     disorder_cases,
     break_check,
     consecutive_grouper,
+    pmover,
     )
 
 _file = Path(__file__).myparents()
@@ -634,17 +637,29 @@ def main(
         get_sidechain_packing_parameters(kwargs, sidechain_method)
 
 
+    
+    fld_struc = Structure(Path(folded_structure))
+    fld_struc.build()
+    atom_names = fld_struc.data_array[:, col_name]
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
         lower = DISORDER_BOUNDS[i][0]
         upper = DISORDER_BOUNDS[i][1]
         if lower == 0:
             DISORDER_CASE = disorder_cases[0]  # N-IDR
+            for j, atom in enumerate(atom_names):
+                if atom == "N":
+                    Nindex = j
+                    break
         elif upper == len(input_seq):
             DISORDER_CASE = disorder_cases[2]  # C-IDR
+            for j, atom in enumerate(atom_names):
+                if atom_names[len(atom_names) - 1 - j] == "C":
+                    Nindex = len(atom_names) - 1 - j
+                    break
         else:
             DISORDER_CASE = disorder_cases[1]  # Break
-        
+
         populate_globals(
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
@@ -668,6 +683,7 @@ def main(
         consume = partial(
             _build_conformers,
             index=i,
+            conformer_name="conformer_"+DISORDER_CASE,
             input_seq=seq,  # string
             output_folder=temp_of,
             nconfs=conformers_per_core,  # int
@@ -694,9 +710,15 @@ def main(
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
         
-        log.info(S("Performing protein shifter function"))
+        log.info(S("Performing protein mover function..."))
         
-        
+        new_conformers = os.listdir(temp_of)
+        idp_xyz = fld_struc.data_array[Nindex][cols_coords]
+        Nx = float(idp_xyz[0])
+        Ny = float(idp_xyz[1])
+        Nz = float(idp_xyz[2])
+        for conformer in new_conformers:
+            pmover(DISORDER_CASE, (Nx, Ny, Nz), temp_of.joinpath(conformer))
         
         log.info(S("done"))
         
