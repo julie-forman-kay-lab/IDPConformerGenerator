@@ -37,6 +37,7 @@ from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
     col_resName,
+    col_resSeq,
     cols_coords,
     col_x,
     col_y,
@@ -243,7 +244,15 @@ def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
     
     # For break and cidr cases, need to check if grafting
     # was already completed for N-IDR and previous breaks
-    if case == disorder_cases[0]:  # N-IDR
+    if case == disorder_cases[0]:
+        """
+        Plan (Nov 18):
+        1. Remove last residue (C-term) on idr
+        2. Initialize a new structure array with total length
+        of idr and fld after C-term removal
+        3. Populate new structure array with idr first then fld
+        """
+            
         pass
     elif case == disorder_cases[1]:  # break
         pass
