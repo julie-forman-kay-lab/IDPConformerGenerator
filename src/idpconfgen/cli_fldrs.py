@@ -85,6 +85,7 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
+from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
@@ -110,6 +111,7 @@ from idpconfgen.fldrs_helper import (
     break_check,
     consecutive_grouper,
     pmover,
+    psurgeon,
     )
 
 _file = Path(__file__).myparents()
@@ -590,6 +592,8 @@ def main(
     XMERPROBS = []
     GET_ADJ = []
     for i, seq in enumerate(DISORDER_SEQS):
+        log.info(S(f"Preparing database for sequence: {seq}"))
+        
         SLICEDICT_XMERS.append(prepare_slice_dict(
             primary,
             seq,
@@ -619,6 +623,8 @@ def main(
             fld_dihedrals_db=None,
             residue_tolerance=residue_tolerance,
             ))
+        
+        log.info(S("done"))
 
     # create different random seeds for the different cores
     # seeds created to the cores based on main seed are predictable
@@ -722,13 +728,57 @@ def main(
         
         log.info(S("done"))
         
-        log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
+        log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
         
         # reinitialize queues so reiteration doesn't crash
         for i in range(ncores + bool(remaining_confs)):
             RANDOMSEEDS.put(random_seed + i)
         for i in range(1, nconfs + 1):
             CONF_NUMBER.put(i)
+    
+    # After conformer construction and moving, time to graft proteins together
+    # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
+    # - Note that residue number `col_resSeq` needs to be continuous
+    # - For good form, make sure `col_serial` is consistent as well
+    # - When grafting remove the tether residue on donor chain
+    DISORDER_CASE = {}
+    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])):
+        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])
+        nidr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])):
+        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])
+        nidr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+        # What to do if we have multiple breaks? Maybe split to subdirs
+    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])):
+        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])
+        nidr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+    
+    for k, case in enumerate(DISORDER_CASE):
+        log.info(f"Grafting {case} conformers...")
+        
+        consume = partial(
+            psurgeon,
+            case=case,
+            fl_seq=input_seq,
+            bounds=DISORDER_BOUNDS[k],
+            fld_struc=Path(folded_structure),
+        )
+        
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+        )
+        
+        execute_pool = pool_function(execute, DISORDER_CASE[case], ncores=ncores)
+        
+        for _ in execute_pool:
+            pass
     
     if not keep_temporary:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))

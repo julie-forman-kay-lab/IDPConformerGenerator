@@ -22,9 +22,9 @@ Important note: do not perform clash check within folded region
 """
 
 disorder_cases = {
-    0: "nidr",
-    1: "break",
-    2: "cidr",
+    0: "N-IDR",
+    1: "Break-IDR",
+    2: "C-IDR",
     }
 
 import numpy as np
@@ -210,7 +210,7 @@ def pmover(case, fld_xyz, idp_path):
     return
 
 
-def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
+def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
@@ -225,17 +225,24 @@ def psurgeon(case, fl_seq, bounds, fld_struc, idp_coords):
     bounds : tuple
         Starting and ending indicies of where disordered region is.
     
-    fld_struc : Structure
-        IDPConformerGenerator Structure class of folded structure.
+    fld_struc : Path
+        Path to the folded structure .PDB file.
     
-    idp_coords : np.ndarray
-        Array of coordinates for IDP generated.
+    idp_struc : Path
+        Path to the donor conformer to graft.
     
     Returns
     -------
     pdb_coords : np.ndarray
         Array of final coordinates 
     """
+    fld = Structure(fld_struc)
+    idr = Structure(idp_struc)
+    fld.build()
+    idr.build()
+    
+    # For break and cidr cases, need to check if grafting
+    # was already completed for N-IDR and previous breaks
     if case == disorder_cases[0]:  # N-IDR
         pass
     elif case == disorder_cases[1]:  # break
