@@ -27,6 +27,8 @@ disorder_cases = {
     2: "C-IDR",
     }
 
+import random
+
 import numpy as np
 
 from idpconfgen import Path
@@ -209,6 +211,77 @@ def pmover(case, fld_xyz, idp_path):
     structure.write_PDB(idp_path)
     
     return
+
+
+def rotator(chain, case):
+    """
+    Rotation function that rotates the protein chain randomly.
+    
+    The point of rotation depends on the case of IDR.
+    For example, with N-IDR, the point of rotation is about
+    the CA atom at the C-term of the IDR chain.
+    
+    Parameters
+    ----------
+    chain : Path
+        Path to the chain of interest we want to rotate.
+    
+    case : string
+        Disordered case of interest determines which point
+        to rotate about.
+
+    Returns
+    -------
+    rotated : IDPConformerGenerator.Structure
+        Structure object with the new rotated coordinates.
+    """
+    minrad = 0
+    maxrad = 2 * np.pi
+    # Select random angle to rotate
+    angle = random.uniform(minrad, maxrad)
+    
+    idp = Structure(chain)
+    idp.build()
+    atom_names = idp.data_array[:, col_name]
+    
+    if case == disorder_cases[0]:  # N-IDR
+        for i, atom in enumerate(atom_names):
+            if atom_names[len(atom_names) - 1 - i] == "N":
+                index = len(atom_names) - 1 - i
+                break
+    elif case == disorder_cases[2]:  # C-IDR
+        for i, atom in enumerate(atom_names):
+            if atom == "C":
+                index = i
+                break
+    
+    point_xyz = idp.data_array[index][cols_coords]
+    px = float(point_xyz[0])
+    py = float(point_xyz[1])
+    pz = float(point_xyz[2])
+    
+    coords = idp.data_array[:, cols_coords]  # needs confirming
+    
+    # Create a 3x3 rotation matrix
+    rotation_matrix = np.array(
+        [[np.cos(angle), -np.sin(angle), 0],
+        [np.sin(angle), np.cos(angle), 0],
+        [0, 0, 1]]
+    )
+    
+    # Create an array of the coordinates to be rotated
+    # ones appended to the end to make a 4xN matrix for multiplication
+    coords_with_ones = np.hstack([coords, np.ones((coords.shape[0], 1))])
+    
+    rotated_coords = np.dot(rotation_matrix, coords_with_ones.T).T
+    rotated_coords = rotated_coords[:, :-1]
+    
+    # Translate rotated coordinates so they are rotated about the desired point
+    rotated_coords[:, 0] += px - np.dot(rotation_matrix[0, :2], [px, py])
+    rotated_coords[:, 1] += py - np.dot(rotation_matrix[1, :2], [px, py])
+    rotated_coords[:, 2] += pz - np.dot(rotation_matrix[2, :2], [px, py])
+
+    return rotated_coords
 
 
 def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
