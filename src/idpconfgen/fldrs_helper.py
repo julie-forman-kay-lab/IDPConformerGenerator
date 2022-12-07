@@ -33,7 +33,7 @@ import numpy as np
 
 from idpconfgen import Path
 
-from idpconfgen.core.definitions import aa3to1
+from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
     Structure,
@@ -45,6 +45,26 @@ from idpconfgen.libs.libstructure import (
     col_y,
     col_z,
 )
+
+
+def calculate_distance(coords1, coords2):
+    """
+    Returns the distance between two 3D coordinates.
+    
+    Calculates the distance between 2 coordinates using Euclidean distance
+    formula.
+    
+    Parameters
+    ----------
+    coords1 : np.ndarray
+    
+    coords2 : np.ndarray
+    
+    Return
+    ------
+    float distance
+    """
+    return np.sqrt(np.sum((coords1 - coords2) ** 2))
 
 
 def consecutive_grouper(seq):
@@ -281,7 +301,48 @@ def rotator(chain, case):
     rotated_coords[:, 1] += py - np.dot(rotation_matrix[1, :2], [px, py])
     rotated_coords[:, 2] += pz - np.dot(rotation_matrix[2, :2], [px, py])
 
-    return rotated_coords
+    idp.data_array[:, cols_coords] = rotated_coords
+    
+    return idp
+
+
+def count_clashes(chain1, chain2):
+    """
+    Checks for steric clashes between two protein chains.
+    
+    Input should be a list of tuples (each has atom symbol and 3D coordinates)
+    Function returns number of steric clashes detected between two chains.
+
+    Parameters
+    ----------
+    chain1 : List[Tuple[str, np.ndarray]]
+    
+    chain2 : List[Tuple[str, np.ndarray]]
+    
+    Returns
+    -------
+    num_clashes : int
+        Number of steric clashes determined using vdW radii
+    """
+    num_clashes = 0
+    
+    # Loop through all pairs of atoms in the 2 protein chains
+    for atom1, coords1 in chain1:
+        for atom2, coords2 in chain2:
+            # calculate distance between atoms
+            distance = calculate_distance(coords1, coords2)
+            
+            # get vdW radii for each atom
+            vdw_radius1 = vdW_radii_tsai_1999[atom1]
+            vdw_radius2 = vdW_radii_tsai_1999[atom2]
+            
+            # Check if a steric clash is detected by comparing
+            # distance between atoms to the sum of their vdW radii
+            if distance < vdw_radius1 + vdw_radius2:
+                num_clashes += 1
+    
+    return num_clashes
+    
 
 
 def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
