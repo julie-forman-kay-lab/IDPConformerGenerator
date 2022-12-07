@@ -37,6 +37,7 @@ from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -295,31 +296,78 @@ def rotator(chain, case):
     return idp
 
 
-def count_clashes(chain1, chain2):
+def count_clashes(
+    parent,
+    fragment,
+    case=None,
+    max_clash=55,
+    tolerance=0.4,      
+    ):
     """
-    Checks for steric clashes between two protein chains.
-    
-    Input should be a list of tuples (each has atom symbol and 3D coordinates)
-    Function returns number of steric clashes detected between two chains.
+    Checks for steric clashes between two protein chains using vdW radii.
 
     Parameters
     ----------
-    chain1 : List[Tuple[str, np.ndarray]]
+    parent : IDPConformerGenerator.Structure
+        Structure of static protein chain of interest.
+        Must already be built using `.build()`
     
-    chain2 : List[Tuple[str, np.ndarray]]
+    fragment : IDPConformerGenerator.Structure
+        Structure of variable protein chain of interest
+        Must already be built using `.build()`
+    
+    case : str, optional
+        Disorder case of interest will change how clash is calculated
+    
+    max_clash : int, optional
+        Integer number for maximum number of allowed clashes
+    
+    tolerance : float, optional
+        Tolerance applicable to vdW clash validation in Angstroms
     
     Returns
     -------
     num_clashes : int
         Number of steric clashes determined using vdW radii
+    
+    False : Bool
+        Too many clashes observed, not worthwhile continuing
     """
     num_clashes = 0
     
+    parent_atoms = parent.data_array[:, col_element]
+    fragment_atoms = fragment.data_array[:, col_element]
+    fragment_seq = fragment.data_array[:, col_resSeq]
+    parent_coords = parent.data_array[:, cols_coords].astype(float)
+    fragment_coords = fragment.data_array[:, cols_coords].astype(float)
+    
+    if case == disorder_cases[0]:
+        # N-IDR, remove last resiude of fragment from consideration
+        for i, seq in enumerate(fragment_seq):
+            j = len(fragment_seq) - 1 - i
+            curr = fragment_seq[j]
+            prev = fragment_seq[j - 1]
+            fragment_atoms = np.delete(fragment_atoms, j, axis=0)
+            fragment_coords = np.delete(fragment_coords, j, axis=0)
+            if prev != curr:
+                break
+    elif case == disorder_cases[1]:
+        pass
+    elif case == disorder_cases[2]:
+        # C-IDR, remove first residue of fragment from consideration
+        for i, seq in enumerate(fragment_seq):
+            curr = seq
+            next = fragment_seq[i + 1]
+            fragment_atoms = np.delete(fragment_atoms, j, axis=0)
+            fragment_coords = np.delete(fragment_coords, j, axis=0)
+            if next != curr:
+                break
+    
     # Loop through all pairs of atoms in the 2 protein chains
-    for atom1, coords1 in chain1:
-        for atom2, coords2 in chain2:
+    for i, atom1 in enumerate(parent_atoms):
+        for j, atom2 in enumerate(fragment_atoms):
             # calculate distance between atoms
-            distance = calculate_distance(coords1, coords2)
+            distance = calculate_distance(parent_coords[i], fragment_coords[j])
             
             # get vdW radii for each atom
             vdw_radius1 = vdW_radii_tsai_1999[atom1]
@@ -327,11 +375,12 @@ def count_clashes(chain1, chain2):
             
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
-            if distance < vdw_radius1 + vdw_radius2:
+            if num_clashes >= max_clash:
+                return False
+            if distance < vdw_radius1 + vdw_radius2 + tolerance:
                 num_clashes += 1
     
     return num_clashes
-    
 
 
 def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
