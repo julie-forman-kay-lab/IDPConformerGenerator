@@ -275,13 +275,6 @@ def rotator(chain, case):
                 index = i
                 break
     
-    point_xyz = idp.data_array[index][cols_coords]
-    px = float(point_xyz[0])
-    py = float(point_xyz[1])
-    pz = float(point_xyz[2])
-    
-    coords = idp.data_array[:, cols_coords]  # needs confirming
-    
     # Create a 3x3 rotation matrix
     rotation_matrix = np.array(
         [[np.cos(angle), -np.sin(angle), 0],
@@ -289,19 +282,15 @@ def rotator(chain, case):
         [0, 0, 1]]
     )
     
-    # Create an array of the coordinates to be rotated
-    # ones appended to the end to make a 4xN matrix for multiplication
-    coords_with_ones = np.hstack([coords, np.ones((coords.shape[0], 1))])
+    # Mark the fixed point and translate point as the origin
+    point_xyz = idp.data_array[index][cols_coords].astype(float)
+    coords = idp.data_array[:, cols_coords].astype(float) - point_xyz
     
-    rotated_coords = np.dot(rotation_matrix, coords_with_ones.T).T
-    rotated_coords = rotated_coords[:, :-1]
+    # Rotate coordinates about a random angle and translate point back
+    rotated_coords = np.dot(rotation_matrix, coords.T).T
+    rotated_coords += point_xyz
     
-    # Translate rotated coordinates so they are rotated about the desired point
-    rotated_coords[:, 0] += px - np.dot(rotation_matrix[0, :2], [px, py])
-    rotated_coords[:, 1] += py - np.dot(rotation_matrix[1, :2], [px, py])
-    rotated_coords[:, 2] += pz - np.dot(rotation_matrix[2, :2], [px, py])
-
-    idp.data_array[:, cols_coords] = rotated_coords
+    idp.data_array[:, cols_coords] = rotated_coords.astype(str)
     
     return idp
 
