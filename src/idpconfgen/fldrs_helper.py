@@ -48,6 +48,36 @@ from idpconfgen.libs.libstructure import (
 )
 
 
+def tolerance_calculator(tolerance):
+    """
+    Calculates the max number of spherical clashes and distance tolerance
+    given a floating point tolerance between 0-1.
+
+    Parameter
+    ---------
+    tolerance : float
+    
+    Returns
+    -------
+    max_rotation : int
+    max_clash : int
+    dist_tolerance : float
+    """
+    if tolerance > 1.0:
+        tolerance = 1.0
+    if tolerance < 0.0:
+        tolerance = 0.0
+        
+    max_rotation = int(-1 * ((tolerance * 256) - 256))
+    if tolerance > 0.9:
+        max_rotation = 32
+        
+    max_clash = int(tolerance * 75)
+    dist_tolerance = tolerance
+    
+    return max_rotation, max_clash, dist_tolerance
+
+
 def calculate_distance(coords1, coords2):
     """
     Returns the distance between two 3D coordinates.

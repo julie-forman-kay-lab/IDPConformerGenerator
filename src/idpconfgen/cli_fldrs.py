@@ -112,6 +112,7 @@ from idpconfgen.fldrs_helper import (
     consecutive_grouper,
     pmover,
     psurgeon,
+    tolerance_calculator,
     )
 
 _file = Path(__file__).myparents()
@@ -264,9 +265,22 @@ ap.add_argument(
     '-kt',
     '--keep-temporary',
     help=(
-        "Switch to keep temporary disordered fragments while building. "
+        "Switch to keep temporary disordered fragments while building."
         ),
     action='store_true',
+)
+
+ap.add_argument(
+    '-tol',
+    '--clash-tolerance',
+    help=(
+        "Float value clash tolerance between 0.0-1.0 where 0.5 is the default "
+        "value denoting minimum of 40 spherical clashes, 0.5 Angstroms "
+        "of tolerance with a given vdW radii and 128 maximum attempts "
+        "for rotation. Where 1.0 allows for 80 clashes, 1.0 Angstroms "
+        "of tolerance for a given vdW radii, and 32 attempts for rotation."
+        ),
+    Default=0.5,
 )
 
 ap.add_argument(
@@ -378,6 +392,7 @@ def main(
         input_seq,
         database,
         custom_sampling,
+        clash_tolerance=0.5,
         keep_temporary=False,
         folded_structure=None,
         dloop_off=False,
@@ -404,6 +419,18 @@ def main(
 
     Distributes over processors.
     """
+    try:
+        clash_tolerance = float(clash_tolerance)
+    except ValueError:
+        log.info(
+            "Please enter a floating point value for clash-tolerances "
+            "between 0.0-1.0."
+        )
+        return
+    
+    max_rotation, max_clash, dist_tolerance = \
+        tolerance_calculator(clash_tolerance)
+    
     if keep_temporary:
         TEMP_DIRNAME = "fldrs_temp/" 
     else:
