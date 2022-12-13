@@ -109,6 +109,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 from idpconfgen.fldrs_helper import (
     disorder_cases,
     break_check,
+    clash_and_rotate_helper,
     consecutive_grouper,
     pmover,
     psurgeon,
@@ -280,7 +281,7 @@ ap.add_argument(
         "for rotation. Where 1.0 allows for 80 clashes, 1.0 Angstroms "
         "of tolerance for a given vdW radii, and 32 attempts for rotation."
         ),
-    Default=0.5,
+    default=0.5,
 )
 
 ap.add_argument(
@@ -771,18 +772,57 @@ def main(
     DISORDER_CASE = {}
     if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])):
         fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])
-        nidr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+        idr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])):
         fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])
-        nidr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+        idr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
         # What to do if we have multiple breaks? Maybe split to subdirs
     if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])):
         fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])
-        nidr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in nidr_confs]
+        idr_confs = os.listdir(fpath)
+        DISORDER_CASE[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     
+    fStruct = Structure(Path(folded_structure))
+    fStruct.build()
+    
+    for case in DISORDER_CASE:
+        log.info(f"Rotating and clash checking {case} conformers...")
+        
+        consume = partial(
+            clash_and_rotate_helper,
+            parent=fStruct,
+            case=case,
+            max_clash=max_clash,
+            max_rotation=max_rotation,
+            tolerance=dist_tolerance,
+        )
+        
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+        )
+        
+        execute_pool = pool_function(execute, DISORDER_CASE[case], ncores=ncores)
+        
+        for result in execute_pool:
+            n_clashes = result[0]
+            idr = result[1]
+            path = result[2]
+            
+            if n_clashes == True:
+                os.remove(path)
+            else:
+                idr.write_PDB(path)
+    
+    
+    # For stiching, generate a tuple database of which pairs have already been
+    # generated.
+    '''
     for k, case in enumerate(DISORDER_CASE):
         log.info(f"Grafting {case} conformers...")
         
@@ -806,7 +846,7 @@ def main(
         
         for _ in execute_pool:
             pass
-    
+    '''
     if not keep_temporary:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 

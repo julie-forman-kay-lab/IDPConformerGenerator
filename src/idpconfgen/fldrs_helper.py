@@ -65,14 +65,14 @@ def tolerance_calculator(tolerance):
     """
     if tolerance > 1.0:
         tolerance = 1.0
-    if tolerance < 0.0:
+    elif tolerance < 0.0:
         tolerance = 0.0
         
     max_rotation = int(-1 * ((tolerance * 256) - 256))
     if tolerance > 0.9:
         max_rotation = 32
         
-    max_clash = int(tolerance * 75)
+    max_clash = int(tolerance * 80)
     dist_tolerance = tolerance
     
     return max_rotation, max_clash, dist_tolerance
@@ -274,8 +274,8 @@ def rotator(chain, case):
     
     Parameters
     ----------
-    chain : Path
-        Path to the chain of interest we want to rotate.
+    chain : Path or IDPConformerGenerator.Structure
+        Chain of interest we want to rotate.
     
     case : string
         Disordered case of interest determines which point
@@ -283,7 +283,7 @@ def rotator(chain, case):
 
     Returns
     -------
-    rotated : IDPConformerGenerator.Structure
+    idp : IDPConformerGenerator.Structure
         Structure object with the new rotated coordinates.
     """
     minrad = 0
@@ -291,8 +291,12 @@ def rotator(chain, case):
     # Select random angle to rotate
     angle = random.uniform(minrad, maxrad)
     
-    idp = Structure(chain)
-    idp.build()
+    if type(chain) is Path:
+        idp = Structure(chain)
+        idp.build()
+    else:
+        idp = chain
+        
     atom_names = idp.data_array[:, col_name]
     
     if case == disorder_cases[0]:  # N-IDR
@@ -323,7 +327,7 @@ def rotator(chain, case):
     
     idp.data_array[:, cols_coords] = rotated_coords.astype(str)
     
-    return idp
+    return idp, chain  # returns original chain/path also
 
 
 def count_clashes(
@@ -360,7 +364,7 @@ def count_clashes(
     num_clashes : int
         Number of steric clashes determined using vdW radii
     
-    False : Bool
+    True : Bool
         Too many clashes observed, not worthwhile continuing
     """
     num_clashes = 0
@@ -388,8 +392,8 @@ def count_clashes(
         for i, seq in enumerate(fragment_seq):
             curr = seq
             next = fragment_seq[i + 1]
-            fragment_atoms = np.delete(fragment_atoms, j, axis=0)
-            fragment_coords = np.delete(fragment_coords, j, axis=0)
+            fragment_atoms = np.delete(fragment_atoms, i, axis=0)
+            fragment_coords = np.delete(fragment_coords, i, axis=0)
             if next != curr:
                 break
     
@@ -406,11 +410,44 @@ def count_clashes(
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
             if num_clashes >= max_clash:
-                return False
+                return True
             if distance < vdw_radius1 + vdw_radius2 + tolerance:
                 num_clashes += 1
     
     return num_clashes
+
+
+def clash_and_rotate_helper(
+    frag_path,
+    parent,
+    case,
+    max_clash,
+    max_rotation,
+    tolerance,
+    ):
+    fragment = rotator(frag_path, case=case)
+    n_clashes = count_clashes(
+        parent,
+        fragment[0],
+        case=case,
+        max_clash=max_clash,
+        tolerance=tolerance,
+    )
+            
+    counter = 1
+    while (n_clashes == True) and (counter <= max_rotation):
+        fragment = rotator(fragment[0], case=case)
+        n_clashes = count_clashes(
+            parent,
+            fragment[0],
+            case=case,
+            max_clash=max_clash,
+            tolerance=tolerance,
+        )
+        
+        counter += 1
+    
+    return n_clashes, fragment[0], frag_path
 
 
 def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
