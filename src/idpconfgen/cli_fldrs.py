@@ -113,6 +113,7 @@ from idpconfgen.fldrs_helper import (
     consecutive_grouper,
     pmover,
     psurgeon,
+    store_idp_paths,
     tolerance_calculator,
     )
 
@@ -764,25 +765,8 @@ def main(
         for i in range(1, nconfs + 1):
             CONF_NUMBER.put(i)
     
-    # After conformer construction and moving, time to graft proteins together
-    # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
-    # - Note that residue number `col_resSeq` needs to be continuous
-    # - For good form, make sure `col_serial` is consistent as well
-    # - When grafting remove the tether residue on donor chain
-    DISORDER_CASE = {}
-    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])):
-        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[0])
-        idr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
-    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])):
-        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[1])
-        idr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
-        # What to do if we have multiple breaks? Maybe split to subdirs
-    if os.path.exists(output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])):
-        fpath = output_folder.joinpath(TEMP_DIRNAME + disorder_cases[2])
-        idr_confs = os.listdir(fpath)
-        DISORDER_CASE[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+    # Initialize the original paths to the generated files
+    DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
     fStruct = Structure(Path(folded_structure))
     fStruct.build()
@@ -819,12 +803,17 @@ def main(
             else:
                 idr.write_PDB(path)
     
+    # Re-do paths so they are updated with confs that pass the clash check
+    DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
-    # For stiching, generate a tuple database of which pairs have already been
-    # generated.
-    '''
+    # After conformer construction and moving, time to graft proteins together
+    # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
+    # - Note that residue number `col_resSeq` needs to be continuous
+    # - For good form, make sure `col_serial` is consistent as well
+    # - When grafting remove the tether residue on donor chain
+    # - Generate a tuple database of which pairs have already been generated
     for k, case in enumerate(DISORDER_CASE):
-        log.info(f"Grafting {case} conformers...")
+        log.info(f"Stitching {case} conformers onto the folded domain...")
         
         consume = partial(
             psurgeon,
@@ -846,7 +835,7 @@ def main(
         
         for _ in execute_pool:
             pass
-    '''
+    
     if not keep_temporary:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 

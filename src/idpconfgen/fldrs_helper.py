@@ -28,9 +28,11 @@ disorder_cases = {
     }
 
 import random
+import os
 
 import numpy as np
 
+from itertools import combinations
 from idpconfgen import Path
 
 from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
@@ -129,6 +131,56 @@ def consecutive_grouper(seq):
         bounds.append((first, last + 1))
     
     return bounds
+
+
+def store_idp_paths(folder, temp_dir):
+    """
+    Stores all of the paths for different cases of IDRs in a dictionary.
+
+    Parameters
+    ----------
+    folder : Path
+        Output folder of interest
+    
+    temp_dir : str
+        Name of the temporary directory of interest
+    
+    Returns
+    -------
+    disorder_case : dict
+        Dictionary of paths to conformers associated with each disorder case
+    """
+    case_path = {}
+    
+    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
+        fpath = folder.joinpath(temp_dir + disorder_cases[0])
+        idr_confs = os.listdir(fpath)
+        case_path[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
+        fpath = folder.joinpath(temp_dir + disorder_cases[1])
+        idr_confs = os.listdir(fpath)
+        case_path[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        # What to do if we have multiple breaks? Maybe split to subdirs
+    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
+        fpath = folder.joinpath(temp_dir + disorder_cases[2])
+        idr_confs = os.listdir(fpath)
+        case_path[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+
+    return case_path
+
+
+def create_combinations(list1, list2, num_combinations):
+    """
+    Create unique combinations between two lists.
+    
+    Made for N-IDR and C-IDR combinations.
+    """
+    all_combinations = list(combinations(list1 + list2, 2))
+    max_combinations = len(all_combinations)
+
+    selected_combinations = random.sample(all_combinations, min(num_combinations, max_combinations))
+
+    return selected_combinations
 
 
 def break_check(fdata):
@@ -450,36 +502,37 @@ def clash_and_rotate_helper(
     return n_clashes, fragment[0], frag_path
 
 
-def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
+def psurgeon(idp_struc, fld_struc, case):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
     Parameters
     ----------
-    case : string
-        Case could be `nidr`, `cidr`, or `break` as defined above.
+    idp_struc : Path or IDPConformerGenerator.Structure
+        Donor conformer to graft
     
-    fl_seq : string
-        Full length sequence of requested protein to build.
-    
-    bounds : tuple
-        Starting and ending indicies of where disordered region is.
-    
-    fld_struc : Path
-        Path to the folded structure .PDB file.
-    
-    idp_struc : Path
-        Path to the donor conformer to graft.
-    
+    case : str
+        Case could be `nidr`, `cidr`, or `break` as defined above
+
+    fld_struc : Path or IDPConformerGenerator.Structure
+        Folded structure to be grafted on
+
     Returns
     -------
-    pdb_coords : np.ndarray
-        Array of final coordinates 
+    final_struc : IDPConformerGenerator.Structure
+        Structure object for the final stiched structure.
     """
-    fld = Structure(fld_struc)
-    idr = Structure(idp_struc)
-    fld.build()
-    idr.build()
+    if type(fld_struc) is Path:
+        fld = Structure(fld_struc)
+        fld.build()
+    if type(idp_struc) is Path:
+        idr = Structure(idp_struc)
+        idr.build()
+    elif type(idp_struc) is tuple:
+        nidr = Structure(idp_struc[0])
+        cidr = Structure(idp_struc[1])
+        nidr.build()
+        cidr.build()
     
     # For break and cidr cases, need to check if grafting
     # was already completed for N-IDR and previous breaks
@@ -496,6 +549,10 @@ def psurgeon(idp_struc, case, fl_seq, bounds, fld_struc):
     elif case == disorder_cases[1]:  # break
         pass
     elif case == disorder_cases[2]:  # C-IDR
+        pass
+    elif case == disorder_cases[0] + disorder_cases[2]:
+        # For cases where we have both C-IDR and N-IDR
+        # idp_struc should be a list of combinations of (N-IDR, C-IDR) paths
         pass
     
     return
