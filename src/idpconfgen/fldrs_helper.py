@@ -39,14 +39,18 @@ from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_chainID,
     col_element,
     col_name,
     col_resName,
     col_resSeq,
+    col_serial,
+    col_segid,
     cols_coords,
     col_x,
     col_y,
     col_z,
+    structure_to_pdb,
 )
 
 
@@ -519,8 +523,8 @@ def psurgeon(idp_struc, fld_struc, case):
 
     Returns
     -------
-    final_struc : IDPConformerGenerator.Structure
-        Structure object for the final stiched structure.
+    new_struc : IDPConformerGenerator.Generator
+        Generator object where each element is a line of a PDB file.
     """
     if type(fld_struc) is Path:
         fld = Structure(fld_struc)
@@ -534,25 +538,71 @@ def psurgeon(idp_struc, fld_struc, case):
         nidr.build()
         cidr.build()
     
-    # For break and cidr cases, need to check if grafting
-    # was already completed for N-IDR and previous breaks
+    idr_seq = idr.data_array[:, col_resSeq]
     if case == disorder_cases[0]:
-        """
-        Plan (Nov 18):
-        1. Remove last residue (C-term) on idr
-        2. Initialize a new structure array with total length
-        of idr and fld after C-term removal
-        3. Populate new structure array with idr first then fld
-        """
-            
-        pass
+        # N-IDR, remove last resiude of fragment
+        for i, seq in enumerate(idr_seq):
+            j = len(idr_seq) - 1 - i
+            curr = idr_seq[j]
+            prev = idr_seq[j - 1]
+            idr._data_array = np.delete(idr.data_array, j, axis=0)
+            if prev != curr:
+                break
+        
+        new_struc_arr = np.insert(fld._data_array, 0, idr.data_array, axis=0)
+        
+        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
+        new_struc_arr[:, col_serial] = new_serial
+        new_struc_arr[:, col_chainID] = "A"
+        new_struc_arr[:, col_segid] = "A"
+        
     elif case == disorder_cases[1]:  # break
         pass
-    elif case == disorder_cases[2]:  # C-IDR
-        pass
+    
+    elif case == disorder_cases[2]:
+        # TODO: need some tweaking here about the CA connectivity atom
+        # C-IDR, remove first resiude of fragment
+        for i, seq in enumerate(idr_seq):
+            curr = seq
+            next = idr_seq[i + 1]
+            idr._data_array = np.delete(idr.data_array, i, axis=0)
+            if next != curr:
+                break
+        
+        # Fix residue connectivity issue
+        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
+        curr_residue = last_residue_fld + 1
+        idr_seq = idr.data_array[:, col_resSeq]
+        for i, seq in enumerate(idr_seq):
+            curr = seq
+            idr._data_array[:, col_resSeq][i] = str(curr_residue)
+            try:
+                if idr_seq[i + 1] != curr:
+                    curr_residue += 1
+            except:
+                break
+        
+        # Initialize and clean new structure
+        new_struc_arr = np.append(fld._data_array, idr.data_array, axis=0)
+        
+        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
+        new_struc_arr[:, col_serial] = new_serial
+        new_struc_arr[:, col_chainID] = "A"
+        new_struc_arr[:, col_segid] = "A"
+        
     elif case == disorder_cases[0] + disorder_cases[2]:
         # For cases where we have both C-IDR and N-IDR
-        # idp_struc should be a list of combinations of (N-IDR, C-IDR) paths
+        # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
         pass
     
-    return
+    return structure_to_pdb(new_struc_arr)
+
+
+IDR = Path("/home/nemoliu/Documents/Conformers/FLDRS/CNOT7/cnot7_100_new/fldrs_temp/C-IDR/conformer_C-IDR_83.pdb")
+FLD = Path("/home/nemoliu/Documents/Conformers/FLDRS/CNOT7/cnot7_4gmj_fld_11-263.pdb")
+
+struc = psurgeon(IDR, FLD, "C-IDR")
+
+with open('/home/nemoliu/Desktop/test.pdb', 'w') as f:
+    for line in struc:
+        f.write(line+"\n")
