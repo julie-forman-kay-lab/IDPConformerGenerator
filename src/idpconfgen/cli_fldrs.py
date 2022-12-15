@@ -689,7 +689,7 @@ def main(
         elif upper == len(input_seq):
             DISORDER_CASE = disorder_cases[2]  # C-IDR
             for j, atom in enumerate(atom_names):
-                if atom_names[len(atom_names) - 1 - j] == "C":
+                if atom_names[len(atom_names) - 1 - j] == "N":
                     Nindex = len(atom_names) - 1 - j
                     break
         else:

@@ -295,9 +295,9 @@ def pmover(case, fld_xyz, idp_path):
     elif case == disorder_cases[1]:  # break
         pass
     elif case == disorder_cases[2]:  # C-IDR
-        # In the case of C-IDR, we want to move relative to carbonyl C
+        # In the case of C-IDR, we want to move relative to first N
         for i, atom in enumerate(atom_names):
-            if atom == "C":
+            if atom == "N":
                 index = i
                 break
     
@@ -362,7 +362,7 @@ def rotator(chain, case):
                 break
     elif case == disorder_cases[2]:  # C-IDR
         for i, atom in enumerate(atom_names):
-            if atom == "C":
+            if atom == "N":
                 index = i
                 break
     
@@ -539,6 +539,8 @@ def psurgeon(idp_struc, fld_struc, case):
         cidr.build()
     
     idr_seq = idr.data_array[:, col_resSeq]
+    fld_seq = fld.data_array[:, col_resSeq]
+    
     if case == disorder_cases[0]:
         # N-IDR, remove last resiude of fragment
         for i, seq in enumerate(idr_seq):
@@ -560,15 +562,15 @@ def psurgeon(idp_struc, fld_struc, case):
         pass
     
     elif case == disorder_cases[2]:
-        # TODO: need some tweaking here about the CA connectivity atom
-        # C-IDR, remove first resiude of fragment
+        # C-IDR, remove last resiude of folded protein
         for i, seq in enumerate(idr_seq):
-            curr = seq
-            next = idr_seq[i + 1]
-            idr._data_array = np.delete(idr.data_array, i, axis=0)
-            if next != curr:
+            j = len(idr_seq) - 1 - i
+            curr = idr_seq[j]
+            prev = idr_seq[j - 1]
+            fld._data_array = np.delete(fld.data_array, j, axis=0)
+            if prev != curr:
                 break
-        
+
         # Fix residue connectivity issue
         last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
         curr_residue = last_residue_fld + 1
@@ -596,13 +598,3 @@ def psurgeon(idp_struc, fld_struc, case):
         pass
     
     return structure_to_pdb(new_struc_arr)
-
-
-IDR = Path("/home/nemoliu/Documents/Conformers/FLDRS/CNOT7/cnot7_100_new/fldrs_temp/C-IDR/conformer_C-IDR_83.pdb")
-FLD = Path("/home/nemoliu/Documents/Conformers/FLDRS/CNOT7/cnot7_4gmj_fld_11-263.pdb")
-
-struc = psurgeon(IDR, FLD, "C-IDR")
-
-with open('/home/nemoliu/Desktop/test.pdb', 'w') as f:
-    for line in struc:
-        f.write(line+"\n")
