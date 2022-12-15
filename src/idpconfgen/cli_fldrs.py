@@ -109,6 +109,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 from idpconfgen.fldrs_helper import (
     disorder_cases,
     break_check,
+    create_combinations,
     clash_and_rotate_helper,
     consecutive_grouper,
     pmover,
@@ -812,29 +813,37 @@ def main(
     # - For good form, make sure `col_serial` is consistent as well
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
-    for k, case in enumerate(DISORDER_CASE):
-        log.info(f"Stitching {case} conformers onto the folded domain...")
+    if len(DISORDER_CASE) == 1:
+        case = next(iter(DISORDER_CASE))
+        files = DISORDER_CASE[case]
+    elif disorder_cases[0] in DISORDER_CASE and disorder_cases[2] in DISORDER_CASE:  # noqa: E501
+        case = disorder_cases[0] + disorder_cases[2]
+        files = create_combinations(
+            DISORDER_CASE[disorder_cases[0]],
+            DISORDER_CASE[disorder_cases[2]],
+            nconfs,
+        )    
         
-        consume = partial(
-            psurgeon,
-            case=case,
-            fl_seq=input_seq,
-            bounds=DISORDER_BOUNDS[k],
-            fld_struc=Path(folded_structure),
-        )
-        
-        execute = partial(
-            report_on_crash,
-            consume,
-            ROC_exception=Exception,
-            ROC_folder=output_folder,
-            ROC_prefix=_name,
-        )
-        
-        execute_pool = pool_function(execute, DISORDER_CASE[case], ncores=ncores)
-        
-        for _ in execute_pool:
-            pass
+    log.info(f"Stitching conformers onto the folded domain...")
+    consume = partial(
+        psurgeon,
+        fld_struc=Path(folded_structure),
+        case=case,
+    )
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_folder=output_folder,
+        ROC_prefix=_name,
+    )
+    execute_pool = pool_function(execute, files, ncores=ncores)
+    
+    for i, conf in enumerate(execute_pool):
+        output = output_folder.joinpath(f"conformer_{i}.pdb")
+        with open(output, 'w') as f:
+            for line in conf:
+                f.write(line + "\n")
     
     if not keep_temporary:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))

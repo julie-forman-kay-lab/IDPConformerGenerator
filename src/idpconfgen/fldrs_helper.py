@@ -539,7 +539,6 @@ def psurgeon(idp_struc, fld_struc, case):
         cidr.build()
     
     idr_seq = idr.data_array[:, col_resSeq]
-    fld_seq = fld.data_array[:, col_resSeq]
     
     if case == disorder_cases[0]:
         # N-IDR, remove last resiude of fragment
@@ -557,10 +556,8 @@ def psurgeon(idp_struc, fld_struc, case):
         new_struc_arr[:, col_serial] = new_serial
         new_struc_arr[:, col_chainID] = "A"
         new_struc_arr[:, col_segid] = "A"
-        
-    elif case == disorder_cases[1]:  # break
+    elif case == disorder_cases[1]:  # internal loop TBD
         pass
-    
     elif case == disorder_cases[2]:
         # C-IDR, remove last resiude of folded protein
         for i, seq in enumerate(idr_seq):
@@ -595,6 +592,8 @@ def psurgeon(idp_struc, fld_struc, case):
     elif case == disorder_cases[0] + disorder_cases[2]:
         # For cases where we have both C-IDR and N-IDR
         # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
+        
+        
         pass
     
     return structure_to_pdb(new_struc_arr)
