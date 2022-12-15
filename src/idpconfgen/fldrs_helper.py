@@ -32,7 +32,7 @@ import os
 
 import numpy as np
 
-from itertools import combinations
+from itertools import product
 from idpconfgen import Path
 
 from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
@@ -50,7 +50,6 @@ from idpconfgen.libs.libstructure import (
     col_x,
     col_y,
     col_z,
-    structure_to_pdb,
 )
 
 
@@ -177,14 +176,32 @@ def create_combinations(list1, list2, num_combinations):
     """
     Create unique combinations between two lists.
     
-    Made for N-IDR and C-IDR combinations.
+    Made for N-IDR and C-IDR combinations. Where list1 = N-IDR paths,
+    and list2 = C-IDR paths. Itertools product is used here because
+    order matters.
+    
+    Parameters
+    ----------
+    list1 : list
+    
+    list2 : list
+    
+    num_combinations : int
+    
+    Return
+    ------
+    selected_combinations : list
+        List of tuples of different combinations as follows:
+        [(item from list 1, item from list 2), ...]
     """
-    all_combinations = list(combinations(list1 + list2, 2))
+    all_combinations = list(product(list1, list2))
     max_combinations = len(all_combinations)
 
     selected_combinations = random.sample(all_combinations, min(num_combinations, max_combinations))
 
     return selected_combinations
+
+
 
 
 def break_check(fdata):
@@ -523,8 +540,8 @@ def psurgeon(idp_struc, fld_struc, case):
 
     Returns
     -------
-    new_struc : IDPConformerGenerator.Generator
-        Generator object where each element is a line of a PDB file.
+    new_struc_arr : np.ndarray (N x 16)
+        Array format of the PDB file.
     """
     if type(fld_struc) is Path:
         fld = Structure(fld_struc)
@@ -538,9 +555,11 @@ def psurgeon(idp_struc, fld_struc, case):
         nidr.build()
         cidr.build()
     
-    idr_seq = idr.data_array[:, col_resSeq]
+    
+    fld_seq = fld.data_array[:, col_resSeq]
     
     if case == disorder_cases[0]:
+        idr_seq = idr.data_array[:, col_resSeq]
         # N-IDR, remove last resiude of fragment
         for i, seq in enumerate(idr_seq):
             j = len(idr_seq) - 1 - i
@@ -559,11 +578,12 @@ def psurgeon(idp_struc, fld_struc, case):
     elif case == disorder_cases[1]:  # internal loop TBD
         pass
     elif case == disorder_cases[2]:
+        idr_seq = idr.data_array[:, col_resSeq]
         # C-IDR, remove last resiude of folded protein
-        for i, seq in enumerate(idr_seq):
-            j = len(idr_seq) - 1 - i
-            curr = idr_seq[j]
-            prev = idr_seq[j - 1]
+        for i, seq in enumerate(fld_seq):
+            j = len(fld_seq) - 1 - i
+            curr = fld_seq[j]
+            prev = fld_seq[j - 1]
             fld._data_array = np.delete(fld.data_array, j, axis=0)
             if prev != curr:
                 break
@@ -592,8 +612,48 @@ def psurgeon(idp_struc, fld_struc, case):
     elif case == disorder_cases[0] + disorder_cases[2]:
         # For cases where we have both C-IDR and N-IDR
         # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
+        # N-IDR, remove last resiude of fragment
+        nidr_seq = nidr.data_array[:, col_resSeq]
+        cidr_seq = cidr.data_array[:, col_resSeq]
         
+        for i, seq in enumerate(nidr_seq):
+            j = len(nidr_seq) - 1 - i
+            curr = nidr_seq[j]
+            prev = nidr_seq[j - 1]
+            nidr._data_array = np.delete(nidr.data_array, j, axis=0)
+            if prev != curr:
+                break
         
-        pass
+        new_struc_arr = np.insert(fld._data_array, 0, nidr.data_array, axis=0)
+        new_struc_seq = new_struc_arr[:, col_resSeq]
+        
+        # C-IDR, remove last resiude of the protein
+        for i, seq in enumerate(new_struc_seq):
+            j = len(new_struc_seq) - 1 - i
+            curr = new_struc_seq[j]
+            prev = new_struc_seq[j - 1]
+            new_struc_arr = np.delete(new_struc_arr, j, axis=0)
+            if prev != curr:
+                break
+        
+        # Fix residue connectivity issue
+        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
+        curr_residue = last_residue_fld
+        for i, seq in enumerate(cidr_seq):
+            curr = seq
+            cidr._data_array[:, col_resSeq][i] = str(curr_residue)
+            try:
+                if cidr_seq[i + 1] != curr:
+                    curr_residue += 1
+            except:
+                break
+        
+        new_struc_arr = np.append(new_struc_arr, cidr.data_array, axis=0)
+        
+        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
+        new_struc_arr[:, col_serial] = new_serial
+        new_struc_arr[:, col_chainID] = "A"
+        new_struc_arr[:, col_segid] = "A"
+        
     
-    return structure_to_pdb(new_struc_arr)
+    return new_struc_arr

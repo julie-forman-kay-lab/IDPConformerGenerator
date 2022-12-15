@@ -102,7 +102,12 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
-from idpconfgen.libs.libstructure import Structure, cols_coords, col_name
+from idpconfgen.libs.libstructure import (
+    Structure,
+    cols_coords,
+    col_name,
+    structure_to_pdb
+    )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
@@ -840,9 +845,10 @@ def main(
     execute_pool = pool_function(execute, files, ncores=ncores)
     
     for i, conf in enumerate(execute_pool):
-        output = output_folder.joinpath(f"conformer_{i}.pdb")
+        struc = structure_to_pdb(conf)
+        output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
         with open(output, 'w') as f:
-            for line in conf:
+            for line in struc:
                 f.write(line + "\n")
     
     if not keep_temporary:
