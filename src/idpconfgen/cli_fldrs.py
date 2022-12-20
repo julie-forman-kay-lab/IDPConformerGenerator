@@ -1,12 +1,13 @@
 """
-Client for filling in the blanks of folded proteins with IDRs.
+Client for filling in the tails of folded proteins with IDRs.
+
+TODO: fill in internal disordered regions (scaffold for this built)
 
 Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
 USAGE:
-    $ idpconfgen fldrs -db torsions.json -seq MMMMMMM...
-
+    $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
 """
 import argparse
 import os
@@ -116,9 +117,8 @@ from idpconfgen.fldrs_helper import (
     align_coords,
     break_check,
     create_combinations,
-    clash_and_rotate_helper,
+    count_clashes,
     consecutive_grouper,
-    pmover,
     psurgeon,
     store_idp_paths,
     tolerance_calculator,
@@ -689,11 +689,8 @@ def main(
         if lower == 0:
             DISORDER_CASE = disorder_cases[0]  # N-IDR
             for j, atom in enumerate(atom_names):
-                if len(fld_term_idx) == 3:
-                    break
-                
+                if len(fld_term_idx) == 3: break
                 if atom == "N":
-                    # Nindex = j
                     fld_term_idx["N"] = j
                 elif atom == "CA":
                     fld_term_idx["CA"] = j
@@ -702,20 +699,16 @@ def main(
         elif upper == len(input_seq):
             DISORDER_CASE = disorder_cases[2]  # C-IDR
             for j, atom in enumerate(atom_names):
-                if len(fld_term_idx) == 3:
-                    break
-                
+                if len(fld_term_idx) == 3: break
                 k = len(atom_names) - 1 - j
-                
                 if atom_names[k] == "N":
-                    # Nindex = k
                     fld_term_idx["N"] = k
                 if atom_names[k] == "CA":
                     fld_term_idx["CA"] = k
                 elif atom_names[k] == "C":
                     fld_term_idx["C"] = k
         else:
-            DISORDER_CASE = disorder_cases[1]  # Break
+            DISORDER_CASE = disorder_cases[1]  # break
 
         populate_globals(
             input_seq=seq,
@@ -745,7 +738,7 @@ def main(
             output_folder=temp_of,
             nconfs=conformers_per_core,  # int
             sidechain_parameters=sidechain_parameters,
-            sidechain_method=sidechain_method,  # goes back to kwards
+            sidechain_method=sidechain_method,  # goes back to kwargs
             bgeo_strategy=bgeo_strategy,
             **kwargs,
             )
@@ -777,13 +770,8 @@ def main(
         
         fld_coords = np.array([fld_Nxyz, fld_CAxyz, fld_Cxyz])
 
-        # idp_xyz = fld_struc.data_array[Nindex][cols_coords]
-        # Nx = float(idp_xyz[0])
-        # Ny = float(idp_xyz[1])
-        # Nz = float(idp_xyz[2])
         for conformer in new_conformers:
             align_coords(temp_of.joinpath(conformer), fld_coords, DISORDER_CASE)
-            # pmover(DISORDER_CASE, (Nx, Ny, Nz), temp_of.joinpath(conformer))
         
         log.info(S("done"))
         
@@ -800,16 +788,18 @@ def main(
     
     fStruct = Structure(Path(folded_structure))
     fStruct.build()
-    '''
+    
     for case in DISORDER_CASE:
-        log.info(f"Rotating and clash checking {case} conformers...")
+        log.info(f"Clash checking {case} conformers...")
+        # TODO: would be ideal to have this in the `build_conformers` function
+        # so we don't have to over-under estimate how many conformers need to be
+        # built
         
         consume = partial(
-            clash_and_rotate_helper,
+            count_clashes,
             parent=fStruct,
             case=case,
             max_clash=max_clash,
-            max_rotation=max_rotation,
             tolerance=dist_tolerance,
         )
         
@@ -832,7 +822,7 @@ def main(
                 os.remove(path)
             else:
                 idr.write_PDB(path)
-    '''
+    
     # Re-do paths so they are updated with confs that pass the clash check
     DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
