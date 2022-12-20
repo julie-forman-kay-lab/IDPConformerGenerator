@@ -113,6 +113,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 from idpconfgen.fldrs_helper import (
     disorder_cases,
+    align_coords,
     break_check,
     create_combinations,
     clash_and_rotate_helper,
@@ -676,28 +677,43 @@ def main(
     # get sidechain dedicated parameters
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
-
-
     
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
     atom_names = fld_struc.data_array[:, col_name]
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
+        fld_term_idx = {}
         lower = DISORDER_BOUNDS[i][0]
         upper = DISORDER_BOUNDS[i][1]
         if lower == 0:
             DISORDER_CASE = disorder_cases[0]  # N-IDR
             for j, atom in enumerate(atom_names):
-                if atom == "N":
-                    Nindex = j
+                if len(fld_term_idx) == 3:
                     break
+                
+                if atom == "N":
+                    # Nindex = j
+                    fld_term_idx["N"] = j
+                elif atom == "CA":
+                    fld_term_idx["CA"] = j
+                elif atom == "C":
+                    fld_term_idx["C"] = j
         elif upper == len(input_seq):
             DISORDER_CASE = disorder_cases[2]  # C-IDR
             for j, atom in enumerate(atom_names):
-                if atom_names[len(atom_names) - 1 - j] == "N":
-                    Nindex = len(atom_names) - 1 - j
+                if len(fld_term_idx) == 3:
                     break
+                
+                k = len(atom_names) - 1 - j
+                
+                if atom_names[k] == "N":
+                    # Nindex = k
+                    fld_term_idx["N"] = k
+                if atom_names[k] == "CA":
+                    fld_term_idx["CA"] = k
+                elif atom_names[k] == "C":
+                    fld_term_idx["C"] = k
         else:
             DISORDER_CASE = disorder_cases[1]  # Break
 
@@ -754,12 +770,20 @@ def main(
         log.info(S("Performing protein mover function..."))
         
         new_conformers = os.listdir(temp_of)
-        idp_xyz = fld_struc.data_array[Nindex][cols_coords]
-        Nx = float(idp_xyz[0])
-        Ny = float(idp_xyz[1])
-        Nz = float(idp_xyz[2])
+        
+        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()
+        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()
+        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
+        
+        fld_coords = np.array([fld_Nxyz, fld_CAxyz, fld_Cxyz])
+
+        # idp_xyz = fld_struc.data_array[Nindex][cols_coords]
+        # Nx = float(idp_xyz[0])
+        # Ny = float(idp_xyz[1])
+        # Nz = float(idp_xyz[2])
         for conformer in new_conformers:
-            pmover(DISORDER_CASE, (Nx, Ny, Nz), temp_of.joinpath(conformer))
+            align_coords(temp_of.joinpath(conformer), fld_coords, DISORDER_CASE)
+            # pmover(DISORDER_CASE, (Nx, Ny, Nz), temp_of.joinpath(conformer))
         
         log.info(S("done"))
         
@@ -776,7 +800,7 @@ def main(
     
     fStruct = Structure(Path(folded_structure))
     fStruct.build()
-    
+    '''
     for case in DISORDER_CASE:
         log.info(f"Rotating and clash checking {case} conformers...")
         
@@ -808,7 +832,7 @@ def main(
                 os.remove(path)
             else:
                 idr.write_PDB(path)
-    
+    '''
     # Re-do paths so they are updated with confs that pass the clash check
     DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
@@ -976,7 +1000,9 @@ def _build_conformers(
     atom_labels, residue_numbers, residue_labels = next(builder)
 
     for _ in range(nconfs):
-
+        # NOTE: here we need to operate the `align_coords` function
+        # if we are to automate rotation and translation during
+        # building process        
         energy, coords = next(builder)
 
         pdb_string = gen_PDB_from_conformer(

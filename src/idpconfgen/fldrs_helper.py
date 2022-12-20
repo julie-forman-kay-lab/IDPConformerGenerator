@@ -35,6 +35,8 @@ import numpy as np
 from itertools import product
 from idpconfgen import Path
 
+from math import sqrt, acos, atan2
+
 from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
@@ -403,6 +405,94 @@ def rotator(chain, case):
     return idp, chain  # returns original chain/path also
 
 
+def align_coords(sample, target, case):
+    """
+    Translates and rotates coordinates based on the IDR case.
+    
+    Set of target coordinates should be for [[N], [CA], [C]]
+
+    Parameters
+    ----------
+    sample : Path
+        PDB structure of the sample IDR
+    
+    target : np.array
+        Set of 3D coordinates representing positions of N, CA, C
+        fixed points to align to
+    
+    case : str
+        IDR case as mentioned above (N-IDR, C-IDR, Break-IDR)
+    
+    Returns
+    -------
+    Overwrites PDB of IDP conformer with new coordinates.
+    """
+    sample_struc = Structure(sample)
+    sample_struc.build()
+    
+    atom_names = sample_struc.data_array[:, col_name]
+    idr_term_idx = {}
+    if case == disorder_cases[0]:  # N-IDR
+        # In the case of N-IDR, we want to move relative to C-term
+        for i, atom in enumerate(atom_names):
+            if len(idr_term_idx) == 3:
+                break
+            
+            j = len(atom_names) - 1 - i
+            if atom_names[j] == "N":
+                idr_term_idx["N"] = j
+            elif atom_names[j] == "CA":
+                idr_term_idx["CA"] = j
+            elif atom_names[j] == "C":
+                idr_term_idx["C"] = j
+    elif case == disorder_cases[1]:  # break
+        pass
+    elif case == disorder_cases[2]:  # C-IDR
+        # In the case of C-IDR, we want to move relative to N-term
+        for i, atom in enumerate(atom_names):
+            if len(idr_term_idx) == 3:
+                break
+            
+            if atom == "N":
+                idr_term_idx["N"] = i
+            elif atom == "CA":
+                idr_term_idx["CA"] = i
+            elif atom == "C":
+                idr_term_idx["C"] = i
+
+    idr_Nxyz = sample_struc.data_array[idr_term_idx["N"]][cols_coords].astype(float).tolist()
+    idr_CAxyz = sample_struc.data_array[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
+    idr_Cxyz = sample_struc.data_array[idr_term_idx["C"]][cols_coords].astype(float).tolist()
+    idr_xyz = sample_struc.data_array[:, cols_coords].astype(float)
+    idr_coords = np.array([idr_Nxyz, idr_CAxyz, idr_Cxyz])
+    
+    centered_idr = idr_coords - idr_coords.mean(axis=0)
+    centered_fld = target - target.mean(axis=0)
+    
+    covariance_matrix = np.dot(centered_idr.T, centered_fld)
+    U, S, Vt = np.linalg.svd(covariance_matrix)
+    rotation_matrix = np.dot(U, Vt)
+
+    rotated_points = np.dot(idr_xyz, rotation_matrix)
+    sample_struc.data_array[:, cols_coords] = rotated_points.astype(str)
+    
+    translation_vector = \
+        target[0] - sample_struc.data_array[idr_term_idx["N"]][cols_coords].astype(float)
+
+    for i, coords in enumerate(sample_struc.data_array[:, cols_coords]):
+        x = str(round(translation_vector[0] + float(coords[0]), 3))
+        y = str(round(translation_vector[1] + float(coords[1]), 3))
+        z = str(round(translation_vector[2] + float(coords[2]), 3))
+        
+        sample_struc.data_array[i][col_x] = x
+        sample_struc.data_array[i][col_y] = y
+        sample_struc.data_array[i][col_z] = z
+    
+    sample_struc.write_PDB(sample)
+    
+    return
+
+
 def count_clashes(
     parent,
     fragment,
@@ -449,25 +539,25 @@ def count_clashes(
     fragment_coords = fragment.data_array[:, cols_coords].astype(float)
     
     if case == disorder_cases[0]:
-        # N-IDR, remove last resiude of fragment from consideration
-        for i, seq in enumerate(fragment_seq):
+        # N-IDR, remove last 2 resiudes of fragment from consideration
+        last_r = int(fragment_seq[len(fragment_seq) - 1])
+        for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
-            curr = fragment_seq[j]
-            prev = fragment_seq[j - 1]
+            prev = int(fragment_seq[j - 1])
             fragment_atoms = np.delete(fragment_atoms, j, axis=0)
             fragment_coords = np.delete(fragment_coords, j, axis=0)
-            if prev != curr:
+            if last_r - prev == 3:
                 break
     elif case == disorder_cases[1]:
         pass
     elif case == disorder_cases[2]:
-        # C-IDR, remove first residue of fragment from consideration
-        for i, seq in enumerate(fragment_seq):
-            curr = seq
-            next = fragment_seq[i + 1]
+        # C-IDR, remove first 2 residues of fragment from consideration
+        first_r = int(fragment_seq[0])
+        for i, _ in enumerate(fragment_seq):
+            next = int(fragment_seq[i + 1])
             fragment_atoms = np.delete(fragment_atoms, i, axis=0)
             fragment_coords = np.delete(fragment_coords, i, axis=0)
-            if next != curr:
+            if next - first_r == 3:
                 break
     
     # Loop through all pairs of atoms in the 2 protein chains
