@@ -49,7 +49,6 @@ def tolerance_calculator(tolerance):
     
     Returns
     -------
-    max_rotation : int
     max_clash : int
     dist_tolerance : float
     """
@@ -58,14 +57,10 @@ def tolerance_calculator(tolerance):
     elif tolerance < 0.0:
         tolerance = 0.0
         
-    max_rotation = int(-1 * ((tolerance * 256) - 256))
-    if tolerance > 0.9:
-        max_rotation = 32
-        
     max_clash = int(tolerance * 80)
     dist_tolerance = tolerance
     
-    return max_rotation, max_clash, dist_tolerance
+    return max_clash, dist_tolerance
 
 
 def calculate_distance(coords1, coords2):
@@ -258,28 +253,28 @@ def align_coords(sample, target, case):
     """
     Translates and rotates coordinates based on the IDR case.
     
-    Set of target coordinates should be for [[N], [CA], [C]]
+    Set of target coordinates should be for [[N], [CA], [C]].
 
     Parameters
     ----------
-    sample : Path
-        PDB structure of the sample IDR
+    sample : np.array
+        Array format of the PDB of IDR in question. The return
+        of `parse_pdb_to_array` from `libstructure`.
     
     target : np.array
         Set of 3D coordinates representing positions of N, CA, C
-        fixed points to align to
+        fixed points to align to.
     
     case : str
-        IDR case as mentioned above (N-IDR, C-IDR, Break-IDR)
+        IDR case as mentioned above (N-IDR, C-IDR, Break-IDR).
     
     Returns
     -------
-    Overwrites PDB of IDP conformer with new coordinates.
+    sample : np.array
+        New array format of the PDB now with coordinates rotated
+        and translated about target.
     """
-    sample_struc = Structure(sample)
-    sample_struc.build()
-    
-    atom_names = sample_struc.data_array[:, col_name]
+    atom_names = sample[:, col_name]
     idr_term_idx = {}
     if case == disorder_cases[0]:  # N-IDR
         # In the case of N-IDR, we want to move relative to C-term
@@ -309,10 +304,10 @@ def align_coords(sample, target, case):
             elif atom == "C":
                 idr_term_idx["C"] = i
 
-    idr_Nxyz = sample_struc.data_array[idr_term_idx["N"]][cols_coords].astype(float).tolist()
-    idr_CAxyz = sample_struc.data_array[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
-    idr_Cxyz = sample_struc.data_array[idr_term_idx["C"]][cols_coords].astype(float).tolist()
-    idr_xyz = sample_struc.data_array[:, cols_coords].astype(float)
+    idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
+    idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
+    idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
+    idr_xyz = sample[:, cols_coords].astype(float)
     idr_coords = np.array([idr_Nxyz, idr_CAxyz, idr_Cxyz])
     
     centered_idr = idr_coords - idr_coords.mean(axis=0)
@@ -323,27 +318,25 @@ def align_coords(sample, target, case):
     rotation_matrix = np.dot(U, Vt)
 
     rotated_points = np.dot(idr_xyz, rotation_matrix)
-    sample_struc.data_array[:, cols_coords] = rotated_points.astype(str)
+    sample[:, cols_coords] = rotated_points.astype(str)
     
     translation_vector = \
-        target[0] - sample_struc.data_array[idr_term_idx["N"]][cols_coords].astype(float)
+        target[0] - sample[idr_term_idx["N"]][cols_coords].astype(float)
 
-    for i, coords in enumerate(sample_struc.data_array[:, cols_coords]):
+    for i, coords in enumerate(sample[:, cols_coords]):
         x = str(round(translation_vector[0] + float(coords[0]), 3))
         y = str(round(translation_vector[1] + float(coords[1]), 3))
         z = str(round(translation_vector[2] + float(coords[2]), 3))
         
-        sample_struc.data_array[i][col_x] = x
-        sample_struc.data_array[i][col_y] = y
-        sample_struc.data_array[i][col_z] = z
+        sample[i][col_x] = x
+        sample[i][col_y] = y
+        sample[i][col_z] = z
     
-    sample_struc.write_PDB(sample)
-    
-    return
+    return sample
 
 
 def count_clashes(
-    frag_path,
+    fragment,
     parent,
     case=None,
     max_clash=55,
@@ -353,13 +346,13 @@ def count_clashes(
     Checks for steric clashes between two protein chains using vdW radii.
 
     Parameters
-    ----------
+    ----------    
+    fragment : np.array
+        Array of the IDR fragment of interest
+    
     parent : IDPConformerGenerator.Structure
         Structure of static protein chain of interest.
         Must already be built using `.build()`
-    
-    frag_path : Path
-        Path to IDR fragment of interest.
     
     case : str, optional
         Disorder case of interest will change how clash is calculated
@@ -377,17 +370,14 @@ def count_clashes(
     
     True : Bool
         Too many clashes observed, not worthwhile continuing
-    """
-    fragment = Structure(frag_path)
-    fragment.build()
-    
+    """  
     num_clashes = 0
     
     parent_atoms = parent.data_array[:, col_element]
-    fragment_atoms = fragment.data_array[:, col_element]
-    fragment_seq = fragment.data_array[:, col_resSeq]
+    fragment_atoms = fragment[:, col_element]
+    fragment_seq = fragment[:, col_resSeq]
     parent_coords = parent.data_array[:, cols_coords].astype(float)
-    fragment_coords = fragment.data_array[:, cols_coords].astype(float)
+    fragment_coords = fragment[:, cols_coords].astype(float)
     
     if case == disorder_cases[0]:
         # N-IDR, remove last 2 resiudes of fragment from consideration
@@ -424,11 +414,11 @@ def count_clashes(
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
             if num_clashes >= max_clash:
-                return True, fragment, frag_path
+                return True, fragment
             if distance < vdw_radius1 + vdw_radius2 + tolerance:
                 num_clashes += 1
     
-    return num_clashes, fragment, frag_path
+    return num_clashes, fragment
 
 
 def psurgeon(idp_struc, fld_struc, case):

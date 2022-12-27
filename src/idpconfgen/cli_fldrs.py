@@ -107,6 +107,7 @@ from idpconfgen.libs.libstructure import (
     Structure,
     cols_coords,
     col_name,
+    parse_pdb_to_array,
     structure_to_pdb
     )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
@@ -437,8 +438,7 @@ def main(
         )
         return
     
-    max_rotation, max_clash, dist_tolerance = \
-        tolerance_calculator(clash_tolerance)
+    max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
     if keep_temporary:
         TEMP_DIRNAME = "fldrs_temp/" 
@@ -710,6 +710,12 @@ def main(
         else:
             DISORDER_CASE = disorder_cases[1]  # break
 
+        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()
+        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()
+        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
+        # Coordinates of boundary to stitch to later on
+        fld_coords = np.array([fld_Nxyz, fld_CAxyz, fld_Cxyz])
+        
         populate_globals(
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
@@ -729,9 +735,17 @@ def main(
             "to facilitate reconstruction later on."
             ))
         
+        fStruct = Structure(Path(folded_structure))
+        fStruct.build()
+        
         # prepares execution function
         consume = partial(
             _build_conformers,
+            fld_xyz=fld_coords,
+            fld_struc=fStruct,
+            disorder_case=DISORDER_CASE,
+            max_clash=max_clash,
+            tolerance=dist_tolerance,
             index=i,
             conformer_name="conformer_"+DISORDER_CASE,
             input_seq=seq,  # string
@@ -760,20 +774,6 @@ def main(
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
         
-        log.info(S("Performing protein mover function..."))
-        
-        new_conformers = os.listdir(temp_of)
-        
-        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()
-        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()
-        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
-        
-        fld_coords = np.array([fld_Nxyz, fld_CAxyz, fld_Cxyz])
-
-        for conformer in new_conformers:
-            align_coords(temp_of.joinpath(conformer), fld_coords, DISORDER_CASE)
-        
-        log.info(S("done"))
         
         log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
         
@@ -782,48 +782,7 @@ def main(
             RANDOMSEEDS.put(random_seed + i)
         for i in range(1, nconfs + 1):
             CONF_NUMBER.put(i)
-    
-    # Initialize the original paths to the generated files
-    DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
-    
-    fStruct = Structure(Path(folded_structure))
-    fStruct.build()
-    
-    for case in DISORDER_CASE:
-        log.info(f"Clash checking {case} conformers...")
-        # TODO: would be ideal to have this in the `build_conformers` function
-        # so we don't have to over-under estimate how many conformers need to be
-        # built
-        
-        consume = partial(
-            count_clashes,
-            parent=fStruct,
-            case=case,
-            max_clash=max_clash,
-            tolerance=dist_tolerance,
-        )
-        
-        execute = partial(
-            report_on_crash,
-            consume,
-            ROC_exception=Exception,
-            ROC_folder=output_folder,
-            ROC_prefix=_name,
-        )
-        
-        execute_pool = pool_function(execute, DISORDER_CASE[case], ncores=ncores)
-        
-        for result in execute_pool:
-            n_clashes = result[0]
-            idr = result[1]
-            path = result[2]
-            
-            if n_clashes == True:
-                os.remove(path)
-            else:
-                idr.write_PDB(path)
-    
-    # Re-do paths so they are updated with confs that pass the clash check
+
     DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
     # After conformer construction and moving, time to graft proteins together
@@ -957,6 +916,11 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
+        fld_xyz=None,
+        fld_struc=None,
+        disorder_case=None,
+        max_clash=55,
+        tolerance=0.4,
         index=None,
         input_seq=None,
         conformer_name='conformer',
@@ -971,14 +935,7 @@ def _build_conformers(
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
-
-    # Strategy for FLDR/S
-    # - generate each disordered region independently and try to glue back on
-    #   folded PDB using `psurgeon`
-    # - we want to minimize modification of `conformer_generator` to retain
-    #   native sampling diversity
-    # - use coordinates of atoms on folded protein instead of "dummy atoms"
-    
+  
     builder = conformer_generator(
         index=index,
         input_seq=input_seq,
@@ -989,23 +946,39 @@ def _build_conformers(
 
     atom_labels, residue_numbers, residue_labels = next(builder)
 
-    for _ in range(nconfs):
-        # NOTE: here we need to operate the `align_coords` function
-        # if we are to automate rotation and translation during
-        # building process        
-        energy, coords = next(builder)
+    for _ in range(nconfs):            
+        while 1:
+            energy, coords = next(builder)
 
-        pdb_string = gen_PDB_from_conformer(
-            input_seq_3_letters,
-            atom_labels,
-            residue_numbers,
-            ROUND(coords, decimals=3),
+            pdb_string = gen_PDB_from_conformer(
+                input_seq_3_letters,
+                atom_labels,
+                residue_numbers,
+                ROUND(coords, decimals=3),
+                )
+
+            pdb_arr = parse_pdb_to_array(pdb_string)
+            rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
+            clashes, fragment = count_clashes(
+                rotated,
+                fld_struc,
+                disorder_case,
+                max_clash,
+                tolerance,
             )
-
+            
+            if type(clashes) is int:
+                final = structure_to_pdb(fragment)
+                log.info(f"Succeeded {disorder_case} to folded region clash check!")  # noqa: E501
+                break
+            else:
+                log.info(f"Failed {disorder_case} to folded region clash check... regenerating")  # noqa: E501
+        
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
         with open(Path(output_folder, fname), 'w') as fout:
-            fout.write(pdb_string)
+            for line in final:
+                fout.write(line + "\n")
 
         ENERGYLOGSAVER.save(fname, energy)
 
