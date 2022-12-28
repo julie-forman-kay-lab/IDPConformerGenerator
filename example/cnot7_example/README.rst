@@ -1,5 +1,5 @@
-Building Folded Regions - N-term. and C-term. IDRs (FLDR/S)
-===========================================================
+Building Disordered Regions on a Folded Domain
+==============================================
 
 .. start-description
 

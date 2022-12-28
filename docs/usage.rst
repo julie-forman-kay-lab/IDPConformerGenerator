@@ -69,10 +69,10 @@ A Real Case Scenario
 .. include:: ../example/drksh3_example/README.rst
    :start-after: .. start-description
 
-Building Folded Regions - Beads on a String Model
--------------------------------------------------
+Building Disordered Regions on a Folded Domain
+----------------------------------------------
 
-.. include:: ../example/4ebp2_example/README.rst
+.. include:: ../example/cnot7_example/README.rst
     :start-after: .. start-description
 
 Exploring IDPConfGen Analysis Functions
