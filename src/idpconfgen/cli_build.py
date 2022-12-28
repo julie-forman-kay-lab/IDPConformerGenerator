@@ -130,10 +130,6 @@ SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
 
-FLD_ANGLES = None
-FLD_BEND_ANGS = None
-FLD_BOND_LENS = None
-
 # keeps a record of the conformer numbers written to disk across the different
 # cores
 CONF_NUMBER = Queue()
@@ -234,27 +230,6 @@ libcli.add_argument_dstrand(ap)
 libcli.add_argument_dany(ap)
 libcli.add_argument_duser(ap)
 #########################################
-
-ap.add_argument(
-    '-flds',
-    '--folded-structures',
-    help=(
-        'Input .JSON file for custom database containing all folded domains '
-        'of interest.'
-        ),
-    default=None,
-    )
-
-ap.add_argument(
-    '-fldr',
-    '--folded-region',
-    help=(
-        'Boundary of folded region of interest separated by dash and comma. '
-        'Ex. -fldr 12-36 OR -fldr 14-24,54-93,132-201'
-        'Note how multiple folded regions are entered from least to greatest.'
-        ),
-    default=None,
-    )
 
 ap.add_argument(
     '-csss',
@@ -406,8 +381,6 @@ def main(
         input_seq,
         database,
         custom_sampling,
-        folded_structures=None,
-        folded_region=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -474,9 +447,6 @@ def main(
     # we use a dictionary because fragments will be evaluated to exact match
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     
-    # initializing global variables for folded region
-    global START_FLD, END_FLD, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, FLD_FRAG_SIZES, FLD_IDX  # noqa: E501
-
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
     # set up the information from CSSS.JSON files
@@ -534,55 +504,6 @@ def main(
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
-        
-    if folded_structures and folded_region:        
-        log.info(T('Initializing folded domain information'))
-        log.info(S("Tip: to build folded domains you must provide both `-flds` and `-fldr`."))  # noqa: E501
-        fldb = read_dictionary_from_disk(folded_structures)
-        _bounds = folded_region.split(',')
-        
-        _, FLD_ANGLES, FLD_BEND_ANGS, FLD_BOND_LENS, fld_secondary, fld_primary = aligndb(fldb, True)  # noqa: E501
-        
-        # FLD global variables will all align with order of
-        # folded regions in the order of residues
-        START_FLD = []
-        END_FLD = []
-        FLD_FRAG_SIZES = []
-        FLD_SLICEDICT_XMERS = []
-        for i, boundary in enumerate(_bounds):
-            _boundary = boundary.split('-')
-            START_FLD.append(int(_boundary[0]) - 1)
-            END_FLD.append(int(_boundary[1]) - 1)
-            if START_FLD[i] > END_FLD[i]:
-                log.info(S(
-                    'Folded boundaries must be in the format `START-END` '
-                    'inclusive. Where START < END.'
-                    ))
-            
-            fld_seq = input_seq[START_FLD[i]: END_FLD[i]]
-            fld_len = len(fld_seq)
-            log.info(S(f"Folded region #{i + 1} is: {fld_seq}"))
-            
-            FLD_FRAG_SIZES.append([fld_len - s for s in xmer_probs_tmp.sizes])
-            
-            _fld_slicedict_xmers = prepare_slice_dict(
-                fld_primary,
-                fld_seq,
-                dssp_regexes=[all_valid_ss_codes],
-                secondary=fld_secondary,
-                mers_size=(FLD_FRAG_SIZES[i]),
-                ncores=ncores,
-                )
-            FLD_SLICEDICT_XMERS.append(_fld_slicedict_xmers)
-            remove_empty_keys(FLD_SLICEDICT_XMERS[i])
-        log.info(S('done'))
-    else:
-        FLD_SLICEDICT_XMERS = None
-        FLD_ANGLES = None
-        FLD_FRAG_SIZES = None
-        START_FLD = 0
-        END_FLD = 0
-        FLD_IDX = -1
 
     db = read_dictionary_from_disk(database)
 
@@ -634,9 +555,6 @@ def main(
         bgeo_strategy,
         SLICEDICT_XMERS,
         csss_dict,
-        FLD_SLICEDICT_XMERS,
-        FLD_ANGLES,
-        flds=folded_structures,
         residue_tolerance=residue_tolerance,
         )
 
@@ -1615,9 +1533,6 @@ def get_adjacent_angles(
         bgeo_strategy,
         slice_dict,
         csss,
-        fld_slice_dict,
-        fld_dihedrals_db,
-        flds=None,
         residue_tolerance=None,
         ):
     """
@@ -1648,16 +1563,6 @@ def get_adjacent_angles(
         A dictionary containing probabilities of secondary structures per
         amino acid residue position.
     
-    fld_slice_dict : dict-like
-        Dictionary containing fragments strings as keys and as values
-        lists with slice objects for folded domain.
-    
-    fld_dihedrals_db : dict-like
-        Folded angle omega/phi/psi database
-        
-    flds : str or Path
-        A string pointing to the path for secondary database of folded domains
-    
     residue_tolerance : dict-like
         A dictionary for possible residue tolerances to look for while sampling
         torsion angles of amino acids.
@@ -1685,11 +1590,6 @@ def get_adjacent_angles(
         # chooses the size of the fragment from
         # pre-configured range of sizes
         plen = RC(options, p=probs)
-
-        if flds:
-            FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
-            if FLD_IDX >= 0:
-                plen = END_FLD[FLD_IDX] - cr
             
         # defines the fragment identity accordingly
         primer_template = GSCNJIT(seq, cr, plen)
@@ -1706,43 +1606,30 @@ def get_adjacent_angles(
                 pt_sub = f'{pt_sub}_P'
 
             try:
-                if flds:
-                    FLD_IDX = find_inbetween(cr, START_FLD, END_FLD)
-                    if FLD_IDX >= 0:
-                        _slice = RC(fld_slice_dict[FLD_IDX][plen][pt_sub])
-                        
-                        dihedrals = fld_dihedrals_db[_slice, :].ravel()
-                        
-                        bend_angs = FLD_BEND_ANGS[_slice, :].ravel()
-                        bond_lens = FLD_BOND_LENS[_slice, :].ravel()
+                if csss:
+                    # matches current residue
+                    # to build with residue number in CSSS
+                    cr_plus_1 = str(cr + 1)
+                    # clear lists
+                    lssC()
+                    lssprobsC()
+                    # adds possible secondary structure for the residue
+                    # the first residue of the fragment
+                    lssE(csss[cr_plus_1].keys())
+                    # adds SS probabilities for the same residue
+                    lssprobsE(csss[cr_plus_1].values())
+                    # based on the probabilities,
+                    # select a SS for residue in question
+                    pcsss = RC(lss, p=lssprobs)
+                    _slice = RC(slice_dict[plen][pt_sub][pcsss])
                 else:
-                    if csss:
-                        # matches current residue
-                        # to build with residue number in CSSS
-                        cr_plus_1 = str(cr + 1)
-
-                        # clear lists
-                        lssC()
-                        lssprobsC()
-
-                        # adds possible secondary structure for the residue
-                        # the first residue of the fragment
-                        lssE(csss[cr_plus_1].keys())
-                        # adds SS probabilities for the same residue
-                        lssprobsE(csss[cr_plus_1].values())
-
-                        # based on the probabilities,
-                        # select a SS for residue in question
-                        pcsss = RC(lss, p=lssprobs)
-                        _slice = RC(slice_dict[plen][pt_sub][pcsss])
-                    else:
-                        _slice = RC(slice_dict[plen][pt_sub])
-                    
-                    dihedrals = dihedrals_db[_slice, :].ravel()
-
-                    if bgeo_strategy == bgeo_exact_name:
-                        bend_angs = BEND_ANGS[_slice, :].ravel()
-                        bond_lens = BOND_LENS[_slice, :].ravel()
+                    _slice = RC(slice_dict[plen][pt_sub])
+                
+                dihedrals = dihedrals_db[_slice, :].ravel()
+                
+                if bgeo_strategy == bgeo_exact_name:
+                    bend_angs = BEND_ANGS[_slice, :].ravel()
+                    bond_lens = BOND_LENS[_slice, :].ravel()
 
             except (KeyError, ValueError):
                 # walks back one residue
