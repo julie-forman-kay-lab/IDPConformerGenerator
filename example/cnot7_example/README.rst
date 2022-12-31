@@ -11,6 +11,14 @@ human CNOT7 deadenylase. Please enter the example :code:`example/cnot7_example` 
 where you will find the FASTA sequence: ``cnot7.fasta``, and a PDB of the folded region
 from PDB ID 4GMJ: ``cnot7_4gmj_fld_11-263.pdb``.
 
+.. note::
+    If your input PDB has phosphorylated residues such as phosphorylated threonine and serine,
+    please change the three letter code in the PDB file indicating the residue lable to the
+    non-modified version. For example: ``TPO`` phosphorylated threonine will become ``THR`` and
+    ``SEP`` phosphorylated serine will become ``SEP``.
+
+    A later update will introduce a PTM module to automate these changes.
+
 Steps from now will assume you're in the working director of ``example/cnot7_example``
 and have already compiled your preferred reusable IDPConformerGenerator database. For
 instructions on the database, please visit the previous exercise "A Real Case Scenario".
