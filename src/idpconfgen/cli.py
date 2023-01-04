@@ -30,6 +30,7 @@ from idpconfgen import (
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
+    cli_resptm,
     cli_search,
     cli_sethpc,
     cli_sscalc,
@@ -73,6 +74,7 @@ Other useful routines:
     * {cli_merge._name}
     * {cli_stats._name}
     * {cli_search._name}
+    * {cli_resptm._name}
 """
 
 ap = libcli.CustomParser(
@@ -112,6 +114,7 @@ libcli.add_subparser(subparsers, cli_sethpc)
 libcli.add_subparser(subparsers, cli_merge)
 libcli.add_subparser(subparsers, cli_stats)
 libcli.add_subparser(subparsers, cli_search)
+libcli.add_subparser(subparsers, cli_resptm)
 
 
 def load_args():
