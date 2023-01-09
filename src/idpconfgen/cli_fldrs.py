@@ -10,7 +10,6 @@ USAGE:
     $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
 """
 import argparse
-import os
 import shutil
 from functools import partial
 from itertools import cycle
@@ -66,7 +65,6 @@ from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
-    build_regex_substitutions,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
@@ -81,7 +79,6 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q,
     make_coord_Q_COO,
     make_coord_Q_planar,
-    make_seq_probabilities,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     rrd10_njit,
@@ -91,18 +88,15 @@ from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
-    read_dict_from_json,
     read_dictionary_from_disk,
     )
 from idpconfgen.libs.libparse import (
-    fill_list,
-    get_seq_chunk_njit,
     get_trimer_seq_njit,
     remap_sequence,
     remove_empty_keys,
     translate_seq_to_3l,
     )
-from idpconfgen.libs.libpdb import atom_line_formatter, get_fasta_from_PDB
+from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
     cols_coords,
@@ -111,7 +105,6 @@ from idpconfgen.libs.libstructure import (
     structure_to_pdb
     )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
-
 
 from idpconfgen.fldrs_helper import (
     disorder_cases,
