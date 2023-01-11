@@ -695,7 +695,6 @@ def main(
         elif upper == len(input_seq):  # C-IDR case
             DISORDER_CASE = disorder_cases[2]
             for j, atom in enumerate(atom_names):
-                if counter == 5: break
                 k = len(atom_names) - 1 - j
                 if counter == 1 and atom_names[k] == "N":
                     fld_term_idx["N"] = k

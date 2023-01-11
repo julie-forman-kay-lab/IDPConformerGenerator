@@ -491,7 +491,7 @@ def psurgeon(idp_struc, fld_struc, case):
         
         fld._data_array = fld_data_array
         
-        new_struc_arr = np.append(idr._data_array, fld._data_array, axis=0)
+        new_struc_arr = np.append(idr.data_array, fld.data_array, axis=0)
         
         new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
         new_struc_arr[:, col_serial] = new_serial
@@ -537,7 +537,7 @@ def psurgeon(idp_struc, fld_struc, case):
                 break
         
         # Initialize and clean new structure
-        new_struc_arr = np.append(fld._data_array, idr._data_array, axis=0)
+        new_struc_arr = np.append(fld.data_array, idr.data_array, axis=0)
         
         new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
         new_struc_arr[:, col_serial] = new_serial
@@ -573,7 +573,7 @@ def psurgeon(idp_struc, fld_struc, case):
         
         fld._data_array = fld_data_array
         
-        new_struc_arr = np.append(nidr._data_array, fld._data_array, axis=0)
+        new_struc_arr = np.append(nidr.data_array, fld.data_array, axis=0)
         new_struc_seq = new_struc_arr[:, col_resSeq]
         
         # Remove last residue of folded domain (now protein)
@@ -596,8 +596,8 @@ def psurgeon(idp_struc, fld_struc, case):
         cidr._data_array = cidr_data_array
         
         # Fix residue connectivity issue
-        last_residue_fld = int(new_struc_arr[:, col_resSeq][-1])        
-        curr_residue = last_residue_fld
+        last_residue_fld = int(new_struc_arr[:, col_resSeq][-1])
+        curr_residue = last_residue_fld + 1
         cidr_seq = cidr.data_array[:, col_resSeq]
         for i, seq in enumerate(cidr_seq):
             curr = seq
