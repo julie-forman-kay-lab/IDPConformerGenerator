@@ -57,7 +57,7 @@ def tolerance_calculator(tolerance):
     elif tolerance < 0.0:
         tolerance = 0.0
         
-    max_clash = int(tolerance * 80)
+    max_clash = int(tolerance * 100)
     dist_tolerance = tolerance
     
     return max_clash, dist_tolerance
@@ -253,7 +253,9 @@ def align_coords(sample, target, case):
     """
     Translates and rotates coordinates based on the IDR case.
     
-    Set of target coordinates should be for [[N], [CA], [C]].
+    Set of `target` coordinates should be for [[C], [N], [CA]].
+    Where the `C` position is of the previous residue for N-IDR
+    and next residue `C` for C-IDR.
 
     Parameters
     ----------
@@ -262,7 +264,7 @@ def align_coords(sample, target, case):
         of `parse_pdb_to_array` from `libstructure`.
     
     target : np.array
-        Set of 3D coordinates representing positions of N, CA, C
+        Set of 3D coordinates representing positions of C, N, CA
         fixed points to align to.
     
     case : str
@@ -276,39 +278,44 @@ def align_coords(sample, target, case):
     """
     atom_names = sample[:, col_name]
     idr_term_idx = {}
+    counter = 0
     if case == disorder_cases[0]:  # N-IDR
         # In the case of N-IDR, we want to move relative to C-term
         for i, atom in enumerate(atom_names):
-            if len(idr_term_idx) == 3:
-                break
-            
+            # Use last residues of N-IDR for alignment
             j = len(atom_names) - 1 - i
-            if atom_names[j] == "N":
+            if counter == 1 and atom_names[j] == "N":
                 idr_term_idx["N"] = j
-            elif atom_names[j] == "CA":
+                counter += 1
+            elif counter == 0 and atom_names[j] == "CA":
                 idr_term_idx["CA"] = j
-            elif atom_names[j] == "C":
+                counter += 1
+            elif counter == 2 and atom_names[j] == "C":
                 idr_term_idx["C"] = j
+                break
     elif case == disorder_cases[1]:  # break
         pass
     elif case == disorder_cases[2]:  # C-IDR
         # In the case of C-IDR, we want to move relative to N-term
         for i, atom in enumerate(atom_names):
-            if len(idr_term_idx) == 3:
-                break
-            
+            # Use first residues of C-IDR for alignment
+            if counter == 5: break
             if atom == "N":
                 idr_term_idx["N"] = i
+                counter += 1
             elif atom == "CA":
                 idr_term_idx["CA"] = i
+                counter += 1
             elif atom == "C":
                 idr_term_idx["C"] = i
+                counter += 1
 
+    idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
     idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
     idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
-    idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
     idr_xyz = sample[:, cols_coords].astype(float)
-    idr_coords = np.array([idr_Nxyz, idr_CAxyz, idr_Cxyz])
+    
+    idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
     
     centered_idr = idr_coords - idr_coords.mean(axis=0)
     centered_fld = target - target.mean(axis=0)
@@ -321,7 +328,7 @@ def align_coords(sample, target, case):
     sample[:, cols_coords] = rotated_points.astype(str)
     
     translation_vector = \
-        target[0] - sample[idr_term_idx["N"]][cols_coords].astype(float)
+        target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
 
     for i, coords in enumerate(sample[:, cols_coords]):
         x = str(round(translation_vector[0] + float(coords[0]), 3))
@@ -339,8 +346,8 @@ def count_clashes(
     fragment,
     parent,
     case=None,
-    max_clash=55,
-    tolerance=0.4,      
+    max_clash=60,
+    tolerance=0.6,      
     ):
     """
     Checks for steric clashes between two protein chains using vdW radii.
@@ -380,26 +387,30 @@ def count_clashes(
     fragment_coords = fragment[:, cols_coords].astype(float)
     
     if case == disorder_cases[0]:
-        # N-IDR, remove last 2 resiudes of fragment from consideration
+        # N-IDR, remove last 4 resiudes of fragment from consideration
         last_r = int(fragment_seq[len(fragment_seq) - 1])
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
-            prev = int(fragment_seq[j - 1])
+            try:  # In case the user wants to build less than 3 residues
+                prev = int(fragment_seq[j - 1])
+            except IndexError: 
+                continue
             fragment_atoms = np.delete(fragment_atoms, j, axis=0)
             fragment_coords = np.delete(fragment_coords, j, axis=0)
-            if last_r - prev == 3:
-                break
+            if last_r - prev == 5: break
     elif case == disorder_cases[1]:
         pass
     elif case == disorder_cases[2]:
-        # C-IDR, remove first 2 residues of fragment from consideration
+        # C-IDR, remove first 4 residues of fragment from consideration
         first_r = int(fragment_seq[0])
         for i, _ in enumerate(fragment_seq):
-            next = int(fragment_seq[i + 1])
+            try:  # In case the user wants to build less than 3 residues
+                next = int(fragment_seq[i + 1])
+            except IndexError: 
+                continue
             fragment_atoms = np.delete(fragment_atoms, i, axis=0)
             fragment_coords = np.delete(fragment_coords, i, axis=0)
-            if next - first_r == 3:
-                break
+            if next - first_r == 5: break
     
     # Loop through all pairs of atoms in the 2 protein chains
     for i, atom1 in enumerate(parent_atoms):
@@ -413,7 +424,7 @@ def count_clashes(
             
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
-            if num_clashes >= max_clash:
+            if num_clashes > 150:
                 return True, fragment
             if distance < vdw_radius1 + vdw_radius2 + tolerance:
                 num_clashes += 1
@@ -452,22 +463,35 @@ def psurgeon(idp_struc, fld_struc, case):
         cidr = Structure(idp_struc[1])
         nidr.build()
         cidr.build()
-    
-    
+        
     fld_seq = fld.data_array[:, col_resSeq]
+    fld_data_array = fld.data_array
     
     if case == disorder_cases[0]:
         idr_seq = idr.data_array[:, col_resSeq]
+        idr_data_array = idr.data_array
         # N-IDR, remove last resiude of fragment
+        # and remove the first residue of folded-domain
         for i, seq in enumerate(idr_seq):
             j = len(idr_seq) - 1 - i
             curr = idr_seq[j]
             prev = idr_seq[j - 1]
-            idr._data_array = np.delete(idr.data_array, j, axis=0)
+            idr_data_array = idr_data_array[:-1]
             if prev != curr:
                 break
         
-        new_struc_arr = np.insert(fld._data_array, 0, idr.data_array, axis=0)
+        idr._data_array = idr_data_array
+        
+        for i, seq in enumerate(fld_seq):
+            curr = fld_seq[i]
+            next = fld_seq[i + 1]
+            fld_data_array = fld_data_array[1:]
+            if next != curr:
+                break
+        
+        fld._data_array = fld_data_array
+        
+        new_struc_arr = np.append(idr._data_array, fld._data_array, axis=0)
         
         new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
         new_struc_arr[:, col_serial] = new_serial
@@ -477,14 +501,27 @@ def psurgeon(idp_struc, fld_struc, case):
         pass
     elif case == disorder_cases[2]:
         idr_seq = idr.data_array[:, col_resSeq]
+        idr_data_array = idr.data_array
         # C-IDR, remove last resiude of folded protein
+        # and remove the first residue of C-IDR
         for i, seq in enumerate(fld_seq):
             j = len(fld_seq) - 1 - i
             curr = fld_seq[j]
             prev = fld_seq[j - 1]
-            fld._data_array = np.delete(fld.data_array, j, axis=0)
+            fld_data_array = fld_data_array[:-1]
             if prev != curr:
                 break
+        
+        fld._data_array = fld_data_array
+        
+        for i, seq in enumerate(idr_seq):
+            curr = idr_seq[i]
+            next = idr_seq[i + 1]
+            idr_data_array = idr_data_array[1:]
+            if next != curr:
+                break
+        
+        idr._data_array = idr_data_array
 
         # Fix residue connectivity issue
         last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
@@ -496,11 +533,11 @@ def psurgeon(idp_struc, fld_struc, case):
             try:
                 if idr_seq[i + 1] != curr:
                     curr_residue += 1
-            except:
+            except IndexError:
                 break
         
         # Initialize and clean new structure
-        new_struc_arr = np.append(fld._data_array, idr.data_array, axis=0)
+        new_struc_arr = np.append(fld._data_array, idr._data_array, axis=0)
         
         new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
         new_struc_arr[:, col_serial] = new_serial
@@ -508,42 +545,67 @@ def psurgeon(idp_struc, fld_struc, case):
         new_struc_arr[:, col_segid] = "A"
         
     elif case == disorder_cases[0] + disorder_cases[2]:
+        nidr_seq = nidr.data_array[:, col_resSeq]
+        cidr_seq = cidr.data_array[:, col_resSeq]
+        nidr_data_array = nidr.data_array
+        cidr_data_array = cidr.data_array
+        
         # For cases where we have both C-IDR and N-IDR
         # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
         # N-IDR, remove last resiude of fragment
-        nidr_seq = nidr.data_array[:, col_resSeq]
-        cidr_seq = cidr.data_array[:, col_resSeq]
-        
         for i, seq in enumerate(nidr_seq):
             j = len(nidr_seq) - 1 - i
             curr = nidr_seq[j]
             prev = nidr_seq[j - 1]
-            nidr._data_array = np.delete(nidr.data_array, j, axis=0)
+            nidr_data_array = nidr_data_array[:-1]
             if prev != curr:
                 break
         
-        new_struc_arr = np.insert(fld._data_array, 0, nidr.data_array, axis=0)
+        nidr._data_array = nidr_data_array
+        
+        # Remove first residue of folded domain
+        for i, seq in enumerate(fld_seq):
+            curr = fld_seq[i]
+            next = fld_seq[i + 1]
+            fld_data_array = fld_data_array[1:]
+            if next != curr:
+                break
+        
+        fld._data_array = fld_data_array
+        
+        new_struc_arr = np.append(nidr._data_array, fld._data_array, axis=0)
         new_struc_seq = new_struc_arr[:, col_resSeq]
         
-        # C-IDR, remove last resiude of the protein
+        # Remove last residue of folded domain (now protein)
         for i, seq in enumerate(new_struc_seq):
             j = len(new_struc_seq) - 1 - i
             curr = new_struc_seq[j]
             prev = new_struc_seq[j - 1]
-            new_struc_arr = np.delete(new_struc_arr, j, axis=0)
+            new_struc_arr = new_struc_arr[:-1]
             if prev != curr:
                 break
         
+        # Remove first residue of C-IDR
+        for i, seq in enumerate(cidr_seq):
+            curr = cidr_seq[i]
+            next = cidr_seq[i + 1]
+            cidr_data_array = cidr_data_array[1:]
+            if next != curr:
+                break
+            
+        cidr._data_array = cidr_data_array
+        
         # Fix residue connectivity issue
-        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
+        last_residue_fld = int(new_struc_arr[:, col_resSeq][-1])        
         curr_residue = last_residue_fld
+        cidr_seq = cidr.data_array[:, col_resSeq]
         for i, seq in enumerate(cidr_seq):
             curr = seq
             cidr._data_array[:, col_resSeq][i] = str(curr_residue)
             try:
                 if cidr_seq[i + 1] != curr:
                     curr_residue += 1
-            except:
+            except IndexError:
                 break
         
         new_struc_arr = np.append(new_struc_arr, cidr.data_array, axis=0)
@@ -552,7 +614,6 @@ def psurgeon(idp_struc, fld_struc, case):
         new_struc_arr[:, col_serial] = new_serial
         new_struc_arr[:, col_chainID] = "A"
         new_struc_arr[:, col_segid] = "A"
-        
     
     return new_struc_arr
 

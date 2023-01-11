@@ -580,12 +580,11 @@ def main(
         ))
         
         # Different than what we tell user due to internal processing for
-        # disordered bits (need 1 extra residue at the beginning or end)
-        # for `pshifter` function.
+        # disordered bits (need 2 extra residues at the beginning or end)
         if lower == 0:
-            dis_seq = input_seq[lower : upper + 1]
+            dis_seq = input_seq[lower : upper + 2]
         elif upper == len(input_seq):
-            dis_seq = input_seq[lower - 1 : upper]
+            dis_seq = input_seq[lower - 2 : upper]
         else:
             dis_seq = input_seq[lower : upper]
         
@@ -648,8 +647,6 @@ def main(
             bgeo_strategy,
             SLICEDICT_XMERS[i],
             csss_dict,
-            fld_slice_dict=None,
-            fld_dihedrals_db=None,
             residue_tolerance=residue_tolerance,
             ))
         
@@ -679,36 +676,46 @@ def main(
         fld_term_idx = {}
         lower = DISORDER_BOUNDS[i][0]
         upper = DISORDER_BOUNDS[i][1]
-        if lower == 0:
-            DISORDER_CASE = disorder_cases[0]  # N-IDR
+        counter = 0
+        # Use the second folded residue's backbone C-N-CA
+        # for rotation and alignment where the `C` atom 
+        # is from the previous resiude
+        if lower == 0:  # N-IDR case
+            DISORDER_CASE = disorder_cases[0]
             for j, atom in enumerate(atom_names):
-                if len(fld_term_idx) == 3: break
+                if counter == 5: break
                 if atom == "N":
                     fld_term_idx["N"] = j
+                    counter += 1
                 elif atom == "CA":
                     fld_term_idx["CA"] = j
+                    counter += 1
                 elif atom == "C":
                     fld_term_idx["C"] = j
-        elif upper == len(input_seq):
-            DISORDER_CASE = disorder_cases[2]  # C-IDR
+                    counter += 1
+        elif upper == len(input_seq):  # C-IDR case
+            DISORDER_CASE = disorder_cases[2]
             for j, atom in enumerate(atom_names):
-                if len(fld_term_idx) == 3: break
+                if counter == 5: break
                 k = len(atom_names) - 1 - j
-                if atom_names[k] == "N":
+                if counter == 1 and atom_names[k] == "N":
                     fld_term_idx["N"] = k
-                if atom_names[k] == "CA":
+                    counter += 1
+                elif counter == 0 and atom_names[k] == "CA":
                     fld_term_idx["CA"] = k
-                elif atom_names[k] == "C":
+                    counter += 1
+                elif counter == 2 and atom_names[k] == "C":
                     fld_term_idx["C"] = k
+                    break
         else:
             DISORDER_CASE = disorder_cases[1]  # break
 
+        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
         fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()
         fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()
-        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
         # Coordinates of boundary to stitch to later on
-        fld_coords = np.array([fld_Nxyz, fld_CAxyz, fld_Cxyz])
-        
+        fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
+
         populate_globals(
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
@@ -724,7 +731,7 @@ def main(
         
         log.info(S(f"Generating temporary disordered conformers for: {seq}"))
         log.info(S(
-            "Please note that sequence may contain an extra residue "
+            "Please note that sequence may contain 2 extra residues "
             "to facilitate reconstruction later on."
             ))
         
