@@ -346,8 +346,8 @@ def count_clashes(
     fragment,
     parent,
     case=None,
-    max_clash=60,
-    tolerance=0.6,      
+    max_clash=50,
+    tolerance=0.5,      
     ):
     """
     Checks for steric clashes between two protein chains using vdW radii.
@@ -387,7 +387,7 @@ def count_clashes(
     fragment_coords = fragment[:, cols_coords].astype(float)
     
     if case == disorder_cases[0]:
-        # N-IDR, remove last 4 resiudes of fragment from consideration
+        # N-IDR, remove last 3 resiudes of fragment from consideration
         last_r = int(fragment_seq[len(fragment_seq) - 1])
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
@@ -395,22 +395,22 @@ def count_clashes(
                 prev = int(fragment_seq[j - 1])
             except IndexError: 
                 continue
-            fragment_atoms = np.delete(fragment_atoms, j, axis=0)
-            fragment_coords = np.delete(fragment_coords, j, axis=0)
-            if last_r - prev == 5: break
+            fragment_atoms = fragment_atoms[:-1]
+            fragment_coords = fragment_coords[:-1]
+            if last_r - prev == 4: break
     elif case == disorder_cases[1]:
         pass
     elif case == disorder_cases[2]:
-        # C-IDR, remove first 4 residues of fragment from consideration
+        # C-IDR, remove first 3 residues of fragment from consideration
         first_r = int(fragment_seq[0])
         for i, _ in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
                 next = int(fragment_seq[i + 1])
             except IndexError: 
                 continue
-            fragment_atoms = np.delete(fragment_atoms, i, axis=0)
-            fragment_coords = np.delete(fragment_coords, i, axis=0)
-            if next - first_r == 5: break
+            fragment_atoms = fragment_atoms[1:]
+            fragment_coords = fragment_coords[1:]
+            if next - first_r == 4: break
     
     # Loop through all pairs of atoms in the 2 protein chains
     for i, atom1 in enumerate(parent_atoms):
@@ -424,7 +424,7 @@ def count_clashes(
             
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
-            if num_clashes > 150:
+            if num_clashes > max_clash:
                 return True, fragment
             if distance < vdw_radius1 + vdw_radius2 + tolerance:
                 num_clashes += 1

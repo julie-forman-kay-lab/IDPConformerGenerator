@@ -278,10 +278,9 @@ ap.add_argument(
     '--clash-tolerance',
     help=(
         "Float value clash tolerance between 0.0-1.0 where 0.5 is the default "
-        "value denoting minimum of 40 spherical clashes, 0.5 Angstroms "
-        "of tolerance with a given vdW radii and 128 maximum attempts "
-        "for rotation. Where 1.0 allows for 80 clashes, 1.0 Angstroms "
-        "of tolerance for a given vdW radii, and 32 attempts for rotation."
+        "value denoting minimum of 50 spherical clashes, 0.5 Angstroms "
+        "of tolerance with a given vdW radii. Where 1.0 allows for 100 "
+        "clashes and 1.0 Angstroms of tolerance for a given vdW radii."
         ),
     default=0.5,
 )
@@ -919,8 +918,8 @@ def _build_conformers(
         fld_xyz=None,
         fld_struc=None,
         disorder_case=None,
-        max_clash=55,
-        tolerance=0.4,
+        max_clash=50,
+        tolerance=0.5,
         index=None,
         input_seq=None,
         conformer_name='conformer',
