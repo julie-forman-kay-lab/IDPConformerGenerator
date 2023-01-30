@@ -83,16 +83,17 @@ class XmerProbsAction(Action):
 xmers_prob_help = """Size of peptide building fragments and their respective
 selection probabilities.
 
-Provide a two column file where the first column is the size of the fragments you
-wish to allow **in order from smallest to largest** and the second column is 
-the relative probability to select each choice. Both columns must be integers.
-Use "#" to comment lines. If you don't provide any value, the default is 
-fragment sizes: 1 to 5 with relative probabilities (1, 1, 3, 3, 2). You can 
-give any integer to define relativeprobabilities: 10 and 90 will results 
-10/(10+90) and 90/(10+90) percent. If a Proline residue follows the fragment 
-being built, the additional Prolineangles will also be consider regardless
-of the selected fragment size. Fragment sizes will be ignored if no matches are 
-found in the database and the probabilities renormalized."""
+Provide a two column file where the first column is the size of the fragments
+ you wish to allow, sorted from smallest to largest, and the second column
+ is the relative probability to select each choice. Both columns must be
+ integers.
+Use "#" to comment lines. If you don't provide any value, the default
+ fragment sizes are: 1 to 5 with relative probabilities (1, 1, 3, 3, 2). You can
+ give any integer to define relativeprobabilities: 10 and 90 will results
+ 10/(10+90) and 90/(10+90) percent. If a Proline residue follows the fragment
+ being built, the extra Proline angles will also be consider regardless
+ of the selected fragment size. Fragment sizes will be ignored if no matches are
+ found in the database and the probabilities renormalized."""
 
 xmer_probs_args = ['-xp', '--xmer-probs']
 xmer_probs_kwargs = {

@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 
 
 def get_xtick_lbl(xticks):
-    """
+    """# noqa: D205, D400
     Mainly for residues, reworks the first x-tick label to
     residue 1 since it's default labeled as 0.
 
@@ -61,7 +61,7 @@ def plot_torsions(
         filename='plot_torsions.png',
         dpi=300,
         ):
-    """
+    """# noqa: D205, D400
     Plot all torsion angle distributions as a scatter plot.
     Defaults to Phi torsion angles.
 
@@ -69,19 +69,19 @@ def plot_torsions(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-        
+
     angles : np.ndarray, shape=(n_confs, residues)
         Container of the Y axis data.
-        
+
     n_conf : integer
         Number of conformers we're processing.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
-        
+
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -90,27 +90,32 @@ def plot_torsions(
     errmsg : list
         List of errors to print to the log while plotting.
     """
-    errmsg=[]
+    errmsg = []
 
     plt.figure(figsize=fig_size)
     for i in range(1, residues):
-        res_ang = [i]*n_conf
-        plt.scatter(res_ang, angles[:,i-1], s=10, facecolors='none', edgecolors=colors)
+        res_ang = [i] * n_conf
+        plt.scatter(res_ang,
+                    angles[:, i - 1],
+                    s=10,
+                    facecolors='none',
+                    edgecolors=colors
+                    )
 
     if increment is None:
-        increment = int(residues/fig_size[0])
+        increment = int(residues / fig_size[0])
         if increment == 0:
-            increment=1
-    
-    if xticks == None:
-        xticks = np.arange(0,residues, increment)
-        xticks_labels = get_xtick_lbl(xticks)
-    plt.xticks(ticks= xticks, labels=xticks_labels, fontsize=xticks_fs)
-    plt.yticks(fontsize = yticks_fs)
+            increment = 1
 
-    if degrees: yunits="deg"
-    else: yunits="rad"
-    if not ylabel: ylabel = f'{angtype} ({yunits})'
+    if xticks is None:
+        xticks = np.arange(0, residues, increment)
+        xticks_labels = get_xtick_lbl(xticks)
+    plt.xticks(ticks=xticks, labels=xticks_labels, fontsize=xticks_fs)
+    plt.yticks(fontsize=yticks_fs)
+
+    if degrees: yunits = "deg"  # noqa: E701
+    else: yunits = "rad"        # noqa: E701
+    if not ylabel: ylabel = f'{angtype} ({yunits})'  # noqa: E701
 
     plt.ylabel(ylabel, fontsize=ylabel_fs)
     plt.xlabel(xlabel, fontsize=xlabel_fs)
@@ -120,8 +125,12 @@ def plot_torsions(
     except Exception as e:
         errmsg.append("There was an issue with your figure saving parameters:")
         errmsg.append(f"{e}")
-        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_torsions.png`...")
-        plt.savefig('plot_torsions.png', dpi=300, transparent=False, bbox_inches='tight')
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_torsions.png`...")  # noqa: E501
+        plt.savefig('plot_torsions.png',
+                    dpi=300,
+                    transparent=False,
+                    bbox_inches='tight'
+                    )
     plt.close("all")
 
     return errmsg
@@ -143,14 +152,14 @@ def plot_fracSS(
         xticks_labels=None,
         yticks_labels=None,
         increment=None,
-        colors=['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b'],
+        colors=['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b'],  # noqa: B006, E501
         xticks_fs=15,
         yticks_fs=15,
         fig_size=(6, 4),
         filename='plot_fracSS.png',
         dpi=300,
         ):
-    """
+    """# noqa: D205, D400
     Plot the fractional secondary structure information as a line graph.
     Made to handel DSSP as well as Ramachandran.
 
@@ -158,19 +167,19 @@ def plot_fracSS(
     ----------
     residues : integer
         Total number of residues of a protein in the ensemble.
-        
+
     frac_ss : dictionary
         Contains fraction of each secondary structure per residue.
-        
+
     n_conf : integer
         Number of conformers we're processing.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
         You can change the file type by specifying its extention in
         the file name.
-        
+
     fig_size : tuple of float or int
         The size ratio of the subplot in the figure.
 
@@ -179,29 +188,29 @@ def plot_fracSS(
     errmsg : list
         List of errors to print to the log while plotting.
     """
-    errmsg=[]
+    errmsg = []
 
-    aa = [x+1 for x in range(residues)]
+    aa = [x + 1 for x in range(residues)]
     plt.figure(figsize=fig_size)
 
     if len(colors) < len(frac_ss):
-        errmsg.append("Number of colors is less than number of secondary structures.")
+        errmsg.append("Number of colors is less than number of secondary structures.")  # noqa: E501
         errmsg.append("Reverting to default colorset...")
         colors = ['#D55E00', '#0072B2', 'k', 'g', 'r', 'c', 'm', 'y', 'b']
 
-    clr=0
+    clr = 0
     for ss in frac_ss:
         plt.plot(aa, frac_ss[ss], label=f'{sstype} {ss}', color=colors[clr])
-        clr+=1
-    plt.legend(bbox_to_anchor=(1.05,1), loc='upper left', borderaxespad=0)
+        clr += 1
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left', borderaxespad=0)
     ax = plt.gca()
 
     if increment is None:
-        increment = int(residues/fig_size[0])
+        increment = int(residues / fig_size[0])
         if increment == 0:
-            increment=1
+            increment = 1
 
-    if xticks == None:
+    if xticks is None:
         xticks = np.arange(0, residues, increment)
         xticks_labels = get_xtick_lbl(xticks)
     ax.set_xticks(xticks)
@@ -216,11 +225,16 @@ def plot_fracSS(
     except Exception as e:
         errmsg.append("There was an issue with your figure saving parameters:")
         errmsg.append(f"{e}")
-        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_fracSS.png`...")
-        plt.savefig('plot_fracSS.png', dpi=300, transparent=False, bbox_inches='tight')
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_fracSS.png`...")  # noqa: E501
+        plt.savefig('plot_fracSS.png',
+                    dpi=300,
+                    transparent=False,
+                    bbox_inches='tight'
+                    )
     plt.close("all")
 
     return errmsg
+
 
 def plot_bend_angles(
         angles,
@@ -228,7 +242,7 @@ def plot_bend_angles(
         *,
         title=None,
         xlabel="Backbone angles",
-        colors=['#D55E00', '#0072B2', 'k', 'g'],
+        colors=['#D55E00', '#0072B2', 'k', 'g'],  # noqa: B006
         ylabel="Bend Angle (Radians)",
         title_fs=20,
         xlabel_fs=15,
@@ -245,17 +259,16 @@ def plot_bend_angles(
         dpi=300,
         ):
     """
-    Plot all torsion angle distributions as a scatter plot.
-    Defaults to Phi torsion angles.
+    Plot backbone bond angle distribution as a boxplot.
 
     Parameters
     ----------
     names : string
         Names of the bend types
-        
+
     angles : np.ndarray, shape=(names, n_trimers)
         Container of the Y axis data.
-        
+
     filename : str, optional
         The file name with which the plot figure will be saved
         in disk. Defaults to plot_torsions.png
@@ -267,7 +280,7 @@ def plot_bend_angles(
     errmsg : list
         List of errors to print to the log while plotting.
     """
-    errmsg=[]
+    errmsg = []
 
     plt.figure(figsize=fig_size)
     plt.boxplot(angles, labels=names)
@@ -279,9 +292,13 @@ def plot_bend_angles(
     except Exception as e:
         errmsg.append("There was an issue with your figure saving parameters:")
         errmsg.append(f"{e}")
-        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_bgeo.png`...")
-        plt.savefig('plot_bgeo.png', dpi=300, transparent=False, bbox_inches='tight')
-        
+        errmsg.append("Saving figure with 300 dpi in the working directory as `plot_bgeo.png`...")  # noqa: E501
+        plt.savefig('plot_bgeo.png',
+                    dpi=300,
+                    transparent=False,
+                    bbox_inches='tight'
+                    )
+
     plt.close("all")
 
     return errmsg

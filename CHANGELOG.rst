@@ -12,6 +12,35 @@ Changelog
 * Bug-fix for Int2Cart strategy. Caught mismatch giving RuntimeError (#227)
 * Update installation documentation for Int2Cart
 
+=======
+v0.6.16 (2022-11-08)
+------------------------------------------------------------
+
+* Update citation to J Phys Chem A reference
+
+v0.6.15 (2022-09-26)
+------------------------------------------------------------
+
+* Added new subclient ``bgeodb`` to append to the database exact bgeos
+* Implement ``exact`` bgeo-strategy
+* Add documentation regarding new features with ``exact`` and ``bgeodb``
+* PR #220
+
+v0.6.14 (2022-07-13)
+------------------------------------------------------------
+
+* Add tests to ``cli_build.main`` (#225)
+
+v0.6.13 (2022-07-13)
+------------------------------------------------------------
+
+* Correct how some loops are written due to redundancies (#226)
+
+v0.6.12 (2022-07-07)
+------------------------------------------------------------
+
+* lint files
+
 v0.6.11 (2022-06-14)
 ------------------------------------------------------------
 

@@ -1,6 +1,5 @@
 """Static definitions that serve the whole program infrastructure."""
 from argparse import Namespace
-from math import pi
 from collections import namedtuple
 from itertools import chain
 # does not import the Path from IDPConfgen to avoid circular imports
@@ -15,6 +14,12 @@ core_folder = Path(__file__).parent
 bgeo_Cm1NCa = 'Cm1_N_Ca'
 bgeo_NCaC = 'N_Ca_C'
 bgeo_CaCNp1 = 'Ca_C_Np1'
+bgeo_CaCO = 'Ca_C_O'
+
+bgeo_NCa = 'N_Ca'
+bgeo_CaC = 'Ca_C'
+bgeo_CNp1 = 'C_Np1'
+bgeo_CO = 'C_O'
 
 
 # Amino-acid 3 to 1 letter code dictionary
@@ -55,24 +60,24 @@ heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 #
 # https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
 vdW_radii_tsai_1999 = {
-'C': 1.7,
-'H': 1.0,
-'N': 1.625,
-'O': 1.480,
-'P': 1.871,
-'S': 1.782,
-}
+    'C': 1.7,
+    'H': 1.0,
+    'N': 1.625,
+    'O': 1.480,
+    'P': 1.871,
+    'S': 1.782,
+    }
 
 # Bondi 1964,
 # https://en.wikipedia.org/wiki/Van_der_Waals_radius
 vdW_radii_bondi_1964 = {
-'C': 1.7,
-'H': 1.09,
-'N': 1.55,
-'O': 1.52,
-'P': 1.8,
-'S': 1.8,
-}
+    'C': 1.7,
+    'H': 1.09,
+    'N': 1.55,
+    'O': 1.52,
+    'P': 1.8,
+    'S': 1.8,
+    }
 
 vdW_radii_dict = {
     'tsai1999': vdW_radii_tsai_1999,
@@ -105,11 +110,11 @@ dssp_ss_keys = Namespace(
 dssp_ss_keys.all_helix = (
     dssp_ss_keys.ahelix,
     dssp_ss_keys.helix_3,
-    #dssp_ss_keys.helix_5,
+    # dssp_ss_keys.helix_5,
     )
 
-#dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
-#dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
+# dssp_ss_keys.helix_3 = (dssp_ss_keys.helix_3,)
+# dssp_ss_keys.helix_5 = (dssp_ss_keys.helix_5,)
 
 dssp_ss_keys.all_strand = (
     # dssp_ss_keys.bbridge,
@@ -125,7 +130,8 @@ dssp_ss_keys.all_loops = (
     # Balasco, N. et al. BioMed Research International vol. 2017 e2617629 (2017)
     dssp_ss_keys.helix_5,
     # polyproline II helix added as loops, following
-    # Mansiaux, Y., Joseph, A. P., Gelly, J.-C. & Brevern, A. G. PLOS ONE 6, e18401 (2011)
+    # Mansiaux, Y., Joseph, A. P., Gelly, J.-C. & Brevern, A. G.
+    # PLOS ONE 6, e18401 (2011)
     dssp_ss_keys.polypII,
     )
 
@@ -179,28 +185,25 @@ blocked_ids = [
 residue_elements = {'C', 'O', 'N', 'H', 'S', 'Se', 'D'}
 minimal_bb_atoms = ['N', 'CA', 'C']  # ordered!
 
-# """
-# Builder Definitions For Fixed Bond Geometries
-# ---------------------------------------------
-# Average values of the backbone angles calculated from Dunbrack PISCES
-# cull_d200611/200611/cullpdb_pc90_res1.6_R0.25_d200611_chains8807
-#
-# Float values are represented as ratio of integers
-# https://docs.python.org/3/tutorial/floatingpoint.html
-# """
+#  Builder Definitions  ###
+#  average values of the backbone angles calculated from
+#  Dunbrack PISCES
+#  cull_d200611/200611/cullpdb_pc90_res1.6_R0.25_d200611_chains8807
+#  float values are represented as ratio of integers
+#  https://docs.python.org/3/tutorial/floatingpoint.html
 # average_N_CA_C = 8731046790257777 / 4503599627370496  # +- 0.04375239960584633
-# average_CA_C_Np1 = 4587708133805365 / 2251799813685248  # +- 0.022904896537130497
-# average_Np1_C_O = 4733796466948169 / 2251799813685248  # +- 0.019050491268134375
-# average_CA_C_O = 4825315589323725 / 2251799813685248  # +- 0.017982788310237034
-# average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.029039312259214314
+# average_CA_C_Np1 = 4587708133805365 / 2251799813685248  # +- 0.022904896537130
+# average_Np1_C_O = 4733796466948169 / 2251799813685248  # +- 0.0190504912681343
+# average_CA_C_O = 4825315589323725 / 2251799813685248  # +- 0.01798278831023703
+# average_Cm1_N_CA = 2385749441983237 / 1125899906842624  # +- 0.029039312259214
 # bend_CA_C_OXT = 2 * pi / 3
 #
 # # pi corrected angles needed for the building algorithm
-# build_bend_N_CA_C = (pi - average_N_CA_C) / 2
 # build_bend_CA_C_Np1 = (pi - average_CA_C_Np1) / 2
-# build_bend_CA_C_O = average_CA_C_O / 2  # this angle does not require `pi -`
 # build_bend_Cm1_N_CA = (pi - average_Cm1_N_CA) / 2
+# build_bend_N_CA_C = (pi - average_N_CA_C) / 2
 # build_bend_CA_C_OXT = (pi - bend_CA_C_OXT) / 2
+# build_bend_CA_C_O = average_CA_C_O / 2  # this angle does not require `pi -`
 #
 # distance_N_CA = 6576479998126497 / 4503599627370496  # 1.46027 +- 0.013036
 # distance_CA_C = 6861872558247717 / 4503599627370496  # 1.52364 +- 0.012599

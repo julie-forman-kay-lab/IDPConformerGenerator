@@ -1,5 +1,5 @@
 """
-IDPConformerGenerator
+IDPConformerGenerator.
 
 Generates IDP Conformers by combining observed backbone angles
     and random distribution.
@@ -18,21 +18,22 @@ import sys
 from idpconfgen import (
     __version__,
     cli_bgeo,
+    cli_bgeodb,
     cli_build,
     cli_csssconv,
-    cli_makecsss,
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
-    cli_sethpc,
+    cli_makecsss,
     cli_merge,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
+    cli_search,
+    cli_sethpc,
     cli_sscalc,
     cli_ssext,
     cli_stats,
-    cli_search,
     cli_torsions,
     cli_torsionsJ,
     cli_validate,
@@ -57,6 +58,7 @@ Individual routines for DB creation:
 Other useful routines:
 
     * {cli_bgeo._name}
+    * {cli_bgeodb._name}
     * {cli_fetch._name}
     * {cli_ssext._name}
     * {cli_fastaext._name}
@@ -95,6 +97,7 @@ libcli.add_subparser(subparsers, cli_build)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)
+libcli.add_subparser(subparsers, cli_bgeodb)
 libcli.add_subparser(subparsers, cli_fastaext)
 libcli.add_subparser(subparsers, cli_fetch)
 libcli.add_subparser(subparsers, cli_ssext)

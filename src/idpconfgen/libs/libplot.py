@@ -15,13 +15,12 @@ def plot_distribution(
         figdpi=300,
         ):
     """."""
-    fig, axs = plt.subplots(ncols=subplots, figsize=[10 * subplots, data.shape[1] * 0.2])
+    fig, axs = plt.subplots(ncols=subplots, figsize=[10 * subplots, data.shape[1] * 0.2])  # noqa: E501
     try:
         axs = axs.ravel()
     except AttributeError:
         axs = [axs]  # needed to facility the for loop bellow
-    #plt.subplots_adjust(left=0.1, bottom=0.03, right=0.98, top=0.98)
-
+    # plt.subplots_adjust(left=0.1, bottom=0.03, right=0.98, top=0.98)
 
     for i, ax in zip(range(subplots), axs):
         ax.set_title(title[i], fontsize=15, weight='bold')

@@ -1,16 +1,17 @@
+"""Test build definitions."""
 import warnings
 from string import digits
+
+import pytest
 
 from idpconfgen.core import build_definitions as BD
 from idpconfgen.core.definitions import aa1to3, aa3to1
 from idpconfgen.libs.libpdb import atom_element, atom_name
 
-import pytest
-
 
 @pytest.fixture
 def ff14SB():
-    """The fs14SB dictionary."""
+    """Return the fs14SB dictionary."""
     return BD.read_ff14SB_params()
 
 
@@ -31,7 +32,6 @@ def test_ff14SB_params_random_2(ff14SB):
 
 def test_ff14SB_params_atom_keys(ff14SB):
     """Test atom type keys are okay."""
-
     required_keys = set([
         'mass',
         'element',
@@ -68,14 +68,12 @@ def test_ff14SB_atoms_have_params(ff14SB):
 
     for key, residue in ff14SB.items():
         if key[0].isupper():  # this should refer only to residues
-            for atom_name, aparams in residue.items():
+            for _atom_name, aparams in residue.items():
                 assert set(aparams.keys()) == required_keys, f'Wrong for {key}'
 
 
 def test_aa_translate_dict_with_atom_labels():
-    """
-    Test if the aa3to1 and aa1to3 dict match the atom labels dicts.
-    """
+    """Test if the aa3to1 and aa1to3 dict match the atom labels dicts."""
     for key in aa3to1.keys():
         assert key in BD.atom_names_pdb
         assert key in BD.atom_names_amber
@@ -93,7 +91,7 @@ def test_all_atoms_are_mapped(ff14SB):
     """
     for key, value in ff14SB.items():
         if key[0].isupper():
-            for atom, params in value.items():
+            for _atom, params in value.items():
                 assert params['type'] in ff14SB, \
                     f'Type {params["type"]} not in ff14SB dictionary'
 
@@ -148,6 +146,7 @@ def test_pdb_templates_element():
                 from_name = line[atom_name].strip().lstrip(digits)[0]
                 element = line[atom_element].strip()
                 assert from_name == element, f'Elements differ for {pdb.name}'
+
 
 def test_Nterm_H_connectivity():
     """Test adds H1-3 connectivities to N term and all atoms."""

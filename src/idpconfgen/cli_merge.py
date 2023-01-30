@@ -1,4 +1,4 @@
-r"""
+r"""# noqa: D205, D400, E501
 Collates and re-numbers conformers within subfolders of a given folder.
 Has the option to remove previous and rename current conformer files after processing.
 
@@ -27,7 +27,9 @@ from idpconfgen.logger import S, T, init_files
 
 LOGFILESNAME = '.idpconfgen_merge'
 _name = 'merge'
-_help = 'Collate and rename/renumber conformers from subfolders into current/new folder.'
+_help = ('Collate and rename/renumber conformers '
+         'from subfolders into current/new folder.'
+         )
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -46,7 +48,7 @@ ap.add_argument(
         'Defaults to the current working directory.'
         ),
     type=Path,
-    required = True,
+    required=True,
     default=None,
     )
 
@@ -103,9 +105,9 @@ def main(
         Defaults to True.
     """
     init_files(log, LOGFILESNAME)
-
+    
     # initialize some variables
-    count=0
+    count = 0
 
     if destination is None:
         destination = source
@@ -128,7 +130,7 @@ def main(
             shutil.copy2(path, Path(destination, f'{prefix}_{count}.pdb'))
         except OSError as e:
             log.info(S(f'Error: {path} : {e.strerror}'))
-        count+=1
+        count += 1
     log.info(S('done'))
 
     if delete:

@@ -3,6 +3,11 @@ A Real Case Scenario
 
 .. start-description
 
+.. note::
+    The purpose of this module is to use IDPConformerGenerator as you would with
+    a real protein of interest (unfolded drkN SH3 is presented here). The database
+    procured from this module can be re-usable for future cases.
+
 The example with a small peptide in the :code:`example` folder is a good way to
 get introduced to IDPConfGen. Although building other IDP conformer ensembles
 use the same workflow as the previous example, we will go over more detailed

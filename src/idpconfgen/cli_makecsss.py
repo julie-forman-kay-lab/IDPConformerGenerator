@@ -1,4 +1,4 @@
-"""
+"""# noqa: D205, D400, E501
 Generates a CSSS.JSON file based on user specifications for probabilistic secondary structure sampling on a per residue basis.
 
 Has the ability to edit previously generated CSSS files as well with `--file-csss`.
@@ -10,13 +10,14 @@ USAGE:
     $ idpconfgen makecsss [--file-csss] [--custom-pattern] > [OUTPUT]
 """
 import argparse
-from collections import defaultdict
 import json
+from collections import defaultdict
 
-from idpconfgen.libs.libio import read_dict_from_json
 from idpconfgen import log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libio import read_dict_from_json
 from idpconfgen.logger import S, T, init_files
+
 
 LOGFILESNAME = '.idpconfgen_makecsss'
 _name = 'makecsss'
@@ -41,9 +42,11 @@ ap.add_argument(
     '-cp',
     '--custom-pattern',
     help=(
-        'Specifies the probability of secondary structure sampling on a per-residue basis. '
+        'Specifies the probability of secondary structure sampling on a'
+        'per-residue basis. '
         'Please cover all residues in your sequence of interest. '
-        'Overlapping residues with the same DSSP_REGEX will be overwritten by subsequent entries. '
+        'Overlapping residues with the same DSSP_REGEX will be overwritten'
+        'by subsequent entries. '
         "E.g. -cp '<RESIDUE or RANGE> <DSSP_REGEX> <PROBABILITY>|...' "
         "E.g. -cp '1-3 L 0.3|1-3 H 0.8|4-20 X 1.0'"
         ),
@@ -52,8 +55,9 @@ ap.add_argument(
 
 libcli.add_argument_output(ap)
 
+
 def parse_custom_pattern(cp):
-    """
+    """# noqa: D205, D400, E501
     Parse the probs8_[ID].txt output from CheSPI as user configurable input file for CSSS.
     
     Parameters
@@ -77,9 +81,10 @@ def parse_custom_pattern(cp):
             res_range = split_gp[0].split("-")
             start_res = int(res_range[0])
             end_res = int(res_range[1])
-            for i in range(start_res, end_res+1):
+            for i in range(start_res, end_res + 1):
                 if i in respro:
-                    log.info(S(f'Warning: propensities for residue {i} have been changed due to overlap in `-cp`.'))
+                    log.info(S(f'Warning: propensities for residue {i} '
+                               'have been changed due to overlap in `-cp`.'))
                 else:
                     respro.append(i)
                 dict_out[i][split_gp[1]] = float(split_gp[2])
@@ -89,13 +94,14 @@ def parse_custom_pattern(cp):
         
     return dict_out
 
+
 def main(
     file_csss,
     custom_pattern,
     output,
     **kwargs,
         ):
-    """
+    """# noqa: D205, D400, E501
     Perform main logic of the script.
     
     Parameters
@@ -117,21 +123,21 @@ def main(
         for resid in converted_csss:
             for ss_regex in converted_csss[resid]:
                 try:
-                    dictCSSS[str(resid)][ss_regex] = converted_csss[resid][ss_regex]
+                    dictCSSS[str(resid)][ss_regex] = converted_csss[resid][ss_regex]     # noqa: E501
                 except KeyError:
-                    log.info(S(f'Warning: new residue {resid} has been appended'))
-                    dictCSSS[str(resid)] = {ss_regex : converted_csss[resid][ss_regex]}
+                    log.info(S(f'Warning: new residue {resid} '
+                               'has been appended'))
+                    dictCSSS[str(resid)] = {ss_regex: converted_csss[resid][ss_regex]}  # noqa: E501
         _output = json.dumps(dictCSSS, indent=4)
     else:
         _output = json.dumps(converted_csss, indent=4)
-
     
     if output:
         log.info(S('saving custom CSSS output onto disk...'))
         with open(output, mode="w") as fout:
             fout.write(_output)
     else:
-        print(_output)
+        print(_output)  # noqa: T201
     
     log.info(S('done'))
     
