@@ -21,10 +21,10 @@ import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.cli_build import (
-    get_adjacent_angles,
     gen_PDB_from_conformer,
+    get_adjacent_angles,
     parse_CSSS,
-)
+    )
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
@@ -63,6 +63,17 @@ from idpconfgen.core.build_definitions import (
     )
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.fldrs_helper import (
+    align_coords,
+    break_check,
+    consecutive_grouper,
+    count_clashes,
+    create_combinations,
+    disorder_cases,
+    psurgeon,
+    store_idp_paths,
+    tolerance_calculator,
+    )
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     create_sidechains_masks_per_residue,
@@ -83,13 +94,10 @@ from idpconfgen.libs.libcalc import (
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
-from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
-from idpconfgen.libs.libio import (
-    make_folder_or_cwd,
-    read_dictionary_from_disk,
-    )
+from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
+from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import (
     get_trimer_seq_njit,
     remap_sequence,
@@ -99,24 +107,13 @@ from idpconfgen.libs.libparse import (
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
-    cols_coords,
     col_name,
+    cols_coords,
     parse_pdb_to_array,
-    structure_to_pdb
+    structure_to_pdb,
     )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
-from idpconfgen.fldrs_helper import (
-    disorder_cases,
-    align_coords,
-    break_check,
-    create_combinations,
-    count_clashes,
-    consecutive_grouper,
-    psurgeon,
-    store_idp_paths,
-    tolerance_calculator,
-    )
 
 _file = Path(__file__).myparents()
 LOGFILESNAME = '.idpconfgen_fldrs'
@@ -271,7 +268,7 @@ ap.add_argument(
         "Switch to keep temporary disordered fragments while building."
         ),
     action='store_true',
-)
+    )
 
 ap.add_argument(
     '-tol',
@@ -283,7 +280,7 @@ ap.add_argument(
         "clashes and 1.0 Angstroms of tolerance for a given vdW radii."
         ),
     default=0.5,
-)
+    )
 
 ap.add_argument(
     '-csss',
@@ -427,13 +424,13 @@ def main(
         log.info(
             "Please enter a floating point value for clash-tolerances "
             "between 0.0-1.0."
-        )
+            )
         return
     
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
     if keep_temporary:
-        TEMP_DIRNAME = "fldrs_temp/" 
+        TEMP_DIRNAME = "fldrs_temp/"
     else:
         TEMP_DIRNAME = '.fldrs_temp/'
     
@@ -552,7 +549,7 @@ def main(
     fld_fasta = fld_fasta.replace('X', '')
     
     # Find out what our disordered sequences are
-    # Can be C-term, N-term, in the middle, or all the above        
+    # Can be C-term, N-term, in the middle, or all the above
     breaks = break_check(pdb_raw)
     mod_input_seq = input_seq
     if breaks:
@@ -576,16 +573,16 @@ def main(
         log.info(S(
             f'Disordered region #{i + 1} = residue {lower + 1} to {upper} '
             f'with the sequence {dis_seq}.'
-        ))
+            ))
         
         # Different than what we tell user due to internal processing for
         # disordered bits (need 2 extra residues at the beginning or end)
         if lower == 0:
-            dis_seq = input_seq[lower : upper + 2]
+            dis_seq = input_seq[lower: upper + 2]
         elif upper == len(input_seq):
-            dis_seq = input_seq[lower - 2 : upper]
+            dis_seq = input_seq[lower - 2: upper]
         else:
-            dis_seq = input_seq[lower : upper]
+            dis_seq = input_seq[lower: upper]
         
         DISORDER_SEQS.append(dis_seq)
     log.info(S('done'))
@@ -633,9 +630,9 @@ def main(
             ))
 
         remove_empty_keys(SLICEDICT_XMERS[i])
-        # updates user defined fragment sizes and probabilities to the ones actually
-        # observed
-        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))
+        # updates user defined fragment sizes and probabilities to the
+        # ones actually observed
+        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
         XMERPROBS.append(_.probs)
 
         GET_ADJ.append(get_adjacent_angles(
@@ -677,12 +674,13 @@ def main(
         upper = DISORDER_BOUNDS[i][1]
         counter = 0
         # Use the second folded residue's backbone C-N-CA
-        # for rotation and alignment where the `C` atom 
+        # for rotation and alignment where the `C` atom
         # is from the previous resiude
         if lower == 0:  # N-IDR case
             DISORDER_CASE = disorder_cases[0]
             for j, atom in enumerate(atom_names):
-                if counter == 5: break
+                if counter == 5:
+                    break
                 if atom == "N":
                     fld_term_idx["N"] = j
                     counter += 1
@@ -694,7 +692,7 @@ def main(
                     counter += 1
         elif upper == len(input_seq):  # C-IDR case
             DISORDER_CASE = disorder_cases[2]
-            for j, atom in enumerate(atom_names):
+            for j, _atom in enumerate(atom_names):
                 k = len(atom_names) - 1 - j
                 if counter == 1 and atom_names[k] == "N":
                     fld_term_idx["N"] = k
@@ -708,9 +706,9 @@ def main(
         else:
             DISORDER_CASE = disorder_cases[1]  # break
 
-        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()
-        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()
-        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()
+        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
+        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
+        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
         # Coordinates of boundary to stitch to later on
         fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
 
@@ -745,7 +743,7 @@ def main(
             max_clash=max_clash,
             tolerance=dist_tolerance,
             index=i,
-            conformer_name="conformer_"+DISORDER_CASE,
+            conformer_name="conformer_" + DISORDER_CASE,
             input_seq=seq,  # string
             output_folder=temp_of,
             nconfs=conformers_per_core,  # int
@@ -772,7 +770,6 @@ def main(
         if remaining_confs:
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
         
-        
         log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
         
         # reinitialize queues so reiteration doesn't crash
@@ -798,21 +795,21 @@ def main(
             DISORDER_CASE[disorder_cases[0]],
             DISORDER_CASE[disorder_cases[2]],
             nconfs,
-        )    
+            )
         
-    log.info(f"Stitching conformers onto the folded domain...")
+    log.info("Stitching conformers onto the folded domain...")
     consume = partial(
         psurgeon,
         fld_struc=Path(folded_structure),
         case=case,
-    )
+        )
     execute = partial(
         report_on_crash,
         consume,
         ROC_exception=Exception,
         ROC_folder=output_folder,
         ROC_prefix=_name,
-    )
+        )
     execute_pool = pool_function(execute, files, ncores=ncores)
     
     for i, conf in enumerate(execute_pool):
@@ -944,7 +941,7 @@ def _build_conformers(
 
     atom_labels, residue_numbers, residue_labels = next(builder)
 
-    for _ in range(nconfs):            
+    for _ in range(nconfs):
         while 1:
             energy, coords = next(builder)
 
@@ -963,7 +960,7 @@ def _build_conformers(
                 disorder_case,
                 max_clash,
                 tolerance,
-            )
+                )
             
             if type(clashes) is int:
                 final = structure_to_pdb(fragment)
@@ -1262,7 +1259,7 @@ def conformer_generator(
                 # primer_template here is used temporarily, and needs to be
                 # removed when get_adj becomes an option
                 if bgeo_strategy == bgeo_exact_name:
-                    primer_template, agls, bangs, blens = GET_ADJ[index](bbi - 1)
+                    primer_template, agls, bangs, blens = GET_ADJ[index](bbi - 1)  # noqa: E501
                 else:
                     primer_template, agls = GET_ADJ[index](bbi - 1)
 

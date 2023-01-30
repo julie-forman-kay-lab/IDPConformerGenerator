@@ -5,21 +5,13 @@ Methodology deviates from traditional IDP or beads-on-a-string FLDR/S approach.
 
 Name: FLDR/S (Folded disordered region/structure sampling)
 """
-
-disorder_cases = {
-    0: "N-IDR",
-    1: "Break-IDR",
-    2: "C-IDR",
-}
-
-import random
 import os
+import random
+from itertools import product
 
 import numpy as np
 
-from itertools import product
 from idpconfgen import Path
-
 from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
@@ -29,19 +21,25 @@ from idpconfgen.libs.libstructure import (
     col_name,
     col_resName,
     col_resSeq,
-    col_serial,
     col_segid,
-    cols_coords,
+    col_serial,
     col_x,
     col_y,
     col_z,
-)
+    cols_coords,
+    )
+
+
+disorder_cases = {
+    0: "N-IDR",
+    1: "Break-IDR",
+    2: "C-IDR",
+    }
 
 
 def tolerance_calculator(tolerance):
     """
-    Calculates the max number of spherical clashes and distance tolerance
-    given a floating point tolerance between 0-1.
+    Calculate the max number of tolerated spherical clashes and distance.
 
     Parameter
     ---------
@@ -65,7 +63,7 @@ def tolerance_calculator(tolerance):
 
 def calculate_distance(coords1, coords2):
     """
-    Returns the distance between two 3D coordinates.
+    Calculate the distance between two 3D coordinates.
     
     Calculates the distance between 2 coordinates using Euclidean distance
     formula.
@@ -87,7 +85,8 @@ def consecutive_grouper(seq):
     """
     Use negative indexing to group together consecutive numbers.
 
-    References:
+    Reference
+    ---------
     https://stackoverflow.com/questions/70363072/group-together-consecutive-numbers-in-a-list
     
     Parameters
@@ -107,7 +106,7 @@ def consecutive_grouper(seq):
         else:
             grouped.append([x])
             
-    bounds=[]
+    bounds = []
     for group in grouped:
         first = group[0]
         last = group[len(group) - 1]
@@ -118,7 +117,7 @@ def consecutive_grouper(seq):
 
 def store_idp_paths(folder, temp_dir):
     """
-    Stores all of the paths for different cases of IDRs in a dictionary.
+    Store all of the paths for different cases of IDRs in a dictionary.
 
     Parameters
     ----------
@@ -138,16 +137,19 @@ def store_idp_paths(folder, temp_dir):
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
         fpath = folder.joinpath(temp_dir + disorder_cases[0])
         idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[0]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        case_path[disorder_cases[0]] = \
+            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
         fpath = folder.joinpath(temp_dir + disorder_cases[1])
         idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[1]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        case_path[disorder_cases[1]] = \
+            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
         # What to do if we have multiple breaks? Maybe split to subdirs
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
         fpath = folder.joinpath(temp_dir + disorder_cases[2])
         idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[2]] = [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        case_path[disorder_cases[2]] = \
+            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
 
     return case_path
 
@@ -177,7 +179,8 @@ def create_combinations(list1, list2, num_combinations):
     all_combinations = list(product(list1, list2))
     max_combinations = len(all_combinations)
 
-    selected_combinations = random.sample(all_combinations, min(num_combinations, max_combinations))
+    selected_combinations = \
+        random.sample(all_combinations, min(num_combinations, max_combinations))
 
     return selected_combinations
 
@@ -242,7 +245,7 @@ def break_check(fdata):
         fld_seqs = []
         for idx in whole:
             fld_idx = list(range(idx[0], idx[1], 3))
-            fld_seqs.append(''.join(aa3to1.get(f) for f in data[:, col_resName][fld_idx].tolist()))
+            fld_seqs.append(''.join(aa3to1.get(f) for f in data[:, col_resName][fld_idx].tolist()))  # noqa: E501
         
         return fld_seqs
     
@@ -251,7 +254,7 @@ def break_check(fdata):
 
 def align_coords(sample, target, case):
     """
-    Translates and rotates coordinates based on the IDR case.
+    Translate and rotate coordinates based on the IDR case.
     
     Set of `target` coordinates should be for [[C], [N], [CA]].
     Where the `C` position is of the previous residue for N-IDR
@@ -281,7 +284,7 @@ def align_coords(sample, target, case):
     counter = 0
     if case == disorder_cases[0]:  # N-IDR
         # In the case of N-IDR, we want to move relative to C-term
-        for i, atom in enumerate(atom_names):
+        for i, _atom in enumerate(atom_names):
             # Use last residues of N-IDR for alignment
             j = len(atom_names) - 1 - i
             if counter == 1 and atom_names[j] == "N":
@@ -299,7 +302,8 @@ def align_coords(sample, target, case):
         # In the case of C-IDR, we want to move relative to N-term
         for i, atom in enumerate(atom_names):
             # Use first residues of C-IDR for alignment
-            if counter == 5: break
+            if counter == 5:
+                break
             if atom == "N":
                 idr_term_idx["N"] = i
                 counter += 1
@@ -343,17 +347,17 @@ def align_coords(sample, target, case):
 
 
 def count_clashes(
-    fragment,
-    parent,
-    case=None,
-    max_clash=50,
-    tolerance=0.5,      
-    ):
+        fragment,
+        parent,
+        case=None,
+        max_clash=50,
+        tolerance=0.5,
+        ):
     """
-    Checks for steric clashes between two protein chains using vdW radii.
+    Check for steric clashes between two protein chains using vdW radii.
 
     Parameters
-    ----------    
+    ----------
     fragment : np.array
         Array of the IDR fragment of interest
     
@@ -377,7 +381,7 @@ def count_clashes(
     
     True : Bool
         Too many clashes observed, not worthwhile continuing
-    """  
+    """
     num_clashes = 0
     
     parent_atoms = parent.data_array[:, col_element]
@@ -393,11 +397,12 @@ def count_clashes(
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
                 prev = int(fragment_seq[j - 1])
-            except IndexError: 
+            except IndexError:
                 continue
             fragment_atoms = fragment_atoms[:-1]
             fragment_coords = fragment_coords[:-1]
-            if last_r - prev == 4: break
+            if last_r - prev == 4:
+                break
     elif case == disorder_cases[1]:
         pass
     elif case == disorder_cases[2]:
@@ -406,11 +411,12 @@ def count_clashes(
         for i, _ in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
                 next = int(fragment_seq[i + 1])
-            except IndexError: 
+            except IndexError:
                 continue
             fragment_atoms = fragment_atoms[1:]
             fragment_coords = fragment_coords[1:]
-            if next - first_r == 4: break
+            if next - first_r == 4:
+                break
     
     # Loop through all pairs of atoms in the 2 protein chains
     for i, atom1 in enumerate(parent_atoms):
@@ -472,7 +478,7 @@ def psurgeon(idp_struc, fld_struc, case):
         idr_data_array = idr.data_array
         # N-IDR, remove last resiude of fragment
         # and remove the first residue of folded-domain
-        for i, seq in enumerate(idr_seq):
+        for i, _seq in enumerate(idr_seq):
             j = len(idr_seq) - 1 - i
             curr = idr_seq[j]
             prev = idr_seq[j - 1]
@@ -482,7 +488,7 @@ def psurgeon(idp_struc, fld_struc, case):
         
         idr._data_array = idr_data_array
         
-        for i, seq in enumerate(fld_seq):
+        for i, _seq in enumerate(fld_seq):
             curr = fld_seq[i]
             next = fld_seq[i + 1]
             fld_data_array = fld_data_array[1:]
@@ -504,7 +510,7 @@ def psurgeon(idp_struc, fld_struc, case):
         idr_data_array = idr.data_array
         # C-IDR, remove last resiude of folded protein
         # and remove the first residue of C-IDR
-        for i, seq in enumerate(fld_seq):
+        for i, _seq in enumerate(fld_seq):
             j = len(fld_seq) - 1 - i
             curr = fld_seq[j]
             prev = fld_seq[j - 1]
@@ -514,7 +520,7 @@ def psurgeon(idp_struc, fld_struc, case):
         
         fld._data_array = fld_data_array
         
-        for i, seq in enumerate(idr_seq):
+        for i, _seq in enumerate(idr_seq):
             curr = idr_seq[i]
             next = idr_seq[i + 1]
             idr_data_array = idr_data_array[1:]
@@ -524,7 +530,7 @@ def psurgeon(idp_struc, fld_struc, case):
         idr._data_array = idr_data_array
 
         # Fix residue connectivity issue
-        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])        
+        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])
         curr_residue = last_residue_fld + 1
         idr_seq = idr.data_array[:, col_resSeq]
         for i, seq in enumerate(idr_seq):
@@ -553,7 +559,7 @@ def psurgeon(idp_struc, fld_struc, case):
         # For cases where we have both C-IDR and N-IDR
         # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
         # N-IDR, remove last resiude of fragment
-        for i, seq in enumerate(nidr_seq):
+        for i, _seq in enumerate(nidr_seq):
             j = len(nidr_seq) - 1 - i
             curr = nidr_seq[j]
             prev = nidr_seq[j - 1]
@@ -564,7 +570,7 @@ def psurgeon(idp_struc, fld_struc, case):
         nidr._data_array = nidr_data_array
         
         # Remove first residue of folded domain
-        for i, seq in enumerate(fld_seq):
+        for i, _seq in enumerate(fld_seq):
             curr = fld_seq[i]
             next = fld_seq[i + 1]
             fld_data_array = fld_data_array[1:]
@@ -577,7 +583,7 @@ def psurgeon(idp_struc, fld_struc, case):
         new_struc_seq = new_struc_arr[:, col_resSeq]
         
         # Remove last residue of folded domain (now protein)
-        for i, seq in enumerate(new_struc_seq):
+        for i, _seq in enumerate(new_struc_seq):
             j = len(new_struc_seq) - 1 - i
             curr = new_struc_seq[j]
             prev = new_struc_seq[j - 1]
@@ -586,7 +592,7 @@ def psurgeon(idp_struc, fld_struc, case):
                 break
         
         # Remove first residue of C-IDR
-        for i, seq in enumerate(cidr_seq):
+        for i, _seq in enumerate(cidr_seq):
             curr = cidr_seq[i]
             next = cidr_seq[i + 1]
             cidr_data_array = cidr_data_array[1:]

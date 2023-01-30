@@ -6,30 +6,33 @@ USAGE:
     $ idpconfgen resptm <PDB-FILES> -pt <PATTERN> -o <OUTPUT> -n <CORES>
 """
 import argparse
-import shutil
 import re
+import shutil
 from functools import partial
 from pathlib import Path
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import extract_from_tar, read_path_bundle
+from idpconfgen.libs.libio import (
+    extract_from_tar,
+    make_folder_or_cwd,
+    read_path_bundle,
+    )
 from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.logger import S, T, init_files, report_on_crash
-
-from idpconfgen.libs.libio import make_folder_or_cwd
 from idpconfgen.libs.libstructure import (
     Structure,
-    structure_to_pdb,
     col_resName,
     col_resSeq,
-)
+    structure_to_pdb,
+    )
+from idpconfgen.logger import S, T, init_files, report_on_crash
+
 
 LOGFILESNAME = '.idpconfgen_resptm'
 TMPDIR = '__tmpresptm__'
 
 _name = 'resptm'
-_help = 'Renames residues of interest within a PDB file for post-translational modifications.'
+_help = 'Renames residues of interest within a PDB file for post-translational modifications.'  # noqa: E501
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -69,7 +72,7 @@ ap.add_argument(
 
 def rename_residues(target_struc, pattern):
     """
-    Renames 3 letter residue codes in a PDB based on the pattern.
+    Rename 3 letter residue codes in a PDB based on the pattern.
 
     Parameters
     ----------
@@ -107,6 +110,27 @@ def main(
         tmpdir=TMPDIR,
         **kwargs,
         ):
+    """
+    Execute main client logic.
+
+    Parameters
+    ----------
+    pdb_files : str or Path, required
+        Path to folder or tarball of PDB files to work with.
+    
+    pattern : str, required
+        Desired residues to change names of.
+    
+    output_folder : str or Path, optional
+        Folder for output structures.
+        Defaults to current working directory.
+    
+    ncores : int, optional
+        Number of workers to use.
+    
+    tmpdir : str, optional
+        Temporary directory to store unzipped PDBs if given tarball.
+    """
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     
@@ -139,14 +163,14 @@ def main(
     consume = partial(
         rename_residues,
         pattern=RES_COMBO,
-    )
+        )
     execute = partial(
         report_on_crash,
         consume,
         ROC_exception=Exception,
         ROC_folder=output_folder,
         ROC_prefix=_name
-    )
+        )
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
     
     for i, conf in enumerate(execute_pool):

@@ -80,7 +80,6 @@ from idpconfgen.libs.libcalc import (
     rrd10_njit,
     )
 from idpconfgen.libs.libfilter import aligndb
-from idpconfgen.libs.libfunc import find_inbetween
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import (
     make_folder_or_cwd,
