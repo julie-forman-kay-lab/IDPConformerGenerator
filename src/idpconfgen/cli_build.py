@@ -1270,7 +1270,7 @@ def conformer_generator(
             except ValueError:
                 # Int2Cart requires length of seq to match length of torsions
                 # if there is a mismatch match is found, start from scratch
-                # 
+
                 # Mismatches occur when the first residue of a sequence throws
                 # two sets of torsion angles, where Int2Cart requires only 1 set
                 # to correct on. For example:

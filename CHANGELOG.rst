@@ -12,7 +12,6 @@ Changelog
 * Bug-fix for Int2Cart strategy. Caught mismatch giving RuntimeError (#227)
 * Update installation documentation for Int2Cart
 
-=======
 v0.6.16 (2022-11-08)
 ------------------------------------------------------------
 
