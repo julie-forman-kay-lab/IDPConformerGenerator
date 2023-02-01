@@ -36,6 +36,7 @@ from idpconfgen import (
     cli_stats,
     cli_torsions,
     cli_torsionsJ,
+    cli_contacts,
     cli_validate,
     log,
     )
@@ -53,6 +54,7 @@ Individual routines for DB creation:
     * {cli_pdbdl._name}
     * {cli_sscalc._name}
     * {cli_torsions._name}
+    * {cli_contacts._name}
     * {cli_build._name}
 
 Other useful routines:
@@ -92,6 +94,7 @@ subparsers = ap.add_subparsers(
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
+libcli.add_subparser(subparsers, cli_contacts)
 libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
 

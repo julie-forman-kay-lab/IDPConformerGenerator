@@ -759,7 +759,7 @@ def add_argument_plot(parser):
             'of meaning. '
             'Additional arguments can be given to configure the '
             'plot style. '
-            "Example: --plot xlabel=Sic1_Res type=omega color='b','r'. "
+            "Example: --plot xlabel=Sic1_Res color='b','r'. "
             'Accepted plot arguments are defined by the plotting function used.'
             ' See ploting functions in the documentation pages. '
             'Defaults to False, no plot is produced.'
