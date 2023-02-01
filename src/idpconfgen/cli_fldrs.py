@@ -1,10 +1,13 @@
 """
 Client for filling in the tails of folded proteins with IDRs.
 
-TODO: fill in internal disordered regions (scaffold for this built)
-
 Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
+
+Future Ideas
+------------
+- Populate internal disordered regions (code has been scaffolded already)
+- Implement CSSS on IDR tails/fragments
 
 USAGE:
     $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
@@ -20,11 +23,7 @@ from time import time
 import numpy as np
 
 from idpconfgen import Path, log
-from idpconfgen.cli_build import (
-    gen_PDB_from_conformer,
-    get_adjacent_angles,
-    parse_CSSS,
-    )
+from idpconfgen.cli_build import gen_PDB_from_conformer, get_adjacent_angles
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
@@ -283,18 +282,6 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '-csss',
-    '--custom-sampling',
-    help=(
-        'Input .JSON file for probabilistic CSSS. '
-        'Will use DSSP codes in this .JSON instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-off. CSSS.JSON file is as created by the '
-        '`idpconfgen csssconv` or `idpconfgen makecsss` command.'
-        ),
-    default=None,
-    )
-
-ap.add_argument(
     '-dsd',
     '--disable-sidechains',
     help='Whether or not to compute sidechains. Defaults to True.',
@@ -390,7 +377,6 @@ ENERGYLOGSAVER = EnergyLogSaver()
 def main(
         input_seq,
         database,
-        custom_sampling,
         clash_tolerance=0.5,
         keep_temporary=False,
         folded_structure=None,
@@ -437,13 +423,13 @@ def main(
     # ensuring some parameters do not overlap
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
-    non_overlapping_parameters = (any_def_loops, dany, duser, bool(custom_sampling))  # noqa: E501
+    non_overlapping_parameters = (any_def_loops, dany, duser)
     _sum = sum(map(bool, non_overlapping_parameters))
 
     if _sum > 1:
         emsg = (
-            'Note (dloop, dstrand, dhelix), dany, duser, and '
-            'custom_sampling are mutually exclusive.'
+            'Note (dloop, dstrand, dhelix), dany, and duser '
+            'are mutually exclusive.'
             )
         raise ValueError(emsg)
     elif _sum < 1:
@@ -481,17 +467,13 @@ def main(
 
     xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
-    # set up the information from CSSS.JSON files
-    csss_dict = False
-    csss_dssp_regexes = None
-
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
     # There are four possibilities of sampling:
     # 1) Sampling loops and/or helix and/or strands, where the found fragments
     #    are all of the same secondary structure
     # 2) sample "any". Disregards any secondary structure annotated
-    # 3) custom sample given by the user
+    # 3) custom sample given by the user (CURRENTLY NOT IN FLDRS)
     # 4) advanced sampling
     #
     # The following if/else block creates the needed variables according to each
@@ -500,22 +482,6 @@ def main(
     if dany:
         # will sample the database disregarding the SS annotation
         dssp_regexes = [all_valid_ss_codes]
-
-    elif custom_sampling:
-        csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
-
-        # If the user wants to sample "any" for some residues
-        # users can have "X" in the CSSS.JSON but that will be converted
-        # internally below
-        if "X" in csss_dssp_regexes:
-            csss_dssp_regexes.remove("X")
-            csss_dssp_regexes.add(all_valid_ss_codes)
-            for _k, _v in csss_dict.items():
-                # X means any SS.
-                if "X" in _v:
-                    _v[all_valid_ss_codes] = _v.pop("X")
-
-        dssp_regexes = list(csss_dssp_regexes)
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
@@ -621,7 +587,6 @@ def main(
         SLICEDICT_XMERS.append(prepare_slice_dict(
             primary,
             seq,
-            csss=bool(csss_dict),
             dssp_regexes=dssp_regexes,
             secondary=secondary,
             mers_size=xmer_probs_tmp.sizes,
@@ -642,7 +607,7 @@ def main(
             ANGLES,
             bgeo_strategy,
             SLICEDICT_XMERS[i],
-            csss_dict,
+            csss_dict=None,
             residue_tolerance=residue_tolerance,
             ))
         
@@ -939,7 +904,7 @@ def _build_conformers(
         bgeo_strategy=bgeo_strategy,
         **kwargs)
 
-    atom_labels, residue_numbers, residue_labels = next(builder)
+    atom_labels, residue_numbers, _residue_labels = next(builder)
 
     for _ in range(nconfs):
         while 1:
