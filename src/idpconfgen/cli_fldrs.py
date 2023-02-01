@@ -607,7 +607,7 @@ def main(
             ANGLES,
             bgeo_strategy,
             SLICEDICT_XMERS[i],
-            csss_dict=None,
+            csss=None,
             residue_tolerance=residue_tolerance,
             ))
         

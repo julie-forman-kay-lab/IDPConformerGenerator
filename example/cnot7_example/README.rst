@@ -17,7 +17,7 @@ from PDB ID 4GMJ: ``cnot7_4gmj_fld_11-263.pdb``.
     non-modified version. For example: ``TPO`` phosphorylated threonine will become ``THR`` and
     ``SEP`` phosphorylated serine will become ``SEP``.
 
-    A later update will introduce a PTM module to automate these changes.
+    Using the ``resptm`` sublcient can help you with this.
 
 Steps from now will assume you're in the working director of ``example/cnot7_example``
 and have already compiled your preferred reusable IDPConformerGenerator database. For
