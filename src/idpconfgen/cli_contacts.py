@@ -41,7 +41,14 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
+from idpconfgen.libs.libstructure import (
+    Structure,
+    cols_coords,
+    col_name,
+    col_resSeq,
+    )
 from idpconfgen.logger import S, T, init_files, report_on_crash
+
 
 
 LOGFILESNAME = '.idpconfgen_contacts'
@@ -97,6 +104,47 @@ ap.add_argument(
     type=Path,
     default=TMPDIR,
     )
+
+
+def ca_distance_matrix(pdb, bound=6):
+    """
+    Find the residues that are in contact with each other.
+
+    Parameters
+    ----------
+    pdb : Path
+        Path to a PDB file of interest.
+    
+    bound : int or float
+        Maximum distance allowed between CA to be considered a contact.
+
+    Returns
+    -------
+    compiled_contacts : dict
+        Dictionary of residues, torsion angles, and CA distances
+    """
+    pdb_struc = Structure(pdb)
+    pdb_struc.build()
+    ca_arr = np.array(
+        [pdb_struc.data_array[i] \
+        for i, data in enumerate(pdb_struc.data_array[:, col_name]) \
+        if data == 'CA']
+        )
+    ca_coordinates = ca_arr[:, cols_coords].astype(float)
+    
+    num_residues = len(ca_coordinates)
+    distance_matrix = []
+    for i in range(num_residues):
+        for j in range(i+1, num_residues):
+            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))
+            # Euclidian distance must be within range (default is 6 A)
+            # residues must be at least 5 apart
+            # TODO: for more than one match, pick CA with shortest contact and
+            # take 2 (X) resides worth of information from either side of it
+            if ca_dist <= bound and j > i + 4:
+                distance_matrix.append((i, j))
+    
+    return distance_matrix
 
 
 def main(
