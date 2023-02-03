@@ -208,7 +208,6 @@ note that these steps are the same if you have installed idpconfgen through ``vi
     git clone https://github.com/THGLab/int2cart
     cd int2cart
     pip install -e .
-    pip install pyyaml
     cd ..
 
     # you should be back in the IDPConformerGenerator GitHub folder
