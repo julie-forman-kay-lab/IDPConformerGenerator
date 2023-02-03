@@ -1273,16 +1273,14 @@ def conformer_generator(
 
                 # Mismatches occur when the first residue of a sequence throws
                 # two sets of torsion angles, where Int2Cart requires only 1 set
-                # to correct on. For example:
-                '''Following example can be seen for Sic1
-                Error, 'seq' and 'tors' lengths don't match
-                Current residue: 0
-                seq value: G
-                seq length: 1
-                tors value: [[ 1.2598734  -3.0602584   2.8664412 ]
-                            [ 1.6958017  -0.30540177 -3.1142986 ]]
-                tors length: 2
-                '''
+                # to correct on. For example, for Sic1:
+                #   Error, 'seq' and 'tors' lengths don't match
+                #   Current residue: 0
+                #   seq value: G
+                #   seq length: 1
+                #   tors value: [[ 1.2598734  -3.0602584   2.8664412 ]
+                #               [ 1.6958017  -0.30540177 -3.1142986 ]]
+                #   tors length: 2
                 # Error should not be common however and solemnly occurs
                 broke_on_start_attempt = True
                 break
