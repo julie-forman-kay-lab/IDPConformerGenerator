@@ -5,14 +5,15 @@ PROTOCOL:
 
 1. Reads backbone coordinates (N, CA, C) from PDB files.
 2. Calculates CA-CA distances within a chain and between chains.
-3. If CA-CA distances are found to be between 5A (default) and the atoms are not
-    within 5 residues apart (default). Residues from either side of the CA are saved.
+3. If CA-CA distances are found to be between 5A (default) and the atoms are
+    not within 5 residues apart (default). Residues from either side of the
+    CA are saved.
     * If consecutive residues observe 5A interactions, take the residue with
     the closest interaction as the central residue and expand on both sides.
 4. Saves results to a JSON dictionary where keys are the input file names
-    and the value is a dictionary containing three lists: 'RES1', 'RES2'
-    'CA_DIST', 'TOR1', 'TOR2'. Where torsions contain the torsion angles
-    from each set of residues.
+    and the values are a list of tuples: [(SEQ1, SEQ2, ARR1, ARR2), ()]
+    where the values are an array of information for the specific sequence
+    in PDB format.
 5. If 'source' JSON file is given, updates that file with the new information.
     Preexisting keys (input file names) are deleted.
 
@@ -47,6 +48,7 @@ from idpconfgen.libs.libstructure import (
     col_name,
     col_resSeq,
     )
+from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -79,18 +81,6 @@ ap.add_argument(
     type=int,
     )
 
-ap.add_argument(
-    '-mlen',
-    '--max-length',
-    help=(
-        "Maximum length of consecutive residues stored with the "
-        "distance restraint for one point of contact."
-        "Defaults to 5."
-        ),
-    default=5,
-    type=int,
-    )
-
 libcli.add_argument_source(ap)
 libcli.add_argument_output(ap)
 libcli.add_argument_ncores(ap)
@@ -106,7 +96,7 @@ ap.add_argument(
     )
 
 
-def ca_distance_matrix(pdb, bound=6):
+def ca_distance_matrix(pdb, max_dist=6):
     """
     Find the residues that are in contact with each other.
 
@@ -115,8 +105,9 @@ def ca_distance_matrix(pdb, bound=6):
     pdb : Path
         Path to a PDB file of interest.
     
-    bound : int or float
+    max_dist : int or float
         Maximum distance allowed between CA to be considered a contact.
+        Default is 6.
 
     Returns
     -------
@@ -132,25 +123,77 @@ def ca_distance_matrix(pdb, bound=6):
         )
     ca_coordinates = ca_arr[:, cols_coords].astype(float)
     
+    with open(pdb) as f:
+        pdb_raw = f.read()
+    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
+    
+    ca_lst = ca_arr.tolist()
     num_residues = len(ca_coordinates)
-    distance_matrix = []
+    contacts = []
     for i in range(num_residues):
         for j in range(i+1, num_residues):
-            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))
+            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
+            chain1 = []
+            chain2 = []
             # Euclidian distance must be within range (default is 6 A)
             # residues must be at least 5 apart
-            # TODO: for more than one match, pick CA with shortest contact and
-            # take 2 (X) resides worth of information from either side of it
-            if ca_dist <= bound and j > i + 4:
-                distance_matrix.append((i, j))
+            if ca_dist <= max_dist and j > i + 4:
+                chain1_seq = ""
+                chain2_seq = ""
+                if i - 1 >= 0 and j - 1 >= 0:
+                    # TODO: currently this is for both inter- and intrachain
+                    # contacts but the database might be too big so offer options
+                    # in the database building process. Also consider refactoring this.
+                    if i - 2 >= 0 and j - 2 >= 0:
+                        chain1.append(ca_lst[i - 2])
+                        chain1_seq += fasta[i - 2]
+                        chain1.append(ca_lst[i - 1])
+                        chain1_seq += fasta[i - 1]
+                        chain1.append(ca_lst[i])
+                        chain1_seq += fasta[i]
+                        chain2.append(ca_lst[j - 2])
+                        chain2_seq += fasta[j - 2]
+                        chain2.append(ca_lst[j - 1])
+                        chain2_seq += fasta[j - 1]
+                        chain2.append(ca_lst[j])
+                        chain2_seq += fasta[j]
+                    else:
+                        chain1.append(ca_lst[i - 1])
+                        chain1_seq += fasta[i]
+                        chain1.append(ca_lst[i])
+                        chain1_seq += fasta[i]
+                        chain2.append(ca_lst[j - 1])
+                        chain2_seq += fasta[j - 1]
+                        chain2.append(ca_lst[j])
+                        chain2_seq += fasta[j]
+                else:
+                    chain1.append(ca_lst[i])
+                    chain1_seq += fasta[i]
+                    chain2.append(ca_lst[j])
+                    chain2_seq += fasta[j]
+                if i + 1 < num_residues and j + 1 < num_residues:
+                    if i + 2 < num_residues and j + 2 < num_residues:
+                        chain1.append(ca_lst[i + 1])
+                        chain1_seq += fasta[i + 1]
+                        chain1.append(ca_lst[i + 2])
+                        chain1_seq += fasta[i + 2]
+                        chain2.append(ca_lst[j + 1])
+                        chain2_seq += fasta[j + 1]
+                        chain2.append(ca_lst[j + 2])
+                        chain2_seq += fasta[j + 2]
+                    else:
+                        chain1.append(ca_lst[i + 1])
+                        chain1_seq += fasta[i + 1]
+                        chain2.append(ca_lst[j + 1])
+                        chain2_seq += fasta[j + 1]
+                contacts.append({chain1_seq: chain1, chain2_seq: chain2})
     
-    return distance_matrix
+    return contacts
 
 
 def main(
     pdb_files,
     distance=5,
-    max_length=5,
     source=None,
     output=None,
     ncores=1,
@@ -167,10 +210,6 @@ def main(
 
     distance : int, optional
         Maximum distance in angstroms to be considered a contact.
-        Defaults to 5.
-    
-    max_length : int, optional
-        Maximum length of residues stored per identified contact.
         Defaults to 5.
     
     source : string or Path, optional
