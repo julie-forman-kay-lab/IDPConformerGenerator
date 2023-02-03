@@ -1,15 +1,19 @@
 """
-Builds IDP conformers.
+Client for filling in the tails of folded proteins with IDRs.
 
 Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
-USAGE:
-    $ idpconfgen build -db torsions.json -seq MMMMMMM...
+Future Ideas
+------------
+- Populate internal disordered regions (code has been scaffolded already)
+- Implement CSSS on IDR tails/fragments
 
+USAGE:
+    $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
 """
 import argparse
-import os
+import shutil
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -19,6 +23,7 @@ from time import time
 import numpy as np
 
 from idpconfgen import Path, log
+from idpconfgen.cli_build import gen_PDB_from_conformer, get_adjacent_angles
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_error_msg,
@@ -57,9 +62,19 @@ from idpconfgen.core.build_definitions import (
     )
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.fldrs_helper import (
+    align_coords,
+    break_check,
+    consecutive_grouper,
+    count_clashes,
+    create_combinations,
+    disorder_cases,
+    psurgeon,
+    store_idp_paths,
+    tolerance_calculator,
+    )
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
-    build_regex_substitutions,
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
     get_cycle_distances_backbone,
@@ -74,32 +89,33 @@ from idpconfgen.libs.libcalc import (
     make_coord_Q,
     make_coord_Q_COO,
     make_coord_Q_planar,
-    make_seq_probabilities,
     place_sidechain_template,
     rotate_coordinates_Q_njit,
     rrd10_njit,
     )
 from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
-from idpconfgen.libs.libio import (
-    make_folder_or_cwd,
-    read_dict_from_json,
-    read_dictionary_from_disk,
-    )
+from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
+from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import (
-    fill_list,
-    get_seq_chunk_njit,
     get_trimer_seq_njit,
     remap_sequence,
     remove_empty_keys,
     translate_seq_to_3l,
     )
-from idpconfgen.libs.libpdb import atom_line_formatter
+from idpconfgen.libs.libpdb import get_fasta_from_PDB
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    cols_coords,
+    parse_pdb_to_array,
+    structure_to_pdb,
+    )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
-LOGFILESNAME = '.idpconfgen_build'
+LOGFILESNAME = '.idpconfgen_fldrs'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -128,6 +144,13 @@ BOND_LENS = None
 SLICEDICT_XMERS = None
 XMERPROBS = None
 GET_ADJ = None
+
+# Case of disorder region (1, 2, or 3) determines strategy
+# also set defaults to be none assuming full IDP
+DISORDER_CASE = None
+DISORDER_BOUNDS = None
+DISORDER_INDEX = None
+DISORDER_SEQS = None
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -197,8 +220,8 @@ def are_globals(bgeo_strategy):
 
 
 # CLI argument parser parameters
-_name = 'build'
-_help = 'Builds conformers from database.'
+_name = 'fldrs'
+_help = 'Building IDRs within a given folded protein.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
 
@@ -231,15 +254,31 @@ libcli.add_argument_duser(ap)
 #########################################
 
 ap.add_argument(
-    '-csss',
-    '--custom-sampling',
+    '-fld',
+    '--folded-structure',
+    help="Input .PDB file for folded structure of interest.",
+    required=True,
+    )
+
+ap.add_argument(
+    '-kt',
+    '--keep-temporary',
     help=(
-        'Input .JSON file for probabilistic CSSS. '
-        'Will use DSSP codes in this .JSON instead of --dhelix, --dstrand, '
-        '--dany. Requires --dloop-off. CSSS.JSON file is as created by the '
-        '`idpconfgen csssconv` or `idpconfgen makecsss` command.'
+        "Switch to keep temporary disordered fragments while building."
         ),
-    default=None,
+    action='store_true',
+    )
+
+ap.add_argument(
+    '-tol',
+    '--clash-tolerance',
+    help=(
+        "Float value clash tolerance between 0.0-1.0 where 0.5 is the default "
+        "value denoting minimum of 50 spherical clashes, 0.5 Angstroms "
+        "of tolerance with a given vdW radii. Where 1.0 allows for 100 "
+        "clashes and 1.0 Angstroms of tolerance for a given vdW radii."
+        ),
+    default=0.5,
     )
 
 ap.add_argument(
@@ -335,51 +374,12 @@ class EnergyLogSaver:
 ENERGYLOGSAVER = EnergyLogSaver()
 
 
-def parse_CSSS(path2csss):
-    """
-    Prepare CSSS.JSON dictionary for the conformer building process.
-
-    The secondary structure keys are identified.
-    The probabilities for each residue are normalized to 1, that is:
-    (1 2 2) results in (0.2 0.4 0.4).
-
-    Parameters
-    ----------
-    path2csss : string
-        Path to where the csss_[ID].json file is containing ss_regexes and
-        their respective probabilities.
-
-    Returns
-    -------
-    dict
-        First key layer indicats residue number position, second key layer
-        indicates the DSSP regex to search for and the values are the
-        probabilities.
-
-    set
-        A set with all the different secondary structure keys identified in the
-        CSSS.JSON file.
-    """
-    # this function was originally done by @menoliu
-    # @joaomcteixeira gave it a touch
-    csss_dict = read_dict_from_json(path2csss)
-    all_dssps = set()
-
-    # we can use this implementation because dictionaries are sorted by default
-    for _resid, dssps in csss_dict.items():
-        probabilities = list(dssps.values())
-        all_dssps.update(dssps.keys())
-        prob_normalized = make_seq_probabilities(probabilities)
-        for dssp_code, prob_n in zip(dssps.keys(), prob_normalized):
-            dssps[dssp_code] = prob_n
-
-    return csss_dict, all_dssps
-
-
 def main(
         input_seq,
         database,
-        custom_sampling,
+        clash_tolerance=0.5,
+        keep_temporary=False,
+        folded_structure=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -404,16 +404,32 @@ def main(
 
     Distributes over processors.
     """
+    try:
+        clash_tolerance = float(clash_tolerance)
+    except ValueError:
+        log.info(
+            "Please enter a floating point value for clash-tolerances "
+            "between 0.0-1.0."
+            )
+        return
+    
+    max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
+    
+    if keep_temporary:
+        TEMP_DIRNAME = "fldrs_temp/"
+    else:
+        TEMP_DIRNAME = '.fldrs_temp/'
+    
     # ensuring some parameters do not overlap
     dloop = not dloop_off
     any_def_loops = any((dloop, dhelix, dstrand))
-    non_overlapping_parameters = (any_def_loops, dany, duser, bool(custom_sampling))  # noqa: E501
+    non_overlapping_parameters = (any_def_loops, dany, duser)
     _sum = sum(map(bool, non_overlapping_parameters))
 
     if _sum > 1:
         emsg = (
-            'Note (dloop, dstrand, dhelix), dany, duser, and '
-            'custom_sampling are mutually exclusive.'
+            'Note (dloop, dstrand, dhelix), dany, and duser '
+            'are mutually exclusive.'
             )
         raise ValueError(emsg)
     elif _sum < 1:
@@ -446,11 +462,10 @@ def main(
     # we use a dictionary because fragments will be evaluated to exact match
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
     
-    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
+    # set the boundaries of disordered regions for folded proteins
+    global DISORDER_CASE, DISORDER_BOUNDS, DISORDER_SEQS
 
-    # set up the information from CSSS.JSON files
-    csss_dict = False
-    csss_dssp_regexes = None
+    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
 
     all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
 
@@ -458,7 +473,7 @@ def main(
     # 1) Sampling loops and/or helix and/or strands, where the found fragments
     #    are all of the same secondary structure
     # 2) sample "any". Disregards any secondary structure annotated
-    # 3) custom sample given by the user
+    # 3) custom sample given by the user (CURRENTLY NOT IN FLDRS)
     # 4) advanced sampling
     #
     # The following if/else block creates the needed variables according to each
@@ -467,22 +482,6 @@ def main(
     if dany:
         # will sample the database disregarding the SS annotation
         dssp_regexes = [all_valid_ss_codes]
-
-    elif custom_sampling:
-        csss_dict, csss_dssp_regexes = parse_CSSS(custom_sampling)
-
-        # If the user wants to sample "any" for some residues
-        # users can have "X" in the CSSS.JSON but that will be converted
-        # internally below
-        if "X" in csss_dssp_regexes:
-            csss_dssp_regexes.remove("X")
-            csss_dssp_regexes.add(all_valid_ss_codes)
-            for _k, _v in csss_dict.items():
-                # X means any SS.
-                if "X" in _v:
-                    _v[all_valid_ss_codes] = _v.pop("X")
-
-        dssp_regexes = list(csss_dssp_regexes)
 
     elif any((dloop, dhelix, dstrand)):
         dssp_regexes = []
@@ -503,6 +502,56 @@ def main(
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
+        
+    # TODO: in the future, can give a tarball or folder of .PDB
+    # randomly select which one to attach disordered regions onto
+    assert folded_structure.endswith('.pdb')
+    
+    log.info(T('Initializing folded domain information'))
+    
+    with open(folded_structure) as f:
+        pdb_raw = f.read()
+    _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
+    fld_fasta = fld_fasta.replace('X', '')
+    
+    # Find out what our disordered sequences are
+    # Can be C-term, N-term, in the middle, or all the above
+    breaks = break_check(pdb_raw)
+    mod_input_seq = input_seq
+    if breaks:
+        for seq in breaks:
+            mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
+            
+    mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
+    assert len(mod_input_seq) == len(input_seq)
+    # Treats folded residues as "*" to ignore in IDP building process
+    disordered_res = []
+    for i, res in enumerate(mod_input_seq):
+        if res != "*":
+            disordered_res.append(i)
+    
+    DISORDER_BOUNDS = consecutive_grouper(disordered_res)
+    DISORDER_SEQS = []
+    for i, bounds in enumerate(DISORDER_BOUNDS):
+        lower = bounds[0]
+        upper = bounds[1]
+        dis_seq = input_seq[lower:upper]
+        log.info(S(
+            f'Disordered region #{i + 1} = residue {lower + 1} to {upper} '
+            f'with the sequence {dis_seq}.'
+            ))
+        
+        # Different than what we tell user due to internal processing for
+        # disordered bits (need 2 extra residues at the beginning or end)
+        if lower == 0:
+            dis_seq = input_seq[lower: upper + 2]
+        elif upper == len(input_seq):
+            dis_seq = input_seq[lower - 2: upper]
+        else:
+            dis_seq = input_seq[lower: upper]
+        
+        DISORDER_SEQS.append(dis_seq)
+    log.info(S('done'))
 
     db = read_dictionary_from_disk(database)
 
@@ -529,40 +578,40 @@ def main(
         log.info(S(f"Building with residue tolerances: {_restol}"))
 
     # these are the slices with which to sample the ANGLES array
-    SLICEDICT_XMERS = prepare_slice_dict(
-        primary,
-        input_seq,
-        csss=bool(csss_dict),
-        dssp_regexes=dssp_regexes,
-        secondary=secondary,
-        mers_size=xmer_probs_tmp.sizes,
-        res_tolerance=residue_tolerance,
-        ncores=ncores,
-        )
+    SLICEDICT_XMERS = []
+    XMERPROBS = []
+    GET_ADJ = []
+    for i, seq in enumerate(DISORDER_SEQS):
+        log.info(S(f"Preparing database for sequence: {seq}"))
+        
+        SLICEDICT_XMERS.append(prepare_slice_dict(
+            primary,
+            seq,
+            dssp_regexes=dssp_regexes,
+            secondary=secondary,
+            mers_size=xmer_probs_tmp.sizes,
+            res_tolerance=residue_tolerance,
+            ncores=ncores,
+            ))
 
-    remove_empty_keys(SLICEDICT_XMERS)
-    # updates user defined fragment sizes and probabilities to the ones actually
-    # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
-    XMERPROBS = _.probs
+        remove_empty_keys(SLICEDICT_XMERS[i])
+        # updates user defined fragment sizes and probabilities to the
+        # ones actually observed
+        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
+        XMERPROBS.append(_.probs)
 
-    GET_ADJ = get_adjacent_angles(
-        sorted(SLICEDICT_XMERS.keys()),
-        XMERPROBS,
-        input_seq,
-        ANGLES,
-        bgeo_strategy,
-        SLICEDICT_XMERS,
-        csss_dict,
-        residue_tolerance=residue_tolerance,
-        )
-
-    populate_globals(
-        input_seq=input_seq,
-        bgeo_strategy=bgeo_strategy,
-        bgeo_path=bgeo_path,
-        forcefield=forcefields[forcefield],
-        **kwargs)
+        GET_ADJ.append(get_adjacent_angles(
+            sorted(SLICEDICT_XMERS[i].keys()),
+            XMERPROBS[i],
+            seq,
+            ANGLES,
+            bgeo_strategy,
+            SLICEDICT_XMERS[i],
+            csss=None,
+            residue_tolerance=residue_tolerance,
+            ))
+        
+        log.info(S("done"))
 
     # create different random seeds for the different cores
     # seeds created to the cores based on main seed are predictable
@@ -579,19 +628,146 @@ def main(
     # get sidechain dedicated parameters
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
+    
+    fld_struc = Structure(Path(folded_structure))
+    fld_struc.build()
+    atom_names = fld_struc.data_array[:, col_name]
+    # Generate library of conformers for each case
+    for i, seq in enumerate(DISORDER_SEQS):
+        fld_term_idx = {}
+        lower = DISORDER_BOUNDS[i][0]
+        upper = DISORDER_BOUNDS[i][1]
+        counter = 0
+        # Use the second folded residue's backbone C-N-CA
+        # for rotation and alignment where the `C` atom
+        # is from the previous resiude
+        if lower == 0:  # N-IDR case
+            DISORDER_CASE = disorder_cases[0]
+            for j, atom in enumerate(atom_names):
+                if counter == 5:
+                    break
+                if atom == "N":
+                    fld_term_idx["N"] = j
+                    counter += 1
+                elif atom == "CA":
+                    fld_term_idx["CA"] = j
+                    counter += 1
+                elif atom == "C":
+                    fld_term_idx["C"] = j
+                    counter += 1
+        elif upper == len(input_seq):  # C-IDR case
+            DISORDER_CASE = disorder_cases[2]
+            for j, _atom in enumerate(atom_names):
+                k = len(atom_names) - 1 - j
+                if counter == 1 and atom_names[k] == "N":
+                    fld_term_idx["N"] = k
+                    counter += 1
+                elif counter == 0 and atom_names[k] == "CA":
+                    fld_term_idx["CA"] = k
+                    counter += 1
+                elif counter == 2 and atom_names[k] == "C":
+                    fld_term_idx["C"] = k
+                    break
+        else:
+            DISORDER_CASE = disorder_cases[1]  # break
 
-    # prepars execution function
+        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
+        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
+        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
+        # Coordinates of boundary to stitch to later on
+        fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
+
+        populate_globals(
+            input_seq=seq,
+            bgeo_strategy=bgeo_strategy,
+            bgeo_path=bgeo_path,
+            forcefield=forcefields[forcefield],
+            **kwargs)
+        
+        # create the temporary folders housing the disordered PDBs
+        # this folder will be deleted when everything is grafted together
+        temp_of = make_folder_or_cwd(
+            output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE)
+            )
+        
+        log.info(S(f"Generating temporary disordered conformers for: {seq}"))
+        log.info(S(
+            "Please note that sequence may contain 2 extra residues "
+            "to facilitate reconstruction later on."
+            ))
+        
+        fStruct = Structure(Path(folded_structure))
+        fStruct.build()
+        
+        # prepares execution function
+        consume = partial(
+            _build_conformers,
+            fld_xyz=fld_coords,
+            fld_struc=fStruct,
+            disorder_case=DISORDER_CASE,
+            max_clash=max_clash,
+            tolerance=dist_tolerance,
+            index=i,
+            conformer_name="conformer_" + DISORDER_CASE,
+            input_seq=seq,  # string
+            output_folder=temp_of,
+            nconfs=conformers_per_core,  # int
+            sidechain_parameters=sidechain_parameters,
+            sidechain_method=sidechain_method,  # goes back to kwargs
+            bgeo_strategy=bgeo_strategy,
+            **kwargs,
+            )
+
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+
+        start = time()
+        with Pool(ncores) as pool:
+            imap = pool.imap(execute, range(ncores))
+            for _ in imap:
+                pass
+
+        if remaining_confs:
+            execute(conformers_per_core * ncores, nconfs=remaining_confs)
+        
+        log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
+        
+        # reinitialize queues so reiteration doesn't crash
+        for i in range(ncores + bool(remaining_confs)):
+            RANDOMSEEDS.put(random_seed + i)
+        for i in range(1, nconfs + 1):
+            CONF_NUMBER.put(i)
+
+    DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
+    
+    # After conformer construction and moving, time to graft proteins together
+    # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
+    # - Note that residue number `col_resSeq` needs to be continuous
+    # - For good form, make sure `col_serial` is consistent as well
+    # - When grafting remove the tether residue on donor chain
+    # - Generate a tuple database of which pairs have already been generated
+    if len(DISORDER_CASE) == 1:
+        case = next(iter(DISORDER_CASE))
+        files = DISORDER_CASE[case]
+    elif disorder_cases[0] in DISORDER_CASE and disorder_cases[2] in DISORDER_CASE:  # noqa: E501
+        case = disorder_cases[0] + disorder_cases[2]
+        files = create_combinations(
+            DISORDER_CASE[disorder_cases[0]],
+            DISORDER_CASE[disorder_cases[2]],
+            nconfs,
+            )
+        
+    log.info("Stitching conformers onto the folded domain...")
     consume = partial(
-        _build_conformers,
-        input_seq=input_seq,  # string
-        output_folder=output_folder,
-        nconfs=conformers_per_core,  # int
-        sidechain_parameters=sidechain_parameters,
-        sidechain_method=sidechain_method,  # goes back to kwards
-        bgeo_strategy=bgeo_strategy,
-        **kwargs,
+        psurgeon,
+        fld_struc=Path(folded_structure),
+        case=case,
         )
-
     execute = partial(
         report_on_crash,
         consume,
@@ -599,17 +775,18 @@ def main(
         ROC_folder=output_folder,
         ROC_prefix=_name,
         )
+    execute_pool = pool_function(execute, files, ncores=ncores)
+    
+    for i, conf in enumerate(execute_pool):
+        struc = structure_to_pdb(conf)
+        output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
+        with open(output, 'w') as f:
+            for line in struc:
+                f.write(line + "\n")
+    
+    if not keep_temporary:
+        shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 
-    start = time()
-    with Pool(ncores) as pool:
-        imap = pool.imap(execute, range(ncores))
-        for _ in imap:
-            pass
-
-    if remaining_confs:
-        execute(conformers_per_core * ncores, nconfs=remaining_confs)
-
-    log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
     ENERGYLOGSAVER.close()
 
 
@@ -622,24 +799,8 @@ def populate_globals(
         **efunc_kwargs):
     """
     Populate global variables needed for building.
-
-    Currently, global variables include:
-
-    BGEO_full
-    BGEO_trimer
-    BGEO_res
-    ALL_ATOM_LABELS, ALL_ATOM_MASKS, ALL_ATOM_EFUNC
-    TEMPLATE_LABELS, TEMPLATE_MASKS, TEMPLATE_EFUNC
-    INT2CART
-
-    Parameters
-    ----------
-    bgeo_strategy : str
-        A key from the
-        :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
-
-    forcefield : str
-        A key in the `core.build_definitions.forcefields` dictionary.
+    
+    Refer to `cli_build.py` for documentation.
     """
     if not isinstance(input_seq, str):
         raise ValueError(
@@ -715,6 +876,12 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
+        fld_xyz=None,
+        fld_struc=None,
+        disorder_case=None,
+        max_clash=50,
+        tolerance=0.5,
+        index=None,
         input_seq=None,
         conformer_name='conformer',
         output_folder=None,
@@ -728,31 +895,50 @@ def _build_conformers(
 
     # TODO: this has to be parametrized for the different HIS types
     input_seq_3_letters = translate_seq_to_3l(input_seq)
-
+  
     builder = conformer_generator(
+        index=index,
         input_seq=input_seq,
         random_seed=RANDOMSEEDS.get(),
         sidechain_parameters=sidechain_parameters,
         bgeo_strategy=bgeo_strategy,
         **kwargs)
 
-    atom_labels, residue_numbers, residue_labels = next(builder)
+    atom_labels, residue_numbers, _residue_labels = next(builder)
 
     for _ in range(nconfs):
+        while 1:
+            energy, coords = next(builder)
 
-        energy, coords = next(builder)
+            pdb_string = gen_PDB_from_conformer(
+                input_seq_3_letters,
+                atom_labels,
+                residue_numbers,
+                ROUND(coords, decimals=3),
+                )
 
-        pdb_string = gen_PDB_from_conformer(
-            input_seq_3_letters,
-            atom_labels,
-            residue_numbers,
-            ROUND(coords, decimals=3),
-            )
-
+            pdb_arr = parse_pdb_to_array(pdb_string)
+            rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
+            clashes, fragment = count_clashes(
+                rotated,
+                fld_struc,
+                disorder_case,
+                max_clash,
+                tolerance,
+                )
+            
+            if type(clashes) is int:
+                final = structure_to_pdb(fragment)
+                log.info(f"Succeeded {disorder_case} to folded region clash check!")  # noqa: E501
+                break
+            else:
+                log.info(f"Failed {disorder_case} to folded region clash check... regenerating")  # noqa: E501
+        
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
         with open(Path(output_folder, fname), 'w') as fout:
-            fout.write(pdb_string)
+            for line in final:
+                fout.write(line + "\n")
 
         ENERGYLOGSAVER.save(fname, energy)
 
@@ -760,9 +946,9 @@ def _build_conformers(
     return
 
 
-# the name of this function is likely to change in the future
 def conformer_generator(
         *,
+        index=None,
         input_seq=None,
         generative_function=None,
         disable_sidechains=True,
@@ -779,111 +965,7 @@ def conformer_generator(
     """
     Build conformers.
 
-    `conformer_generator` is actually a Python generator. Examples on
-    how it works:
-
-    Note that all arguments are **named** arguments.
-
-    >>> builder = conformer_generator(
-    >>>    input_seq='MGAETTWSCAAA'  # the primary sequence of the protein
-    >>>    )
-
-    `conformer_generator` is a generator, you can instantiate it simply
-    providing the residue sequence of your protein of interest.
-
-    The **very first** iteration will return the labels of the protein
-    being built. Labels are sorted by all atom models. Likewise,
-    `residue_number` and `residue_labels` sample **all atoms**. These
-    three are numpy arrays and can be used to index the actual coordinates.
-
-    >>> atom_labels, residue_numbers, residue_labels = next(builder)
-
-    After this point, each iteraction `next(builder)` yields the coordinates
-    for a new conformer. There is no limit in the generator.
-
-    >>> new_coords = next(builder)
-
-    `new_coords` is a (N, 3) np.float64 array where N is the number of
-    atoms. As expected, atom coordinates are aligned with the labels
-    previously generated.
-
-    When no longer needed,
-
-    >>> del builder
-
-    Should delete the builder generator.
-
-    You can gather the coordinates of several conformers in a single
-    multi dimensional array with the following:
-
-    >>> builder = conformer_generator(
-    >>>     input_seq='MGGGGG...',
-    >>>     generative_function=your_function)
-    >>>
-    >>> atoms, res3letter, resnums = next(builder)
-    >>>
-    >>> num_of_conformers = 10_000
-    >>> shape = (num_of_conformers, len(atoms), 3)
-    >>> all_coords = np.empty(shape, dtype=float64)
-    >>>
-    >>> for i in range(num_of_conformers):
-    >>>     all_coords[i, :, :] = next(builder)
-    >>>
-
-    Parameters
-    ----------
-    input_seq : str, mandatory
-        The primary sequence of the protein being built in FASTA format.
-        `input_seq` will be used to generate the whole conformers' and
-        labels arrangement.
-        Example: "MAGERDDAPL".
-
-    generative_function : callable, optional
-        The generative function used by the builder to retrieve torsion
-        angles during the building process.
-
-        The builder expects this function to receive two parameters:
-            - `nres`, the residue fragment size to get angles from
-            - `cres`, the next residue being built. For example,
-                with cres=10, the builder will expect a minimum of three
-                torsion angles (phi, psi, omega) for residue 10.
-
-        Depending on the nature of the `generative function` the two
-        pameters may be ignored by the function itself (use **kwargs
-        for that purpose).
-
-        If `None` provided, the builder will use the internal `SLIDES`
-        and `ANGLES` variables and will assume the `cli_build.main` was
-        executed priorly, or that ANGLES and SLICES were populated
-        properly.
-
-    disable_sidechains : bool
-        Disables sidechain creation. Defaults to `False`, computes
-        sidechains.
-
-    nconfs : int
-        The number of conformers to build.
-
-    sidechain_method : str
-        The method used to build/pack sidechains over the backbone
-        structure. Defaults to `faspr`.
-        Expects a key in
-        `components.sidechain_packing.sidechain_packing_methods`.
-
-    bgeo_strategy : str
-        The strategy used to generate the bond geometries. Available options
-        are: :py:data:`idpconfgen.components.bgeo_strategies.bgeo_strategies`.
-
-    bgeo_path : str of Path
-        Path to a bond geometry library as created by `bgeo` CLI.
-
-    Yields
-    ------
-    First yield: tuple (np.ndarray, np.ndarray, np.ndarray)
-        The conformer label arrays.
-
-    Other yields: tuple (float, np.ndarray)
-        Energy of the conformer, conformer coordinates.
+    Refer to documentation in `cli_build.py`.
     """
     if not isinstance(input_seq, str):
         raise ValueError(f'`input_seq` must be given! {input_seq}')
@@ -1142,9 +1224,9 @@ def conformer_generator(
                 # primer_template here is used temporarily, and needs to be
                 # removed when get_adj becomes an option
                 if bgeo_strategy == bgeo_exact_name:
-                    primer_template, agls, bangs, blens = GET_ADJ(bbi - 1)
+                    primer_template, agls, bangs, blens = GET_ADJ[index](bbi - 1)  # noqa: E501
                 else:
-                    primer_template, agls = GET_ADJ(bbi - 1)
+                    primer_template, agls = GET_ADJ[index](bbi - 1)
 
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
@@ -1462,206 +1544,6 @@ def conformer_generator(
 
         yield SUM(total_energy), all_atom_coords
         conf_n += 1
-
-
-def gen_PDB_from_conformer(
-        input_seq_3_letters,
-        atom_labels,
-        residues,
-        coords,
-        ALF=atom_line_formatter,
-        ):
-    """."""
-    lines = []
-    LINES_APPEND = lines.append
-    ALF_FORMAT = ALF.format
-    resi = -1
-
-    # this is possible ONLY because there are no DOUBLE CHARS atoms
-    # in the atoms that constitute a protein chain
-    ATOM_LABEL_FMT = ' {: <3}'.format
-
-    assert len(atom_labels) == coords.shape[0]
-
-    atom_i = 1
-    for i in range(len(atom_labels)):
-
-        if np.isnan(coords[i, 0]):
-            continue
-
-        if atom_labels[i] == 'N':
-            resi += 1
-            current_residue = input_seq_3_letters[resi]
-            current_resnum = residues[i]
-
-        atm = atom_labels[i].strip()
-        ele = atm.lstrip('123')[0]
-
-        if len(atm) < 4:
-            atm = ATOM_LABEL_FMT(atm)
-
-        LINES_APPEND(ALF_FORMAT(
-            'ATOM',
-            atom_i,
-            atm,
-            '',
-            current_residue,
-            'A',
-            current_resnum,
-            '',
-            coords[i, 0],
-            coords[i, 1],
-            coords[i, 2],
-            0.0,
-            0.0,
-            '',
-            ele,
-            '',
-            ))
-
-        atom_i += 1
-
-    return os.linesep.join(lines)
-
-
-def get_adjacent_angles(
-        options,
-        probs,
-        seq,
-        dihedrals_db,
-        bgeo_strategy,
-        slice_dict,
-        csss,
-        residue_tolerance=None,
-        ):
-    """
-    Get angles to build the next adjacent protein fragment.
-
-    Parameters
-    ----------
-    options : list
-        The length of the possible fragment sizes.
-
-    probs : list
-        A list with the relative probabilites to select from `options`.
-
-    seq : str
-        The conformer sequence.
-
-    dihedrals_db : dict-like
-        The angle omega/phi/psi database.
-
-    bgeo_strategy : string
-        Bond geometry strategy to use.
-
-    slice_dict : dict-like
-        A dictionary containing the fragments strings as keys and as values
-        lists with slice objects.
-
-    csss : dict-like
-        A dictionary containing probabilities of secondary structures per
-        amino acid residue position.
-    
-    residue_tolerance : dict-like
-        A dictionary for possible residue tolerances to look for while sampling
-        torsion angles of amino acids.
-    """
-    residue_tolerance = residue_tolerance or {}
-    probs = fill_list(probs, 0, len(options))
-
-    # prepares helper lists
-    lss = []  # list of possible secondary structures in case `csss` is given
-    lssprobs = []  # list of possible ss probabilities in case `csss` is given
-    lssE, lssprobsE = lss.extend, lssprobs.extend
-    lssC, lssprobsC = lss.clear, lssprobs.clear
-
-    def func(
-            aidx,
-            CRNFI=calc_residue_num_from_index,
-            RC=np.random.choice,
-            GSCNJIT=get_seq_chunk_njit,
-            BRS=build_regex_substitutions,
-            ):
-
-        # calculates the current residue number from the atom index
-        cr = CRNFI(aidx)
-        
-        # chooses the size of the fragment from
-        # pre-configured range of sizes
-        plen = RC(options, p=probs)
-            
-        # defines the fragment identity accordingly
-        primer_template = GSCNJIT(seq, cr, plen)
-        _ori_template = primer_template
-        next_residue = GSCNJIT(seq, cr + plen, 1)
-        # recalculates the plen to avoid plen/template inconsistencies that
-        # occur if the plen is higher then the number of
-        # residues until the end of the protein.
-        plen = len(primer_template)
-        pt_sub = BRS(primer_template, residue_tolerance)
-
-        while plen > 0:
-            if next_residue == 'P':
-                pt_sub = f'{pt_sub}_P'
-
-            try:
-                if csss:
-                    # matches current residue
-                    # to build with residue number in CSSS
-                    cr_plus_1 = str(cr + 1)
-                    # clear lists
-                    lssC()
-                    lssprobsC()
-                    # adds possible secondary structure for the residue
-                    # the first residue of the fragment
-                    lssE(csss[cr_plus_1].keys())
-                    # adds SS probabilities for the same residue
-                    lssprobsE(csss[cr_plus_1].values())
-                    # based on the probabilities,
-                    # select a SS for residue in question
-                    pcsss = RC(lss, p=lssprobs)
-                    _slice = RC(slice_dict[plen][pt_sub][pcsss])
-                else:
-                    _slice = RC(slice_dict[plen][pt_sub])
-                
-                dihedrals = dihedrals_db[_slice, :].ravel()
-                
-                if bgeo_strategy == bgeo_exact_name:
-                    bend_angs = BEND_ANGS[_slice, :].ravel()
-                    bond_lens = BOND_LENS[_slice, :].ravel()
-
-            except (KeyError, ValueError):
-                # walks back one residue
-                plen -= 1
-                next_residue = primer_template[-1]
-                primer_template = primer_template[:-1]
-                pt_sub = BRS(primer_template, residue_tolerance)
-            else:
-                break
-        else:
-            # raise AssertionError to avoid `python -o` silencing
-            _emsg = (
-                "The code should not arrive here. "
-                "If it does, it may mean no matches were found for fragment "
-                f"{_ori_template!r} down to the single residue."
-                )
-            raise AssertionError(_emsg)
-
-        if next_residue == 'P':
-            # because angles have the proline information
-
-            if bgeo_strategy == bgeo_exact_name:
-                return primer_template + 'P', dihedrals, bend_angs, bond_lens
-
-            return primer_template + 'P', dihedrals
-
-        else:
-            if bgeo_strategy == bgeo_exact_name:
-                return primer_template, dihedrals, bend_angs, bond_lens
-
-            return primer_template, dihedrals
-
-    return func
 
 
 if __name__ == "__main__":

@@ -9,7 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* Add new subclient ``contacts`` to calculate and store coordinates of residue contacts of interest
+* Added new building feature ``--fld-structures`` to build certain domains of interest
+* Added building flag ``--fld-bounds`` to indicate where the folded region starts and ends
 
 v0.6.16 (2022-11-08)
 ------------------------------------------------------------

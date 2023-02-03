@@ -69,6 +69,11 @@ A Real Case Scenario
 .. include:: ../example/drksh3_example/README.rst
    :start-after: .. start-description
 
+Building Disordered Regions on a Folded Domain
+----------------------------------------------
+
+.. include:: ../example/cnot7_example/README.rst
+    :start-after: .. start-description
 
 Exploring IDPConfGen Analysis Functions
 ---------------------------------------

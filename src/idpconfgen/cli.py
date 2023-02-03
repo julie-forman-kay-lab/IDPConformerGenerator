@@ -24,11 +24,13 @@ from idpconfgen import (
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
+    cli_fldrs,
     cli_makecsss,
     cli_merge,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
+    cli_resptm,
     cli_search,
     cli_sethpc,
     cli_sscalc,
@@ -56,6 +58,7 @@ Individual routines for DB creation:
     * {cli_torsions._name}
     * {cli_contacts._name}
     * {cli_build._name}
+    * {cli_fldrs._name}
 
 Other useful routines:
 
@@ -73,6 +76,7 @@ Other useful routines:
     * {cli_merge._name}
     * {cli_stats._name}
     * {cli_search._name}
+    * {cli_resptm._name}
 """
 
 ap = libcli.CustomParser(
@@ -97,6 +101,7 @@ libcli.add_subparser(subparsers, cli_torsions)
 libcli.add_subparser(subparsers, cli_contacts)
 libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
+libcli.add_subparser(subparsers, cli_fldrs)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)
@@ -112,6 +117,7 @@ libcli.add_subparser(subparsers, cli_sethpc)
 libcli.add_subparser(subparsers, cli_merge)
 libcli.add_subparser(subparsers, cli_stats)
 libcli.add_subparser(subparsers, cli_search)
+libcli.add_subparser(subparsers, cli_resptm)
 
 
 def load_args():
