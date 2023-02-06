@@ -42,13 +42,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
-from idpconfgen.libs.libstructure import (
-    Structure,
-    cols_coords,
-    col_name,
-    col_resSeq,
-    )
-from idpconfgen.libs.libpdb import get_fasta_from_PDB
+from idpconfgen.libs.libhigherlevel import calc_interchain_ca_contacts
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -94,101 +88,6 @@ ap.add_argument(
     type=Path,
     default=TMPDIR,
     )
-
-
-def ca_distance_matrix(pdb, max_dist=6):
-    """
-    Find the residues that are in contact with each other.
-
-    Parameters
-    ----------
-    pdb : Path
-        Path to a PDB file of interest.
-    
-    max_dist : int or float
-        Maximum distance allowed between CA to be considered a contact.
-        Default is 6.
-
-    Returns
-    -------
-    compiled_contacts : dict
-        Dictionary of residues, torsion angles, and CA distances
-    """
-    pdb_struc = Structure(pdb)
-    pdb_struc.build()
-    ca_arr = np.array(
-        [pdb_struc.data_array[i] \
-        for i, data in enumerate(pdb_struc.data_array[:, col_name]) \
-        if data == 'CA']
-        )
-    ca_coordinates = ca_arr[:, cols_coords].astype(float)
-    
-    with open(pdb) as f:
-        pdb_raw = f.read()
-    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
-    
-    ca_lst = ca_arr.tolist()
-    num_residues = len(ca_coordinates)
-    contacts = []
-    for i in range(num_residues):
-        for j in range(i+1, num_residues):
-            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
-            chain1 = []
-            chain2 = []
-            # Euclidian distance must be within range (default is 6 A)
-            # residues must be at least 5 apart
-            if ca_dist <= max_dist and j > i + 4:
-                chain1_seq = ""
-                chain2_seq = ""
-                if i - 1 >= 0 and j - 1 >= 0:
-                    # TODO: currently this is for both inter- and intrachain
-                    # contacts but the database might be too big so offer options
-                    # in the database building process. Also consider refactoring this.
-                    if i - 2 >= 0 and j - 2 >= 0:
-                        chain1.append(ca_lst[i - 2])
-                        chain1_seq += fasta[i - 2]
-                        chain1.append(ca_lst[i - 1])
-                        chain1_seq += fasta[i - 1]
-                        chain1.append(ca_lst[i])
-                        chain1_seq += fasta[i]
-                        chain2.append(ca_lst[j - 2])
-                        chain2_seq += fasta[j - 2]
-                        chain2.append(ca_lst[j - 1])
-                        chain2_seq += fasta[j - 1]
-                        chain2.append(ca_lst[j])
-                        chain2_seq += fasta[j]
-                    else:
-                        chain1.append(ca_lst[i - 1])
-                        chain1_seq += fasta[i]
-                        chain1.append(ca_lst[i])
-                        chain1_seq += fasta[i]
-                        chain2.append(ca_lst[j - 1])
-                        chain2_seq += fasta[j - 1]
-                        chain2.append(ca_lst[j])
-                        chain2_seq += fasta[j]
-                else:
-                    chain1.append(ca_lst[i])
-                    chain1_seq += fasta[i]
-                    chain2.append(ca_lst[j])
-                    chain2_seq += fasta[j]
-                if i + 1 < num_residues and j + 1 < num_residues:
-                    if i + 2 < num_residues and j + 2 < num_residues:
-                        chain1.append(ca_lst[i + 1])
-                        chain1_seq += fasta[i + 1]
-                        chain1.append(ca_lst[i + 2])
-                        chain1_seq += fasta[i + 2]
-                        chain2.append(ca_lst[j + 1])
-                        chain2_seq += fasta[j + 1]
-                        chain2.append(ca_lst[j + 2])
-                        chain2_seq += fasta[j + 2]
-                    else:
-                        chain1.append(ca_lst[i + 1])
-                        chain1_seq += fasta[i + 1]
-                        chain2.append(ca_lst[j + 1])
-                        chain2_seq += fasta[j + 1]
-                contacts.append({chain1_seq: chain1, chain2_seq: chain2})
-    
-    return contacts
 
 
 def main(

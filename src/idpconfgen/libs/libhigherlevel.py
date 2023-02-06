@@ -40,7 +40,12 @@ from idpconfgen.libs.libmulticore import (
     pool_function_in_chunks,
     )
 from idpconfgen.libs.libparse import group_by
-from idpconfgen.libs.libpdb import PDBList, atom_name, atom_resSeq
+from idpconfgen.libs.libpdb import (
+    PDBList,
+    atom_name,
+    atom_resSeq,
+    get_fasta_from_PDB,
+    )
 from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
@@ -920,3 +925,62 @@ def bgeo_reduce(bgeo):
                     respairs.extend(bgeo[btype][res][pairs][tor])
 
     return dpairs, dres
+
+
+def calc_interchain_ca_contacts(pdb, max_dist=6):
+    """
+    Find the residues that are in contact with each other.
+
+    Parameters
+    ----------
+    pdb : Path
+        Path to a PDB file of interest.
+    
+    max_dist : int or float
+        Maximum distance allowed between CA to be considered a contact.
+        Default is 6.
+
+    Returns
+    -------
+    compiled_contacts : dict
+        Dictionary of residues, torsion angles, and CA distances
+    """
+    pdb_struc = Structure(pdb)
+    pdb_struc.build()
+    ca_arr = np.array(
+        [pdb_struc.data_array[i]
+            for i, data in enumerate(pdb_struc.data_array[:, col_name])
+            if data == 'CA']
+        )
+    ca_coordinates = ca_arr[:, cols_coords].astype(float)
+    
+    with open(pdb) as f:
+        pdb_raw = f.read()
+    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
+    
+    num_residues = len(ca_coordinates)
+    contacts = []
+    for i in range(num_residues):
+        for j in range(i + 1, num_residues):
+            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
+            chain1 = []
+            chain2 = []
+            chain1_seq = ""
+            chain2_seq = ""
+            # Euclidian distance must be within range (default is 6 A)
+            # residues must be at least 5 apart
+            if ca_dist <= 6 and j > i + 4:
+                for k in range(i - 2, i + 3):
+                    if 0 <= k < num_residues:
+                        ca_dist = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
+                        chain1.append((k, ca_dist))
+                        chain1_seq += fasta[k]
+                
+                for k in range(j - 2, j + 3):
+                    if 0 <= k < num_residues:
+                        chain2.append(k)
+                        chain2_seq += fasta[k]
+                
+                contacts.append({chain1_seq: chain1, chain2_seq: chain2})
+    
+    return contacts
