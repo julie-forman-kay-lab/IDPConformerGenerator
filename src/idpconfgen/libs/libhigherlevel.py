@@ -942,8 +942,8 @@ def calc_interchain_ca_contacts(pdb, max_dist=6):
 
     Returns
     -------
-    compiled_contacts : dict
-        Dictionary of residues, torsion angles, and CA distances
+    contacts : dict
+        Dictionary of pairs of sequences, residues, and CA distances
     """
     pdb_struc = Structure(pdb)
     pdb_struc.build()
@@ -984,3 +984,44 @@ def calc_interchain_ca_contacts(pdb, max_dist=6):
                 contacts.append({chain1_seq: chain1, chain2_seq: chain2})
     
     return contacts
+
+
+def calc_intrachain_ca_contacts(pdb, max_dist=6):
+    """
+    Find CA contacts below a certain distance between different chains.
+    
+    Different from interchain CA contacts as that was meant to supplement
+    the default IDPConformerGenerator database.
+    
+    This function is made to create an entirely new
+    database based on contacts found between chains.
+    
+    Returns the sequence, secondary structure annotation, CA distances,
+    and torsion angles for only the contacts found to save disk-spaces
+    
+    Parameters
+    ----------
+    pdb : Path
+        IDPConformerGenerator Path variable to the desired PDB file on disk.
+    
+    max_dist : float or int
+        Maximum distance between CA to be considered a contact.
+    
+    Returns
+    -------
+    pdb_id : str
+        Name of the PDB file
+    
+    contacts : dict
+        Dictionary of pairs of sequences, CA distances, and torsion angles
+    """
+    pdb_struc = Structure(pdb)
+    pdb_struc.build()
+    # TODO:
+    # overarching dictionary has the key of "pdb_id"
+    # value contains another dictionary
+    # secondary dictionary contains another dictionary
+    # what this returns are lists of dictionaries containing
+    # [{seq1: [(omega, phi, psi, CA_dist), ()], seq2: []}, {seq1: [], seq2: []}]
+    
+    
