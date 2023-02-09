@@ -7,6 +7,7 @@ and are defined here to avoid circular imports.
 import re
 from contextlib import suppress
 from functools import partial, reduce
+from itertools import combinations
 
 import numpy as np
 
@@ -48,9 +49,11 @@ from idpconfgen.libs.libpdb import (
     )
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_chainID, 
     col_name,
     col_resName,
     cols_coords,
+    gen_empty_structure_data_array,
     )
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -1015,13 +1018,63 @@ def calc_intrachain_ca_contacts(pdb, max_dist=6):
     contacts : dict
         Dictionary of pairs of sequences, CA distances, and torsion angles
     """
-    pdb_struc = Structure(pdb)
-    pdb_struc.build()
-    # TODO:
     # overarching dictionary has the key of "pdb_id"
     # value contains another dictionary
-    # secondary dictionary contains another dictionary
-    # what this returns are lists of dictionaries containing
-    # [{seq1: [(omega, phi, psi, CA_dist), ()], seq2: []}, {seq1: [], seq2: []}]
-    
-    
+    # secondary dictionary of chain combos in tuple e.g. ('A', 'B')
+    # contain two dictionaries of sequence, torsions, and CA_distances
+    with open (pdb) as f:
+        pdb_raw = f.read()
+    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
+
+    pdb_struc = Structure(pdb)
+    pdb_struc.build()
+    chain_idx = {}
+    chain_struc = {}
+
+    # Should we include HETATM?
+    # get index of every different chain from the PDB
+    for i, chainID in enumerate(pdb_struc.data_array[:, col_chainID]):
+        if i == 0:
+            chain_idx[chainID] = []
+        try:
+            nextID = pdb_struc.data_array[:, col_chainID][i + 1]
+            if nextID != chainID:
+                chain_idx[nextID] = []
+            else:
+                chain_idx[chainID].append(i)
+        except IndexError:
+            break
+
+    # get structure of every chain in the dictionary
+    for chain in chain_idx:
+        length = len(chain_idx[chain])
+        new_struc = gen_empty_structure_data_array(length)
+        for i, idx in enumerate(chain_idx[chain]):
+            new_struc[i] = pdb_struc.data_array[idx]
+        chain_struc[chain] = new_struc
+
+    chain_combo = [comb for comb in combinations(list(chain_struc.keys()), 2)]
+
+    chain_contacts = {}
+    for combo in chain_combo:
+
+        chainID_1 = combo[0]
+        chainID_2 = combo[1]
+
+        chain1_CA_arr = np.array(
+            [chain_struc[chainID_1][i]
+                for i, data in enumerate(chain_struc[chainID_1][:, col_name])
+                if data == 'CA']
+            )
+        chain2_CA_arr = np.array(
+            [chain_struc[chainID_2][j]
+                for j, data in enumerate(chain_struc[chainID_2][:, col_name])
+                if data == 'CA']
+            )
+
+        if len(chain1_CA_arr) == 0 or len(chain2_CA_arr) == 0:
+            continue
+        
+        chain_contacts[combo] = [[], []]
+        chain1_CA_coords = chain1_CA_arr[:, cols_coords].astype(float)
+        chain2_CA_coords = chain2_CA_arr[:, cols_coords].astype(float)
