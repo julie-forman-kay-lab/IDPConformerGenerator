@@ -1146,6 +1146,7 @@ def calc_interchain_ca_contacts(pdb, max_dist):
             for j, coords2 in enumerate(chain2_CA_coords):
                 ca_dist = np.linalg.norm(coords1 - coords2)
                 if ca_dist <= max_dist:
+                    counter += 1
                     chain_dist = []
                     torsions1 = []
                     torsions2 = []
@@ -1174,11 +1175,10 @@ def calc_interchain_ca_contacts(pdb, max_dist):
                     chain_contacts[combo][chainID_1]["torsions"].append(torsions1)
                     chain_contacts[combo][chainID_2]["fasta"].append(chain2_seq)
                     chain_contacts[combo][chainID_2]["torsions"].append(torsions2)
-                    counter += 1
                     assert len(chain1_seq) == len(chain_dist) == len(torsions1)
                     assert len(chain2_seq) == len(torsions2)
 
     if counter == 0:
-        return
+        return False
     
     return pdbid, remove_empty_lists(chain_contacts), counter

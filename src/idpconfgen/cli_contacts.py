@@ -71,9 +71,8 @@ ap.add_argument(
     '--distance',
     help=(
         "Maximum distance in angstroms allowed for a contact between "
-        "residues. Defaults to 6."
+        "residues. Defaults to 6 for intrachain and 12 for interchain."
         ),
-    default=6,
     type=int,
     )
 
@@ -104,7 +103,7 @@ ap.add_argument(
 
 def main(
     pdb_files,
-    distance=6,
+    distance=None,
     interchain=False,
     source=None,
     output=None,
@@ -122,7 +121,7 @@ def main(
 
     distance : int, optional
         Maximum distance in angstroms to be considered a contact.
-        Defaults to 5.
+        Defaults to 6 for intrachain and 12 for interchain.
     
     source : string or Path, optional
         If given, updates a preexisting torsions.JSON file.
@@ -142,6 +141,10 @@ def main(
     output = output or 'contacts.json'
     if not output.endswith('.json'):
         raise ValueError('Output file should have `.json` extension.')
+
+    if distance == None:
+        if interchain: distance = 12
+        else: distance = 6
 
     log.info(T('Extracting torsion angles'))
     init_files(log, LOGFILESNAME)
@@ -181,6 +184,8 @@ def main(
     final_count = 0
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
     for result in execute_pool:
+        if result == False:
+            continue
         pdbid = result[0]
         contacts = result[1]
         final_count += result[2]
