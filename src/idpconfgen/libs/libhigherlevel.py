@@ -1178,4 +1178,7 @@ def calc_interchain_ca_contacts(pdb, max_dist):
                     assert len(chain1_seq) == len(chain_dist) == len(torsions1)
                     assert len(chain2_seq) == len(torsions2)
 
+    if counter == 0:
+        return
+    
     return pdbid, remove_empty_lists(chain_contacts), counter
