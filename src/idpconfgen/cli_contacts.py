@@ -27,9 +27,8 @@ USAGE:
     $ idpconfgen contacts [PDBS] -sc file.json -o mycontacts.json -n
 """
 import argparse
+import shutil
 from functools import partial
-
-import numpy as np
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
@@ -42,7 +41,10 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function, starunpack
 from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
-from idpconfgen.libs.libhigherlevel import calc_interchain_ca_contacts
+from idpconfgen.libs.libhigherlevel import (
+    calc_intrachain_ca_contacts,
+    calc_interchain_ca_contacts,
+    )
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -69,10 +71,20 @@ ap.add_argument(
     '--distance',
     help=(
         "Maximum distance in angstroms allowed for a contact between "
-        "residues. Defaults to 5."
+        "residues. Defaults to 6."
         ),
-    default=5,
+    default=6,
     type=int,
+    )
+
+ap.add_argument(
+    '-inter',
+    '--interchain',
+    help=(
+        "Switches mode to interchain contacts."
+        "Defaults to False, only considers intrachain contacts."
+        ),
+    action='store_true',
     )
 
 libcli.add_argument_source(ap)
@@ -92,7 +104,8 @@ ap.add_argument(
 
 def main(
     pdb_files,
-    distance=5,
+    distance=6,
+    interchain=False,
     source=None,
     output=None,
     ncores=1,
@@ -144,6 +157,48 @@ def main(
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
+    
+    log.info(T('preparing task execution'))
+    if interchain:
+        consume = partial(
+            calc_interchain_ca_contacts,
+            max_dist=distance,
+            )
+    else:
+        consume = partial(
+            calc_intrachain_ca_contacts,
+            max_dist=distance,
+            )
+        
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
+        )
+    
+    contacts_results = {}
+    final_count = 0
+    execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
+    for result in execute_pool:
+        pdbid = result[0]
+        contacts = result[1]
+        final_count += result[2]
+        contacts_results[pdbid] = contacts
+    
+    log.info(S('done'))
+    log.info(S(f'Total number of {final_count} contacts found.'))
+    
+    if source:
+        pop_difference_with_log(database_dict, contacts_results)
+        for key, value in contacts_results.items():
+            database_dict[key].update(value)
+        save_dict_to_json(database_dict, output=output)
+    else:
+        save_dict_to_json(contacts_results, output=output)
+    
+    if _istarfile:
+        shutil.rmtree(tmpdir)
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)

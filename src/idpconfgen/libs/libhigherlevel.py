@@ -930,7 +930,7 @@ def bgeo_reduce(bgeo):
     return dpairs, dres
 
 
-def calc_interchain_ca_contacts(pdb, max_dist=6):
+def calc_intrachain_ca_contacts(pdb, max_dist):
     """
     Find the residues that are in contact with each other.
 
@@ -959,10 +959,11 @@ def calc_interchain_ca_contacts(pdb, max_dist=6):
     
     with open(pdb) as f:
         pdb_raw = f.read()
-    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
+    pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
     
     num_residues = len(ca_coordinates)
     contacts = []
+    counter=0
     for i in range(num_residues):
         for j in range(i + 1, num_residues):
             ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
@@ -972,7 +973,7 @@ def calc_interchain_ca_contacts(pdb, max_dist=6):
             chain2_seq = ""
             # Euclidian distance must be within range (default is 6 A)
             # residues must be at least 5 apart
-            if ca_dist <= 6 and j > i + 4:
+            if ca_dist <= max_dist and j > i + 4:
                 for k in range(i - 2, i + 3):
                     if 0 <= k < num_residues:
                         ca_dist = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
@@ -985,8 +986,9 @@ def calc_interchain_ca_contacts(pdb, max_dist=6):
                         chain2_seq += fasta[k]
                 
                 contacts.append({chain1_seq: chain1, chain2_seq: chain2})
+                counter += 1
     
-    return contacts
+    return pdbid, contacts, counter
 
 
 def remove_empty_lists(d):
@@ -1001,7 +1003,7 @@ def remove_empty_lists(d):
     return d
 
 
-def calc_intrachain_ca_contacts(pdb, max_dist=6):
+def calc_interchain_ca_contacts(pdb, max_dist):
     """
     Find CA contacts below a certain distance between different chains.
     
@@ -1048,7 +1050,7 @@ def calc_intrachain_ca_contacts(pdb, max_dist=6):
     # contain two dictionaries of sequence, torsions, and CA_distances
     with open (pdb) as f:
         pdb_raw = f.read()
-    _pdbid, fasta = get_fasta_from_PDB([pdb, pdb_raw])
+    pdbid, _fasta = get_fasta_from_PDB([pdb, pdb_raw])
 
     pdb_struc = Structure(pdb)
     pdb_struc.build()
@@ -1100,6 +1102,7 @@ def calc_intrachain_ca_contacts(pdb, max_dist=6):
     chain_combo = [comb for comb in combinations(list(chain_struc.keys()), 2)]
 
     chain_contacts = {}
+    counter = 0
     for combo in chain_combo:
 
         chainID_1 = combo[0]
@@ -1137,7 +1140,7 @@ def calc_intrachain_ca_contacts(pdb, max_dist=6):
         for i, coords1 in enumerate(chain1_CA_coords):
             for j, coords2 in enumerate(chain2_CA_coords):
                 ca_dist = np.linalg.norm(coords1 - coords2)
-                if ca_dist <= 6:
+                if ca_dist <= max_dist:
                     chain_dist = []
                     torsions1 = []
                     torsions2 = []
@@ -1166,8 +1169,8 @@ def calc_intrachain_ca_contacts(pdb, max_dist=6):
                     chain_contacts[combo][chainID_1]["torsions"].append(torsions1)
                     chain_contacts[combo][chainID_2]["fasta"].append(chain2_seq)
                     chain_contacts[combo][chainID_2]["torsions"].append(torsions2)
-
+                    counter += 1
                     assert len(chain1_seq) == len(chain_dist) == len(torsions1)
                     assert len(chain2_seq) == len(torsions2)
 
-    return remove_empty_lists(chain_contacts)
+    return pdbid, remove_empty_lists(chain_contacts), counter
