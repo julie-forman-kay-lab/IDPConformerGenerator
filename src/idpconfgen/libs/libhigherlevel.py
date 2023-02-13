@@ -52,6 +52,7 @@ from idpconfgen.libs.libstructure import (
     col_chainID, 
     col_name,
     col_resName,
+    col_record,
     cols_coords,
     gen_empty_structure_data_array,
     )
@@ -1063,27 +1064,30 @@ def calc_interchain_ca_contacts(pdb, max_dist):
     # Should we include HETATM?
     # get index of every different chain from the PDB
     for i, chainID in enumerate(pdb_struc.data_array[:, col_chainID]):
-        if i == 0:
-            chain_idx[chainID] = []
-        try:
-            nextID = pdb_struc.data_array[:, col_chainID][i + 1]
-            if nextID != chainID:
-                chain_idx[nextID] = []
-            else:
-                chain_idx[chainID].append(i)
-        except IndexError:
-            break
+        if chainID.isupper():
+            if len(chain_idx) == 0:
+                chain_idx[chainID] = []
+            try:
+                nextID = pdb_struc.data_array[:, col_chainID][i + 1]
+                if nextID != chainID:
+                    chain_idx[nextID] = []
+                else:
+                    chain_idx[chainID].append(i)
+            except IndexError:
+                break
 
     # get structure of every chain in the dictionary
     for chain in chain_idx:
         length = len(chain_idx[chain])
+        if length <= 0:
+            continue
         new_struc = gen_empty_structure_data_array(length)
         for i, idx in enumerate(chain_idx[chain]):
             new_struc[i] = pdb_struc.data_array[idx]
 
         backbone_struc = []
         for i, atom in enumerate(new_struc[:, col_name]):
-            if atom == "N" or atom == "CA" or atom == "C":
+            if new_struc[:, col_record][i] == 'ATOM' and (atom == "N" or atom == "CA" or atom == "C"):
                 backbone_struc.append(new_struc[i].tolist())
 
         if len(backbone_struc) == 0:
