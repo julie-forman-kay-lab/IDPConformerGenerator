@@ -1111,7 +1111,8 @@ def calc_interchain_ca_contacts(pdb, max_dist):
 
         chainID_1 = combo[0]
         chainID_2 = combo[1]
-
+        combo = str(combo)
+        
         chain1_CA_arr = np.array(
             [chain_struc[chainID_1][i]
                 for i, data in enumerate(chain_struc[chainID_1][:, col_name])
