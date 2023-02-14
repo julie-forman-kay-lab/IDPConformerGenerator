@@ -1096,11 +1096,11 @@ def calc_interchain_ca_contacts(pdb, max_dist):
         chain_struc[chain] = new_struc
         chain_tors[chain] = {}
         backbone_struc = np.array(backbone_struc)
-        backbone_tors = calc_torsion_angles(backbone_struc[:, cols_coords].astype(float))
+        #backbone_tors = calc_torsion_angles(backbone_struc[:, cols_coords].astype(float))
 
-        chain_tors[chain]['omega'] = backbone_tors[1::3].tolist()
-        chain_tors[chain]['phi'] = backbone_tors[2::3].tolist()
-        chain_tors[chain]['psi'] = backbone_tors[::3].tolist()
+        #chain_tors[chain]['omega'] = backbone_tors[1::3].tolist()
+        #chain_tors[chain]['phi'] = backbone_tors[2::3].tolist()
+        #chain_tors[chain]['psi'] = backbone_tors[::3].tolist()
 
 
     chain_combo = [comb for comb in combinations(list(chain_struc.keys()), 2)]
@@ -1130,12 +1130,12 @@ def calc_interchain_ca_contacts(pdb, max_dist):
         chain_contacts[combo] = {
             chainID_1: {
                 "fasta": [],
-                "torsions": [],
+                #"torsions": [],
                 "ca_dist": [],
                 },
             chainID_2: {
                 "fasta": [],
-                "torsions": [],
+                #"torsions": [],
                 },
             }
         chain1_CA_coords = chain1_CA_arr[:, cols_coords].astype(float)
@@ -1148,8 +1148,8 @@ def calc_interchain_ca_contacts(pdb, max_dist):
                 if ca_dist <= max_dist:
                     counter += 1
                     chain_dist = []
-                    torsions1 = []
-                    torsions2 = []
+                    #torsions1 = []
+                    #torsions2 = []
                     chain1_seq = ""
                     chain2_seq = ""
                     for k in range(i - 2, i + 3):
@@ -1158,25 +1158,25 @@ def calc_interchain_ca_contacts(pdb, max_dist):
                             chain_dist.append(ca_dist)
                             res1 = aa3to1.get(chain1_CA_arr[:, col_resName][k], "X")
                             chain1_seq += res1
-                            omega = chain_tors[chainID_1]['omega'][k - 1]
-                            phi = chain_tors[chainID_1]['phi'][k - 1]
-                            psi = chain_tors[chainID_1]['psi'][k - 1]
-                            torsions1.append((omega, phi, psi))
+                            #omega = chain_tors[chainID_1]['omega'][k - 1]
+                            #phi = chain_tors[chainID_1]['phi'][k - 1]
+                            #psi = chain_tors[chainID_1]['psi'][k - 1]
+                            #torsions1.append((omega, phi, psi))
                     for k in range(j - 2, j + 3):
                         if 0 <= k < chain2_nres:
                             res2 = aa3to1.get(chain2_CA_arr[:, col_resName][k], "X")
                             chain2_seq += res2
-                            omega = chain_tors[chainID_2]['omega'][k - 1]
-                            phi = chain_tors[chainID_2]['phi'][k - 1]
-                            psi = chain_tors[chainID_2]['psi'][k - 1]
-                            torsions2.append((omega, phi, psi))
+                            #omega = chain_tors[chainID_2]['omega'][k - 1]
+                            #phi = chain_tors[chainID_2]['phi'][k - 1]
+                            #si = chain_tors[chainID_2]['psi'][k - 1]
+                            #torsions2.append((omega, phi, psi))
                     chain_contacts[combo][chainID_1]["fasta"].append(chain1_seq)
                     chain_contacts[combo][chainID_1]["ca_dist"].append(chain_dist)
-                    chain_contacts[combo][chainID_1]["torsions"].append(torsions1)
+                    #chain_contacts[combo][chainID_1]["torsions"].append(torsions1)
                     chain_contacts[combo][chainID_2]["fasta"].append(chain2_seq)
-                    chain_contacts[combo][chainID_2]["torsions"].append(torsions2)
-                    assert len(chain1_seq) == len(chain_dist) == len(torsions1)
-                    assert len(chain2_seq) == len(torsions2)
+                    #chain_contacts[combo][chainID_2]["torsions"].append(torsions2)
+                    assert len(chain1_seq) == len(chain_dist) # == len(torsions1)
+                    #assert len(chain2_seq) == len(torsions2)
 
     if counter == 0:
         return False
