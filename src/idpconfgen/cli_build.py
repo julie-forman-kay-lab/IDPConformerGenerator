@@ -10,6 +10,7 @@ USAGE:
 """
 import argparse
 import os
+import re
 from functools import partial
 from itertools import cycle
 from multiprocessing import Pool, Queue
@@ -92,6 +93,8 @@ from idpconfgen.libs.libparse import (
     get_trimer_seq_njit,
     remap_sequence,
     remove_empty_keys,
+    split_by_ranges,
+    split_into_chunks,
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
@@ -221,6 +224,31 @@ ap.add_argument(
     default=1,
     type=int,
     )
+
+ap.add_argument(
+    '--long',
+    help=(
+        'Switch to enable building long IDPs. '
+        'Note this will NOT automatically enable if you have IDPs '
+        'longer than 400 AA but it is recommended to turn this on. '
+        'Defaults to True.'
+        ),
+    action="store_true",
+    )
+
+ap.add_argument(
+    '--long-ranges',
+    help=(
+        "Custom ranges of residues to build fragmentally for a long IDP "
+        "is denoted by dashes for residue numbers and commas for different "
+        "ranges. Note that ALL patterns MUST end at a comma. "
+        "For example: -pt 1-157,158-342, "
+        "Optional flag, if left empty, generate fragments evenly with up "
+        "to 200 AA per fragment."
+        ),
+    nargs='?',
+    )
+
 
 #########################################
 libcli.add_argument_dloopoff(ap)
@@ -380,6 +408,8 @@ def main(
         input_seq,
         database,
         custom_sampling,
+        long=False,
+        long_ranges=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -427,6 +457,35 @@ def main(
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(T('starting the building process'))
     log.info(S(f'input sequence: {input_seq}'))
+    
+    if len(input_seq) > 300:
+        if long == False:
+            log.info(
+                "TIP: if your IDP is longer than ~350 residues, consider "
+                "enabling the `--long` flag for faster generation."
+                )
+        else:
+            LONG_REGEX = re.compile(r"\d+-\d+,")
+            LONG_FRAGMENTS = []
+            if long_ranges:
+                if LONG_REGEX.match(long_ranges):
+                    ranges = long_ranges.split(',')
+                    ranges.pop()  # last element should be empty
+                    idx_ranges = []
+                    for r in ranges:
+                        parts = r.split("-")
+                        if len(parts) >= 2:
+                            idx_ranges.append(parts[1])
+                    LONG_FRAGMENTS = split_by_ranges(input_seq, idx_ranges)
+                else:
+                    log.info(S('Incorrect pattern input. Resorting to default.'))
+                    log.info(S('Pattern is as follows: 1-254,255-380...'))
+            else:
+                LONG_FRAGMENTS = split_into_chunks(input_seq)
+    else:
+        long = False
+        long_ranges = None
+    
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
