@@ -58,6 +58,17 @@ from idpconfgen.core.build_definitions import (
     )
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.fldrs_helper import (
+    align_coords,
+    break_check,
+    consecutive_grouper,
+    count_clashes,
+    create_combinations,
+    disorder_cases,
+    psurgeon,
+    store_idp_paths,
+    tolerance_calculator,
+    )
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
@@ -98,6 +109,13 @@ from idpconfgen.libs.libparse import (
     translate_seq_to_3l,
     )
 from idpconfgen.libs.libpdb import atom_line_formatter
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    cols_coords,
+    parse_pdb_to_array,
+    structure_to_pdb,
+    )
 from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
@@ -150,6 +168,11 @@ ALL_ATOM_EFUNC = None
 TEMPLATE_LABELS = None
 TEMPLATE_MASKS = None
 TEMPLATE_EFUNC = None
+
+# Global variables for enabling the "long" feature for building
+# extended IDPs (e.g. > 300 AA)
+LONG_REGEX = None
+LONG_FRAGMENTS = None
 
 
 class _BuildPreparation:
@@ -466,7 +489,7 @@ def main(
                 )
         else:
             LONG_REGEX = re.compile(r"\d+-\d+,")
-            LONG_FRAGMENTS = []
+            global LONG_FRAGMENTS
             if long_ranges:
                 if LONG_REGEX.match(long_ranges):
                     ranges = long_ranges.split(',')
@@ -476,12 +499,19 @@ def main(
                         parts = r.split("-")
                         if len(parts) >= 2:
                             idx_ranges.append(parts[1])
-                    LONG_FRAGMENTS = split_by_ranges(input_seq, idx_ranges)
+                    long_fragments = split_by_ranges(input_seq, idx_ranges)
                 else:
                     log.info(S('Incorrect pattern input. Resorting to default.'))
                     log.info(S('Pattern is as follows: 1-254,255-380...'))
             else:
-                LONG_FRAGMENTS = split_into_chunks(input_seq)
+                long_fragments = split_into_chunks(input_seq)
+            
+            for i in range(len(long_fragments) - 1):
+                j = i + 1
+                # Add overlapping residues to subsequent fragments
+                long_fragments[j] = long_fragments[i][-2:] + long_fragments[j]
+                
+            LONG_FRAGMENTS = long_fragments
     else:
         long = False
         long_ranges = None
@@ -642,8 +672,12 @@ def main(
     # prepars execution function
     consume = partial(
         _build_conformers,
+        ncores=ncores,
+        remaining_confs=remaining_confs,
+        random_seed=random_seed,
         input_seq=input_seq,  # string
         output_folder=output_folder,
+        long=long,
         nconfs=conformers_per_core,  # int
         sidechain_parameters=sidechain_parameters,
         sidechain_method=sidechain_method,  # goes back to kwards
@@ -774,9 +808,13 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
+        ncores=1,
+        remaining_confs=0,
+        random_seed=0,
         input_seq=None,
         conformer_name='conformer',
         output_folder=None,
+        long=False,
         nconfs=1,
         sidechain_parameters=None,
         bgeo_strategy=bgeo_strategies_default,
@@ -784,38 +822,133 @@ def _build_conformers(
         ):
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
+    
+    if long:        
+        for i, sequence in enumerate(LONG_FRAGMENTS):            
+            input_seq_3_letters = translate_seq_to_3l(sequence)
+            builder = conformer_generator(
+                input_seq=sequence,
+                random_seed=RANDOMSEEDS.get(),
+                sidechain_parameters=sidechain_parameters,
+                bgeo_strategy=bgeo_strategy,
+                **kwargs)
+            atom_labels, residue_numbers, residue_labels = next(builder)
+            
+            if i == 0:
+                for _ in range(nconfs):
+                    energy, coords = next(builder)
 
-    # TODO: this has to be parametrized for the different HIS types
-    input_seq_3_letters = translate_seq_to_3l(input_seq)
+                    pdb_string = gen_PDB_from_conformer(
+                        input_seq_3_letters,
+                        atom_labels,
+                        residue_numbers,
+                        ROUND(coords, decimals=3),
+                        )
 
-    builder = conformer_generator(
-        input_seq=input_seq,
-        random_seed=RANDOMSEEDS.get(),
-        sidechain_parameters=sidechain_parameters,
-        bgeo_strategy=bgeo_strategy,
-        **kwargs)
+                    fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
-    atom_labels, residue_numbers, residue_labels = next(builder)
+                    with open(Path(output_folder, fname), 'w') as fout:
+                        fout.write(pdb_string)
 
-    for _ in range(nconfs):
+                    ENERGYLOGSAVER.save(fname, energy)
+                    
+                del builder
+            else:
+                for j in range(nconfs):
+                    fname = f'{conformer_name}_{j}.pdb'
+                    final_struc = Structure(Path(output_folder, fname))
+                    final_struc.build()
+                    atom_names = final_struc.data_array[:, col_name]
+                    counter = 0
+                    terminal_idx = {}
+                    for j, _atom in enumerate(atom_names):
+                        k = len(atom_names) - 1 - j
+                        if counter == 1 and atom_names[k] == "N":
+                            terminal_idx["N"] = k
+                            counter += 1
+                        elif counter == 0 and atom_names[k] == "CA":
+                            terminal_idx["CA"] = k
+                            counter += 1
+                        elif counter == 2 and atom_names[k] == "C":
+                            terminal_idx["C"] = k
+                            break
+                    
+                        stitch_Cxyz = final_struc.data_array[terminal_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
+                        stitch_Nxyz = final_struc.data_array[terminal_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
+                        stitch_CAxyz = final_struc.data_array[terminal_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
+                        # Coordinates of boundary to stitch to later on
+                        stitch_coords = np.array([stitch_Cxyz, stitch_Nxyz, stitch_CAxyz])
+                    
+                    while 1:
+                        energy, coords = next(builder)
+                        
+                        pdb_string = gen_PDB_from_conformer(
+                            input_seq_3_letters,
+                            atom_labels,
+                            residue_numbers,
+                            ROUND(coords, decimals=3),
+                            )
 
-        energy, coords = next(builder)
+                        pdb_arr = parse_pdb_to_array(pdb_string)
+                        rotated = align_coords(pdb_arr, stitch_coords, "C-IDR")
+                        clashes, fragment = count_clashes(
+                            rotated,
+                            final_struc,
+                            case="C-IDR",
+                            max_clash=40,
+                            tolerance=0.4,
+                            )
+                        
+                        if type(clashes) is int:
+                            success_frag = structure_to_pdb(fragment)
+                            fname_temp = f'{conformer_name}_{j}_temp.pdb'
+                            with open(Path(output_folder, fname_temp), 'w') as fout:
+                                for line in success_frag:
+                                    fout.write(line + "\n")
+                            true_final = psurgeon(Path(output_folder, fname_temp), final_struc, "C-IDR")
+                            true_final_struc = structure_to_pdb(true_final)
+                            os.remove(Path(output_folder, fname_temp))
+                            os.remove(Path(output_folder, fname))
+                            with open(Path(output_folder, fname), 'w') as fout:
+                                for line in true_final_struc:
+                                    fout.write(line + "\n")
+                    ENERGYLOGSAVER.save(fname, energy)
 
-        pdb_string = gen_PDB_from_conformer(
-            input_seq_3_letters,
-            atom_labels,
-            residue_numbers,
-            ROUND(coords, decimals=3),
-            )
+            del builder
+        for i in range(ncores + bool(remaining_confs)):
+            RANDOMSEEDS.put(random_seed + i)
+    else:
+        # TODO: this has to be parametrized for the different HIS types
+        input_seq_3_letters = translate_seq_to_3l(input_seq)
 
-        fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
+        builder = conformer_generator(
+            input_seq=input_seq,
+            random_seed=RANDOMSEEDS.get(),
+            sidechain_parameters=sidechain_parameters,
+            bgeo_strategy=bgeo_strategy,
+            **kwargs)
 
-        with open(Path(output_folder, fname), 'w') as fout:
-            fout.write(pdb_string)
+        atom_labels, residue_numbers, residue_labels = next(builder)
 
-        ENERGYLOGSAVER.save(fname, energy)
+        for _ in range(nconfs):
 
-    del builder
+            energy, coords = next(builder)
+
+            pdb_string = gen_PDB_from_conformer(
+                input_seq_3_letters,
+                atom_labels,
+                residue_numbers,
+                ROUND(coords, decimals=3),
+                )
+
+            fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
+
+            with open(Path(output_folder, fname), 'w') as fout:
+                fout.write(pdb_string)
+
+            ENERGYLOGSAVER.save(fname, energy)
+
+        del builder
     return
 
 
