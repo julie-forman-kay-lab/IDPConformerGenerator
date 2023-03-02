@@ -490,7 +490,7 @@ get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)
 
 
-def split_into_chunks(string, size=200):
+def split_into_chunks(string, size=150):
     """
     Split a string into chunks of characters.
     

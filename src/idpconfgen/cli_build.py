@@ -60,14 +60,8 @@ from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.fldrs_helper import (
     align_coords,
-    break_check,
-    consecutive_grouper,
     count_clashes,
-    create_combinations,
-    disorder_cases,
     psurgeon,
-    store_idp_paths,
-    tolerance_calculator,
     )
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libbuild import (
@@ -171,7 +165,7 @@ TEMPLATE_EFUNC = None
 
 # Global variables for enabling the "long" feature for building
 # extended IDPs (e.g. > 300 AA)
-LONG_REGEX = None
+GET_ADJ_LONG = None
 LONG_FRAGMENTS = None
 
 
@@ -267,7 +261,7 @@ ap.add_argument(
         "ranges. Note that ALL patterns MUST end at a comma. "
         "For example: -pt 1-157,158-342, "
         "Optional flag, if left empty, generate fragments evenly with up "
-        "to 200 AA per fragment."
+        "to 150 AA per fragment."
         ),
     nargs='?',
     )
@@ -488,10 +482,10 @@ def main(
                 "enabling the `--long` flag for faster generation."
                 )
         else:
-            LONG_REGEX = re.compile(r"\d+-\d+,")
             global LONG_FRAGMENTS
             if long_ranges:
-                if LONG_REGEX.match(long_ranges):
+                range_regex = re.compile(r"\d+-\d+,")
+                if range_regex.match(long_ranges):
                     ranges = long_ranges.split(',')
                     ranges.pop()  # last element should be empty
                     idx_ranges = []
@@ -616,91 +610,184 @@ def main(
     if residue_tolerance is not None:
         _restol = str(residue_tolerance)[1:-1]
         log.info(S(f"Building with residue tolerances: {_restol}"))
-
-    # these are the slices with which to sample the ANGLES array
-    SLICEDICT_XMERS = prepare_slice_dict(
-        primary,
-        input_seq,
-        csss=bool(csss_dict),
-        dssp_regexes=dssp_regexes,
-        secondary=secondary,
-        mers_size=xmer_probs_tmp.sizes,
-        res_tolerance=residue_tolerance,
-        ncores=ncores,
-        )
-
-    remove_empty_keys(SLICEDICT_XMERS)
-    # updates user defined fragment sizes and probabilities to the ones actually
-    # observed
-    _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
-    XMERPROBS = _.probs
-
-    GET_ADJ = get_adjacent_angles(
-        sorted(SLICEDICT_XMERS.keys()),
-        XMERPROBS,
-        input_seq,
-        ANGLES,
-        bgeo_strategy,
-        SLICEDICT_XMERS,
-        csss_dict,
-        residue_tolerance=residue_tolerance,
-        )
-
-    populate_globals(
-        input_seq=input_seq,
-        bgeo_strategy=bgeo_strategy,
-        bgeo_path=bgeo_path,
-        forcefield=forcefields[forcefield],
-        **kwargs)
-
+    
     # create different random seeds for the different cores
     # seeds created to the cores based on main seed are predictable
     for i in range(ncores + bool(remaining_confs)):
         RANDOMSEEDS.put(random_seed + i)
-
+        
     # creates a queue of numbers that will serve all subprocesses.
     # Used to name the output files, conformer_1, conformer_2, ...
     for i in range(1, nconfs + 1):
         CONF_NUMBER.put(i)
-
-    ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
-
+    
     # get sidechain dedicated parameters
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
+    
+    if long:
+        for seq in LONG_FRAGMENTS:
+            log.info(S(f"Preparing database for sequence: {seq}"))
+            SLICEDICT_XMERS = prepare_slice_dict(
+                primary,
+                seq,
+                dssp_regexes=dssp_regexes,  #TODO implement CSSS also here
+                secondary=secondary,
+                mers_size=xmer_probs_tmp.sizes,
+                res_tolerance=residue_tolerance,
+                ncores=ncores,
+                )
+            remove_empty_keys(SLICEDICT_XMERS)
+            # updates user defined fragment sizes and probabilities to the
+            # ones actually observed
+            _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))  # noqa: E501
+            XMERPROBS = _.probs
+            
+            GET_ADJ = get_adjacent_angles(
+                sorted(SLICEDICT_XMERS.keys()),
+                XMERPROBS,
+                seq,
+                ANGLES,
+                bgeo_strategy,
+                SLICEDICT_XMERS,
+                csss=None,
+                residue_tolerance=residue_tolerance,
+                )
+        
+            log.info(S("done"))
+            
+            populate_globals(
+                input_seq=seq,
+                bgeo_strategy=bgeo_strategy,
+                bgeo_path=bgeo_path,
+                forcefield=forcefields[forcefield],
+                **kwargs)
+            
+            ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
+            
+            if seq == LONG_FRAGMENTS[0]:  # first run, need to generate chains first
+                # prepars execution function
+                consume = partial(
+                    _build_conformers,
+                    input_seq=seq,  # string
+                    output_folder=output_folder,
+                    nconfs=conformers_per_core,  # int
+                    sidechain_parameters=sidechain_parameters,
+                    sidechain_method=sidechain_method,  # goes back to kwards
+                    bgeo_strategy=bgeo_strategy,
+                    **kwargs,
+                    )
 
-    # prepars execution function
-    consume = partial(
-        _build_conformers,
-        ncores=ncores,
-        remaining_confs=remaining_confs,
-        random_seed=random_seed,
-        input_seq=input_seq,  # string
-        output_folder=output_folder,
-        long=long,
-        nconfs=conformers_per_core,  # int
-        sidechain_parameters=sidechain_parameters,
-        sidechain_method=sidechain_method,  # goes back to kwards
-        bgeo_strategy=bgeo_strategy,
-        **kwargs,
-        )
+                execute = partial(
+                    report_on_crash,
+                    consume,
+                    ROC_exception=Exception,
+                    ROC_folder=output_folder,
+                    ROC_prefix=_name,
+                    )
+                start = time()
+            else:
+                consume = partial(
+                    _build_conformers,
+                    input_seq=seq,  # string
+                    output_folder=output_folder,
+                    long=long,
+                    nconfs=conformers_per_core,  # int
+                    sidechain_parameters=sidechain_parameters,
+                    sidechain_method=sidechain_method,  # goes back to kwards
+                    bgeo_strategy=bgeo_strategy,
+                    **kwargs,
+                    )
 
-    execute = partial(
-        report_on_crash,
-        consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
+                execute = partial(
+                    report_on_crash,
+                    consume,
+                    ROC_exception=Exception,
+                    ROC_folder=output_folder,
+                    ROC_prefix=_name,
+                    )
 
-    start = time()
-    with Pool(ncores) as pool:
-        imap = pool.imap(execute, range(ncores))
-        for _ in imap:
-            pass
+            with Pool(ncores) as pool:
+                imap = pool.imap(execute, range(ncores))
+                for _ in imap:
+                    pass
+                
+            if remaining_confs:
+                execute(conformers_per_core * ncores, nconfs=remaining_confs)
+            
+            # reinitialize queues so reiteration doesn't crash
+            for i in range(ncores + bool(remaining_confs)):
+                RANDOMSEEDS.put(random_seed + i)
+            for i in range(1, nconfs + 1):
+                CONF_NUMBER.put(i)
+    else:
+        # these are the slices with which to sample the ANGLES array
+        SLICEDICT_XMERS = prepare_slice_dict(
+            primary,
+            input_seq,
+            csss=bool(csss_dict),
+            dssp_regexes=dssp_regexes,
+            secondary=secondary,
+            mers_size=xmer_probs_tmp.sizes,
+            res_tolerance=residue_tolerance,
+            ncores=ncores,
+            )
 
-    if remaining_confs:
-        execute(conformers_per_core * ncores, nconfs=remaining_confs)
+        remove_empty_keys(SLICEDICT_XMERS)
+        # updates user defined fragment sizes and probabilities to the ones actually
+        # observed
+        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
+        XMERPROBS = _.probs
+
+        GET_ADJ = get_adjacent_angles(
+            sorted(SLICEDICT_XMERS.keys()),
+            XMERPROBS,
+            input_seq,
+            ANGLES,
+            bgeo_strategy,
+            SLICEDICT_XMERS,
+            csss_dict,
+            residue_tolerance=residue_tolerance,
+            )
+
+        populate_globals(
+            input_seq=input_seq,
+            bgeo_strategy=bgeo_strategy,
+            bgeo_path=bgeo_path,
+            forcefield=forcefields[forcefield],
+            **kwargs)
+        
+        ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
+        
+        # prepars execution function
+        consume = partial(
+            _build_conformers,
+            input_seq=input_seq,  # string
+            output_folder=output_folder,
+            long=long,
+            nconfs=conformers_per_core,  # int
+            sidechain_parameters=sidechain_parameters,
+            sidechain_method=sidechain_method,  # goes back to kwards
+            bgeo_strategy=bgeo_strategy,
+            **kwargs,
+            )
+
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+
+        start = time()
+        with Pool(ncores) as pool:
+            imap = pool.imap(execute, range(ncores))
+            for _ in imap:
+                pass
+            
+        if remaining_confs:
+            execute(conformers_per_core * ncores, nconfs=remaining_confs)
 
     log.info(f'{nconfs} conformers built in {time() - start:.3f} seconds')
     ENERGYLOGSAVER.close()
@@ -808,9 +895,6 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
-        ncores=1,
-        remaining_confs=0,
-        random_seed=0,
         input_seq=None,
         conformer_name='conformer',
         output_folder=None,
@@ -823,115 +907,81 @@ def _build_conformers(
     """Arrange building of conformers and saves them to PDB files."""
     ROUND = np.round
     
-    if long:        
-        for i, sequence in enumerate(LONG_FRAGMENTS):            
-            input_seq_3_letters = translate_seq_to_3l(sequence)
-            builder = conformer_generator(
-                input_seq=sequence,
-                random_seed=RANDOMSEEDS.get(),
-                sidechain_parameters=sidechain_parameters,
-                bgeo_strategy=bgeo_strategy,
-                **kwargs)
-            atom_labels, residue_numbers, residue_labels = next(builder)
-            
-            if i == 0:
-                for _ in range(nconfs):
-                    energy, coords = next(builder)
-
-                    pdb_string = gen_PDB_from_conformer(
-                        input_seq_3_letters,
-                        atom_labels,
-                        residue_numbers,
-                        ROUND(coords, decimals=3),
-                        )
-
-                    fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
-
-                    with open(Path(output_folder, fname), 'w') as fout:
-                        fout.write(pdb_string)
-
-                    ENERGYLOGSAVER.save(fname, energy)
-                    
-                del builder
-            else:
-                for j in range(nconfs):
-                    fname = f'{conformer_name}_{j}.pdb'
-                    final_struc = Structure(Path(output_folder, fname))
-                    final_struc.build()
-                    atom_names = final_struc.data_array[:, col_name]
-                    counter = 0
-                    terminal_idx = {}
-                    for j, _atom in enumerate(atom_names):
-                        k = len(atom_names) - 1 - j
-                        if counter == 1 and atom_names[k] == "N":
-                            terminal_idx["N"] = k
-                            counter += 1
-                        elif counter == 0 and atom_names[k] == "CA":
-                            terminal_idx["CA"] = k
-                            counter += 1
-                        elif counter == 2 and atom_names[k] == "C":
-                            terminal_idx["C"] = k
-                            break
-                    
-                        stitch_Cxyz = final_struc.data_array[terminal_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
-                        stitch_Nxyz = final_struc.data_array[terminal_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
-                        stitch_CAxyz = final_struc.data_array[terminal_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
-                        # Coordinates of boundary to stitch to later on
-                        stitch_coords = np.array([stitch_Cxyz, stitch_Nxyz, stitch_CAxyz])
-                    
-                    while 1:
-                        energy, coords = next(builder)
-                        
-                        pdb_string = gen_PDB_from_conformer(
-                            input_seq_3_letters,
-                            atom_labels,
-                            residue_numbers,
-                            ROUND(coords, decimals=3),
-                            )
-
-                        pdb_arr = parse_pdb_to_array(pdb_string)
-                        rotated = align_coords(pdb_arr, stitch_coords, "C-IDR")
-                        clashes, fragment = count_clashes(
-                            rotated,
-                            final_struc,
-                            case="C-IDR",
-                            max_clash=40,
-                            tolerance=0.4,
-                            )
-                        
-                        if type(clashes) is int:
-                            success_frag = structure_to_pdb(fragment)
-                            fname_temp = f'{conformer_name}_{j}_temp.pdb'
-                            with open(Path(output_folder, fname_temp), 'w') as fout:
-                                for line in success_frag:
-                                    fout.write(line + "\n")
-                            true_final = psurgeon(Path(output_folder, fname_temp), final_struc, "C-IDR")
-                            true_final_struc = structure_to_pdb(true_final)
-                            os.remove(Path(output_folder, fname_temp))
-                            os.remove(Path(output_folder, fname))
-                            with open(Path(output_folder, fname), 'w') as fout:
-                                for line in true_final_struc:
-                                    fout.write(line + "\n")
-                    ENERGYLOGSAVER.save(fname, energy)
-
-            del builder
-        for i in range(ncores + bool(remaining_confs)):
-            RANDOMSEEDS.put(random_seed + i)
-    else:
-        # TODO: this has to be parametrized for the different HIS types
-        input_seq_3_letters = translate_seq_to_3l(input_seq)
-
-        builder = conformer_generator(
-            input_seq=input_seq,
-            random_seed=RANDOMSEEDS.get(),
-            sidechain_parameters=sidechain_parameters,
-            bgeo_strategy=bgeo_strategy,
-            **kwargs)
-
-        atom_labels, residue_numbers, residue_labels = next(builder)
-
+    # TODO: this has to be parametrized for the different HIS types
+    input_seq_3_letters = translate_seq_to_3l(input_seq)
+    
+    builder = conformer_generator(
+        input_seq=input_seq,
+        random_seed=RANDOMSEEDS.get(),
+        sidechain_parameters=sidechain_parameters,
+        bgeo_strategy=bgeo_strategy,
+        **kwargs)
+    
+    atom_labels, residue_numbers, residue_labels = next(builder)
+    
+    if long:
         for _ in range(nconfs):
+            conf_number = CONF_NUMBER.get()
+            prev_struc_name = f'{conformer_name}_{conf_number}.pdb'
+            prev_struc = Structure(Path(output_folder, prev_struc_name))
+            prev_struc.build()
+            atom_names = prev_struc.data_array[:, col_name]
+            counter = 0
+            terminal_idx = {}
+            for j, _atom in enumerate(atom_names):
+                k = len(atom_names) - 1 - j
+                if counter == 1 and atom_names[k] == "N":
+                    terminal_idx["N"] = k
+                    counter += 1
+                elif counter == 0 and atom_names[k] == "CA":
+                    terminal_idx["CA"] = k
+                    counter += 1
+                elif counter == 2 and atom_names[k] == "C":
+                    terminal_idx["C"] = k
+                    break
+                
+            stitch_Cxyz = prev_struc.data_array[terminal_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
+            stitch_Nxyz = prev_struc.data_array[terminal_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
+            stitch_CAxyz = prev_struc.data_array[terminal_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
+            # Coordinates of boundary to stitch to later on
+            stitch_coords = np.array([stitch_Cxyz, stitch_Nxyz, stitch_CAxyz])
 
+            while 1:
+                energy, coords = next(builder)
+
+                pdb_string = gen_PDB_from_conformer(
+                    input_seq_3_letters,
+                    atom_labels,
+                    residue_numbers,
+                    ROUND(coords, decimals=3),
+                    )
+                pdb_arr = parse_pdb_to_array(pdb_string)
+                rotated = align_coords(pdb_arr, stitch_coords, "C-IDR")
+                clashes, fragment = count_clashes(
+                    rotated,
+                    prev_struc,
+                    case="C-IDR",
+                    max_clash=40,
+                    tolerance=0.4,
+                    )
+
+                if type(clashes) is int:
+                    success_frag = structure_to_pdb(fragment)
+                    fname_temp = f'{conformer_name}_{conf_number}_frag.pdb'
+                    with open(Path(output_folder, fname_temp), 'w') as fout:
+                        for line in success_frag:
+                            fout.write(line + "\n")
+                    final = psurgeon(Path(output_folder, fname_temp), Path(output_folder, prev_struc_name), "C-IDR")
+                    final_struc = structure_to_pdb(final)
+                    os.remove(Path(output_folder, fname_temp))
+                    os.remove(Path(output_folder, prev_struc_name))
+                    with open(Path(output_folder, prev_struc_name), 'w') as fout:
+                        for line in final_struc:
+                            fout.write(line + "\n")
+                    ENERGYLOGSAVER.save(prev_struc_name, energy)
+                    break
+    else:
+        for _ in range(nconfs):
             energy, coords = next(builder)
 
             pdb_string = gen_PDB_from_conformer(
@@ -948,7 +998,7 @@ def _build_conformers(
 
             ENERGYLOGSAVER.save(fname, energy)
 
-        del builder
+    del builder
     return
 
 
