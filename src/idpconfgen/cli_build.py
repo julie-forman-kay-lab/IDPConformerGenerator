@@ -476,7 +476,7 @@ def main(
     log.info(S(f'input sequence: {input_seq}'))
     
     if len(input_seq) > 300:
-        if long == False:
+        if long is False:
             log.info(
                 "TIP: if your IDP is longer than ~350 residues, consider "
                 "enabling the `--long` flag for faster generation."
@@ -495,7 +495,7 @@ def main(
                             idx_ranges.append(parts[1])
                     long_fragments = split_by_ranges(input_seq, idx_ranges)
                 else:
-                    log.info(S('Incorrect pattern input. Resorting to default.'))
+                    log.info(S('Incorrect pattern input. Resorting to default.'))  # noqa: E501
                     log.info(S('Pattern is as follows: 1-254,255-380...'))
             else:
                 long_fragments = split_into_chunks(input_seq)
@@ -631,7 +631,7 @@ def main(
             SLICEDICT_XMERS = prepare_slice_dict(
                 primary,
                 seq,
-                dssp_regexes=dssp_regexes,  #TODO implement CSSS also here
+                dssp_regexes=dssp_regexes,  # TODO implement CSSS also here
                 secondary=secondary,
                 mers_size=xmer_probs_tmp.sizes,
                 res_tolerance=residue_tolerance,
@@ -665,7 +665,8 @@ def main(
             
             ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
             
-            if seq == LONG_FRAGMENTS[0]:  # first run, need to generate chains first
+            # first run, need to generate chains first
+            if seq == LONG_FRAGMENTS[0]:
                 # prepars execution function
                 consume = partial(
                     _build_conformers,
@@ -734,9 +735,9 @@ def main(
             )
 
         remove_empty_keys(SLICEDICT_XMERS)
-        # updates user defined fragment sizes and probabilities to the ones actually
-        # observed
-        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))
+        # updates user defined fragment sizes and probabilities
+        # to the ones actually observed
+        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS.keys()))  # noqa: E501
         XMERPROBS = _.probs
 
         GET_ADJ = get_adjacent_angles(
@@ -971,11 +972,15 @@ def _build_conformers(
                     with open(Path(output_folder, fname_temp), 'w') as fout:
                         for line in success_frag:
                             fout.write(line + "\n")
-                    final = psurgeon(Path(output_folder, fname_temp), Path(output_folder, prev_struc_name), "C-IDR")
+                    final = psurgeon(
+                        Path(output_folder, fname_temp),
+                        Path(output_folder, prev_struc_name),
+                        "C-IDR"
+                        )
                     final_struc = structure_to_pdb(final)
                     os.remove(Path(output_folder, fname_temp))
                     os.remove(Path(output_folder, prev_struc_name))
-                    with open(Path(output_folder, prev_struc_name), 'w') as fout:
+                    with open(Path(output_folder, prev_struc_name), 'w') as fout:  # noqa: E501
                         for line in final_struc:
                             fout.write(line + "\n")
                     ENERGYLOGSAVER.save(prev_struc_name, energy)

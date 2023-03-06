@@ -33,21 +33,18 @@ from functools import partial
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import (
-    FileReaderIterator,
     extract_from_tar,
     read_path_bundle,
     read_dictionary_from_disk,
     save_dict_to_json,
     )
-from idpconfgen.libs.libmulticore import pool_function, starunpack
-from idpconfgen.libs.libparse import pop_difference_with_log, values_to_dict
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.libs.libhigherlevel import (
     calc_intrachain_ca_contacts,
     calc_interchain_ca_contacts,
     )
 from idpconfgen.logger import S, T, init_files, report_on_crash
-
-
 
 LOGFILESNAME = '.idpconfgen_contacts'
 TMPDIR = '__tmpcontacts__'
@@ -102,22 +99,23 @@ ap.add_argument(
 
 
 def main(
-    pdb_files,
-    distance=None,
-    interchain=False,
-    source=None,
-    output=None,
-    ncores=1,
-    tmpdir=TMPDIR,
-    func=None,
-    ):
+        pdb_files,
+        distance=None,
+        interchain=False,
+        source=None,
+        output=None,
+        ncores=1,
+        tmpdir=TMPDIR,
+        func=None,
+        ):
     """
     Execute main client logic.
 
     Parameters
     ----------
     pdb_files : str or Path, required
-        Location for PDB files to operate on, can be within a folder or inside .TAR file
+        Location for PDB files to operate on, can be within a folder
+        or inside .TAR file.
 
     distance : int, optional
         Maximum distance in angstroms to be considered a contact.
@@ -142,9 +140,11 @@ def main(
     if not output.endswith('.json'):
         raise ValueError('Output file should have `.json` extension.')
 
-    if distance == None:
-        if interchain: distance = 12
-        else: distance = 6
+    if distance is None:
+        if interchain:
+            distance = 12
+        else:
+            distance = 6
 
     log.info(T('Extracting torsion angles'))
     init_files(log, LOGFILESNAME)
@@ -184,7 +184,7 @@ def main(
     final_count = 0
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
     for result in execute_pool:
-        if result == False:
+        if result is False:
             continue
         pdbid = result[0]
         contacts = result[1]
@@ -204,6 +204,7 @@ def main(
     
     if _istarfile:
         shutil.rmtree(tmpdir)
+
 
 if __name__ == '__main__':
     libcli.maincli(ap, main)
