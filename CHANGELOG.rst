@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Bug-fix for installation and tox build/pr
+* Lint ``test.py``
+
 v0.6.16 (2022-11-08)
 ------------------------------------------------------------
 
