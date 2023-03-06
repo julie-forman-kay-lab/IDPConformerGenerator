@@ -274,7 +274,7 @@ ap.add_argument(
     '--clash-tolerance',
     help=(
         "Float value clash tolerance between 0.0-1.0 where 0.5 is the default "
-        "value denoting minimum of 50 spherical clashes, 0.5 Angstroms "
+        "value denoting minimum of 25 spherical clashes, 0.5 Angstroms "
         "of tolerance with a given vdW radii. Where 1.0 allows for 100 "
         "clashes and 1.0 Angstroms of tolerance for a given vdW radii."
         ),
