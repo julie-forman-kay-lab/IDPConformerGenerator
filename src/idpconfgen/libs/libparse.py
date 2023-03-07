@@ -520,13 +520,13 @@ def split_into_chunks(string, size=150):
     return chunks
 
 
-def split_by_ranges(string, ranges):
+def split_by_ranges(seq, ranges):
     """
     Split a string into substrings based on a list of custom ranges.
     
     Parameters
     ----------
-    string : str
+    seq : str
         String or sequence of desire to be split.
     
     ranges : list of int
@@ -541,8 +541,8 @@ def split_by_ranges(string, ranges):
     chunks = []
     start = 0
     for end in ranges:
-        chunks.append(string[start:end])
+        chunks.append(seq[start:end])
         start = end
-    if start < len(string):
-        chunks.append(string[start:])
+    if start < len(seq):
+        chunks.append(seq[start:])
     return chunks

@@ -247,7 +247,7 @@ ap.add_argument(
     help=(
         'Switch to enable building long IDPs. '
         'Note this will NOT automatically enable if you have IDPs '
-        'longer than 400 AA but it is recommended to turn this on. '
+        'longer than 300 AA but it is recommended to turn this on. '
         'Defaults to True.'
         ),
     action="store_true",
@@ -258,8 +258,9 @@ ap.add_argument(
     help=(
         "Custom ranges of residues to build fragmentally for a long IDP "
         "is denoted by dashes for residue numbers and commas for different "
-        "ranges. Note that ALL patterns MUST end at a comma. "
-        "For example: -pt 1-157,158-342, "
+        "ranges. Note that ALL patterns MUST end "
+        "at the last residue with a comma. "
+        "For ex. a 301 AA long IDP: --long-ranges 1-113,114-210,211-301,"
         "Optional flag, if left empty, generate fragments evenly with up "
         "to 150 AA per fragment."
         ),
@@ -492,11 +493,12 @@ def main(
                     for r in ranges:
                         parts = r.split("-")
                         if len(parts) >= 2:
-                            idx_ranges.append(parts[1])
+                            idx_ranges.append(int(parts[1]))
                     long_fragments = split_by_ranges(input_seq, idx_ranges)
+                    print(long_fragments)
                 else:
                     log.info(S('Incorrect pattern input. Resorting to default.'))  # noqa: E501
-                    log.info(S('Pattern is as follows: 1-254,255-380...'))
+                    log.info(S('Sample pattern is as follows: 1-89,90-191,'))
             else:
                 long_fragments = split_into_chunks(input_seq)
             
