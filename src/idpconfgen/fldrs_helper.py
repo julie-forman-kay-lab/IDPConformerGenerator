@@ -55,8 +55,8 @@ def tolerance_calculator(tolerance):
     elif tolerance < 0.0:
         tolerance = 0.0
         
-    max_clash = int(tolerance * 50)
-    dist_tolerance = tolerance
+    max_clash = int(tolerance * 80)
+    dist_tolerance = tolerance * 1.25
     
     return max_clash, dist_tolerance
 
@@ -350,8 +350,8 @@ def count_clashes(
         fragment,
         parent,
         case=None,
-        max_clash=50,
-        tolerance=0.5,
+        max_clash=40,
+        tolerance=0.4,
         ):
     """
     Check for steric clashes between two protein chains using vdW radii.
