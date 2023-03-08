@@ -391,31 +391,31 @@ def count_clashes(
     fragment_coords = fragment[:, cols_coords].astype(float)
     
     if case == disorder_cases[0]:
-        # N-IDR, remove last resiude of the fragment from consideration
+        # N-IDR, remove last 3 resiudes of the fragment from consideration
         last_r = int(fragment_seq[len(fragment_seq) - 1])
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
-            try:  # In case the user wants to build less than 2 residues
+            try:  # In case the user wants to build less than 3 residues
                 prev = int(fragment_seq[j - 1])
             except IndexError:
                 continue
             fragment_atoms = fragment_atoms[:-1]
             fragment_coords = fragment_coords[:-1]
-            if last_r - prev == 2:
+            if last_r - prev == 3:
                 break
     elif case == disorder_cases[1]:
         pass
     elif case == disorder_cases[2]:
-        # C-IDR, remove first residue of the fragment from consideration
+        # C-IDR, remove first 3 residues of the fragment from consideration
         first_r = int(fragment_seq[0])
         for i, _ in enumerate(fragment_seq):
-            try:  # In case the user wants to build less than 2 residues
+            try:  # In case the user wants to build less than 3 residues
                 next = int(fragment_seq[i + 1])
             except IndexError:
                 continue
             fragment_atoms = fragment_atoms[1:]
             fragment_coords = fragment_coords[1:]
-            if next - first_r == 2:
+            if next - first_r == 3:
                 break
     
     # Loop through all pairs of atoms in the 2 protein chains
