@@ -107,6 +107,7 @@ from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
+    col_resSeq,
     cols_coords,
     parse_pdb_to_array,
     structure_to_pdb,
@@ -632,41 +633,44 @@ def main(
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
     atom_names = fld_struc.data_array[:, col_name]
+    
+    fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
+    first_seq = fld_seq[0]
+    last_seq = fld_seq[-1]
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
         fld_term_idx = {}
         lower = DISORDER_BOUNDS[i][0]
         upper = DISORDER_BOUNDS[i][1]
-        counter = 0
         # Use the second folded residue's backbone C-N-CA
         # for rotation and alignment where the `C` atom
         # is from the previous resiude
         if lower == 0:  # N-IDR case
             DISORDER_CASE = disorder_cases[0]
             for j, atom in enumerate(atom_names):
-                if counter == 5:
-                    break
-                if atom == "N":
+                curr_seq = fld_seq[j]
+                
+                if curr_seq == first_seq + 1 and atom == "N":
                     fld_term_idx["N"] = j
-                    counter += 1
-                elif atom == "CA":
+                elif curr_seq == first_seq + 1 and atom == "CA":
                     fld_term_idx["CA"] = j
-                    counter += 1
-                elif atom == "C":
+                elif curr_seq == first_seq and atom == "C":
                     fld_term_idx["C"] = j
-                    counter += 1
+                elif curr_seq == first_seq + 2:
+                    break
         elif upper == len(input_seq):  # C-IDR case
             DISORDER_CASE = disorder_cases[2]
             for j, _atom in enumerate(atom_names):
                 k = len(atom_names) - 1 - j
-                if counter == 1 and atom_names[k] == "N":
+                curr_seq = fld_seq[k]
+                
+                if curr_seq == last_seq and atom_names[k] == "N":
                     fld_term_idx["N"] = k
-                    counter += 1
-                elif counter == 0 and atom_names[k] == "CA":
+                elif curr_seq == last_seq and atom_names[k] == "CA":
                     fld_term_idx["CA"] = k
-                    counter += 1
-                elif counter == 2 and atom_names[k] == "C":
+                elif curr_seq == last_seq - 1 and atom_names[k] == "C":
                     fld_term_idx["C"] = k
+                elif curr_seq == last_seq - 2:
                     break
         else:
             DISORDER_CASE = disorder_cases[1]  # break

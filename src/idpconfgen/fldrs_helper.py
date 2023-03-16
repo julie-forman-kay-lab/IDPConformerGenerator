@@ -280,39 +280,44 @@ def align_coords(sample, target, case):
         and translated about target.
     """
     atom_names = sample[:, col_name]
+    res_seq = sample[:, col_resSeq].astype(int)
+    
+    first_seq = res_seq[0]
+    last_seq = res_seq[-1]
+    
     idr_term_idx = {}
-    counter = 0
+    
     if case == disorder_cases[0]:  # N-IDR
         # In the case of N-IDR, we want to move relative to C-term
         for i, _atom in enumerate(atom_names):
             # Use last residues of N-IDR for alignment
             j = len(atom_names) - 1 - i
-            if counter == 1 and atom_names[j] == "N":
+            seq = res_seq[j]
+            
+            if seq == last_seq and atom_names[j] == "N":
                 idr_term_idx["N"] = j
-                counter += 1
-            elif counter == 0 and atom_names[j] == "CA":
+            elif seq == last_seq and atom_names[j] == "CA":
                 idr_term_idx["CA"] = j
-                counter += 1
-            elif counter == 2 and atom_names[j] == "C":
+            elif seq == last_seq - 1 and atom_names[j] == "C":
                 idr_term_idx["C"] = j
+            elif seq == last_seq - 2:
                 break
     elif case == disorder_cases[1]:  # break
         pass
     elif case == disorder_cases[2]:  # C-IDR
         # In the case of C-IDR, we want to move relative to N-term
         for i, atom in enumerate(atom_names):
+            seq = res_seq[i]
+            
             # Use first residues of C-IDR for alignment
-            if counter == 5:
-                break
-            if atom == "N":
+            if seq == first_seq + 1 and atom == "N":
                 idr_term_idx["N"] = i
-                counter += 1
-            elif atom == "CA":
+            elif seq == first_seq + 1 and atom == "CA":
                 idr_term_idx["CA"] = i
-                counter += 1
-            elif atom == "C":
+            elif seq == first_seq and atom == "C":
                 idr_term_idx["C"] = i
-                counter += 1
+            elif seq == first_seq + 2:
+                break
 
     idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
     idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
