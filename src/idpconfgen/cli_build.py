@@ -261,8 +261,8 @@ ap.add_argument(
         "ranges. Note that ALL patterns MUST end "
         "at the last residue with a comma. "
         "For ex. a 301 AA long IDP: --long-ranges 1-113,114-210,211-301,"
-        "Optional flag, if left empty, generate fragments evenly with up "
-        "to 150 AA per fragment."
+        "Optional flag. If left empty, generate IDP with fragments of length "
+        "150 AA at a time. E.g. the same as --long-ranges 1-150,151-300,"
         ),
     nargs='?',
     )
