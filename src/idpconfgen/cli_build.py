@@ -106,6 +106,7 @@ from idpconfgen.libs.libpdb import atom_line_formatter
 from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
+    col_resSeq,
     cols_coords,
     parse_pdb_to_array,
     structure_to_pdb,
@@ -929,18 +930,21 @@ def _build_conformers(
             prev_struc = Structure(Path(output_folder, prev_struc_name))
             prev_struc.build()
             atom_names = prev_struc.data_array[:, col_name]
-            counter = 0
+            prev_seq = prev_struc.data_array[:, col_resSeq].astype(int)
+            last_seq = prev_seq[-1]
+            
             terminal_idx = {}
             for j, _atom in enumerate(atom_names):
                 k = len(atom_names) - 1 - j
-                if counter == 1 and atom_names[k] == "N":
+                curr_seq = prev_seq[k]
+                
+                if curr_seq == last_seq and atom_names[k] == "N":
                     terminal_idx["N"] = k
-                    counter += 1
-                elif counter == 0 and atom_names[k] == "CA":
+                elif curr_seq == last_seq and atom_names[k] == "CA":
                     terminal_idx["CA"] = k
-                    counter += 1
-                elif counter == 2 and atom_names[k] == "C":
+                elif curr_seq == last_seq - 1 and atom_names[k] == "C":
                     terminal_idx["C"] = k
+                elif curr_seq == last_seq - 2:
                     break
                 
             stitch_Cxyz = prev_struc.data_array[terminal_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
