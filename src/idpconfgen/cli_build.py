@@ -629,12 +629,28 @@ def main(
         get_sidechain_packing_parameters(kwargs, sidechain_method)
     
     if long:
-        for seq in LONG_FRAGMENTS:
+        csss_multi_dict = []  # list of csss_dict for each frag
+        if custom_sampling:
+            counter = 1
+            for seq in LONG_FRAGMENTS:
+                temp_csss = {}
+                for res, _ in enumerate(seq):
+                    temp_csss[str(res + 1)] = csss_dict[str(counter)]
+                    counter += 1
+                counter -= 2
+                csss_multi_dict.append(temp_csss)
+                assert len(temp_csss) == len(seq)
+        else:
+            for seq in LONG_FRAGMENTS:
+                csss_multi_dict.append(False)
+                    
+        for idx, seq in enumerate(LONG_FRAGMENTS):
             log.info(S(f"Preparing database for sequence: {seq}"))
             SLICEDICT_XMERS = prepare_slice_dict(
                 primary,
                 seq,
-                dssp_regexes=dssp_regexes,  # TODO implement CSSS also here
+                csss=bool(csss_multi_dict[idx]),
+                dssp_regexes=dssp_regexes,
                 secondary=secondary,
                 mers_size=xmer_probs_tmp.sizes,
                 res_tolerance=residue_tolerance,
@@ -653,7 +669,7 @@ def main(
                 ANGLES,
                 bgeo_strategy,
                 SLICEDICT_XMERS,
-                csss=None,
+                csss=csss_multi_dict[idx],
                 residue_tolerance=residue_tolerance,
                 )
         
