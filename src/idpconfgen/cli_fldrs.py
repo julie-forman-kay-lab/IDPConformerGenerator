@@ -65,6 +65,7 @@ from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.fldrs_helper import (
     align_coords,
     break_check,
+    calculate_distance,
     consecutive_grouper,
     count_clashes,
     create_combinations,
@@ -549,7 +550,7 @@ def main(
         elif upper == len(input_seq):
             dis_seq = input_seq[lower - 2: upper]
         else:
-            dis_seq = input_seq[lower: upper]
+            dis_seq = input_seq[lower - 2: upper + 2]
         
         DISORDER_SEQS.append(dis_seq)
     log.info(S('done'))
@@ -672,8 +673,25 @@ def main(
                     fld_term_idx["C"] = k
                 elif curr_seq == last_seq - 2:
                     break
-        else:
-            DISORDER_CASE = disorder_cases[1]  # break
+        else:  # IDR break case
+            DISORDER_CASE = disorder_cases[1]
+            for s, aa in enumerate(fld_seq):
+                if aa == lower - 1:
+                    if atom_names[s] == 'C':
+                        lower_coords = fld_struc.data_array[:, cols_coords][s].astype(float)
+                        fld_term_idx["C"] = s
+                elif aa == lower:
+                    if atom_names[s] == "N":
+                        fld_term_idx["N"] = s
+                    elif atom_names[s] == "CA":
+                        fld_term_idx["CA"] = s
+                elif aa == upper + 1:
+                    if atom_names[s] == 'C':
+                        upper_coords = fld_struc.data_array[:, cols_coords][s].astype(float)
+                elif aa == upper + 2:
+                    break
+            break_distance = calculate_distance(lower_coords, upper_coords)
+            
 
         fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
         fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
@@ -709,6 +727,7 @@ def main(
             fld_xyz=fld_coords,
             fld_struc=fStruct,
             disorder_case=DISORDER_CASE,
+            ree=break_distance,
             max_clash=max_clash,
             tolerance=dist_tolerance,
             index=i,
@@ -883,6 +902,7 @@ def _build_conformers(
         fld_xyz=None,
         fld_struc=None,
         disorder_case=None,
+        ree=None,
         max_clash=50,
         tolerance=0.5,
         index=None,
@@ -922,21 +942,44 @@ def _build_conformers(
                 )
 
             pdb_arr = parse_pdb_to_array(pdb_string)
-            rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
-            clashes, fragment = count_clashes(
-                rotated,
-                fld_struc,
-                disorder_case,
-                max_clash,
-                tolerance,
-                )
             
-            if type(clashes) is int:
-                final = structure_to_pdb(fragment)
-                log.info(f"Succeeded {disorder_case} to folded region clash check!")  # noqa: E501
-                break
+            if disorder_case == disorder_cases[1]:
+                pdb_atoms = pdb_arr[:, col_name]
+                pdb_coords = pdb_arr[:, cols_coords].astype(float)
+                first_found = False
+                last_counter = 0
+                for i, atom in enumerate(pdb_atoms):
+                    j = len(pdb_atoms) - 1 - i
+                    if atom == 'C' and first_found == False:
+                        first_C = pdb_coords[i]
+                        first_found = True
+                    if pdb_atoms[j] == 'C' and last_counter <= 1:
+                        last_C = pdb_coords[j]
+                        last_counter += 1
+                    if last_counter == 2:
+                        break
+                idp_ree = calculate_distance(first_C, last_C)
+                if ree - 0.75 <= idp_ree <= ree + 0.75:
+                    final = structure_to_pdb(pdb_arr)
+                    break
+                else:
+                    log.info(f"{disorder_case} does not have the correct end-to-end distance... regenerating")  # noqa: E501
             else:
-                log.info(f"Failed {disorder_case} to folded region clash check... regenerating")  # noqa: E501
+                rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
+                clashes, fragment = count_clashes(
+                    rotated,
+                    fld_struc,
+                    disorder_case,
+                    max_clash,
+                    tolerance,
+                    )
+                
+                if type(clashes) is int:
+                    final = structure_to_pdb(fragment)
+                    log.info(f"Succeeded {disorder_case} to folded region clash check!")  # noqa: E501
+                    break
+                else:
+                    log.info(f"Failed {disorder_case} to folded region clash check... regenerating")  # noqa: E501
         
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
