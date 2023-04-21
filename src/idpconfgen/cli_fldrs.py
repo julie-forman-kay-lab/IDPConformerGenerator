@@ -7,7 +7,7 @@ information. Database is as created by `idpconfgen torsions` CLI.
 Future Ideas
 ------------
 WIP: Populate internal disordered regions (code has been scaffolded already).
-- Implement flags to disable N-IDR, Break-IDR, or C-IDR (like secondary structure flags)
+- Implement flags to disable N-IDR, Break-IDR, or C-IDR
   at the choise of the user.
 - Implement CSSS on IDR tails/fragments.
 
@@ -639,6 +639,10 @@ def main(
     
     fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
     first_seq = fld_seq[0]
+    # Check in case PDB structure doesn't start off as residue 1
+    if first_seq > 1:
+        fld_seq -= first_seq - 1
+        first_seq = fld_seq[0]
     last_seq = fld_seq[-1]
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
@@ -676,12 +680,12 @@ def main(
                     fld_term_idx["C"] = k
                 elif curr_seq == last_seq - 2:
                     break
-        else:  # IDR break case
+        else:  # Break-IDR case
             DISORDER_CASE = disorder_cases[1]
             for s, aa in enumerate(fld_seq):
                 if aa == lower - 1:
                     if atom_names[s] == 'C':
-                        lower_coords = fld_struc.data_array[:, cols_coords][s].astype(float)
+                        lower_coords = fld_struc.data_array[:, cols_coords][s].astype(float)  # noqa: E501
                         fld_term_idx["C"] = s
                 elif aa == lower:
                     if atom_names[s] == "N":
@@ -690,11 +694,10 @@ def main(
                         fld_term_idx["CA"] = s
                 elif aa == upper + 1:
                     if atom_names[s] == 'C':
-                        upper_coords = fld_struc.data_array[:, cols_coords][s].astype(float)
+                        upper_coords = fld_struc.data_array[:, cols_coords][s].astype(float)  # noqa: E501
                 elif aa == upper + 2:
                     break
             break_distance = calculate_distance(lower_coords, upper_coords)
-            
 
         fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
         fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
@@ -702,7 +705,7 @@ def main(
         # Coordinates of boundary to stitch to later on
         fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
 
-        populate_globals(
+        populate_globals( 
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
             bgeo_path=bgeo_path,
@@ -790,20 +793,24 @@ def main(
     else:
         current_cases = list(DISORDER_CASE.keys())
         try:
-            break_files = create_combinations(DISORDER_CASE[disorder_cases[1]], nconfs)
+            break_files = \
+                create_combinations(DISORDER_CASE[disorder_cases[1]], nconfs)
         except KeyError:
             pass
-        if set(current_cases) == {disorder_cases[0], disorder_cases[2]}:  # N-IDR and C-IDR
+        # N-IDR and C-IDR
+        if set(current_cases) == {disorder_cases[0], disorder_cases[2]}:
             files = create_combinations(
-                [DISORDER_CASE[disorder_cases[0]], DISORDER_CASE[disorder_cases[2]]],
+                [DISORDER_CASE[disorder_cases[0]], DISORDER_CASE[disorder_cases[2]]],  # noqa: E501
                 nconfs
                 )
-        elif set(current_cases) == {disorder_cases[0], disorder_cases[1]}:  # N-IDR and Break-IDR
+        # N-IDR and Break-IDR
+        elif set(current_cases) == {disorder_cases[0], disorder_cases[1]}:
             files = create_combinations(
                 [DISORDER_CASE[disorder_cases[0]], break_files],
                 nconfs
                 )
-        elif set(current_cases) == {disorder_cases[1], disorder_cases[2]}:  # Break-IDR and C-IDR
+        # Break-IDR and C-IDR
+        elif set(current_cases) == {disorder_cases[1], disorder_cases[2]}:
             files = create_combinations(
                 [break_files, DISORDER_CASE[disorder_cases[2]]],
                 nconfs
@@ -982,7 +989,7 @@ def _build_conformers(
                 last_counter = 0
                 for i, atom in enumerate(pdb_atoms):
                     j = len(pdb_atoms) - 1 - i
-                    if atom == 'C' and first_found == False:
+                    if atom == 'C' and first_found is False:
                         first_C = pdb_coords[i]
                         first_found = True
                     if pdb_atoms[j] == 'C' and last_counter <= 1:
