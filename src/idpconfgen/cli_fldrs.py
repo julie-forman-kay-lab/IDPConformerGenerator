@@ -6,8 +6,10 @@ information. Database is as created by `idpconfgen torsions` CLI.
 
 Future Ideas
 ------------
-- Populate internal disordered regions (code has been scaffolded already)
-- Implement CSSS on IDR tails/fragments
+WIP: Populate internal disordered regions (code has been scaffolded already).
+- Implement flags to disable N-IDR, Break-IDR, or C-IDR (like secondary structure flags)
+  at the choise of the user.
+- Implement CSSS on IDR tails/fragments.
 
 USAGE:
     $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
@@ -640,6 +642,7 @@ def main(
     last_seq = fld_seq[-1]
     # Generate library of conformers for each case
     for i, seq in enumerate(DISORDER_SEQS):
+        break_distance = None
         fld_term_idx = {}
         lower = DISORDER_BOUNDS[i][0]
         upper = DISORDER_BOUNDS[i][1]
@@ -708,9 +711,16 @@ def main(
         
         # create the temporary folders housing the disordered PDBs
         # this folder will be deleted when everything is grafted together
-        temp_of = make_folder_or_cwd(
-            output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE)
-            )
+        if DISORDER_CASE == disorder_cases[1]:
+            temp_of = make_folder_or_cwd(
+                output_folder.joinpath(
+                    TEMP_DIRNAME + DISORDER_CASE + f"/break_{i}"
+                    )
+                )
+        else:
+            temp_of = make_folder_or_cwd(
+                output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE)
+                )
         
         log.info(S(f"Generating temporary disordered conformers for: {seq}"))
         log.info(S(
@@ -775,15 +785,37 @@ def main(
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
     if len(DISORDER_CASE) == 1:
-        case = next(iter(DISORDER_CASE))
+        case = list(DISORDER_CASE.keys())[0]
         files = DISORDER_CASE[case]
-    elif disorder_cases[0] in DISORDER_CASE and disorder_cases[2] in DISORDER_CASE:  # noqa: E501
-        case = disorder_cases[0] + disorder_cases[2]
-        files = create_combinations(
-            DISORDER_CASE[disorder_cases[0]],
-            DISORDER_CASE[disorder_cases[2]],
-            nconfs,
-            )
+    else:
+        current_cases = list(DISORDER_CASE.keys())
+        try:
+            break_files = create_combinations(DISORDER_CASE[disorder_cases[1]], nconfs)
+        except KeyError:
+            pass
+        if set(current_cases) == {disorder_cases[0], disorder_cases[2]}:  # N-IDR and C-IDR
+            files = create_combinations(
+                [DISORDER_CASE[disorder_cases[0]], DISORDER_CASE[disorder_cases[2]]],
+                nconfs
+                )
+        elif set(current_cases) == {disorder_cases[0], disorder_cases[1]}:  # N-IDR and Break-IDR
+            files = create_combinations(
+                [DISORDER_CASE[disorder_cases[0]], break_files],
+                nconfs
+                )
+        elif set(current_cases) == {disorder_cases[1], disorder_cases[2]}:  # Break-IDR and C-IDR
+            files = create_combinations(
+                [break_files, DISORDER_CASE[disorder_cases[2]]],
+                nconfs
+                )
+        else:
+            files = create_combinations(
+                DISORDER_CASE[disorder_cases[0]],
+                break_files,
+                DISORDER_CASE[disorder_cases[2]],
+                nconfs
+                )
+        case = ''.join(current_cases)
         
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(

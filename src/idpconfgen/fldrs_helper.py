@@ -140,10 +140,15 @@ def store_idp_paths(folder, temp_dir):
         case_path[disorder_cases[0]] = \
             [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
+        case_path[disorder_cases[1]] = []
         fpath = folder.joinpath(temp_dir + disorder_cases[1])
-        idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[1]] = \
-            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        break_folders = os.listdir(fpath)
+        for folder in break_folders:
+            idr_folder_path = Path(fpath.joinpath(folder))
+            idr_names = os.listdir(idr_folder_path)
+            case_path[disorder_cases[1]].append(
+                [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
+                )
         # What to do if we have multiple breaks? Maybe split to subdirs
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
         fpath = folder.joinpath(temp_dir + disorder_cases[2])
@@ -154,7 +159,7 @@ def store_idp_paths(folder, temp_dir):
     return case_path
 
 
-def create_combinations(list1, list2, num_combinations):
+def create_combinations(lst, num_combinations):
     """
     Create unique combinations between two lists.
     
@@ -164,9 +169,9 @@ def create_combinations(list1, list2, num_combinations):
     
     Parameters
     ----------
-    list1 : list
-    
-    list2 : list
+    lst : list
+        Can be a list of lists, but normally in the order of
+        N-IDR, Break-IDR, C-IDR paths
     
     num_combinations : int
     
@@ -176,7 +181,7 @@ def create_combinations(list1, list2, num_combinations):
         List of tuples of different combinations as follows:
         [(item from list 1, item from list 2), ...]
     """
-    all_combinations = list(product(list1, list2))
+    all_combinations = list(product(*lst))
     max_combinations = len(all_combinations)
 
     selected_combinations = \
