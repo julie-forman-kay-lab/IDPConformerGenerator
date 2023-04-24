@@ -361,7 +361,8 @@ def align_coords(sample, target, case):
     sample[:, cols_coords] = rotated_points.astype(str)
     
     if case == disorder_cases[1]:
-        translation_vector = target[0] - idr_Fxyz
+        translation_vector = \
+            target[0] - sample[idr_term_idx["F"]][cols_coords].astype(float)
     else:
         translation_vector = \
             target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
