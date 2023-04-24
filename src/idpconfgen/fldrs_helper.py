@@ -307,8 +307,20 @@ def align_coords(sample, target, case):
                 idr_term_idx["C"] = j
             elif seq == last_seq - 2:
                 break
-    elif case == disorder_cases[1]:  # break
-        pass
+    elif case == disorder_cases[1]:  # Break-IDR
+        counter = 0
+        for i, atom in enumerate(atom_names):
+            seq = res_seq[i]
+            j = len(atom_names) - 1 - i
+            rev_seq = res_seq[j]
+            if seq == first_seq and atom == "C":
+                idr_term_idx["F"] = i
+                counter += 1
+            if rev_seq == last_seq - 1 and atom_names[j] == "C":
+                idr_term_idx["L"] = j
+                counter += 1
+            if counter == 2:
+                break
     elif case == disorder_cases[2]:  # C-IDR
         # In the case of C-IDR, we want to move relative to N-term
         for i, atom in enumerate(atom_names):
@@ -323,14 +335,21 @@ def align_coords(sample, target, case):
                 idr_term_idx["C"] = i
             elif seq == first_seq + 2:
                 break
+    if case == disorder_cases[1]:
+        idr_Fxyz = sample[idr_term_idx["F"]][cols_coords].astype(float)
+        idr_Lxyz = sample[idr_term_idx["L"]][cols_coords].astype(float)
+        idr_Mxyz = np.mean([idr_Fxyz, idr_Lxyz], axis = 0)
+        idr_xyz = sample[:, cols_coords].astype(float)
+        
+        idr_coords = np.array([idr_Fxyz, idr_Lxyz])
+    else:
+        idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
+        idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
+        idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
+        idr_xyz = sample[:, cols_coords].astype(float)
 
-    idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
-    idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
-    idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
-    idr_xyz = sample[:, cols_coords].astype(float)
-    
-    idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
-    
+        idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
+
     centered_idr = idr_coords - idr_coords.mean(axis=0)
     centered_fld = target - target.mean(axis=0)
     
@@ -341,8 +360,11 @@ def align_coords(sample, target, case):
     rotated_points = np.dot(idr_xyz, rotation_matrix)
     sample[:, cols_coords] = rotated_points.astype(str)
     
-    translation_vector = \
-        target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
+    if case == disorder_cases[1]:
+        translation_vector = target[0] - idr_Fxyz
+    else:
+        translation_vector = \
+            target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
 
     for i, coords in enumerate(sample[:, cols_coords]):
         x = str(round(translation_vector[0] + float(coords[0]), 3))

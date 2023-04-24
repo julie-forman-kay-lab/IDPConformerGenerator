@@ -685,25 +685,19 @@ def main(
             for s, aa in enumerate(fld_seq):
                 if aa == lower - 1:
                     if atom_names[s] == 'C':
-                        lower_coords = fld_struc.data_array[:, cols_coords][s].astype(float)  # noqa: E501
-                        fld_term_idx["C"] = s
-                elif aa == lower:
-                    if atom_names[s] == "N":
-                        fld_term_idx["N"] = s
-                    elif atom_names[s] == "CA":
-                        fld_term_idx["CA"] = s
+                        fld_term_idx["F"] = s
                 elif aa == upper + 1:
                     if atom_names[s] == 'C':
-                        upper_coords = fld_struc.data_array[:, cols_coords][s].astype(float)  # noqa: E501
+                        fld_term_idx["L"] = s
                 elif aa == upper + 2:
                     break
-            break_distance = calculate_distance(lower_coords, upper_coords)
-
-        fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float).tolist()  # noqa: E501
-        fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float).tolist()  # noqa: E501
-        fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float).tolist()  # noqa: E501
+        
+        fld_Fxyz = fld_struc.data_array[fld_term_idx["F"]][cols_coords].astype(float)  # noqa: E501
+        fld_Lxyz = fld_struc.data_array[fld_term_idx["L"]][cols_coords].astype(float)  # noqa: E501
+        fld_Mxyz = np.mean([fld_Fxyz, fld_Lxyz], axis=0)
         # Coordinates of boundary to stitch to later on
-        fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
+        fld_coords = np.array([fld_Fxyz, fld_Mxyz, fld_Lxyz])
+        break_distance = calculate_distance(fld_Fxyz, fld_Lxyz)
 
         populate_globals( 
             input_seq=seq,
@@ -942,8 +936,8 @@ def _build_conformers(
         fld_struc=None,
         disorder_case=None,
         ree=None,
-        max_clash=50,
-        tolerance=0.5,
+        max_clash=40,
+        tolerance=0.4,
         index=None,
         input_seq=None,
         conformer_name='conformer',
@@ -985,20 +979,24 @@ def _build_conformers(
             if disorder_case == disorder_cases[1]:
                 pdb_atoms = pdb_arr[:, col_name]
                 pdb_coords = pdb_arr[:, cols_coords].astype(float)
-                first_found = False
-                last_counter = 0
+                res_seq = pdb_arr[:, col_resSeq].astype(int)
+                first_seq = res_seq[0]
+                last_seq = res_seq[-1]
+                counter = 0
                 for i, atom in enumerate(pdb_atoms):
+                    seq = res_seq[i]
                     j = len(pdb_atoms) - 1 - i
-                    if atom == 'C' and first_found is False:
+                    rev_seq = res_seq[j]
+                    if seq == first_seq and atom == "C":
                         first_C = pdb_coords[i]
-                        first_found = True
-                    if pdb_atoms[j] == 'C' and last_counter <= 1:
+                        counter += 1
+                    if rev_seq == last_seq - 1 and pdb_atoms[j] == "C":
                         last_C = pdb_coords[j]
-                        last_counter += 1
-                    if last_counter == 2:
+                        counter += 1
+                    if counter == 2:
                         break
                 idp_ree = calculate_distance(first_C, last_C)
-                if ree - 0.75 <= idp_ree <= ree + 0.75:
+                if ree - 0.1 <= idp_ree <= ree + 0.1:
                     final = structure_to_pdb(pdb_arr)
                     break
                 else:
