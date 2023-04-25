@@ -692,12 +692,19 @@ def main(
                 elif aa == upper + 2:
                     break
         
-        fld_Fxyz = fld_struc.data_array[fld_term_idx["F"]][cols_coords].astype(float)  # noqa: E501
-        fld_Lxyz = fld_struc.data_array[fld_term_idx["L"]][cols_coords].astype(float)  # noqa: E501
-        fld_Mxyz = np.mean([fld_Fxyz, fld_Lxyz], axis=0)
-        # Coordinates of boundary to stitch to later on
-        fld_coords = np.array([fld_Fxyz, fld_Mxyz, fld_Lxyz])
-        break_distance = calculate_distance(fld_Fxyz, fld_Lxyz)
+        if DISORDER_CASE == disorder_cases[1]:
+            fld_Fxyz = fld_struc.data_array[fld_term_idx["F"]][cols_coords].astype(float)  # noqa: E501
+            fld_Lxyz = fld_struc.data_array[fld_term_idx["L"]][cols_coords].astype(float)  # noqa: E501
+            # Coordinates of boundary to stitch to later on
+            fld_coords = np.array([fld_Fxyz, fld_Lxyz])
+            break_distance = calculate_distance(fld_Fxyz, fld_Lxyz)
+        else:
+            fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float)  # noqa: E501
+            fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float)  # noqa: E501
+            fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
+            # Coordinates of boundary to stitch to later on
+            fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
+            break_distance = None
 
         populate_globals( 
             input_seq=seq,
@@ -823,6 +830,7 @@ def main(
         psurgeon,
         fld_struc=Path(folded_structure),
         case=case,
+        insert_idx=lower,  # TODO: Change how psurgeon works for Break-IDR
         )
     execute = partial(
         report_on_crash,

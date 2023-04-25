@@ -343,9 +343,9 @@ def align_coords(sample, target, case):
         
         idr_coords = np.array([idr_Fxyz, idr_Lxyz])
     else:
-        idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float).tolist()
-        idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float).tolist()
-        idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float).tolist()
+        idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float)
+        idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float)
+        idr_CAxyz = sample[idr_term_idx["CA"]][cols_coords].astype(float)
         idr_xyz = sample[:, cols_coords].astype(float)
 
         idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
@@ -437,7 +437,32 @@ def count_clashes(
             if last_r - prev == 3:
                 break
     elif case == disorder_cases[1]:
-        pass
+        # Break-IDR remove first and last 3 residues of fragment
+        first_r = int(fragment_seq[0])
+        last_r = int(fragment_seq[len(fragment_seq) - 1])
+        fin_first = False
+        fin_last = False
+        for i, _ in enumerate(fragment_seq):
+            j = len(fragment_seq) - 1 - i
+            try:  # In case the user wants to build less than 3 residues
+                prev = int(fragment_seq[j - 1])
+                next = int(fragment_seq[i + 1])
+            except IndexError:
+                continue
+            
+            if fin_first == False:
+                fragment_atoms = fragment_atoms[1:]
+                fragment_coords = fragment_coords[1:]
+            if fin_last == False:
+                fragment_atoms = fragment_atoms[:-1]
+                fragment_coords = fragment_coords[:-1]
+            if next - first_r == 3:
+                fin_first = True
+            if last_r - prev == 3:
+                fin_last = True
+            
+            if fin_first and fin_last == True:
+                break
     elif case == disorder_cases[2]:
         # C-IDR, remove first 3 residues of fragment from consideration
         first_r = int(fragment_seq[0])
@@ -471,7 +496,7 @@ def count_clashes(
     return num_clashes, fragment
 
 
-def psurgeon(idp_struc, fld_struc, case):
+def psurgeon(idp_struc, fld_struc, case, insert_idx):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
@@ -485,6 +510,9 @@ def psurgeon(idp_struc, fld_struc, case):
 
     fld_struc : Path or IDPConformerGenerator.Structure
         Folded structure to be grafted on
+    
+    insert_idx : int
+        For Break-IDR, where we would insert the chain to close the break
 
     Returns
     -------
@@ -494,21 +522,20 @@ def psurgeon(idp_struc, fld_struc, case):
     if type(fld_struc) is Path:
         fld = Structure(fld_struc)
         fld.build()
+        fld_seq = fld.data_array[:, col_resSeq]
+        fld_data_array = fld.data_array
     if type(idp_struc) is Path:
         idr = Structure(idp_struc)
         idr.build()
+        idr_seq = idr.data_array[:, col_resSeq]
+        idr_data_array = idr.data_array
     elif type(idp_struc) is tuple:
         nidr = Structure(idp_struc[0])
         cidr = Structure(idp_struc[1])
         nidr.build()
         cidr.build()
-        
-    fld_seq = fld.data_array[:, col_resSeq]
-    fld_data_array = fld.data_array
     
     if case == disorder_cases[0]:
-        idr_seq = idr.data_array[:, col_resSeq]
-        idr_data_array = idr.data_array
         # N-IDR, remove last resiude of fragment
         # and remove the first residue of folded-domain
         for i, _seq in enumerate(idr_seq):
@@ -532,15 +559,60 @@ def psurgeon(idp_struc, fld_struc, case):
         
         new_struc_arr = np.append(idr.data_array, fld.data_array, axis=0)
         
-        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
-        new_struc_arr[:, col_serial] = new_serial
-        new_struc_arr[:, col_chainID] = "A"
-        new_struc_arr[:, col_segid] = "A"
-    elif case == disorder_cases[1]:  # internal loop TBD
-        pass
+    elif case == disorder_cases[1]:
+        # Break-IDR, remove first and last residue of fragment
+        # and folded protein
+        first_rm = False
+        last_rm = False
+        for i, _seq in enumerate(idr_seq):
+            j = len(idr_seq) - 1 - i
+            curr_rev = idr_seq[j]
+            curr = idr_seq[i]
+            try:
+                prev = idr_seq[j - 1]
+                next = idr_seq[i + 1]
+            except IndexError:
+                continue
+            if first_rm is False:
+                idr_data_array = idr_data_array[:-1]
+            if last_rm is False:
+                idr_data_array = idr_data_array[1:]
+            if prev != curr_rev:
+                last_rm = True
+            if next != curr:
+                first_rm = True
+            
+            if first_rm and last_rm is True:
+                break
+        
+        first_rm = False
+        last_rm = False
+        for i, _seq in enumerate(fld_seq):
+            j = len(fld_seq) - 1 - i
+            curr_rev = fld_seq[j]
+            curr = fld_seq[i]
+            try:
+                prev = fld_seq[j - 1]
+                next = fld_seq[i + 1]
+            except IndexError:
+                continue
+            
+            if first_rm is False:
+                fld_data_array = fld_data_array[:-1]
+            if last_rm is False:
+                fld_data_array = fld_data_array[1:]
+            if prev != curr_rev:
+                last_rm = True
+            if next != curr:
+                first_rm = True
+            
+            if first_rm and last_rm is True:
+                break
+        
+        fld_data_list = fld_data_array.tolist()
+        idr_data_list = idr_data_array.tolist()
+        
     elif case == disorder_cases[2]:
-        idr_seq = idr.data_array[:, col_resSeq]
-        idr_data_array = idr.data_array
         # C-IDR, remove last resiude of folded protein
         # and remove the first residue of C-IDR
         for i, _seq in enumerate(fld_seq):
@@ -577,11 +649,6 @@ def psurgeon(idp_struc, fld_struc, case):
         
         # Initialize and clean new structure
         new_struc_arr = np.append(fld.data_array, idr.data_array, axis=0)
-        
-        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
-        new_struc_arr[:, col_serial] = new_serial
-        new_struc_arr[:, col_chainID] = "A"
-        new_struc_arr[:, col_segid] = "A"
         
     elif case == disorder_cases[0] + disorder_cases[2]:
         nidr_seq = nidr.data_array[:, col_resSeq]
@@ -649,10 +716,10 @@ def psurgeon(idp_struc, fld_struc, case):
         
         new_struc_arr = np.append(new_struc_arr, cidr.data_array, axis=0)
         
-        new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
-        new_struc_arr[:, col_serial] = new_serial
-        new_struc_arr[:, col_chainID] = "A"
-        new_struc_arr[:, col_segid] = "A"
+    new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
+    new_struc_arr[:, col_serial] = new_serial
+    new_struc_arr[:, col_chainID] = "A"
+    new_struc_arr[:, col_segid] = "A"
     
     return new_struc_arr
 
