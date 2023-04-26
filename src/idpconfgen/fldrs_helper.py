@@ -496,7 +496,7 @@ def count_clashes(
     return num_clashes, fragment
 
 
-def psurgeon(idp_struc, fld_struc, case, insert_idx):
+def psurgeon(idp_struc, fld_struc, case, ranges):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
@@ -511,8 +511,8 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
     fld_struc : Path or IDPConformerGenerator.Structure
         Folded structure to be grafted on
     
-    insert_idx : int
-        For Break-IDR, where we would insert the chain to close the break
+    ranges : tuple of int
+        For Break-IDR, what residue ranges for the chain break
 
     Returns
     -------
@@ -524,6 +524,10 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
         fld.build()
         fld_seq = fld.data_array[:, col_resSeq]
         fld_data_array = fld.data_array
+    else:
+        fld_seq = fld_struc.data_array[:, col_resSeq]
+        fld_data_array = fld_struc.data_array
+        
     if type(idp_struc) is Path:
         idr = Structure(idp_struc)
         idr.build()
@@ -534,6 +538,9 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
         cidr = Structure(idp_struc[1])
         nidr.build()
         cidr.build()
+    else:
+        idr_seq = idp_struc[:, col_resSeq]
+        idr_data_array = idp_struc
     
     if case == disorder_cases[0]:
         # N-IDR, remove last resiude of fragment
@@ -560,6 +567,8 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
         new_struc_arr = np.append(idr.data_array, fld.data_array, axis=0)
         
     elif case == disorder_cases[1]:
+        lower = ranges[0]
+        upper = ranges[1]
         # Break-IDR, remove first and last residue of fragment
         # and folded protein
         first_rm = False
@@ -573,44 +582,47 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
                 next = idr_seq[i + 1]
             except IndexError:
                 continue
+            
             if first_rm is False:
-                idr_data_array = idr_data_array[:-1]
-            if last_rm is False:
                 idr_data_array = idr_data_array[1:]
-            if prev != curr_rev:
-                last_rm = True
-            if next != curr:
-                first_rm = True
-            
-            if first_rm and last_rm is True:
-                break
-        
-        first_rm = False
-        last_rm = False
-        for i, _seq in enumerate(fld_seq):
-            j = len(fld_seq) - 1 - i
-            curr_rev = fld_seq[j]
-            curr = fld_seq[i]
-            try:
-                prev = fld_seq[j - 1]
-                next = fld_seq[i + 1]
-            except IndexError:
-                continue
-            
-            if first_rm is False:
-                fld_data_array = fld_data_array[:-1]
             if last_rm is False:
-                fld_data_array = fld_data_array[1:]
+                idr_data_array = idr_data_array[:-1]
             if prev != curr_rev:
                 last_rm = True
             if next != curr:
                 first_rm = True
             
             if first_rm and last_rm is True:
+                first_rm = False
+                last_rm = False
                 break
         
-        fld_data_list = fld_data_array.tolist()
+        og_fld_list = fld_data_array.tolist()
         idr_data_list = idr_data_array.tolist()
+        fld_data_list = []
+        # Find the position to insert IDR
+        # Remove the first and last residue at the break site
+        first_fld_seq = int(fld_seq[0])
+        actual_lower = first_fld_seq + lower - 1
+        actual_upper = first_fld_seq + upper
+        found = False
+        for i, seq in enumerate(fld_seq):
+            seq = int(seq)
+            if seq == actual_lower or seq == actual_upper:
+                if found is False:
+                    found = True
+                    insert_idx = i
+            else:
+                fld_data_list.append(og_fld_list[i])
+        
+        idr_seq = idr_data_array[:, col_resSeq].astype(int)
+ 
+        for i, row in enumerate(idr_data_list):
+            # Fix residue numbering for IDR (we know it starts at 1)
+            row[col_resSeq] = str(idr_seq[i] + actual_lower - 2)
+            fld_data_list.insert(insert_idx + i, row)
+        
+        new_struc_arr = np.array(fld_data_list)
         
     elif case == disorder_cases[2]:
         # C-IDR, remove last resiude of folded protein
@@ -625,7 +637,7 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
         
         fld._data_array = fld_data_array
         
-        for i, _seq in enumerate(idr_seq):
+        for i, _ in enumerate(idr_seq):
             curr = idr_seq[i]
             next = idr_seq[i + 1]
             idr_data_array = idr_data_array[1:]
@@ -683,7 +695,7 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
         new_struc_seq = new_struc_arr[:, col_resSeq]
         
         # Remove last residue of folded domain (now protein)
-        for i, _seq in enumerate(new_struc_seq):
+        for i, _ in enumerate(new_struc_seq):
             j = len(new_struc_seq) - 1 - i
             curr = new_struc_seq[j]
             prev = new_struc_seq[j - 1]
@@ -692,7 +704,7 @@ def psurgeon(idp_struc, fld_struc, case, insert_idx):
                 break
         
         # Remove first residue of C-IDR
-        for i, _seq in enumerate(cidr_seq):
+        for i, _ in enumerate(cidr_seq):
             curr = cidr_seq[i]
             next = cidr_seq[i + 1]
             cidr_data_array = cidr_data_array[1:]
