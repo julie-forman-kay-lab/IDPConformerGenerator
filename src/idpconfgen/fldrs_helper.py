@@ -274,6 +274,11 @@ def align_coords(sample, target, case):
     target : np.array
         Set of 3D coordinates representing positions of C, N, CA
         fixed points to align to.
+        
+        For Break-IDR it would be (F, L), (CA, N) where "F" and "L"
+        are the positions of "C" for the first and last bit of the
+        chain break respectively and "CA" is for alignment to
+        first part of break while "N" is for the last part.
     
     case : str
         IDR case as mentioned above (N-IDR, C-IDR, Break-IDR).
@@ -335,13 +340,14 @@ def align_coords(sample, target, case):
                 idr_term_idx["C"] = i
             elif seq == first_seq + 2:
                 break
+
     if case == disorder_cases[1]:
         idr_Fxyz = sample[idr_term_idx["F"]][cols_coords].astype(float)
         idr_Lxyz = sample[idr_term_idx["L"]][cols_coords].astype(float)
-        idr_Mxyz = np.mean([idr_Fxyz, idr_Lxyz], axis = 0)
         idr_xyz = sample[:, cols_coords].astype(float)
         
         idr_coords = np.array([idr_Fxyz, idr_Lxyz])
+        centered_fld = target[0] - target[0].mean(axis=0)
     else:
         idr_Cxyz = sample[idr_term_idx["C"]][cols_coords].astype(float)
         idr_Nxyz = sample[idr_term_idx["N"]][cols_coords].astype(float)
@@ -349,9 +355,9 @@ def align_coords(sample, target, case):
         idr_xyz = sample[:, cols_coords].astype(float)
 
         idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
+        centered_fld = target - target.mean(axis=0)
 
     centered_idr = idr_coords - idr_coords.mean(axis=0)
-    centered_fld = target - target.mean(axis=0)
     
     covariance_matrix = np.dot(centered_idr.T, centered_fld)
     U, S, Vt = np.linalg.svd(covariance_matrix)
@@ -362,7 +368,7 @@ def align_coords(sample, target, case):
     
     if case == disorder_cases[1]:
         translation_vector = \
-            target[0] - sample[idr_term_idx["F"]][cols_coords].astype(float)
+            target[0][0] - sample[idr_term_idx["F"]][cols_coords].astype(float)
     else:
         translation_vector = \
             target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
@@ -376,6 +382,46 @@ def align_coords(sample, target, case):
         sample[i][col_y] = y
         sample[i][col_z] = z
     
+    # Second round of translation required to handle CA-N distances
+    # must be around 2.4 A
+    if case == disorder_cases[1]:
+        # These points are fixed
+        fld_CA = target[1][0]
+        fld_N = target[1][1]
+        
+        desired_dist = 2.4
+        first_res = sample[:, col_resSeq][0].astype(int)
+        last_res = sample[:, col_resSeq][-1].astype(int)
+        counter = 0
+        for i, row in enumerate(sample):
+            j = len(sample) - i - 1
+            curr = row[col_resSeq].astype(int)
+            fwd_res = row[col_name]
+            last = sample[:, col_resSeq][j].astype(int)
+            rev_res = sample[:, col_name][j]
+            if curr == first_res + 1 and fwd_res == 'N':
+                idr_N = row[cols_coords].astype(float)
+                counter += 1
+            if last == last_res - 1 and rev_res == 'CA':
+                idr_CA = sample[:, cols_coords][j].astype(float)
+                counter += 1
+            if counter == 2:
+                break
+        
+        dir1 = (idr_N - fld_CA) / np.linalg.norm(idr_N - fld_CA)
+        dir2 = (idr_CA - fld_N) / np.linalg.norm(idr_CA - fld_N)
+
+        second_translation = ((fld_CA + desired_dist * dir1) - idr_N) + ((fld_N + desired_dist * dir2) - idr_CA)  # noqa: E501
+        
+        for i, coords in enumerate(sample[:, cols_coords]):
+            x = str(round(second_translation[0] + float(coords[0]), 3))
+            y = str(round(second_translation[1] + float(coords[1]), 3))
+            z = str(round(second_translation[2] + float(coords[2]), 3))
+
+            sample[i][col_x] = x
+            sample[i][col_y] = y
+            sample[i][col_z] = z
+
     return sample
 
 
@@ -570,13 +616,12 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
         lower = ranges[0]
         upper = ranges[1]
         # Break-IDR, remove first and last residue of fragment
-        # and folded protein
+        # and folded protein between the break
         first_rm = False
         last_rm = False
-        for i, _seq in enumerate(idr_seq):
+        for i, seq in enumerate(idr_seq):
             j = len(idr_seq) - 1 - i
             curr_rev = idr_seq[j]
-            curr = idr_seq[i]
             try:
                 prev = idr_seq[j - 1]
                 next = idr_seq[i + 1]
@@ -589,7 +634,7 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
                 idr_data_array = idr_data_array[:-1]
             if prev != curr_rev:
                 last_rm = True
-            if next != curr:
+            if next != seq:
                 first_rm = True
             
             if first_rm and last_rm is True:
@@ -624,6 +669,74 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
         
         new_struc_arr = np.array(fld_data_list)
         
+        # Fix the position of the Oxygen atoms at the stitch sites
+        new_struc_atoms = new_struc_arr[:, col_name]
+        new_struc_res = new_struc_arr[:, col_resSeq].astype(int)
+        new_struc_coords = new_struc_arr[:, cols_coords].astype(float)
+        lower_idx = {}
+        lower_pts = {}
+        upper_idx = {}
+        upper_pts = {}
+        for s, seq in enumerate(new_struc_res):
+            if seq == actual_lower - 1:
+                if new_struc_atoms[s] == 'CA':
+                    lower_idx['CA'] = s
+                    lower_pts['CA'] = new_struc_coords[s]
+                elif new_struc_atoms[s] == 'C':
+                    lower_idx['C'] = s
+                    lower_pts['C'] = new_struc_coords[s]
+                elif new_struc_atoms[s] == 'O':
+                    lower_idx['O'] = s
+                    lower_pts['O'] = new_struc_coords[s]
+            elif seq == actual_lower and new_struc_atoms[s] == 'N':
+                lower_idx['N'] = s
+                lower_pts['N'] = new_struc_coords[s]
+            elif seq == actual_upper:
+                if new_struc_atoms[s] == 'CA':
+                    upper_idx['CA'] = s
+                    upper_pts['CA'] = new_struc_coords[s]
+                elif new_struc_atoms[s] == 'C':
+                    upper_idx['C'] = s
+                    upper_pts['C'] = new_struc_coords[s]
+                elif new_struc_atoms[s] == 'O':
+                    upper_idx['O'] = s
+                    upper_pts['O'] = new_struc_coords[s]
+            elif seq == actual_upper + 1 and new_struc_atoms[s] == 'N':
+                upper_idx['N'] = s
+                upper_pts['N'] = new_struc_coords[s]
+            elif seq == actual_upper + 2:
+                break
+        
+        lower_CO_length = calculate_distance(lower_pts['C'], lower_pts['O'])
+        upper_CO_length = calculate_distance(upper_pts['C'], upper_pts['O'])
+        
+        lower_base_vector = lower_pts['CA'] - lower_pts['N']
+        lower_base_vector /= np.linalg.norm(lower_base_vector)
+        
+        upper_base_vector = upper_pts['CA'] - upper_pts['N']
+        upper_base_vector /= np.linalg.norm(upper_base_vector)
+        
+        lower_slant = lower_pts['C'] - lower_pts['N']
+        lower_projection = np.dot(lower_slant, lower_base_vector)
+        lower_perpendicular = np.sqrt(np.abs(np.linalg.norm(lower_slant)**2 - lower_projection**2))
+        
+        upper_slant = upper_pts['C'] - upper_pts['N']
+        upper_projection = np.dot(upper_slant, upper_base_vector)
+        upper_perpendicular = np.sqrt(np.abs(np.linalg.norm(upper_slant)**2 - upper_projection**2))
+   
+        lower_displacement = lower_perpendicular * lower_base_vector
+        upper_displacement = upper_perpendicular * upper_base_vector
+        
+        new_lower_O = lower_pts['O'] + lower_displacement + lower_CO_length
+        new_upper_O = upper_pts['O'] + upper_displacement + upper_CO_length
+        
+        new_struc_arr[:, col_x][lower_idx['O']] = str(new_lower_O[0])
+        new_struc_arr[:, col_y][lower_idx['O']] = str(new_lower_O[1])
+        new_struc_arr[:, col_z][lower_idx['O']] = str(new_lower_O[2])
+        new_struc_arr[:, col_x][upper_idx['O']] = str(new_upper_O[0])
+        new_struc_arr[:, col_y][upper_idx['O']] = str(new_upper_O[1])
+        new_struc_arr[:, col_z][upper_idx['O']] = str(new_upper_O[2])
+    
     elif case == disorder_cases[2]:
         # C-IDR, remove last resiude of folded protein
         # and remove the first residue of C-IDR

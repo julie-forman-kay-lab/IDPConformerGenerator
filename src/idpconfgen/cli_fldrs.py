@@ -686,17 +686,21 @@ def main(
                 if aa == lower - 1:
                     if atom_names[s] == 'C':
                         fld_term_idx["F"] = s
-                elif aa == upper + 1:
-                    if atom_names[s] == 'C':
-                        fld_term_idx["L"] = s
-                elif aa == upper + 2:
+                    elif atom_names[s] == 'CA':
+                        fld_term_idx["CA"] = s
+                elif aa == upper + 1 and atom_names[s] == 'C':
+                    fld_term_idx["L"] = s
+                elif aa == upper + 2 and atom_names[s] == 'N':
+                    fld_term_idx["N"] = s
+                elif aa == upper + 3:
                     break
-        
         if DISORDER_CASE == disorder_cases[1]:
             fld_Fxyz = fld_struc.data_array[fld_term_idx["F"]][cols_coords].astype(float)  # noqa: E501
             fld_Lxyz = fld_struc.data_array[fld_term_idx["L"]][cols_coords].astype(float)  # noqa: E501
+            fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
+            fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float)  # noqa: E501
             # Coordinates of boundary to stitch to later on
-            fld_coords = np.array([fld_Fxyz, fld_Lxyz])
+            fld_coords = (np.array([fld_Fxyz, fld_Lxyz]), np.array([fld_CAxyz, fld_Nxyz]))
             break_distance = calculate_distance(fld_Fxyz, fld_Lxyz)
         else:
             fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float)  # noqa: E501
