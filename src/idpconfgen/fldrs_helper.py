@@ -496,10 +496,10 @@ def count_clashes(
             except IndexError:
                 continue
             
-            if fin_first == False:
+            if fin_first is False:
                 fragment_atoms = fragment_atoms[1:]
                 fragment_coords = fragment_coords[1:]
-            if fin_last == False:
+            if fin_last is False:
                 fragment_atoms = fragment_atoms[:-1]
                 fragment_coords = fragment_coords[:-1]
             if next - first_r == 3:
@@ -507,7 +507,7 @@ def count_clashes(
             if last_r - prev == 3:
                 fin_last = True
             
-            if fin_first and fin_last == True:
+            if fin_first and fin_last is True:
                 break
     elif case == disorder_cases[2]:
         # C-IDR, remove first 3 residues of fragment from consideration
@@ -691,7 +691,7 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
             elif seq == actual_lower and new_struc_atoms[s] == 'N':
                 lower_idx['N'] = s
                 lower_pts['N'] = new_struc_coords[s]
-            elif seq == 600:
+            elif seq == actual_upper:
                 if new_struc_atoms[s] == 'CA':
                     upper_idx['CA'] = s
                     upper_pts['CA'] = new_struc_coords[s]
@@ -712,19 +712,13 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
         
         lower_CAC = lower_pts['CA'] - lower_pts['C']
         lower_NC = lower_pts['N'] - lower_pts['C']
-        lower_angle = np.arccos(np.dot(lower_CAC, lower_NC) /\
-            (np.linalg.norm(lower_CAC) * np.linalg.norm(lower_NC)))
-        lower_O_vector = lower_CO_length * np.sin(lower_angle/2) \
-            * (lower_CAC / np.linalg.norm(lower_CAC)) + lower_CO_length \
-            * np.sin(lower_angle/2) * (lower_NC / np.linalg.norm(lower_NC))
+        lower_angle = np.arccos(np.dot(lower_CAC, lower_NC) / (np.linalg.norm(lower_CAC) * np.linalg.norm(lower_NC)))  # noqa: E501
+        lower_O_vector = lower_CO_length * np.sin(lower_angle / 2) * (lower_CAC / np.linalg.norm(lower_CAC)) + lower_CO_length * np.sin(lower_angle / 2) * (lower_NC / np.linalg.norm(lower_NC))  # noqa: E501
 
         upper_CAC = upper_pts['CA'] - upper_pts['C']
         upper_NC = upper_pts['N'] - upper_pts['C']
-        upper_angle = np.arccos(np.dot(upper_CAC, upper_NC) /\
-            (np.linalg.norm(upper_CAC) * np.linalg.norm(upper_NC)))
-        upper_O_vector = lower_CO_length * np.sin(upper_angle/2) \
-            * (upper_CAC / np.linalg.norm(upper_CAC)) + upper_CO_length \
-            * np.sin(upper_angle/2) * (upper_NC / np.linalg.norm(upper_NC))
+        upper_angle = np.arccos(np.dot(upper_CAC, upper_NC) / (np.linalg.norm(upper_CAC) * np.linalg.norm(upper_NC)))  # noqa: E501
+        upper_O_vector = lower_CO_length * np.sin(upper_angle / 2) * (upper_CAC / np.linalg.norm(upper_CAC)) + upper_CO_length * np.sin(upper_angle / 2) * (upper_NC / np.linalg.norm(upper_NC))  # noqa: E501
         
         new_lower_O = lower_pts['C'] - lower_O_vector
         new_upper_O = upper_pts['C'] - upper_O_vector

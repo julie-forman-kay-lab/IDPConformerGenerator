@@ -700,7 +700,7 @@ def main(
             fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
             fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float)  # noqa: E501
             # Coordinates of boundary to stitch to later on
-            fld_coords = (np.array([fld_Fxyz, fld_Lxyz]), np.array([fld_CAxyz, fld_Nxyz]))
+            fld_coords = (np.array([fld_Fxyz, fld_Lxyz]), np.array([fld_CAxyz, fld_Nxyz]))  # noqa: E501
             break_distance = calculate_distance(fld_Fxyz, fld_Lxyz)
         else:
             fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float)  # noqa: E501
@@ -710,7 +710,7 @@ def main(
             fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
             break_distance = None
 
-        populate_globals( 
+        populate_globals(
             input_seq=seq,
             bgeo_strategy=bgeo_strategy,
             bgeo_path=bgeo_path,
@@ -1009,10 +1009,23 @@ def _build_conformers(
                         break
                 idp_ree = calculate_distance(first_C, last_C)
                 if ree - 0.1 <= idp_ree <= ree + 0.1:
-                    final = structure_to_pdb(pdb_arr)
-                    break
+                    rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
+                    clashes, fragment = count_clashes(
+                        rotated,
+                        fld_struc,
+                        disorder_case,
+                        max_clash * 2,
+                        tolerance,
+                        )
+                    
+                    if type(clashes) is int:
+                        final = structure_to_pdb(fragment)
+                        log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
+                        break
+                    else:
+                        log.info(f"Failed. {disorder_case} to folded region clash check... regenerating")  # noqa: E501
                 else:
-                    log.info(f"{disorder_case} does not have the correct end-to-end distance... regenerating")  # noqa: E501
+                    log.info(f"Failed. {disorder_case} does not have the correct Ree... regenerating")  # noqa: E501
             else:
                 rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
                 clashes, fragment = count_clashes(
@@ -1025,10 +1038,10 @@ def _build_conformers(
                 
                 if type(clashes) is int:
                     final = structure_to_pdb(fragment)
-                    log.info(f"Succeeded {disorder_case} to folded region clash check!")  # noqa: E501
+                    log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
                     break
                 else:
-                    log.info(f"Failed {disorder_case} to folded region clash check... regenerating")  # noqa: E501
+                    log.info(f"Failed. {disorder_case} to folded region clash check... regenerating")  # noqa: E501
         
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
 
