@@ -140,16 +140,15 @@ def store_idp_paths(folder, temp_dir):
         case_path[disorder_cases[0]] = \
             [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
-        case_path[disorder_cases[1]] = []
+        # What to do if we have multiple breaks? Maybe split to subdirs
+        # case_path[disorder_cases[1]] = []
         fpath = folder.joinpath(temp_dir + disorder_cases[1])
         break_folders = os.listdir(fpath)
         for folder in break_folders:
             idr_folder_path = Path(fpath.joinpath(folder))
             idr_names = os.listdir(idr_folder_path)
-            case_path[disorder_cases[1]].append(
+            case_path[disorder_cases[1]] = \
                 [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
-                )
-        # What to do if we have multiple breaks? Maybe split to subdirs
     if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
         fpath = folder.joinpath(temp_dir + disorder_cases[2])
         idr_confs = os.listdir(fpath)

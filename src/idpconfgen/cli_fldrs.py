@@ -828,13 +828,14 @@ def main(
                 nconfs
                 )
         case = ''.join(current_cases)
-        
+    
+    # TODO: need to modify stitching for multiple Break IDRs
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(
         psurgeon,
         fld_struc=Path(folded_structure),
         case=case,
-        insert_idx=lower,  # TODO: Change how psurgeon works for Break-IDR
+        insert_idx=(lower, upper),
         )
     execute = partial(
         report_on_crash,
