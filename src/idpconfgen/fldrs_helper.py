@@ -691,7 +691,7 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
             elif seq == actual_lower and new_struc_atoms[s] == 'N':
                 lower_idx['N'] = s
                 lower_pts['N'] = new_struc_coords[s]
-            elif seq == actual_upper:
+            elif seq == 600:
                 if new_struc_atoms[s] == 'CA':
                     upper_idx['CA'] = s
                     upper_pts['CA'] = new_struc_coords[s]
@@ -710,25 +710,24 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
         lower_CO_length = calculate_distance(lower_pts['C'], lower_pts['O'])
         upper_CO_length = calculate_distance(upper_pts['C'], upper_pts['O'])
         
-        lower_base_vector = lower_pts['CA'] - lower_pts['N']
-        lower_base_vector /= np.linalg.norm(lower_base_vector)
+        lower_CAC = lower_pts['CA'] - lower_pts['C']
+        lower_NC = lower_pts['N'] - lower_pts['C']
+        lower_angle = np.arccos(np.dot(lower_CAC, lower_NC) /\
+            (np.linalg.norm(lower_CAC) * np.linalg.norm(lower_NC)))
+        lower_O_vector = lower_CO_length * np.sin(lower_angle/2) \
+            * (lower_CAC / np.linalg.norm(lower_CAC)) + lower_CO_length \
+            * np.sin(lower_angle/2) * (lower_NC / np.linalg.norm(lower_NC))
+
+        upper_CAC = upper_pts['CA'] - upper_pts['C']
+        upper_NC = upper_pts['N'] - upper_pts['C']
+        upper_angle = np.arccos(np.dot(upper_CAC, upper_NC) /\
+            (np.linalg.norm(upper_CAC) * np.linalg.norm(upper_NC)))
+        upper_O_vector = lower_CO_length * np.sin(upper_angle/2) \
+            * (upper_CAC / np.linalg.norm(upper_CAC)) + upper_CO_length \
+            * np.sin(upper_angle/2) * (upper_NC / np.linalg.norm(upper_NC))
         
-        upper_base_vector = upper_pts['CA'] - upper_pts['N']
-        upper_base_vector /= np.linalg.norm(upper_base_vector)
-        
-        lower_slant = lower_pts['C'] - lower_pts['N']
-        lower_projection = np.dot(lower_slant, lower_base_vector)
-        lower_perpendicular = np.sqrt(np.abs(np.linalg.norm(lower_slant)**2 - lower_projection**2))
-        
-        upper_slant = upper_pts['C'] - upper_pts['N']
-        upper_projection = np.dot(upper_slant, upper_base_vector)
-        upper_perpendicular = np.sqrt(np.abs(np.linalg.norm(upper_slant)**2 - upper_projection**2))
-   
-        lower_displacement = lower_perpendicular * lower_base_vector
-        upper_displacement = upper_perpendicular * upper_base_vector
-        
-        new_lower_O = lower_pts['O'] + lower_displacement + lower_CO_length
-        new_upper_O = upper_pts['O'] + upper_displacement + upper_CO_length
+        new_lower_O = lower_pts['C'] - lower_O_vector
+        new_upper_O = upper_pts['C'] - upper_O_vector
         
         new_struc_arr[:, col_x][lower_idx['O']] = str(new_lower_O[0])
         new_struc_arr[:, col_y][lower_idx['O']] = str(new_lower_O[1])
