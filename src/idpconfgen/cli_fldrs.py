@@ -68,11 +68,11 @@ from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.fldrs_helper import (
     align_coords,
     break_check,
-    calculate_distance,
     consecutive_grouper,
     count_clashes,
     create_combinations,
     disorder_cases,
+    match_upper,
     psurgeon,
     store_idp_paths,
     tolerance_calculator,
@@ -603,7 +603,7 @@ def main(
         log.info("You have a Break-IDR. Generating prerequisite data...")
         UPPER_TWO_COORDS = []
         DISORDER_CASE = disorder_cases[3]
-        upper_nconfs = 100
+        upper_nconfs = 1000
         confs_per_core_upper = upper_nconfs // ncores
         remaining_confs_upper = upper_nconfs % ncores
         
@@ -614,7 +614,7 @@ def main(
             temp_of = make_folder_or_cwd(
                 output_folder.joinpath(TEMP_DIRNAME + DISORDER_CASE + f"/upper_{idx}")
                 )
-            
+            log.info(S("Please note that IndexError of multiprocess is normal as we are only generating a 2 residue library."))
             SLICEDICT_XMERS = prepare_slice_dict(
                 primary,
                 seq,
@@ -713,16 +713,20 @@ def main(
             if remaining_confs_upper:
                 execute(confs_per_core_upper * ncores, nconfs=remaining_confs_upper)
 
-            log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
+            log.info(f'{upper_nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
             ENERGYLOGSAVER.close()
             
             files = glob.glob(str(temp_of) + "/*.pdb")
             for pdb in files:
+                temp_dict = {}
                 struc = Structure(Path(pdb))
                 struc.build()
-                struc_name = struc.data_array[:, col_name][:4]
+                # Store only the N, CA, C, O coordinates to save space/RAM
+                struc_name = struc.data_array[:, col_name][:4].tolist()
                 struc_coords = struc.data_array[:, cols_coords][:4].astype(float)
-                temp_two_coords.append((struc_name, struc_coords))
+                for a, atom in enumerate(struc_name):
+                    temp_dict[atom] = struc_coords[a]
+                temp_two_coords.append(temp_dict)
             UPPER_TWO_COORDS.append(temp_two_coords)
             shutil.rmtree(temp_of)
         
@@ -764,53 +768,31 @@ def main(
         
         log.info(S("done"))
 
-    # create different random seeds for the different cores
-    # seeds created to the cores based on main seed are predictable
-    for i in range(ncores + bool(remaining_confs)):
-        RANDOMSEEDS.put(random_seed + i)
-
-    # creates a queue of numbers that will serve all subprocesses.
-    # Used to name the output files, conformer_1, conformer_2, ...
-    for i in range(1, nconfs + 1):
-        CONF_NUMBER.put(i)
-
     ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
     # get sidechain dedicated parameters
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
     
-    
-    fld_struc = Structure(Path(folded_structure))
-    fld_struc.build()
-    atom_names = fld_struc.data_array[:, col_name]
-    
-    fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
-    first_seq = fld_seq[0]
-    # Check in case PDB structure doesn't start off as residue 1
-    if first_seq > 1:
-        fld_seq -= first_seq - 1
-        first_seq = fld_seq[0]
-    last_seq = fld_seq[-1]
-
-    fld_struc = Structure(Path(folded_structure))
-    fld_struc.build()
-    atom_names = fld_struc.data_array[:, col_name]
-    
-    fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
-    first_seq = fld_seq[0]
-    # Check in case PDB structure doesn't start off as residue 1
-    if first_seq > 1:
-        fld_seq -= first_seq - 1
-        first_seq = fld_seq[0]
-    last_seq = fld_seq[-1]
     # Generate library of conformers for each case
-    for i, seq in enumerate(DISORDER_SEQS):
+    for index, seq in enumerate(DISORDER_SEQS):
         fld_term_idx = {}
-        lower = DISORDER_BOUNDS[i][0]
-        upper = DISORDER_BOUNDS[i][1]
+        lower = DISORDER_BOUNDS[index][0]
+        upper = DISORDER_BOUNDS[index][1]
         upper_coords = None
         breakidr_idx = -1
+        
+        # create different random seeds for the different cores
+        # seeds created to the cores based on main seed are predictable
+        for i in range(ncores + bool(remaining_confs)):
+            RANDOMSEEDS.put(random_seed + i)
+
+        # creates a queue of numbers that will serve all subprocesses.
+        # Used to name the output files, conformer_1, conformer_2, ...
+        for i in range(1, nconfs + 1):
+            CONF_NUMBER.put(i)
+        
+        
         # Use the second folded residue's backbone C-N-CA
         # for rotation and alignment where the `C` atom
         # is from the previous resiude
@@ -873,7 +855,7 @@ def main(
         if DISORDER_CASE == disorder_cases[1]:
             temp_of = make_folder_or_cwd(
                 output_folder.joinpath(
-                    TEMP_DIRNAME + DISORDER_CASE + f"/break_{i}"
+                    TEMP_DIRNAME + DISORDER_CASE + f"/break_{index}"
                     )
                 )
         else:
@@ -899,7 +881,7 @@ def main(
             upper_xyz=upper_coords,
             max_clash=max_clash,
             tolerance=dist_tolerance,
-            index=i,
+            index=index,
             conformer_name="conformer_" + DISORDER_CASE,
             input_seq=seq,  # string
             output_folder=temp_of,
@@ -928,12 +910,6 @@ def main(
             execute(conformers_per_core * ncores, nconfs=remaining_confs)
         
         log.info(f'{nconfs} {DISORDER_CASE} conformers built in {time() - start:.3f} seconds')  # noqa: E501
-        
-        # reinitialize queues so reiteration doesn't crash
-        for i in range(ncores + bool(remaining_confs)):
-            RANDOMSEEDS.put(random_seed + i)
-        for i in range(1, nconfs + 1):
-            CONF_NUMBER.put(i)
 
     DISORDER_CASE = store_idp_paths(output_folder, TEMP_DIRNAME)
     
@@ -1113,71 +1089,38 @@ def _build_conformers(
                 )
 
             pdb_arr = parse_pdb_to_array(pdb_string)
+            rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
             
             if disorder_case == disorder_cases[1]:
-                pdb_atoms = pdb_arr[:, col_name]
-                pdb_coords = pdb_arr[:, cols_coords].astype(float)
-                res_seq = pdb_arr[:, col_resSeq].astype(int)
-                first_seq = res_seq[0]
-                last_seq = res_seq[-1]
-                counter = 0
-                for i, atom in enumerate(pdb_atoms):
-                    seq = res_seq[i]
-                    j = len(pdb_atoms) - 1 - i
-                    rev_seq = res_seq[j]
-                    if seq == first_seq and atom == "C":
-                        first_C = pdb_coords[i]
-                        counter += 1
-                    if rev_seq == last_seq - 1 and pdb_atoms[j] == "C":
-                        last_C = pdb_coords[j]
-                        counter += 1
-                    if counter == 2:
+                    # double the threshold because we have 2 fixed points
+                    max_clash *= 2
+                    rotated = match_upper(rotated, upper_xyz)
+                    if rotated is False:
+                        continue
+            elif disorder_case == disorder_cases[3]:
+                rotated_seq = rotated[:, col_resSeq]
+                for i, _ in enumerate(rotated_seq):
+                    j = len(rotated_seq) - 1 - i
+                    curr = rotated_seq[j]
+                    prev = rotated_seq[j - 1]
+                    rotated = rotated[:-1]
+                    if prev != curr:
                         break
-                idp_ree = calculate_distance(first_C, last_C)
-                if upper_xyz - 0.1 <= idp_ree <= upper_xyz + 0.1:
-                    rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
-                    clashes, fragment = count_clashes(
-                        rotated,
-                        fld_struc,
-                        disorder_case,
-                        max_clash * 2,
-                        tolerance,
-                        )
-                    
-                    if type(clashes) is int:
-                        final = structure_to_pdb(fragment)
-                        log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
-                        break
-                    else:
-                        log.info(f"Failed. {disorder_case} to folded region clash check... regenerating")  # noqa: E501
-                else:
-                    log.info(f"Failed. {disorder_case} does not have the correct Ree... regenerating")  # noqa: E501
+                final = structure_to_pdb(rotated)
+                break
+            clashes, fragment = count_clashes(
+                rotated,
+                fld_struc,
+                disorder_case,
+                max_clash,
+                tolerance,
+                )
+            if type(clashes) is int:
+                final = structure_to_pdb(fragment)
+                log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
+                break
             else:
-                rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
-                if disorder_case == disorder_cases[3]:
-                    rotated_seq = rotated[:, col_resSeq]
-                    for i, seq in enumerate(rotated_seq):
-                        j = len(rotated_seq) - 1 - i
-                        curr = rotated_seq[j]
-                        prev = rotated_seq[j - 1]
-                        rotated = rotated[:-1]
-                        if prev != curr:
-                            break
-                    final = structure_to_pdb(rotated)
-                    break
-                clashes, fragment = count_clashes(
-                    rotated,
-                    fld_struc,
-                    disorder_case,
-                    max_clash,
-                    tolerance,
-                    )
-                if type(clashes) is int:
-                    final = structure_to_pdb(fragment)
-                    log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
-                    break
-                else:
-                    log.info(f"Failed. {disorder_case} to folded region clash check... regenerating")  # noqa: E501
+                log.info(f"Failed. {disorder_case} to folded region clash check... regenerating")  # noqa: E501
         
         fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
         with open(Path(output_folder, fname), 'w') as fout:

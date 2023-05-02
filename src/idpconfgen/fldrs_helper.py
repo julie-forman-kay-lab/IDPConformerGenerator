@@ -135,26 +135,28 @@ def store_idp_paths(folder, temp_dir):
     """
     case_path = {}
     
-    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
-        fpath = folder.joinpath(temp_dir + disorder_cases[0])
-        idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[0]] = \
-            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
-    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
-        # What to do if we have multiple breaks? Maybe split to subdirs
-        # case_path[disorder_cases[1]] = []
-        fpath = folder.joinpath(temp_dir + disorder_cases[1])
-        break_folders = os.listdir(fpath)
-        for folder in break_folders:
-            idr_folder_path = Path(fpath.joinpath(folder))
-            idr_names = os.listdir(idr_folder_path)
-            case_path[disorder_cases[1]] = \
-                [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
-    if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
-        fpath = folder.joinpath(temp_dir + disorder_cases[2])
-        idr_confs = os.listdir(fpath)
-        case_path[disorder_cases[2]] = \
-            [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+    try:
+        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
+            fpath = folder.joinpath(temp_dir + disorder_cases[0])
+            idr_confs = os.listdir(fpath)
+            case_path[disorder_cases[0]] = \
+                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
+            # What to do if we have multiple breaks? Maybe split to subdirs
+            fpath = folder.joinpath(temp_dir + disorder_cases[1])
+            break_folders = os.listdir(fpath)
+            for folder in break_folders:
+                idr_folder_path = Path(fpath.joinpath(folder))
+                idr_names = os.listdir(idr_folder_path)
+                case_path[disorder_cases[1]] = \
+                    [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
+        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
+            fpath = folder.joinpath(temp_dir + disorder_cases[2])
+            idr_confs = os.listdir(fpath)
+            case_path[disorder_cases[2]] = \
+                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+    except AttributeError:
+        pass
 
     return case_path
 
@@ -359,6 +361,84 @@ def align_coords(sample, target, case):
     return sample
 
 
+def match_upper(
+        fragment,
+        upper_coords,
+        ):
+    """
+    Check to see if the coordinates of the last N-CA exists within
+    the pre-generated library of N-CA-C-O of the upper residue in the
+    chain break.
+
+    Parameters
+    ----------
+    fragment : np.array
+        Array of the IDR fragment of interest
+    
+    upper_coords : list of dict
+        Each dictionary has first key-layer of atom name 'N', 'CA', 'C', 'O'.
+        Value layer are the float xyz coordinates in a list [x, y, z].
+    
+    Returns
+    -------
+    Fragment or False
+        False when there is not a single match. Return updated fragment
+        otherwise with new C and O coordinates from match. Error of 0.05 A
+    """
+    random.shuffle(upper_coords)
+    
+    idr_seq = fragment[:, col_resSeq].astype(int)
+    idr_name = fragment[:, col_name]
+    for i, _seq in enumerate(idr_seq):
+        j = len(idr_seq) - 1 - i
+        curr = idr_seq[j]
+        prev = idr_seq[j - 1]
+        name = idr_name[j]
+        
+        if name == 'CA':
+            idr_ca_xyz = fragment[:, cols_coords][j].astype(float)
+        elif name == 'N':
+            idr_n_xyz = fragment[:, cols_coords][j].astype(float)
+        if prev != curr:
+            break
+    
+    for uxyz in upper_coords:
+        u_ca_xyz = uxyz['CA']
+        u_n_xyz = uxyz['N']
+        
+        d_ca = np.average(np.abs(u_ca_xyz - idr_ca_xyz)).astype(float)
+        d_n = np.average(np.abs(u_n_xyz - idr_n_xyz)).astype(float)
+        
+        if d_ca and d_n <= 0.1:
+            u_c_xyz = uxyz['C']
+            u_o_xyz = uxyz['O']
+            for i, _seq in enumerate(idr_seq):
+                j = len(idr_seq) - 1 - i
+                curr = idr_seq[j]
+                prev = idr_seq[j - 1]
+                name = idr_name[j]
+
+                if name == 'O':
+                    fragment[:, col_x][j] = str(u_o_xyz[0])
+                    fragment[:, col_y][j] = str(u_o_xyz[1])
+                    fragment[:, col_z][j] = str(u_o_xyz[2])
+                elif name == 'C':
+                    fragment[:, col_x][j] = str(u_c_xyz[0])
+                    fragment[:, col_y][j] = str(u_c_xyz[1])
+                    fragment[:, col_z][j] = str(u_c_xyz[2])
+                if prev != curr:
+                    break
+            for i, _seq in enumerate(idr_seq):
+                j = len(idr_seq) - 1 - i
+                name = idr_name[j]
+                if name == 'OXT':
+                    fragment = np.delete(fragment, j, 0)
+                    break
+            return fragment
+    
+    return False
+
+
 def count_clashes(
         fragment,
         parent,
@@ -548,31 +628,16 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
     elif case == disorder_cases[1]:
         lower = ranges[0]
         upper = ranges[1]
-        # Break-IDR, remove first and last residue of fragment
-        # and folded protein between the break
-        first_rm = False
-        last_rm = False
+        # Break-IDR, remove first residue of fragment
+        # and residues on folded protein between the break
         for i, seq in enumerate(idr_seq):
-            j = len(idr_seq) - 1 - i
-            curr_rev = idr_seq[j]
             try:
-                prev = idr_seq[j - 1]
                 next = idr_seq[i + 1]
             except IndexError:
                 continue
             
-            if first_rm is False:
-                idr_data_array = idr_data_array[1:]
-            if last_rm is False:
-                idr_data_array = idr_data_array[:-1]
-            if prev != curr_rev:
-                last_rm = True
+            idr_data_array = idr_data_array[1:]
             if next != seq:
-                first_rm = True
-            
-            if first_rm and last_rm is True:
-                first_rm = False
-                last_rm = False
                 break
         
         og_fld_list = fld_data_array.tolist()
