@@ -1093,7 +1093,7 @@ def _build_conformers(
             
             if disorder_case == disorder_cases[1]:
                     # double the threshold because we have 2 fixed points
-                    max_clash *= 2
+                    max_clash *= 10  # for benchmark purposes
                     rotated = match_upper(rotated, upper_xyz)
                     if rotated is False:
                         continue

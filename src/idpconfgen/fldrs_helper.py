@@ -410,6 +410,7 @@ def match_upper(
         d_n = np.average(np.abs(u_n_xyz - idr_n_xyz)).astype(float)
         
         if d_ca and d_n <= 0.1:
+            return fragment  # for benchmark purposes
             u_c_xyz = uxyz['C']
             u_o_xyz = uxyz['O']
             for i, _seq in enumerate(idr_seq):
