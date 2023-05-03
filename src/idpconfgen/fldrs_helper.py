@@ -29,12 +29,10 @@ from idpconfgen.libs.libstructure import (
     cols_coords,
     )
 
-
 disorder_cases = {
     0: "N-IDR",
     1: "Break-IDR",
     2: "C-IDR",
-    3: "Upper",
     }
 
 
@@ -314,7 +312,7 @@ def align_coords(sample, target, case):
                 idr_term_idx["C"] = j
             elif seq == last_seq - 2:
                 break
-    elif case == disorder_cases[1] or disorder_cases[2]:  # Break-IDR or C-IDR
+    elif case == disorder_cases[2]:  # C-IDR
         # We want to move relative to N-term of fragment
         for i, atom in enumerate(atom_names):
             seq = res_seq[i]
@@ -410,7 +408,6 @@ def match_upper(
         d_n = np.average(np.abs(u_n_xyz - idr_n_xyz)).astype(float)
         
         if d_ca and d_n <= 0.1:
-            return fragment  # for benchmark purposes
             u_c_xyz = uxyz['C']
             u_o_xyz = uxyz['O']
             for i, _seq in enumerate(idr_seq):
