@@ -602,7 +602,7 @@ def main(
     if len(UPPER_TWO_SEQS) > 0:
         log.info("You have a Break-IDR. Generating prerequisite data...")
         UPPER_TWO_COORDS = []
-        DISORDER_CASE = disorder_cases[3]
+        DISORDER_CASE = disorder_cases[1]
         upper_nconfs = 1000
         confs_per_core_upper = upper_nconfs // ncores
         remaining_confs_upper = upper_nconfs % ncores
@@ -1097,17 +1097,6 @@ def _build_conformers(
                     rotated = match_upper(rotated, upper_xyz)
                     if rotated is False:
                         continue
-            elif disorder_case == disorder_cases[3]:
-                rotated_seq = rotated[:, col_resSeq]
-                for i, _ in enumerate(rotated_seq):
-                    j = len(rotated_seq) - 1 - i
-                    curr = rotated_seq[j]
-                    prev = rotated_seq[j - 1]
-                    rotated = rotated[:-1]
-                    if prev != curr:
-                        break
-                final = structure_to_pdb(rotated)
-                break
             clashes, fragment = count_clashes(
                 rotated,
                 fld_struc,

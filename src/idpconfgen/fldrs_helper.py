@@ -80,6 +80,40 @@ def calculate_distance(coords1, coords2):
     return np.sqrt(np.sum((coords1 - coords2) ** 2))
 
 
+def calculate_angle(a, b, c):
+    """
+    Calculate angle between three 3D coordinates.
+
+    Parameters
+    ----------
+    a : np.ndarray
+    
+    b : np.ndarray
+    
+    c : np.ndarray
+    
+    Return
+    ------
+    float angle in radians
+    """
+    ab = a - b
+    cb = c - b
+
+    # Calculate the dot product
+    dot_product = np.dot(ab, cb)
+
+    # Calculate the magnitudes of the vectors
+    mag_ab = np.linalg.norm(ab)
+    mag_cb = np.linalg.norm(cb)
+
+    # Calculate the cosine of the angle between the vectors
+    cos_angle = dot_product / (mag_ab * mag_cb)
+    # Calculate the angle in radians
+    angle = np.arccos(cos_angle)
+
+    return angle
+
+
 def consecutive_grouper(seq):
     """
     Use negative indexing to group together consecutive numbers.
