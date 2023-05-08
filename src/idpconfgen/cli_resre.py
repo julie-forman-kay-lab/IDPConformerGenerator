@@ -2,8 +2,8 @@
 Client for renaming 3 letter residues in a PDB file.
 
 USAGE:
-    $ idpconfgen resptm <PDB-FILES> -pt <PATTERN>
-    $ idpconfgen resptm <PDB-FILES> -pt <PATTERN> -o <OUTPUT> -n <CORES>
+    $ idpconfgen resre <PDB-FILES> -pt <PATTERN>
+    $ idpconfgen resre <PDB-FILES> -pt <PATTERN> -o <OUTPUT> -n <CORES>
 """
 import argparse
 import re
@@ -28,10 +28,10 @@ from idpconfgen.libs.libstructure import (
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
-LOGFILESNAME = '.idpconfgen_resptm'
-TMPDIR = '__tmpresptm__'
+LOGFILESNAME = '.idpconfgen_resre'
+TMPDIR = '__tmpresre__'
 
-_name = 'resptm'
+_name = 'resre'
 _help = 'Renames residues of interest within a PDB file for post-translational modifications.'  # noqa: E501
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
@@ -175,7 +175,7 @@ def main(
     
     for i, conf in enumerate(execute_pool):
         struc = structure_to_pdb(conf)
-        output = output_folder.joinpath(f"resptm_conf_{i + 1}.pdb")
+        output = output_folder.joinpath(f"resre_conf_{i + 1}.pdb")
         with open(output, 'w') as f:
             for line in struc:
                 f.write(line + "\n")

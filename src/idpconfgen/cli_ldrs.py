@@ -6,13 +6,10 @@ information. Database is as created by `idpconfgen torsions` CLI.
 
 Future Ideas
 ------------
-WIP: Populate internal disordered regions (code has been scaffolded already).
-- Implement flags to disable N-IDR, Break-IDR, or C-IDR
-  at the choise of the user.
 - Implement CSSS on IDR tails/fragments.
 
 USAGE:
-    $ idpconfgen fldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
+    $ idpconfgen ldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
 """
 import argparse
 import glob
@@ -65,15 +62,15 @@ from idpconfgen.core.build_definitions import (
     )
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.fldrs_helper import (
+from idpconfgen.ldrs_helper import (
     align_coords,
     break_check,
     consecutive_grouper,
     count_clashes,
     create_combinations,
     disorder_cases,
-    match_upper,
     psurgeon,
+    sliding_window,
     store_idp_paths,
     tolerance_calculator,
     )
@@ -120,7 +117,7 @@ from idpconfgen.logger import S, T, init_files, pre_msg, report_on_crash
 
 
 _file = Path(__file__).myparents()
-LOGFILESNAME = '.idpconfgen_fldrs'
+LOGFILESNAME = '.idpconfgen_ldrs'
 
 # Global variables needed to build conformers.
 # Why are global variables needed?
@@ -227,7 +224,7 @@ def are_globals(bgeo_strategy):
 
 
 # CLI argument parser parameters
-_name = 'fldrs'
+_name = 'ldrs'
 _help = 'Building IDRs within a given folded protein.'
 
 _prog, _des, _usage = libcli.parse_doc_params(__doc__)
@@ -423,9 +420,9 @@ def main(
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
     if keep_temporary:
-        TEMP_DIRNAME = "fldrs_temp/"
+        TEMP_DIRNAME = "ldrs_temp/"
     else:
-        TEMP_DIRNAME = '.fldrs_temp/'
+        TEMP_DIRNAME = '.ldrs_temp/'
     
     # ensuring some parameters do not overlap
     dloop = not dloop_off
@@ -480,7 +477,7 @@ def main(
     # 1) Sampling loops and/or helix and/or strands, where the found fragments
     #    are all of the same secondary structure
     # 2) sample "any". Disregards any secondary structure annotated
-    # 3) custom sample given by the user (CURRENTLY NOT IN FLDRS)
+    # 3) custom sample given by the user (CURRENTLY NOT IN LDRS)
     # 4) advanced sampling
     #
     # The following if/else block creates the needed variables according to each
@@ -1094,7 +1091,7 @@ def _build_conformers(
             if disorder_case == disorder_cases[1]:
                     # double the threshold because we have 2 fixed points
                     max_clash *= 2
-                    rotated = match_upper(rotated, upper_xyz)
+                    rotated = sliding_window(rotated, upper_xyz)
                     if rotated is False:
                         continue
             clashes, fragment = count_clashes(

@@ -16,6 +16,8 @@ from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libstructure import (
     Structure,
+    structure_to_pdb,
+    write_PDB,
     col_chainID,
     col_element,
     col_name,
@@ -393,82 +395,152 @@ def align_coords(sample, target, case):
     return sample
 
 
-def match_upper(
-        fragment,
-        upper_coords,
+def sliding_window(
+        cterm_idr,
+        nterm_idr_lib,
+        max_clash,
+        tolerance,
+        output_folder,
         ):
     """
-    Check to see if the coordinates of the last N-CA exists within
-    the pre-generated library of N-CA-C-O of the upper residue in the
-    chain break.
+    Sliding window search protocol to find possible pairs of chains
+    that will close the break.
 
     Parameters
     ----------
-    fragment : np.array
-        Array of the IDR fragment of interest
+    cterm_idr : str or Path
+        Path to the IDR chain of interest from C-term side of break
     
-    upper_coords : list of dict
-        Each dictionary has first key-layer of atom name 'N', 'CA', 'C', 'O'.
-        Value layer are the float xyz coordinates in a list [x, y, z].
+    nterm_idr_lib : list
+        List of paths of IDR chains from N-term side of break
+    
+    max_clash : int
+        Integer number for maximum number of allowed clashes
+    
+    tolerance : float
+        Tolerance applicable to vdW clash validation in Angstroms
+    
+    output_folder : str
+        Output folder to store conformers with matches
     
     Returns
     -------
-    Fragment or False
-        False when there is not a single match. Return updated fragment
-        otherwise with new C and O coordinates from match. Error of 0.05 A
+    False
+        If no matches have been found. Otherwise write them to output folder.
     """
-    random.shuffle(upper_coords)
+    matches = 0
+    idr_struc = Structure(Path(cterm_idr))
+    idr_struc.build()
+    idr_arr = idr_struc.data_array
+    idr_name = idr_arr[:, col_name]
+    idr_coords = idr_arr[:, cols_coords].astype(float)
+    idr_resseq = idr_arr[:, col_resSeq].astype(int)
     
-    idr_seq = fragment[:, col_resSeq].astype(int)
-    idr_name = fragment[:, col_name]
-    for i, _seq in enumerate(idr_seq):
-        j = len(idr_seq) - 1 - i
-        curr = idr_seq[j]
-        prev = idr_seq[j - 1]
-        name = idr_name[j]
-        
-        if name == 'CA':
-            idr_ca_xyz = fragment[:, cols_coords][j].astype(float)
-        elif name == 'N':
-            idr_n_xyz = fragment[:, cols_coords][j].astype(float)
-        if prev != curr:
-            break
+    idr_C = []
+    idr_CA = []
+    idr_O = []
+    idr_res = []
+    for n, name in enumerate(idr_name):
+        if name == 'C':
+            idr_C.append(idr_coords[n])
+            idr_res.append(idr_resseq[n])
+        elif name == 'CA':
+            idr_CA.append(idr_coords[n])
+        elif name == 'O':
+            idr_O.append(idr_coords[n])
     
-    for uxyz in upper_coords:
-        u_ca_xyz = uxyz['CA']
-        u_n_xyz = uxyz['N']
+    for nterm_idr in nterm_idr_lib:
+        nterm_idr_struc = Structure(Path(nterm_idr))
+        nterm_idr_struc.build()
+        nterm_idr_arr = nterm_idr_struc.data_array
+        nterm_idr_name = nterm_idr_arr[:, col_name]
+        nterm_idr_coords = nterm_idr_arr[:, cols_coords].astype(float)
         
-        d_ca = np.average(np.abs(u_ca_xyz - idr_ca_xyz)).astype(float)
-        d_n = np.average(np.abs(u_n_xyz - idr_n_xyz)).astype(float)
+        nterm_idr_N = []
+        nterm_idr_CA = []
+        for n, name in enumerate(nterm_idr_name):
+            if name == 'N':
+                nterm_idr_N.append(nterm_idr_coords[n])
+            elif name == 'CA':
+                nterm_idr_CA.append(nterm_idr_coords[n])
         
-        if d_ca and d_n <= 0.1:
-            u_c_xyz = uxyz['C']
-            u_o_xyz = uxyz['O']
-            for i, _seq in enumerate(idr_seq):
-                j = len(idr_seq) - 1 - i
-                curr = idr_seq[j]
-                prev = idr_seq[j - 1]
-                name = idr_name[j]
+        for i, curr_c in enumerate(idr_C):
+            try:
+                next_n = nterm_idr_N[i + 1]
+                next_ca = nterm_idr_CA[i + 1]
+            except IndexError:
+                break
+            CN_dist = calculate_distance(curr_c, next_n)
+            CCA_dist = calculate_distance(curr_c, next_ca)
+            CACN_ang = calculate_angle(idr_CA[i], curr_c, next_n)
+            # Refer to distances and angles in `core/build_definitions.py`
+            if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7:  # noqa: E501
+                term_residue = idr_res[i]
+                
+                idr_list = []
+                for p, _ in enumerate(idr_resseq):
+                    next = idr_resseq[p + 1]
+                    idr_list.append(idr_arr[p])
+                    nterm_idr_arr = nterm_idr_arr[1:]
+                    if next == term_residue + 1:
+                        break
+                idr_arr = np.array(idr_list)
+                    
+                nterm_idr_struc._data_array = nterm_idr_arr
+                
+                clashes, _ = count_clashes(
+                    idr_arr,
+                    nterm_idr_struc,
+                    disorder_cases[1],
+                    max_clash,
+                    tolerance,
+                    )
+                
+                if type(clashes) is int:
+                    nterm_idr_list = nterm_idr_arr.tolist()
+                    final_struc_arr = np.array(idr_list + nterm_idr_list)
+                    final_struc_name = final_struc_arr[:, col_name]
+                    final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
+                    
+                    for idx, name in enumerate(final_struc_name):
+                        if final_struc_res[idx] == term_residue:
+                            if name == 'O':
+                                O_idx = idx
+                        elif final_struc_res[idx] == term_residue + 1:
+                            if name == 'H':
+                                H_idx = idx
+                        elif final_struc_res[idx] == term_residue + 2:
+                            break
+                    
+                    # Fix the position of the Carbonyl O and Nitrogen H
+                    CO_length = calculate_distance(curr_c, idr_O[i])
+                    CAC_O_vec = idr_CA[i] - curr_c
+                    NC_O_vec = next_n - curr_c
+                    O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
+                    O_vector = CO_length * np.sin(O_angle / 2) * (CAC_O_vec / np.linalg.norm(CAC_O_vec)) + CO_length * np.sin(O_angle / 2) * (NC_O_vec / np.linalg.norm(NC_O_vec))  # noqa: E501
+                    new_O_xyz = curr_c - O_vector
+                    
+                    NH_length = 1.0
+                    CN_H_vec = curr_c - next_n
+                    CAN_H_vec = next_ca - next_n
+                    H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
+                    H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
+                    new_H_xyz = next_n - H_vector
+                    
+                    final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
+                    final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
+                    final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
+                    final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
+                    final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
+                    final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
+                    
+                    final_struc = structure_to_pdb(final_struc_arr)
+                    cterm_idr_stem = Path(cterm_idr).stem
+                    nterm_idr_stem = Path(nterm_idr).stem
+                    matches += 1
+                    write_PDB(final_struc, output_folder + f"{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
 
-                if name == 'O':
-                    fragment[:, col_x][j] = str(u_o_xyz[0])
-                    fragment[:, col_y][j] = str(u_o_xyz[1])
-                    fragment[:, col_z][j] = str(u_o_xyz[2])
-                elif name == 'C':
-                    fragment[:, col_x][j] = str(u_c_xyz[0])
-                    fragment[:, col_y][j] = str(u_c_xyz[1])
-                    fragment[:, col_z][j] = str(u_c_xyz[2])
-                if prev != curr:
-                    break
-            for i, _seq in enumerate(idr_seq):
-                j = len(idr_seq) - 1 - i
-                name = idr_name[j]
-                if name == 'OXT':
-                    fragment = np.delete(fragment, j, 0)
-                    break
-            return fragment
-    
-    return False
+    return matches
 
 
 def count_clashes(
@@ -518,8 +590,8 @@ def count_clashes(
     first_r = int(fragment_seq[0])
     last_r = int(fragment_seq[len(fragment_seq) - 1])
     
-    if case == disorder_cases[0]:
-        # N-IDR, remove last 3 resiudes of fragment from consideration
+    if case == disorder_cases[0] or disorder_cases[1]:
+        # N-IDR or Break-IDR, remove last 3 resiudes of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
@@ -529,31 +601,6 @@ def count_clashes(
             fragment_atoms = fragment_atoms[:-1]
             fragment_coords = fragment_coords[:-1]
             if last_r - prev == 3:
-                break
-    elif case == disorder_cases[1]:
-        # Break-IDR remove first and last 3 residues of fragment
-        fin_first = False
-        fin_last = False
-        for i, _ in enumerate(fragment_seq):
-            j = len(fragment_seq) - 1 - i
-            try:  # In case the user wants to build less than 3 residues
-                prev = int(fragment_seq[j - 1])
-                next = int(fragment_seq[i + 1])
-            except IndexError:
-                continue
-            
-            if fin_first is False:
-                fragment_atoms = fragment_atoms[1:]
-                fragment_coords = fragment_coords[1:]
-            if fin_last is False:
-                fragment_atoms = fragment_atoms[:-1]
-                fragment_coords = fragment_coords[:-1]
-            if next - first_r == 3:
-                fin_first = True
-            if last_r - prev == 3:
-                fin_last = True
-            
-            if fin_first and fin_last is True:
                 break
     elif case == disorder_cases[2]:
         # C-IDR, remove first 3 residues of fragment from consideration
@@ -942,66 +989,4 @@ def rotator(chain, case):
     idp.data_array[:, cols_coords] = rotated_coords.astype(str)
     
     return idp, chain  # returns original chain/path also
-    
-    ---------------
-    # Fix the position of the Oxygen atoms at the stitch sites
-    new_struc_atoms = new_struc_arr[:, col_name]
-    new_struc_res = new_struc_arr[:, col_resSeq].astype(int)
-    new_struc_coords = new_struc_arr[:, cols_coords].astype(float)
-    lower_idx = {}
-    lower_pts = {}
-    upper_idx = {}
-    upper_pts = {}
-    for s, seq in enumerate(new_struc_res):
-        if seq == actual_lower - 1:
-            if new_struc_atoms[s] == 'CA':
-                lower_idx['CA'] = s
-                lower_pts['CA'] = new_struc_coords[s]
-            elif new_struc_atoms[s] == 'C':
-                lower_idx['C'] = s
-                lower_pts['C'] = new_struc_coords[s]
-            elif new_struc_atoms[s] == 'O':
-                lower_idx['O'] = s
-                lower_pts['O'] = new_struc_coords[s]
-        elif seq == actual_lower and new_struc_atoms[s] == 'N':
-            lower_idx['N'] = s
-            lower_pts['N'] = new_struc_coords[s]
-        elif seq == actual_upper:
-            if new_struc_atoms[s] == 'CA':
-                upper_idx['CA'] = s
-                upper_pts['CA'] = new_struc_coords[s]
-            elif new_struc_atoms[s] == 'C':
-                upper_idx['C'] = s
-                upper_pts['C'] = new_struc_coords[s]
-            elif new_struc_atoms[s] == 'O':
-                upper_idx['O'] = s
-                upper_pts['O'] = new_struc_coords[s]
-        elif seq == actual_upper + 1 and new_struc_atoms[s] == 'N':
-            upper_idx['N'] = s
-            upper_pts['N'] = new_struc_coords[s]
-        elif seq == actual_upper + 2:
-            break
-    
-    lower_CO_length = calculate_distance(lower_pts['C'], lower_pts['O'])
-    upper_CO_length = calculate_distance(upper_pts['C'], upper_pts['O'])
-    
-    lower_CAC = lower_pts['CA'] - lower_pts['C']
-    lower_NC = lower_pts['N'] - lower_pts['C']
-    lower_angle = np.arccos(np.dot(lower_CAC, lower_NC) / (np.linalg.norm(lower_CAC) * np.linalg.norm(lower_NC)))  # noqa: E501
-    lower_O_vector = lower_CO_length * np.sin(lower_angle / 2) * (lower_CAC / np.linalg.norm(lower_CAC)) + lower_CO_length * np.sin(lower_angle / 2) * (lower_NC / np.linalg.norm(lower_NC))  # noqa: E501
-    upper_CAC = upper_pts['CA'] - upper_pts['C']
-    upper_NC = upper_pts['N'] - upper_pts['C']
-    upper_angle = np.arccos(np.dot(upper_CAC, upper_NC) / (np.linalg.norm(upper_CAC) * np.linalg.norm(upper_NC)))  # noqa: E501
-    upper_O_vector = lower_CO_length * np.sin(upper_angle / 2) * (upper_CAC / np.linalg.norm(upper_CAC)) + upper_CO_length * np.sin(upper_angle / 2) * (upper_NC / np.linalg.norm(upper_NC))  # noqa: E501
-    
-    new_lower_O = lower_pts['C'] - lower_O_vector
-    new_upper_O = upper_pts['C'] - upper_O_vector
-    
-    new_struc_arr[:, col_x][lower_idx['O']] = str(new_lower_O[0])
-    new_struc_arr[:, col_y][lower_idx['O']] = str(new_lower_O[1])
-    new_struc_arr[:, col_z][lower_idx['O']] = str(new_lower_O[2])
-    new_struc_arr[:, col_x][upper_idx['O']] = str(new_upper_O[0])
-    new_struc_arr[:, col_y][upper_idx['O']] = str(new_upper_O[1])
-    new_struc_arr[:, col_z][upper_idx['O']] = str(new_upper_O[2])
-    -------------
 '''

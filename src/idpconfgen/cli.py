@@ -24,13 +24,13 @@ from idpconfgen import (
     cli_dssppii,
     cli_fastaext,
     cli_fetch,
-    cli_fldrs,
+    cli_ldrs,
     cli_makecsss,
     cli_merge,
+    cli_resre,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
-    cli_resptm,
     cli_search,
     cli_sethpc,
     cli_sscalc,
@@ -56,7 +56,7 @@ Individual routines for DB creation:
     * {cli_sscalc._name}
     * {cli_torsions._name}
     * {cli_build._name}
-    * {cli_fldrs._name}
+    * {cli_ldrs._name}
 
 Other useful routines:
 
@@ -74,7 +74,7 @@ Other useful routines:
     * {cli_merge._name}
     * {cli_stats._name}
     * {cli_search._name}
-    * {cli_resptm._name}
+    * {cli_resre._name}
 """
 
 ap = libcli.CustomParser(
@@ -98,7 +98,7 @@ libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
 libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
-libcli.add_subparser(subparsers, cli_fldrs)
+libcli.add_subparser(subparsers, cli_ldrs)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)
@@ -114,7 +114,7 @@ libcli.add_subparser(subparsers, cli_sethpc)
 libcli.add_subparser(subparsers, cli_merge)
 libcli.add_subparser(subparsers, cli_stats)
 libcli.add_subparser(subparsers, cli_search)
-libcli.add_subparser(subparsers, cli_resptm)
+libcli.add_subparser(subparsers, cli_resre)
 
 
 def load_args():
