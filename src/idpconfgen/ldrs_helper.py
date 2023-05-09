@@ -501,7 +501,7 @@ def sliding_window(
                     final_struc_arr = np.array(idr_list + nterm_idr_list)
                     final_struc_name = final_struc_arr[:, col_name]
                     final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
-                    
+                    H_idx = -1  # for cases like Proline without "H"
                     for idx, name in enumerate(final_struc_name):
                         if final_struc_res[idx] == term_residue:
                             if name == 'O':
@@ -530,9 +530,10 @@ def sliding_window(
                     final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
                     final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
                     final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
-                    final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
-                    final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
-                    final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
+                    if H_idx > 0:
+                        final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
+                        final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
+                        final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
                     
                     final_struc = structure_to_pdb(final_struc_arr)
                     cterm_idr_stem = Path(cterm_idr).stem
