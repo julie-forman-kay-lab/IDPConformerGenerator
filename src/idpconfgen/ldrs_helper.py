@@ -14,6 +14,7 @@ import numpy as np
 from idpconfgen import Path
 from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libstructure import (
     Structure,
     structure_to_pdb,
@@ -473,8 +474,12 @@ def sliding_window(
             CN_dist = calculate_distance(curr_c, next_n)
             CCA_dist = calculate_distance(curr_c, next_ca)
             CACN_ang = calculate_angle(idr_CA[i], curr_c, next_n)
+            CACNCA_coords = np.array([idr_CA[i], curr_c, next_n, next_ca])
+            omega = calc_torsion_angles(CACNCA_coords)
+            # Here is a set of geometric checks to ensure we have closure
             # Refer to distances and angles in `core/build_definitions.py`
-            if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7:  # noqa: E501
+            # |omega| angle must be greater than 150 deg
+            if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7 and np.abs(omega) >= 2.61:  # noqa: E501
                 term_residue = idr_res[i]
                 
                 idr_list = []
@@ -519,18 +524,20 @@ def sliding_window(
                     O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
                     O_vector = CO_length * np.sin(O_angle / 2) * (CAC_O_vec / np.linalg.norm(CAC_O_vec)) + CO_length * np.sin(O_angle / 2) * (NC_O_vec / np.linalg.norm(NC_O_vec))  # noqa: E501
                     new_O_xyz = curr_c - O_vector
-                    
-                    NH_length = 1.0
-                    CN_H_vec = curr_c - next_n
-                    CAN_H_vec = next_ca - next_n
-                    H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
-                    H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
-                    new_H_xyz = next_n - H_vector
-                    
+  
                     final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
                     final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
                     final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
-                    if H_idx > 0:
+                    
+                    if H_idx >= 0:
+                        # Bond length also taken from `core/build_definitions.py`
+                        NH_length = 1.0
+                        CN_H_vec = curr_c - next_n
+                        CAN_H_vec = next_ca - next_n
+                        H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
+                        H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
+                        new_H_xyz = next_n - H_vector
+                        
                         final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
                         final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
                         final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
