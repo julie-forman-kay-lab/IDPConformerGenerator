@@ -1090,8 +1090,8 @@ def _build_conformers(
                 rotated,
                 fld_struc,
                 disorder_case,
-                max_clash=500,
-                tolerance=1,
+                max_clash,
+                tolerance,
                 )
             if type(clashes) is int:
                 final = structure_to_pdb(fragment)
