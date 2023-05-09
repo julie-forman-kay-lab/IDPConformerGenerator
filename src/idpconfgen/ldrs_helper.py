@@ -171,11 +171,27 @@ def store_idp_paths(folder, temp_dir):
     case_path = {}
     
     try:
-        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
+        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])) and os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
             fpath = folder.joinpath(temp_dir + disorder_cases[0])
             idr_confs = os.listdir(fpath)
             case_path[disorder_cases[0]] = \
                 [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+            
+            fpath = folder.joinpath(temp_dir + disorder_cases[2])
+            idr_confs = os.listdir(fpath)
+            case_path[disorder_cases[2]] = \
+                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
+        elif os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
+            fpath = folder.joinpath(temp_dir + disorder_cases[0])
+            idr_confs = os.listdir(fpath)
+            case_path[disorder_cases[0]] = \
+                [[Path(fpath.joinpath(cpath))] for cpath in idr_confs]
+        elif os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
+            fpath = folder.joinpath(temp_dir + disorder_cases[2])
+            idr_confs = os.listdir(fpath)
+            case_path[disorder_cases[2]] = \
+                [[Path(fpath.joinpath(cpath))] for cpath in idr_confs]
+        
         if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
             # What to do if we have multiple breaks? Maybe split to subdirs
             fpath = folder.joinpath(temp_dir + disorder_cases[1])
@@ -185,11 +201,6 @@ def store_idp_paths(folder, temp_dir):
                 idr_names = os.listdir(idr_folder_path)
                 case_path[disorder_cases[1]] = \
                     [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
-        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
-            fpath = folder.joinpath(temp_dir + disorder_cases[2])
-            idr_confs = os.listdir(fpath)
-            case_path[disorder_cases[2]] = \
-                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
     except AttributeError:
         pass
 
@@ -215,8 +226,8 @@ def create_combinations(lst, num_combinations):
     Return
     ------
     selected_combinations : list
-        List of tuples of different combinations as follows:
-        [(item from list 1, item from list 2), ...]
+        List of lists of different combinations as follows:
+        [[item from list 1, item from list 2], ...]
     """
     all_combinations = list(product(*lst))
     max_combinations = len(all_combinations)
@@ -224,7 +235,7 @@ def create_combinations(lst, num_combinations):
     selected_combinations = \
         random.sample(all_combinations, min(num_combinations, max_combinations))
 
-    return selected_combinations
+    return np.array(selected_combinations).tolist()
 
 
 def break_check(fdata):
@@ -591,19 +602,19 @@ def count_clashes(
     
     parent_atoms = parent.data_array[:, col_element]
     fragment_atoms = fragment[:, col_element]
-    fragment_seq = fragment[:, col_resSeq]
+    fragment_seq = fragment[:, col_resSeq].astype(int)
     parent_coords = parent.data_array[:, cols_coords].astype(float)
     fragment_coords = fragment[:, cols_coords].astype(float)
     
-    first_r = int(fragment_seq[0])
-    last_r = int(fragment_seq[len(fragment_seq) - 1])
+    first_r = fragment_seq[0]
+    last_r = fragment_seq[-1]
     
     if case == disorder_cases[0] or disorder_cases[1]:
         # N-IDR or Break-IDR, remove last 3 resiudes of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
-                prev = int(fragment_seq[j - 1])
+                prev = fragment_seq[j - 1]
             except IndexError:
                 continue
             fragment_atoms = fragment_atoms[:-1]
@@ -614,7 +625,7 @@ def count_clashes(
         # C-IDR, remove first 3 residues of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
-                next = int(fragment_seq[i + 1])
+                next = fragment_seq[i + 1]
             except IndexError:
                 continue
             fragment_atoms = fragment_atoms[1:]
@@ -642,22 +653,22 @@ def count_clashes(
     return num_clashes, fragment
 
 
-def psurgeon(idp_struc, fld_struc, case, ranges):
+def psurgeon(idp_lst, fld_struc, case, ranges):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
     Parameters
     ----------
-    idp_struc : Path or IDPConformerGenerator.Structure
-        Donor conformer to graft
+    idp_lst : list of Path
+        Always in the order of [N-IDR, Break-IDR, C-IDR]
     
-    case : str
-        Case could be `nidr`, `cidr`, or `break` as defined above
+    case : list of str
+        Case could be `N-IDR`, `C-IDR`, or `Break-IDR` as defined above
 
     fld_struc : Path or IDPConformerGenerator.Structure
         Folded structure to be grafted on
     
-    ranges : tuple of int
+    ranges : list of tuple of int
         For Break-IDR, what residue ranges for the chain break
 
     Returns
@@ -673,135 +684,16 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
     else:
         fld_seq = fld_struc.data_array[:, col_resSeq]
         fld_data_array = fld_struc.data_array
-        
-    if type(idp_struc) is Path:
-        idr = Structure(idp_struc)
-        idr.build()
-        idr_seq = idr.data_array[:, col_resSeq]
-        idr_data_array = idr.data_array
-    elif type(idp_struc) is tuple:
-        nidr = Structure(idp_struc[0])
-        cidr = Structure(idp_struc[1])
-        nidr.build()
-        cidr.build()
-    else:
-        idr_seq = idp_struc[:, col_resSeq]
-        idr_data_array = idp_struc
     
-    if case == disorder_cases[0]:
+    if disorder_cases[0] in case:
         # N-IDR, remove last resiude of fragment
         # and remove the first residue of folded-domain
-        for i, _seq in enumerate(idr_seq):
-            j = len(idr_seq) - 1 - i
-            curr = idr_seq[j]
-            prev = idr_seq[j - 1]
-            idr_data_array = idr_data_array[:-1]
-            if prev != curr:
-                break
-        
-        idr._data_array = idr_data_array
-        
-        for i, _seq in enumerate(fld_seq):
-            curr = fld_seq[i]
-            next = fld_seq[i + 1]
-            fld_data_array = fld_data_array[1:]
-            if next != curr:
-                break
-        
-        fld._data_array = fld_data_array
-        
-        new_struc_arr = np.append(idr.data_array, fld.data_array, axis=0)
-        
-    elif case == disorder_cases[1]:
-        lower = ranges[0]
-        upper = ranges[1]
-        # Break-IDR, remove first residue of fragment
-        # and residues on folded protein between the break
-        for i, seq in enumerate(idr_seq):
-            try:
-                next = idr_seq[i + 1]
-            except IndexError:
-                continue
-            
-            idr_data_array = idr_data_array[1:]
-            if next != seq:
-                break
-        
-        og_fld_list = fld_data_array.tolist()
-        idr_data_list = idr_data_array.tolist()
-        fld_data_list = []
-        # Find the position to insert IDR
-        # Remove the first and last residue at the break site
-        first_fld_seq = int(fld_seq[0])
-        actual_lower = first_fld_seq + lower - 1
-        actual_upper = first_fld_seq + upper
-        found = False
-        for i, seq in enumerate(fld_seq):
-            seq = int(seq)
-            if seq == actual_lower or seq == actual_upper:
-                if found is False:
-                    found = True
-                    insert_idx = i
-            else:
-                fld_data_list.append(og_fld_list[i])
-        
-        idr_seq = idr_data_array[:, col_resSeq].astype(int)
- 
-        for i, row in enumerate(idr_data_list):
-            # Fix residue numbering for IDR (we know it starts at 1)
-            row[col_resSeq] = str(idr_seq[i] + actual_lower - 2)
-            fld_data_list.insert(insert_idx + i, row)
-        
-        new_struc_arr = np.array(fld_data_list)
-    
-    elif case == disorder_cases[2]:
-        # C-IDR, remove last resiude of folded protein
-        # and remove the first residue of C-IDR
-        for i, _seq in enumerate(fld_seq):
-            j = len(fld_seq) - 1 - i
-            curr = fld_seq[j]
-            prev = fld_seq[j - 1]
-            fld_data_array = fld_data_array[:-1]
-            if prev != curr:
-                break
-        
-        fld._data_array = fld_data_array
-        
-        for i, _ in enumerate(idr_seq):
-            curr = idr_seq[i]
-            next = idr_seq[i + 1]
-            idr_data_array = idr_data_array[1:]
-            if next != curr:
-                break
-        
-        idr._data_array = idr_data_array
-
-        # Fix residue connectivity issue
-        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])
-        curr_residue = last_residue_fld + 1
-        idr_seq = idr.data_array[:, col_resSeq]
-        for i, seq in enumerate(idr_seq):
-            curr = seq
-            idr._data_array[:, col_resSeq][i] = str(curr_residue)
-            try:
-                if idr_seq[i + 1] != curr:
-                    curr_residue += 1
-            except IndexError:
-                break
-        
-        # Initialize and clean new structure
-        new_struc_arr = np.append(fld.data_array, idr.data_array, axis=0)
-        
-    elif case == disorder_cases[0] + disorder_cases[2]:
+        nidr = Structure(idp_lst[0])
+        nidr.build()
         nidr_seq = nidr.data_array[:, col_resSeq]
-        cidr_seq = cidr.data_array[:, col_resSeq]
         nidr_data_array = nidr.data_array
-        cidr_data_array = cidr.data_array
         
-        # For cases where we have both C-IDR and N-IDR
-        # idp_struc should be a list of tuple (N-IDR, C-IDR) paths
-        # N-IDR, remove last resiude of fragment
-        for i, _seq in enumerate(nidr_seq):
+        for i, _ in enumerate(nidr_seq):
             j = len(nidr_seq) - 1 - i
             curr = nidr_seq[j]
             prev = nidr_seq[j - 1]
@@ -811,40 +703,45 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
         
         nidr._data_array = nidr_data_array
         
-        # Remove first residue of folded domain
-        for i, _seq in enumerate(fld_seq):
-            curr = fld_seq[i]
+        for i, seq in enumerate(fld_seq):
             next = fld_seq[i + 1]
             fld_data_array = fld_data_array[1:]
-            if next != curr:
+            if next != seq:
+                break
+        
+        fld._data_array = fld_data_array
+        idp_lst.pop(0)
+        ranges.pop(0)
+        new_struc_arr = np.append(nidr.data_array, fld.data_array, axis=0)
+
+    if disorder_cases[2] in case:
+        # C-IDR, remove last resiude of folded protein
+        # and remove the first residue of C-IDR
+        cidr = Structure(idp_lst[-1])
+        cidr.build()
+        cidr_seq = cidr.data_array[:, col_resSeq]
+        cidr_data_array = cidr.data_array
+        
+        for i, seq in enumerate(cidr_seq):
+            next = cidr_seq[i + 1]
+            cidr_data_array = cidr_data_array[1:]
+            if next != seq:
+                break
+        
+        cidr._data_array = cidr_data_array
+        
+        for i, _ in enumerate(fld_seq):
+            j = len(fld_seq) - 1 - i
+            curr = fld_seq[j]
+            prev = fld_seq[j - 1]
+            fld_data_array = fld_data_array[:-1]
+            if prev != curr:
                 break
         
         fld._data_array = fld_data_array
         
-        new_struc_arr = np.append(nidr.data_array, fld.data_array, axis=0)
-        new_struc_seq = new_struc_arr[:, col_resSeq]
-        
-        # Remove last residue of folded domain (now protein)
-        for i, _ in enumerate(new_struc_seq):
-            j = len(new_struc_seq) - 1 - i
-            curr = new_struc_seq[j]
-            prev = new_struc_seq[j - 1]
-            new_struc_arr = new_struc_arr[:-1]
-            if prev != curr:
-                break
-        
-        # Remove first residue of C-IDR
-        for i, _ in enumerate(cidr_seq):
-            curr = cidr_seq[i]
-            next = cidr_seq[i + 1]
-            cidr_data_array = cidr_data_array[1:]
-            if next != curr:
-                break
-            
-        cidr._data_array = cidr_data_array
-        
         # Fix residue connectivity issue
-        last_residue_fld = int(new_struc_arr[:, col_resSeq][-1])
+        last_residue_fld = int(fld.data_array[:, col_resSeq][-1])
         curr_residue = last_residue_fld + 1
         cidr_seq = cidr.data_array[:, col_resSeq]
         for i, seq in enumerate(cidr_seq):
@@ -856,8 +753,70 @@ def psurgeon(idp_struc, fld_struc, case, ranges):
             except IndexError:
                 break
         
-        new_struc_arr = np.append(new_struc_arr, cidr.data_array, axis=0)
+        if disorder_cases[0] in case:
+            new_struc_arr = np.append(nidr.data_array, fld.data_array, axis=0)
+            new_struc_arr = np.append(new_struc_arr, cidr.data_array, axis=0)
+        else:
+            new_struc_arr = np.append(fld.data_array, cidr.data_array, axis=0)
+        idp_lst.pop(-1)
+        ranges.pop(-1)
+    
+    if disorder_cases[1] in case:
+        if len(case) == 1:
+            new_struc_arr = fld_data_array
         
+        new_struc_seq = new_struc_arr[:, col_resSeq].astype(int)
+        first_struc_seq = new_struc_seq[0]
+        
+        for idx, minmax in enumerate(ranges):
+            lower = minmax[0]
+            upper = minmax[1]
+            new_struc_lst = new_struc_arr.tolist()
+            
+            idr = Structure(idp_lst[idx])
+            idr.build()
+            
+            idr_seq = idr.data_array[:, col_resSeq].astype(int)
+            idr_data_array = idr.data_array
+            last_res = idr_seq[-1]
+            # Break-IDR, remove first and last residue of fragment
+            # and the first residues on either side of the chain break
+            for i, seq in enumerate(idr_seq):
+                next = idr_seq[i + 1]
+                j = len(idr_seq) - 1 - i
+                rev = idr_seq[j - 1]
+                
+                if next < 2:
+                    idr_data_array = idr_data_array[1:]
+                if rev < last_res - 1:
+                    idr_data_array = idr_data_array[:-1]
+                if next >= 2 and rev <= last_res - 1:
+                    break
+                
+            idr_data_lst = idr_data_array.tolist()
+            surrounding_data_list = []
+            actual_lower = first_struc_seq + lower - 1
+            actual_upper = first_struc_seq + upper
+            found = False
+            for s, seq in enumerate(new_struc_seq):
+                if seq == actual_lower or actual_upper:
+                    if found is False:
+                        found = True
+                        insert_idx = s
+                    else:
+                        surrounding_data_list.append(new_struc_lst[s])
+            
+            # Needs to be reinitialized because we changed the array
+            idr_seq = idr_data_array[:, col_resSeq].astype(int)
+            for r, row in enumerate(idr_data_lst):
+                idr_seq = row[col_resSeq]
+                row[col_resSeq] = str(idr_seq[r] + actual_lower - 2)
+                surrounding_data_list.insert(insert_idx + r, row)
+            
+            new_struc_arr = np.array(surrounding_data_list)
+            new_struc_seq = new_struc_arr[:, col_resSeq].astype(int)
+    
+    # Fix serial numbers and chain IDs
     new_serial = [str(i) for i in range(1, len(new_struc_arr) + 1)]
     new_struc_arr[:, col_serial] = new_serial
     new_struc_arr[:, col_chainID] = "A"

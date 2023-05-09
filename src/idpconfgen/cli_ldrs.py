@@ -862,7 +862,7 @@ def main(
         
         log.info(S(f"Generating temporary disordered conformers for: {seq}"))
         log.info(S(
-            "Please note that sequence may contain 1-2 extra residues "
+            "Please note that sequence will contain 2 extra residues "
             "to facilitate reconstruction later on."
             ))
         
@@ -917,23 +917,22 @@ def main(
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
     if len(DISORDER_CASE) == 1:
-        case = next(iter(DISORDER_CASE))
-        files = DISORDER_CASE[case]
-    elif disorder_cases[0] in DISORDER_CASE and disorder_cases[2] in DISORDER_CASE:  # noqa: E501
-        case = disorder_cases[0] + disorder_cases[2]
+        cases = [next(iter(DISORDER_CASE))]
+        files = DISORDER_CASE[cases[0]]
+    elif disorder_cases[0] and disorder_cases[2] in DISORDER_CASE:  # noqa: E501
+        cases = [disorder_cases[0], disorder_cases[2]]
         files = create_combinations(
             [DISORDER_CASE[disorder_cases[0]],
             DISORDER_CASE[disorder_cases[2]]],
             nconfs,
             )
     
-    # TODO: need to modify stitching for multiple Break IDRs
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(
         psurgeon,
         fld_struc=Path(folded_structure),
-        case=case,
-        ranges=(lower, upper),
+        case=cases,
+        ranges=DISORDER_BOUNDS,
         )
     execute = partial(
         report_on_crash,
@@ -1087,19 +1086,12 @@ def _build_conformers(
 
             pdb_arr = parse_pdb_to_array(pdb_string)
             rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
-            
-            if disorder_case == disorder_cases[1]:
-                    # double the threshold because we have 2 fixed points
-                    max_clash *= 2
-                    rotated = sliding_window(rotated, upper_xyz)
-                    if rotated is False:
-                        continue
             clashes, fragment = count_clashes(
                 rotated,
                 fld_struc,
                 disorder_case,
-                max_clash,
-                tolerance,
+                max_clash=500,
+                tolerance=1,
                 )
             if type(clashes) is int:
                 final = structure_to_pdb(fragment)

@@ -1,5 +1,5 @@
-Building Disordered Regions on a Folded Domain
-==============================================
+Modelling Disordered Regions on a Folded Domain
+===============================================
 
 .. start-description
 
