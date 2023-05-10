@@ -784,33 +784,32 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
             for i, seq in enumerate(idr_seq):
                 next = idr_seq[i + 1]
                 j = len(idr_seq) - 1 - i
-                rev = idr_seq[j - 1]
+                rev = idr_seq[j]
                 
-                if next < 2:
+                if seq == 1:
                     idr_data_array = idr_data_array[1:]
-                if rev < last_res - 1:
+                if rev == last_res:
                     idr_data_array = idr_data_array[:-1]
-                if next >= 2 and rev <= last_res - 1:
+                if seq > 2 and rev < last_res - 1:
                     break
                 
             idr_data_lst = idr_data_array.tolist()
             surrounding_data_list = []
             actual_lower = first_struc_seq + lower - 1
-            actual_upper = first_struc_seq + upper
+            actual_upper = first_struc_seq + upper - 1
             found = False
             for s, seq in enumerate(new_struc_seq):
-                if seq == actual_lower or actual_upper:
+                if seq == actual_lower or seq == actual_upper:
                     if found is False:
                         found = True
                         insert_idx = s
-                    else:
-                        surrounding_data_list.append(new_struc_lst[s])
-            
+                    continue
+                else:
+                    surrounding_data_list.append(new_struc_lst[s])
             # Needs to be reinitialized because we changed the array
-            idr_seq = idr_data_array[:, col_resSeq].astype(int)
             for r, row in enumerate(idr_data_lst):
-                idr_seq = row[col_resSeq]
-                row[col_resSeq] = str(idr_seq[r] + actual_lower - 2)
+                idr_seq = int(row[col_resSeq])
+                row[col_resSeq] = str(idr_seq + actual_lower - 2)
                 surrounding_data_list.insert(insert_idx + r, row)
             
             new_struc_arr = np.array(surrounding_data_list)
