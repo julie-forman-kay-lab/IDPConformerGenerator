@@ -15,7 +15,8 @@ import argparse
 import os
 import shutil
 from functools import partial
-from itertools import cycle
+from glob import glob
+from itertools import cycle, product
 from multiprocessing import Pool, Queue
 from random import randint
 from time import time
@@ -694,7 +695,9 @@ def main(
             
             match_of_files = next(os.walk(match_of))[2]
             num_files = len(match_of_files)
+            prev_combinations = []
             
+            start = time()
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
                     RANDOMSEEDS.put(random_seed + i)
@@ -800,15 +803,25 @@ def main(
                 log.info(f"Finished generating library for {seq}.")
                 log.info(f"Commencing sliding window protocol for Break-IDR...")
                 
-                # TODO: we need to make only new comparisons of files we haven't seen before
+                # We need to make only new comparisons of files we haven't seen before
+                C_folders = glob(str(break_of) + "/*_C/")
+                N_folders = glob(str(break_of) + "/*_N/")
+                
+                all_combinations = list(product(C_folders, N_folders))
+                new_combinations = [comb for comb in all_combinations if comb not in prev_combinations]
+                prev_combinations = all_combinations
+                
+                tocheck_C = [item[0] for item in new_combinations]
+                tocheck_N = [item[1] for item in new_combinations]
+                
                 execute = partial(
                     sliding_window,
-                    nterm_idr_lib=temp_of_N,  # Change this
+                    nterm_idr_lib=tocheck_N,
                     max_clash=max_clash,
                     tolerance=dist_tolerance,
                     output_folder=match_of,
                     )
-                execute_pool = pool_function(execute, temp_of_C, ncores=ncores)  # Change temp_of_C
+                execute_pool = pool_function(execute, tocheck_C, ncores=ncores)
                 for _ in execute_pool:
                     pass
                 
@@ -817,6 +830,13 @@ def main(
                 log.info(f"Generated {num_files} closed IDR models this run.")
             
             breakidr_num += 1
+            
+            all_C = glob(str(break_of) + "/*_C/")
+            all_N = glob(str(break_of) + "/*_N/")
+            
+            for i, c in enumerate(all_C):
+                shutil.rmtree(c)
+                shutil.rmtree(all_N[i])
 
         else:
             for i in range(ncores + bool(remaining_confs)):
@@ -931,13 +951,42 @@ def main(
     if len(case_and_paths) == 1:
         cases = [next(iter(case_and_paths))]
         files = case_and_paths[cases[0]]
-    elif disorder_cases[0] and disorder_cases[2] in case_and_paths:  # noqa: E501
-        cases = [disorder_cases[0], disorder_cases[2]]
+    elif len(case_and_paths) == 2:
+        if disorder_cases[1] in case_and_paths:
+            if disorder_cases[0] in case_and_paths:
+                # N-IDR, Break-IDR
+                cases = [disorder_cases[0], disorder_cases[1]]
+                files = create_combinations(
+                    [case_and_paths[disorder_cases[0]],
+                    case_and_paths[disorder_cases[1]]],
+                    nconfs,
+                    )
+            else:
+                # Break-IDR, C-IDR
+                cases = [disorder_cases[1], disorder_cases[2]]
+                files = create_combinations(
+                    [case_and_paths[disorder_cases[1]],
+                    case_and_paths[disorder_cases[2]]],
+                    nconfs,
+                    )
+        else:
+            # N-IDR, C-IDR
+            cases = [disorder_cases[0], disorder_cases[2]]
+            files = create_combinations(
+                [case_and_paths[disorder_cases[0]],
+                case_and_paths[disorder_cases[2]]],
+                nconfs,
+                )
+    else:
+        # N-IDR, Break-IDR, C-IDR
+        cases = [disorder_cases[0], disorder_cases[1], disorder_cases[2]]
         files = create_combinations(
             [case_and_paths[disorder_cases[0]],
+            case_and_paths[disorder_cases[1]],
             case_and_paths[disorder_cases[2]]],
             nconfs,
             )
+        
     
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(

@@ -170,6 +170,9 @@ def store_idp_paths(folder, temp_dir):
     """
     case_path = {}
     
+    # TODO: perform os walk here, just see what the folders are like and go through each folder
+    # too many conditional statements right now
+    
     try:
         if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])) and os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
             fpath = folder.joinpath(temp_dir + disorder_cases[0])
