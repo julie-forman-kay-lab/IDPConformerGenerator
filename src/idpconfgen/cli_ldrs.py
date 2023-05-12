@@ -690,7 +690,7 @@ def main(
             match_of_files = next(os.walk(match_of))[2]
             num_files = len(match_of_files)
             prev_combinations = []
-            
+            bidr_set = 0
             start = time()
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
@@ -707,7 +707,7 @@ def main(
 
                 # Build the C-term of break first
                 temp_of_C = make_folder_or_cwd(
-                    break_of.joinpath(f"{breakidr_num}_C")
+                    break_of.joinpath(f"{breakidr_num}_{bidr_set}_C")
                     )
 
                 log.info(S(f"Generating temporary disordered library for C-terminus of break: {seq}"))
@@ -721,7 +721,7 @@ def main(
                     max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
                     tolerance=dist_tolerance * 4,
                     index=index,
-                    conformer_name=f"{breakidr_num}_C",
+                    conformer_name=f"{breakidr_num}_{bidr_set}_C",
                     input_seq=seq,  # string
                     output_folder=temp_of_C,
                     nconfs=library_confs_per_core,  # int
@@ -754,7 +754,7 @@ def main(
                     CONF_NUMBER.put(i)
                 
                 temp_of_N = make_folder_or_cwd(
-                    break_of.joinpath(f"{breakidr_num}_N")
+                    break_of.joinpath(f"{breakidr_num}_{bidr_set}_N")
                     )
 
                 log.info(S(f"Generating temporary disordered library for N-terminus of break: {seq}"))
@@ -768,7 +768,7 @@ def main(
                     max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
                     tolerance=dist_tolerance * 4,
                     index=index,
-                    conformer_name=f"{breakidr_num}_N",
+                    conformer_name=f"{breakidr_num}_{bidr_set}_N",
                     input_seq=seq,  # string
                     output_folder=temp_of_N,
                     nconfs=library_confs_per_core,  # int
@@ -822,6 +822,7 @@ def main(
                 match_of_files = next(os.walk(match_of))[2]
                 num_files = len(match_of_files)
                 log.info(f"Generated {num_files} closed IDR models this run.")
+                bidr_set += 1
             
             breakidr_num += 1
             
