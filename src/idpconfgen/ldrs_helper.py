@@ -58,7 +58,7 @@ def tolerance_calculator(tolerance):
         tolerance = 0.0
         
     max_clash = int(tolerance * 80)
-    dist_tolerance = tolerance * 1.25
+    dist_tolerance = tolerance * 0.8
     
     return max_clash, dist_tolerance
 
@@ -151,68 +151,9 @@ def consecutive_grouper(seq):
     return bounds
 
 
-def store_idp_paths(folder, temp_dir):
-    """
-    Store all of the paths for different cases of IDRs in a dictionary.
-
-    Parameters
-    ----------
-    folder : Path
-        Output folder of interest
-    
-    temp_dir : str
-        Name of the temporary directory of interest
-    
-    Returns
-    -------
-    disorder_case : dict
-        Dictionary of paths to conformers associated with each disorder case
-    """
-    case_path = {}
-    
-    # TODO: perform os walk here, just see what the folders are like and go through each folder
-    # too many conditional statements right now
-    
-    try:
-        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])) and os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
-            fpath = folder.joinpath(temp_dir + disorder_cases[0])
-            idr_confs = os.listdir(fpath)
-            case_path[disorder_cases[0]] = \
-                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
-            
-            fpath = folder.joinpath(temp_dir + disorder_cases[2])
-            idr_confs = os.listdir(fpath)
-            case_path[disorder_cases[2]] = \
-                [Path(fpath.joinpath(cpath)) for cpath in idr_confs]
-        elif os.path.exists(folder.joinpath(temp_dir + disorder_cases[0])):
-            fpath = folder.joinpath(temp_dir + disorder_cases[0])
-            idr_confs = os.listdir(fpath)
-            case_path[disorder_cases[0]] = \
-                [[Path(fpath.joinpath(cpath))] for cpath in idr_confs]
-        elif os.path.exists(folder.joinpath(temp_dir + disorder_cases[2])):
-            fpath = folder.joinpath(temp_dir + disorder_cases[2])
-            idr_confs = os.listdir(fpath)
-            case_path[disorder_cases[2]] = \
-                [[Path(fpath.joinpath(cpath))] for cpath in idr_confs]
-        
-        if os.path.exists(folder.joinpath(temp_dir + disorder_cases[1])):
-            # What to do if we have multiple breaks? Maybe split to subdirs
-            fpath = folder.joinpath(temp_dir + disorder_cases[1])
-            break_folders = os.listdir(fpath)
-            for folder in break_folders:
-                idr_folder_path = Path(fpath.joinpath(folder))
-                idr_names = os.listdir(idr_folder_path)
-                case_path[disorder_cases[1]] = \
-                    [Path(idr_folder_path.joinpath(cpath)) for cpath in idr_names]
-    except AttributeError:
-        pass
-
-    return case_path
-
-
 def create_combinations(lst, num_combinations):
     """
-    Create unique combinations between two lists.
+    Create unique combinations between list of lists.
     
     Made for N-IDR and C-IDR combinations. Where list1 = N-IDR paths,
     and list2 = C-IDR paths. Itertools product is used here because
@@ -239,6 +180,63 @@ def create_combinations(lst, num_combinations):
         random.sample(all_combinations, min(num_combinations, max_combinations))
 
     return np.array(selected_combinations).tolist()
+
+
+def create_all_combinations(folder, nconfs):
+    """
+    Creates combinations of all cases.
+
+    Parameters
+    ----------
+    folder : Path
+        Temporary folder with all IDR cases.
+    
+    nconfs : int
+        Desired number of list elements based on number of conformers.
+    
+    Returns
+    -------
+    combinations : list
+        List of all combinations with first element being path for N-IDR,
+        then Break-IDR, and last element C-IDR if necessary.
+    """
+    nidr_path = folder.joinpath(disorder_cases[0])
+    bidr_path = folder.joinpath(disorder_cases[1])
+    cidr_path = folder.joinpath(disorder_cases[2])
+    nidr_files = []
+    bidr_combinations = []
+    cidr_files = []
+    
+    if os.path.isdir(nidr_path):
+        nidr_confs = os.listdir(nidr_path)
+        nidr_files = [Path(nidr_path.joinpath(cpath)) for cpath in nidr_confs]
+    if os.path.isdir(bidr_path):
+        bidr_cases_dir = os.listdir(bidr_path)
+        bidr_confs_lst = []
+        for c, cpath in enumerate(bidr_cases_dir):
+            bidr_matches = bidr_path.joinpath(cpath + f"{c}_match")
+            bidr_confs = os.listdir(bidr_matches)
+            bidr_files = [Path(bidr_matches.joinpath(fpath)) for fpath in bidr_confs]
+            bidr_confs_lst.append(bidr_files)
+        bidr_combinations = create_combinations(bidr_confs_lst, nconfs)
+    if os.path.isdir(cidr_path):
+        cidr_confs = os.listdir(cidr_path)
+        cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]
+    
+    if len(nidr_files) and len(cidr_files) and len(bidr_combinations) > 0:
+        return create_combinations([nidr_files, bidr_combinations, cidr_files], nconfs)
+    elif len(nidr_files) and len(bidr_combinations) > 0:
+        return create_combinations([nidr_files, bidr_combinations], nconfs)
+    elif len(cidr_files) and len(bidr_combinations) > 0:
+        return create_combinations([bidr_combinations, cidr_files], nconfs)
+    elif len(nidr_files) and len(cidr_files) > 0:
+        return create_combinations([nidr_files, cidr_files], nconfs)
+    elif len(nidr_files) > 0:
+        return nidr_files
+    elif len(bidr_combinations) > 0:
+        return bidr_combinations
+    elif len(cidr_files) > 0:
+        return cidr_files
 
 
 def break_check(fdata):
@@ -613,7 +611,7 @@ def count_clashes(
     last_r = fragment_seq[-1]
     
     if case == disorder_cases[0] or disorder_cases[1]:
-        # N-IDR or Break-IDR, remove last 3 resiudes of fragment from consideration
+        # N-IDR or Break-IDR, remove last 2 resiudes of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
@@ -625,7 +623,7 @@ def count_clashes(
             if last_r - prev == 3:
                 break
     elif case == disorder_cases[2]:
-        # C-IDR, remove first 3 residues of fragment from consideration
+        # C-IDR, remove first 2 residues of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
                 next = fragment_seq[i + 1]

@@ -68,11 +68,10 @@ from idpconfgen.ldrs_helper import (
     break_check,
     consecutive_grouper,
     count_clashes,
-    create_combinations,
+    create_all_combinations,
     disorder_cases,
     psurgeon,
     sliding_window,
-    store_idp_paths,
     tolerance_calculator,
     )
 from idpconfgen.libs import libcli
@@ -587,14 +586,9 @@ def main(
     
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
-    atom_names = fld_struc.data_array[:, col_name]
-    
+    fld_name = fld_struc.data_array[:, col_name]
     fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
     first_seq = fld_seq[0]
-    # Check in case PDB structure doesn't start off as residue 1
-    if first_seq > 1:
-        fld_seq -= first_seq - 1
-        first_seq = fld_seq[0]
     last_seq = fld_seq[-1]
 
     # these are the slices with which to sample the ANGLES array
@@ -643,8 +637,8 @@ def main(
     for index, seq in enumerate(DISORDER_SEQS):
         fld_term_idx = {}
         case = DISORDER_CASES[index]
-        lower = DISORDER_BOUNDS[index][0]
-        upper = DISORDER_BOUNDS[index][1]
+        lower = DISORDER_BOUNDS[index][0] + first_seq - 1
+        upper = DISORDER_BOUNDS[index][1] + first_seq
         fStruct = Structure(Path(folded_structure))
         fStruct.build()
         breakidr_num = 0
@@ -652,19 +646,19 @@ def main(
         
         if case == disorder_cases[1]:
             for s, aa in enumerate(fld_seq):
-                if aa == lower - 1 and atom_names[s] == 'C':
+                if aa == lower - 1 and fld_name[s] == 'C':
                     fld_term_idx["CL"] = s
                 elif aa == lower:
-                    if atom_names[s] == 'N':
+                    if fld_name[s] == 'N':
                         fld_term_idx["NL"] = s
-                    elif atom_names[s] == 'CA':
+                    elif fld_name[s] == 'CA':
                         fld_term_idx["CAL"] = s
-                elif aa == upper and atom_names[s] == 'C':
+                elif aa == upper and fld_name[s] == 'C':
                     fld_term_idx['CU'] = s
                 elif aa == upper + 1:
-                    if atom_names[s] == 'N':
+                    if fld_name[s] == 'N':
                         fld_term_idx['NU'] = s
-                    elif atom_names[s] == 'CA':
+                    elif fld_name[s] == 'CA':
                         fld_term_idx['CAU'] = s
                 if aa > upper + 1:
                     break
@@ -687,10 +681,10 @@ def main(
                 output_folder.joinpath(TEMP_DIRNAME + case)
                 )
             break_of = make_folder_or_cwd(
-                output_folder.joinpath(break_parent_of + f"break_{breakidr_num}")
+                break_parent_of.joinpath(f"break_{breakidr_num}")
                 )
             match_of = make_folder_or_cwd(
-                output_folder.joinpath(break_of + f"{breakidr_num}_match")
+                break_of.joinpath(f"{breakidr_num}_match")
                 )
             
             match_of_files = next(os.walk(match_of))[2]
@@ -701,7 +695,7 @@ def main(
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
                     RANDOMSEEDS.put(random_seed + i)
-                for i in range(1, nconfs + 1):
+                for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
                 populate_globals(
@@ -713,7 +707,7 @@ def main(
 
                 # Build the C-term of break first
                 temp_of_C = make_folder_or_cwd(
-                    output_folder.joinpath(break_of + f"{breakidr_num}_C")
+                    break_of.joinpath(f"{breakidr_num}_C")
                     )
 
                 log.info(S(f"Generating temporary disordered library for C-terminus of break: {seq}"))
@@ -724,8 +718,8 @@ def main(
                     fld_xyz=fld_coords_C,
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[2],  # Treating C-term as C-IDR
-                    max_clash=max_clash,
-                    tolerance=dist_tolerance,
+                    max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
+                    tolerance=dist_tolerance * 4,
                     index=index,
                     conformer_name=f"{breakidr_num}_C",
                     input_seq=seq,  # string
@@ -756,11 +750,11 @@ def main(
                 # Do the same but for N-term end of break-IDR
                 for i in range(ncores + bool(library_remaining_confs)):
                     RANDOMSEEDS.put(random_seed + i)
-                for i in range(1, nconfs + 1):
+                for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
                 temp_of_N = make_folder_or_cwd(
-                    output_folder.joinpath(break_of + f"{breakidr_num}_N")
+                    break_of.joinpath(f"{breakidr_num}_N")
                     )
 
                 log.info(S(f"Generating temporary disordered library for N-terminus of break: {seq}"))
@@ -771,8 +765,8 @@ def main(
                     fld_xyz=fld_coords_N,
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[0],  # Treating N-term as N-IDR
-                    max_clash=max_clash,
-                    tolerance=dist_tolerance,
+                    max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
+                    tolerance=dist_tolerance * 4,
                     index=index,
                     conformer_name=f"{breakidr_num}_N",
                     input_seq=seq,  # string
@@ -802,10 +796,10 @@ def main(
                 
                 log.info(f"Finished generating library for {seq}.")
                 log.info(f"Commencing sliding window protocol for Break-IDR...")
-                
+                # TODO continue debugging here
                 # We need to make only new comparisons of files we haven't seen before
-                C_folders = glob(str(break_of) + "/*_C/")
-                N_folders = glob(str(break_of) + "/*_N/")
+                C_folders = glob(str(temp_of_C) + "/*_C/")
+                N_folders = glob(str(temp_of_N) + "/*_N/")
                 
                 all_combinations = list(product(C_folders, N_folders))
                 new_combinations = [comb for comb in all_combinations if comb not in prev_combinations]
@@ -849,7 +843,7 @@ def main(
             # for rotation and alignment where the `C` atom
             # is from the previous resiude
             if case == disorder_cases[0]:  # N-IDR case
-                for j, atom in enumerate(atom_names):
+                for j, atom in enumerate(fld_name):
                     curr_seq = fld_seq[j]
 
                     if curr_seq == first_seq + 1 and atom == "N":
@@ -861,15 +855,15 @@ def main(
                     elif curr_seq == first_seq + 2:
                         break
             elif case == disorder_cases[2]:  # C-IDR case
-                for j, _atom in enumerate(atom_names):
-                    k = len(atom_names) - 1 - j
+                for j, _atom in enumerate(fld_name):
+                    k = len(fld_name) - 1 - j
                     curr_seq = fld_seq[k]
 
-                    if curr_seq == last_seq and atom_names[k] == "N":
+                    if curr_seq == last_seq and fld_name[k] == "N":
                         fld_term_idx["N"] = k
-                    elif curr_seq == last_seq and atom_names[k] == "CA":
+                    elif curr_seq == last_seq and fld_name[k] == "CA":
                         fld_term_idx["CA"] = k
-                    elif curr_seq == last_seq - 1 and atom_names[k] == "C":
+                    elif curr_seq == last_seq - 1 and fld_name[k] == "C":
                         fld_term_idx["C"] = k
                     elif curr_seq == last_seq - 2:
                         break
@@ -879,7 +873,7 @@ def main(
             fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
             # Coordinates of boundary to stitch to later on
             fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
-
+                        
             populate_globals(
                 input_seq=seq,
                 bgeo_strategy=bgeo_strategy,
@@ -940,59 +934,19 @@ def main(
         
         log.info(f'{nconfs} {case} conformers built in {time() - start:.3f} seconds')  # noqa: E501
 
-    case_and_paths = store_idp_paths(output_folder, TEMP_DIRNAME)
-    
-    # After conformer construction and moving, time to graft proteins together
+    # After conformer construction and moving, time to graft structures together
     # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
     # - Note that residue number `col_resSeq` needs to be continuous
     # - For good form, make sure `col_serial` is consistent as well
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
-    if len(case_and_paths) == 1:
-        cases = [next(iter(case_and_paths))]
-        files = case_and_paths[cases[0]]
-    elif len(case_and_paths) == 2:
-        if disorder_cases[1] in case_and_paths:
-            if disorder_cases[0] in case_and_paths:
-                # N-IDR, Break-IDR
-                cases = [disorder_cases[0], disorder_cases[1]]
-                files = create_combinations(
-                    [case_and_paths[disorder_cases[0]],
-                    case_and_paths[disorder_cases[1]]],
-                    nconfs,
-                    )
-            else:
-                # Break-IDR, C-IDR
-                cases = [disorder_cases[1], disorder_cases[2]]
-                files = create_combinations(
-                    [case_and_paths[disorder_cases[1]],
-                    case_and_paths[disorder_cases[2]]],
-                    nconfs,
-                    )
-        else:
-            # N-IDR, C-IDR
-            cases = [disorder_cases[0], disorder_cases[2]]
-            files = create_combinations(
-                [case_and_paths[disorder_cases[0]],
-                case_and_paths[disorder_cases[2]]],
-                nconfs,
-                )
-    else:
-        # N-IDR, Break-IDR, C-IDR
-        cases = [disorder_cases[0], disorder_cases[1], disorder_cases[2]]
-        files = create_combinations(
-            [case_and_paths[disorder_cases[0]],
-            case_and_paths[disorder_cases[1]],
-            case_and_paths[disorder_cases[2]]],
-            nconfs,
-            )
-        
+    files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)
     
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(
         psurgeon,
         fld_struc=Path(folded_structure),
-        case=cases,
+        case=DISORDER_CASES,
         ranges=DISORDER_BOUNDS,
         )
     execute = partial(
