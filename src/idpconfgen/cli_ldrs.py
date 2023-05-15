@@ -633,46 +633,49 @@ def main(
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
     
+    fStruct = Structure(Path(folded_structure))
+    fStruct.build()
+    
     # Generate library of conformers for each case
     for index, seq in enumerate(DISORDER_SEQS):
         fld_term_idx = {}
         case = DISORDER_CASES[index]
-        lower = DISORDER_BOUNDS[index][0] + first_seq - 1
-        upper = DISORDER_BOUNDS[index][1] + first_seq
-        fStruct = Structure(Path(folded_structure))
-        fStruct.build()
+        if disorder_cases[0] not in DISORDER_CASES:
+            lower = DISORDER_BOUNDS[index][0] + first_seq - 1
+            upper = DISORDER_BOUNDS[index][1] + first_seq
+        else:
+            lower = DISORDER_BOUNDS[index][0]
+            upper = DISORDER_BOUNDS[index][1] + 1
         breakidr_num = 0
         library_nconfs = 640
-        
         if case == disorder_cases[1]:
             for s, aa in enumerate(fld_seq):
                 if aa == lower - 1 and fld_name[s] == 'C':
-                    fld_term_idx["CL"] = s
+                    fld_term_idx["CC"] = s
                 elif aa == lower:
                     if fld_name[s] == 'N':
-                        fld_term_idx["NL"] = s
+                        fld_term_idx["NC"] = s
                     elif fld_name[s] == 'CA':
-                        fld_term_idx["CAL"] = s
+                        fld_term_idx["CAC"] = s
                 elif aa == upper and fld_name[s] == 'C':
-                    fld_term_idx['CU'] = s
+                    fld_term_idx['CN'] = s
                 elif aa == upper + 1:
                     if fld_name[s] == 'N':
-                        fld_term_idx['NU'] = s
+                        fld_term_idx['NN'] = s
                     elif fld_name[s] == 'CA':
-                        fld_term_idx['CAU'] = s
+                        fld_term_idx['CAN'] = s
                 if aa > upper + 1:
                     break
-            
-            fld_CLxyz = fld_struc.data_array[fld_term_idx["CL"]][cols_coords].astype(float)
-            fld_NLxyz = fld_struc.data_array[fld_term_idx["NL"]][cols_coords].astype(float)
-            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAL"]][cols_coords].astype(float)
+            fld_CLxyz = fld_struc.data_array[fld_term_idx["CC"]][cols_coords].astype(float)
+            fld_NLxyz = fld_struc.data_array[fld_term_idx["NC"]][cols_coords].astype(float)
+            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAC"]][cols_coords].astype(float)
             fld_coords_C = np.array([fld_CLxyz, fld_NLxyz, fld_CALxyz])
             
-            fld_CUxyz = fld_struc.data_array[fld_term_idx["CU"]][cols_coords].astype(float)
-            fld_NUxyz = fld_struc.data_array[fld_term_idx["NU"]][cols_coords].astype(float)
-            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAU"]][cols_coords].astype(float)
+            fld_CUxyz = fld_struc.data_array[fld_term_idx["CN"]][cols_coords].astype(float)
+            fld_NUxyz = fld_struc.data_array[fld_term_idx["NN"]][cols_coords].astype(float)
+            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAN"]][cols_coords].astype(float)
             fld_coords_N = np.array([fld_CUxyz, fld_NUxyz, fld_CAUxyz])
-            
+
             library_confs_per_core = library_nconfs // ncores
             library_remaining_confs = library_nconfs % ncores
             
@@ -691,10 +694,11 @@ def main(
             num_files = len(match_of_files)
             prev_combinations = []
             bidr_set = 0
+            lib_rs = random_seed
             start = time()
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + i)
+                    RANDOMSEEDS.put(lib_rs + bidr_set + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
@@ -719,7 +723,7 @@ def main(
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[2],  # Treating C-term as C-IDR
                     max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
-                    tolerance=dist_tolerance * 4,
+                    tolerance=dist_tolerance,
                     index=index,
                     conformer_name=f"{breakidr_num}_{bidr_set}_C",
                     input_seq=seq,  # string
@@ -749,7 +753,7 @@ def main(
 
                 # Do the same but for N-term end of break-IDR
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + i)
+                    RANDOMSEEDS.put(lib_rs + bidr_set + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
@@ -766,7 +770,7 @@ def main(
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[0],  # Treating N-term as N-IDR
                     max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
-                    tolerance=dist_tolerance * 4,
+                    tolerance=dist_tolerance,
                     index=index,
                     conformer_name=f"{breakidr_num}_{bidr_set}_N",
                     input_seq=seq,  # string
@@ -796,17 +800,17 @@ def main(
                 
                 log.info(f"Finished generating library for {seq}.")
                 log.info(f"Commencing sliding window protocol for Break-IDR...")
-                # TODO continue debugging here
-                # We need to make only new comparisons of files we haven't seen before
-                C_folders = glob(str(temp_of_C) + "/*_C/")
-                N_folders = glob(str(temp_of_N) + "/*_N/")
                 
-                all_combinations = list(product(C_folders, N_folders))
+                # We need to make only new comparisons of files we haven't seen before
+                C_files = glob(str(break_of) + "/*_C/*.pdb")
+                N_files = glob(str(break_of) + "/*_N/*.pdb")
+                
+                all_combinations = list(product(C_files, N_files))
                 new_combinations = [comb for comb in all_combinations if comb not in prev_combinations]
                 prev_combinations = all_combinations
                 
-                tocheck_C = [item[0] for item in new_combinations]
-                tocheck_N = [item[1] for item in new_combinations]
+                tocheck_C = list(set([item[0] for item in new_combinations]))
+                tocheck_N = list(set([item[1] for item in new_combinations]))
                 
                 execute = partial(
                     sliding_window,
@@ -942,7 +946,8 @@ def main(
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
     files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)
-    
+    # TODO: check if stitching works with multiple cases
+    # Also need new protein with easy IDR closure in the /example folder
     log.info("Stitching conformers onto the folded domain...")
     consume = partial(
         psurgeon,
