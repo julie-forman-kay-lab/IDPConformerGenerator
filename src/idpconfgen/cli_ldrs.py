@@ -694,11 +694,10 @@ def main(
             num_files = len(match_of_files)
             prev_combinations = []
             bidr_set = 0
-            lib_rs = random_seed
             start = time()
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(lib_rs + bidr_set + i)
+                    RANDOMSEEDS.put(random_seed + (bidr_set * ncores) + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
@@ -753,7 +752,7 @@ def main(
 
                 # Do the same but for N-term end of break-IDR
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(lib_rs + bidr_set + i)
+                    RANDOMSEEDS.put(random_seed + (bidr_set * ncores) + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
@@ -769,7 +768,7 @@ def main(
                     fld_xyz=fld_coords_N,
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[0],  # Treating N-term as N-IDR
-                    max_clash=max_clash * 2,  # 4x multiplier due to 2 fixed ends
+                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends
                     tolerance=dist_tolerance * 2,
                     index=index,
                     conformer_name=f"{breakidr_num}_{bidr_set}_N",
@@ -806,7 +805,7 @@ def main(
                 N_files = glob(str(break_of) + "/*_N/*.pdb")
                 
                 all_combinations = list(product(C_files, N_files))
-                new_combinations = [comb for comb in all_combinations if comb not in prev_combinations]
+                new_combinations = list(set(all_combinations) - set(prev_combinations))
                 prev_combinations = all_combinations
                 
                 tocheck_C = list(set([item[0] for item in new_combinations]))

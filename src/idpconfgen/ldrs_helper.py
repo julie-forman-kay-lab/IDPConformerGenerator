@@ -558,7 +558,7 @@ def sliding_window(
                     cterm_idr_stem = Path(cterm_idr).stem
                     nterm_idr_stem = Path(nterm_idr).stem
                     matches += 1
-                    write_PDB(final_struc, output_folder + f"{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
+                    write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
 
     return matches
 
@@ -624,7 +624,7 @@ def count_clashes(
                 break
     elif case == disorder_cases[2]:
         # C-IDR, remove first 2 residues of fragment from consideration
-        for i, seq in enumerate(fragment_seq):
+        for i, _ in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
                 next = fragment_seq[i + 1]
             except IndexError:
