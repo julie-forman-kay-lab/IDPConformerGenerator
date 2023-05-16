@@ -214,7 +214,7 @@ def create_all_combinations(folder, nconfs):
         bidr_cases_dir = os.listdir(bidr_path)
         bidr_confs_lst = []
         for c, cpath in enumerate(bidr_cases_dir):
-            bidr_matches = bidr_path.joinpath(cpath + f"{c}_match")
+            bidr_matches = bidr_path.joinpath(cpath + f"/{c}_match")
             bidr_confs = os.listdir(bidr_matches)
             bidr_files = [Path(bidr_matches.joinpath(fpath)) for fpath in bidr_confs]
             bidr_confs_lst.append(bidr_files)
@@ -774,7 +774,7 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
             upper = minmax[1]
             new_struc_lst = new_struc_arr.tolist()
             
-            idr = Structure(idp_lst[idx])
+            idr = Structure(idp_lst[0][idx])
             idr.build()
             
             idr_seq = idr.data_array[:, col_resSeq].astype(int)
@@ -796,8 +796,12 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
                 
             idr_data_lst = idr_data_array.tolist()
             surrounding_data_list = []
-            actual_lower = first_struc_seq + lower - 1
-            actual_upper = first_struc_seq + upper - 1
+            if disorder_cases[0] not in case:
+                actual_lower = lower + first_struc_seq - 1
+                actual_upper = upper + first_struc_seq
+            else:
+                actual_lower = lower
+                actual_upper = upper + 1
             found = False
             for s, seq in enumerate(new_struc_seq):
                 if seq == actual_lower or seq == actual_upper:
