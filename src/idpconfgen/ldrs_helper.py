@@ -610,7 +610,7 @@ def count_clashes(
     first_r = fragment_seq[0]
     last_r = fragment_seq[-1]
     
-    if case == disorder_cases[0] or disorder_cases[1]:
+    if case == disorder_cases[0] or case == disorder_cases[1]:
         # N-IDR or Break-IDR, remove last 2 resiudes of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
@@ -624,7 +624,7 @@ def count_clashes(
                 break
     elif case == disorder_cases[2]:
         # C-IDR, remove first 2 residues of fragment from consideration
-        for i, _ in enumerate(fragment_seq):
+        for i, seq in enumerate(fragment_seq):
             try:  # In case the user wants to build less than 3 residues
                 next = fragment_seq[i + 1]
             except IndexError:

@@ -722,8 +722,8 @@ def main(
                     fld_xyz=fld_coords_C,
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[2],  # Treating C-term as C-IDR
-                    max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
-                    tolerance=dist_tolerance,
+                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends
+                    tolerance=dist_tolerance * 2,
                     index=index,
                     conformer_name=f"{breakidr_num}_{bidr_set}_C",
                     input_seq=seq,  # string
@@ -769,8 +769,8 @@ def main(
                     fld_xyz=fld_coords_N,
                     fld_struc=fStruct,
                     disorder_case=disorder_cases[0],  # Treating N-term as N-IDR
-                    max_clash=max_clash * 4,  # 4x multiplier due to 2 fixed ends
-                    tolerance=dist_tolerance,
+                    max_clash=max_clash * 2,  # 4x multiplier due to 2 fixed ends
+                    tolerance=dist_tolerance * 2,
                     index=index,
                     conformer_name=f"{breakidr_num}_{bidr_set}_N",
                     input_seq=seq,  # string
