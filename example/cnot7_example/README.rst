@@ -1,15 +1,14 @@
-Modelling Disordered Regions on a Folded Domain
-===============================================
+Modelling Disordered Region Tails on a Folded Domain
+====================================================
 
 .. start-description
 
-The following example will walk you through building a IDR tails on folded regions
-using the Local Disordered Region Sampling (LDRS ``ldrs`` subclient).
+The following example will walk you through building N-terminal and C-terminal
+IDR tails on folded regions using the Local Disordered Region Sampling (LDRS ``ldrs`` subclient).
 
-For this exercise, we will be constructing the N-IDR and C-IDR tails on the
-human CNOT7 deadenylase. Please enter the example :code:`example/cnot7_example` folder
-where you will find the FASTA sequence: ``cnot7.fasta``, and a PDB of the folded region
-from PDB ID 4GMJ: ``cnot7_4gmj_fld_11-263.pdb``.
+For this exercise, we will be constructing the tails on the human CNOT7 deadenylase protein.
+Please enter the example :code:`example/cnot7_example` folder where you will find the complete FASTA
+sequence: ``cnot7.fasta``, and a PDB of the folded region from PDB ID 4GMJ: ``4GMJ_CNOT7.pdb``.
 
 .. note::
     If your input PDB has phosphorylated residues such as phosphorylated threonine and serine,
@@ -32,7 +31,7 @@ disordered tails on folded domains like so::
         -etbb 100 \
         -etss 250 \
         -nc 100 \
-        -fld cnot7_4gmj_fld_11-263.pdb \
+        -fld 4GMJ_CNOT7.pdb \
         -of ./cnot7_ldrs_L+_faspr \
         -n
 
@@ -43,5 +42,7 @@ file of the folded domain.
 Any other parameters will only impact the disordered regions generated. Additional settings
 include ``-tol`` and ``-kt``, where the former sets a tolerance for clashes between the
 disordered tail(s) and folded domain while the latter acts as a switch to retain the
-disordered tail(s) generated in the building process. By default, disordered tails are
-deleted after full length conformers are generated.
+disordered tail(s) generated in the building process. By default, disordered tail only
+conformers are deleted after full length conformers are generated.
+
+.. end-description
