@@ -71,7 +71,7 @@ from idpconfgen.ldrs_helper import (
     create_all_combinations,
     disorder_cases,
     psurgeon,
-    sliding_window,
+    next_seeker,
     tolerance_calculator,
     )
 from idpconfgen.libs import libcli
@@ -798,7 +798,7 @@ def main(
                     execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)
                 
                 log.info(f"Finished generating library for {seq}.")
-                log.info(f"Commencing sliding window protocol for Break-IDR...")
+                log.info(f"Commencing next-seeker protocol for Break-IDR...")
                 
                 # We need to make only new comparisons of files we haven't seen before
                 C_files = glob(str(break_of) + "/*_C/*.pdb")
@@ -812,7 +812,7 @@ def main(
                 tocheck_N = list(set([item[1] for item in new_combinations]))
                 
                 execute = partial(
-                    sliding_window,
+                    next_seeker,
                     nterm_idr_lib=tocheck_N,
                     max_clash=max_clash,
                     tolerance=dist_tolerance,

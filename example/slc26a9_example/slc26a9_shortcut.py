@@ -16,7 +16,7 @@ from idpconfgen.libs.libstructure import (
 from idpconfgen.ldrs_helper import (
     align_coords,
     count_clashes,
-    sliding_window
+    next_seeker,
     )
 
 from idpconfgen import Path
@@ -146,9 +146,9 @@ execute_pool = pool_function(execute, idr_lst, ncores=ncores)
 for _ in execute_pool:
     pass
 
-# Execute sliding window protocol
+# Execute next-seeker protocol
 execute = partial(
-    sliding_window,
+    next_seeker,
     nterm_idr_lib=idr_upper,
     max_clash=40,
     tolerance=0.4,

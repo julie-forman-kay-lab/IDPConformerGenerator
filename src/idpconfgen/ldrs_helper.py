@@ -408,7 +408,7 @@ def align_coords(sample, target, case):
     return sample
 
 
-def sliding_window(
+def next_seeker(
         cterm_idr,
         nterm_idr_lib,
         max_clash,
@@ -416,7 +416,7 @@ def sliding_window(
         output_folder,
         ):
     """
-    Sliding window search protocol to find possible pairs of chains
+    Next-seeker search protocol to find possible pairs of chains
     that will close the break.
 
     Parameters
