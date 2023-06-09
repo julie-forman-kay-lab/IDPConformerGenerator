@@ -601,8 +601,10 @@ def count_clashes(
     """
     num_clashes = 0
     
-    parent_atoms = parent.data_array[:, col_element]
-    fragment_atoms = fragment[:, col_element]
+    # Not using `col_element` because some PDB files may not have that column
+    # take the first character of `col_name` instead
+    parent_atoms = parent.data_array[:, col_name]
+    fragment_atoms = fragment[:, col_name]
     fragment_seq = fragment[:, col_resSeq].astype(int)
     parent_coords = parent.data_array[:, cols_coords].astype(float)
     fragment_coords = fragment[:, cols_coords].astype(float)
@@ -635,14 +637,17 @@ def count_clashes(
                 break
 
     # Loop through all pairs of atoms in the 2 protein chains
+    # Take the first character of atom name as the element ID
     for i, atom1 in enumerate(parent_atoms):
+        a1 = atom1[0]
         for j, atom2 in enumerate(fragment_atoms):
+            a2 = atom2[0]
             # calculate distance between atoms
             distance = calculate_distance(parent_coords[i], fragment_coords[j])
             
             # get vdW radii for each atom
-            vdw_radius1 = vdW_radii_tsai_1999[atom1]
-            vdw_radius2 = vdW_radii_tsai_1999[atom2]
+            vdw_radius1 = vdW_radii_tsai_1999[a1]
+            vdw_radius2 = vdW_radii_tsai_1999[a2]
             
             # Check if a steric clash is detected by comparing
             # distance between atoms to the sum of their vdW radii
