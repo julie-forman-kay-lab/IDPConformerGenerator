@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.6.17 (2023-06-12)
+------------------------------------------------------------
+
 * Bug-fix for installation and tox build/pr
 
 v0.6.16 (2022-11-08)
