@@ -9,10 +9,10 @@ Local Disordered Region Sampling (LDRS ``ldrs`` subclient). If not, please visit
 the ``cnot7_example``.
 
 For this exercise, we will construct the intrinsically disordered region from
-residues 49-135 on the STAS domain of SLC26A9 (PDB ID 7CH1, UniProt A0A7K9KBT8).
+residues 568-652 on the STAS domain of SLC26A9 (PDB ID 7CH1, UniProt A0A7K9KBT8).
 In the :code:`example/slc26a9_example` folder you will find the complete FASTA
 sequence: ``SLC26A9_STAS.fasta``, and a PDB of the folded region from PDB ID
-4GMJ: ``7CH1_SLC26A9.pdb``.
+7CH1: ``7CH1_SLC26A9.pdb``.
 
 .. note::
     Modeling an IDR between folded regions may take a while depending on various
@@ -105,7 +105,6 @@ our candidates for sidechain addition.
 the ``idpconfgen`` Python environment.
 
 4. Model the sidechains onto the conformers generated previously in the
-B
 ``matches`` folder using `MC-SCE software<https://github.com/THGLab/MCSCE>`_:
 
     .. code-block:: bash
