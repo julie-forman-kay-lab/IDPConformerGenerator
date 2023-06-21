@@ -19,7 +19,7 @@ PDB of the folded region from PDB ID 4GMJ: ``4GMJ_CNOT7.pdb``.
     ``TPO`` phosphorylated threonine will become ``THR`` and ``SEP``
     phosphorylated serine will become ``SER``.
 
-    Using the ``resre`` sublient can help you with this.
+    Using the ``resre`` subclient can help you with this.
 
 Steps from now will assume you're in the ``example/cnot7_example`` directory and
 have already compiled your preferred reusable IDPConformerGenerator *database*.
