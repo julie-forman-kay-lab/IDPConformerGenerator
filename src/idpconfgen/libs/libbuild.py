@@ -293,7 +293,7 @@ def create_conformer_labels(
     Returns
     -------
     tuple (atom labels, residue numbers, residue labels)
-        Each is a np.ndarray of types: '<U4', np.int, and '<U3' and
+        Each is a np.ndarray of types: '<U4', int, and '<U3' and
         shape (N,) where N is the number of atoms.
         The three arrays have the same length.
     """
@@ -317,7 +317,7 @@ def create_conformer_labels(
 
     # /
     # per atom labels
-    residue_numbers = np.empty(num_atoms, dtype=np.int)
+    residue_numbers = np.empty(num_atoms, dtype=int)
     residue_labels = np.empty(num_atoms, dtype='<U3')
 
     # generators
