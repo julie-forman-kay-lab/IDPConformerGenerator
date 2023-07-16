@@ -1,29 +1,32 @@
-Modelling Disordered Region Tails on a Folded Domain
-====================================================
+Modeling Disordered Region Tails on a Folded Domain
+===================================================
 
 .. start-description
 
 The following example will walk you through building N-terminal and C-terminal
-IDR tails on folded regions using the Local Disordered Region Sampling (LDRS ``ldrs`` subclient).
+IDR tails on folded regions using the Local Disordered Region Sampling (LDRS
+``ldrs`` subclient).
 
-For this exercise, we will be constructing the tails on the human CNOT7 deadenylase protein.
-Please enter the example :code:`example/cnot7_example` folder where you will find the complete FASTA
-sequence: ``cnot7.fasta``, and a PDB of the folded region from PDB ID 4GMJ: ``4GMJ_CNOT7.pdb``.
+For this exercise, we will be constructing the tails on the human CNOT7
+deadenylase protein.  Please enter the example :code:`example/cnot7_example`
+folder where you will find the complete CNOT7 sequence: ``cnot7.fasta``, and a
+PDB of the folded region from PDB ID 4GMJ: ``4GMJ_CNOT7.pdb``.
 
 .. note::
-    If your input PDB has phosphorylated residues such as phosphorylated threonine and serine,
-    please change the three letter code in the PDB file indicating the residue lable to the
-    non-modified version. For example: ``TPO`` phosphorylated threonine will become ``THR`` and
-    ``SEP`` phosphorylated serine will become ``SEP``.
+    If your input PDB has phosphorylated residues such as phosphorylated
+    threonine and serine, please change the three-letter code in the PDB file
+    indicating the residue label to the non-modified version. For example:
+    ``TPO`` phosphorylated threonine will become ``THR`` and ``SEP``
+    phosphorylated serine will become ``SER``.
 
-    Using the ``resre`` sublcient can help you with this.
+    Using the ``resre`` subclient can help you with this.
 
-Steps from now will assume you're in the working director of ``example/cnot7_example``
-and have already compiled your preferred reusable IDPConformerGenerator database. For
-instructions on the database, please visit the previous exercise "A Real Case Scenario".
+Steps from now will assume you're in the ``example/cnot7_example`` directory and
+have already compiled your preferred reusable IDPConformerGenerator *database*.
+For instructions on the database, please visit the previous exercise "A Real
+Case Scenario".
 
-Aside from the ``build`` subclient, we will be using the ``ldrs`` subclient to build
-disordered tails on folded domains like so::
+To generate the disordered terminal tails on CNOT7 run the following command::
 
     idpconfgen ldrs \
         -db <PATH TO DATABASE.JSON> \
