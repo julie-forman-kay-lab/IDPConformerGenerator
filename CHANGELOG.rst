@@ -12,6 +12,11 @@ Changelog
 * Added new building feature ``--fld-structures`` to build certain domains of interest
 * Added building flag ``--fld-bounds`` to indicate where the folded region starts and ends
 
+v0.6.17 (2023-06-12)
+------------------------------------------------------------
+
+* Bug-fix for installation and tox build/pr
+
 v0.6.16 (2022-11-08)
 ------------------------------------------------------------
 
