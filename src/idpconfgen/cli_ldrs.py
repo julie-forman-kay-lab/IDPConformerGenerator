@@ -518,10 +518,10 @@ def main(
     
     # Find out what our disordered sequences are
     # Can be C-term, N-term, in the middle, or all the above
-    breaks = break_check(pdb_raw)
+    linkers = break_check(pdb_raw)
     mod_input_seq = input_seq
-    if breaks:
-        for seq in breaks:
+    if linkers:
+        for seq in linkers:
             mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
             
     mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
@@ -646,7 +646,7 @@ def main(
         else:
             lower = DISORDER_BOUNDS[index][0]
             upper = DISORDER_BOUNDS[index][1] + 1
-        breakidr_num = 0
+        linkeridr_num = 0
         library_nconfs = 640
         if case == disorder_cases[1]:
             for s, aa in enumerate(fld_seq):
@@ -666,38 +666,38 @@ def main(
                         fld_term_idx['CAN'] = s
                 if aa > upper + 1:
                     break
-            fld_CLxyz = fld_struc.data_array[fld_term_idx["CC"]][cols_coords].astype(float)
-            fld_NLxyz = fld_struc.data_array[fld_term_idx["NC"]][cols_coords].astype(float)
-            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAC"]][cols_coords].astype(float)
+            fld_CLxyz = fld_struc.data_array[fld_term_idx["CC"]][cols_coords].astype(float)  # noqa: E501
+            fld_NLxyz = fld_struc.data_array[fld_term_idx["NC"]][cols_coords].astype(float)  # noqa: E501
+            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAC"]][cols_coords].astype(float)  # noqa: E501
             fld_coords_C = np.array([fld_CLxyz, fld_NLxyz, fld_CALxyz])
             
-            fld_CUxyz = fld_struc.data_array[fld_term_idx["CN"]][cols_coords].astype(float)
-            fld_NUxyz = fld_struc.data_array[fld_term_idx["NN"]][cols_coords].astype(float)
-            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAN"]][cols_coords].astype(float)
+            fld_CUxyz = fld_struc.data_array[fld_term_idx["CN"]][cols_coords].astype(float)  # noqa: E501
+            fld_NUxyz = fld_struc.data_array[fld_term_idx["NN"]][cols_coords].astype(float)  # noqa: E501
+            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAN"]][cols_coords].astype(float)  # noqa: E501
             fld_coords_N = np.array([fld_CUxyz, fld_NUxyz, fld_CAUxyz])
 
             library_confs_per_core = library_nconfs // ncores
             library_remaining_confs = library_nconfs % ncores
             
             # Initialize directories
-            break_parent_of = make_folder_or_cwd(
+            linker_parent_of = make_folder_or_cwd(
                 output_folder.joinpath(TEMP_DIRNAME + case)
                 )
-            break_of = make_folder_or_cwd(
-                break_parent_of.joinpath(f"break_{breakidr_num}")
+            linker_of = make_folder_or_cwd(
+                linker_parent_of.joinpath(f"linker_{linkeridr_num}")
                 )
             match_of = make_folder_or_cwd(
-                break_of.joinpath(f"{breakidr_num}_match")
+                linker_of.joinpath(f"{linkeridr_num}_match")
                 )
             
             match_of_files = next(os.walk(match_of))[2]
             num_files = len(match_of_files)
             prev_combinations = []
-            bidr_set = 0
+            lidr_set = 0
             start = time()
             while num_files < nconfs:
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + (bidr_set * ncores) + i)
+                    RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
@@ -708,23 +708,23 @@ def main(
                     forcefield=forcefields[forcefield],
                     **kwargs)
 
-                # Build the C-term of break first
+                # Build the C-term of linker first
                 temp_of_C = make_folder_or_cwd(
-                    break_of.joinpath(f"{breakidr_num}_{bidr_set}_C")
+                    linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_C")
                     )
 
-                log.info(S(f"Generating temporary disordered library for C-terminus of break: {seq}"))
+                log.info(S(f"Generating temporary disordered library for C-terminus of linker: {seq}"))  # noqa: E501
 
                 # prepares execution function
                 consume = partial(
                     _build_conformers,
                     fld_xyz=fld_coords_C,
                     fld_struc=fStruct,
-                    disorder_case=disorder_cases[2],  # Treating C-term as C-IDR
-                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends
+                    disorder_case=disorder_cases[2],  # Treating C-term as C-IDR  # noqa: E501
+                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                     tolerance=dist_tolerance * 2,
                     index=index,
-                    conformer_name=f"{breakidr_num}_{bidr_set}_C",
+                    conformer_name=f"{linkeridr_num}_{lidr_set}_C",
                     input_seq=seq,  # string
                     output_folder=temp_of_C,
                     nconfs=library_confs_per_core,  # int
@@ -748,30 +748,30 @@ def main(
                         pass
                     
                 if remaining_confs:
-                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)
+                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
 
-                # Do the same but for N-term end of break-IDR
+                # Do the same but for N-term end of linker-IDR
                 for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + (bidr_set * ncores) + i)
+                    RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
                 for i in range(1, library_nconfs + 1):
                     CONF_NUMBER.put(i)
                 
                 temp_of_N = make_folder_or_cwd(
-                    break_of.joinpath(f"{breakidr_num}_{bidr_set}_N")
+                    linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_N")
                     )
 
-                log.info(S(f"Generating temporary disordered library for N-terminus of break: {seq}"))
+                log.info(S(f"Generating temporary disordered library for N-terminus of linker: {seq}"))  # noqa: E501
 
                 # prepares execution function
                 consume = partial(
                     _build_conformers,
                     fld_xyz=fld_coords_N,
                     fld_struc=fStruct,
-                    disorder_case=disorder_cases[0],  # Treating N-term as N-IDR
-                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends
+                    disorder_case=disorder_cases[0],  # Treating N-term as N-IDR  # noqa: E501
+                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                     tolerance=dist_tolerance * 2,
                     index=index,
-                    conformer_name=f"{breakidr_num}_{bidr_set}_N",
+                    conformer_name=f"{linkeridr_num}_{lidr_set}_N",
                     input_seq=seq,  # string
                     output_folder=temp_of_N,
                     nconfs=library_confs_per_core,  # int
@@ -795,17 +795,18 @@ def main(
                         pass
                     
                 if remaining_confs:
-                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)
+                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
                 
                 log.info(f"Finished generating library for {seq}.")
-                log.info(f"Commencing next-seeker protocol for Break-IDR...")
+                log.info("Commencing next-seeker protocol for Linker-IDR...")
                 
-                # We need to make only new comparisons of files we haven't seen before
-                C_files = glob(str(break_of) + "/*_C/*.pdb")
-                N_files = glob(str(break_of) + "/*_N/*.pdb")
+                # We need to make only new comparisons of files
+                # we haven't seen before
+                C_files = glob(str(linker_of) + "/*_C/*.pdb")
+                N_files = glob(str(linker_of) + "/*_N/*.pdb")
                 
                 all_combinations = list(product(C_files, N_files))
-                new_combinations = list(set(all_combinations) - set(prev_combinations))
+                new_combinations = list(set(all_combinations) - set(prev_combinations))  # noqa: E501
                 prev_combinations = all_combinations
                 
                 tocheck_C = list(set([item[0] for item in new_combinations]))
@@ -825,12 +826,12 @@ def main(
                 match_of_files = next(os.walk(match_of))[2]
                 num_files = len(match_of_files)
                 log.info(f"Generated {num_files} closed IDR models this run.")
-                bidr_set += 1
+                lidr_set += 1
             
-            breakidr_num += 1
+            linkeridr_num += 1
             
-            all_C = glob(str(break_of) + "/*_C/")
-            all_N = glob(str(break_of) + "/*_N/")
+            all_C = glob(str(linker_of) + "/*_C/")
+            all_N = glob(str(linker_of) + "/*_N/")
             
             for i, c in enumerate(all_C):
                 shutil.rmtree(c)
@@ -891,7 +892,7 @@ def main(
                 output_folder.joinpath(TEMP_DIRNAME + case)
                 )
 
-            log.info(S(f"Generating temporary disordered conformers for: {seq}"))
+            log.info(S(f"Generating temporary disordered conformers for: {seq}"))  # noqa: E501
             log.info(S(
                 "Please note that sequence will contain 2 extra residues "
                 "to facilitate reconstruction later on."
@@ -944,7 +945,7 @@ def main(
     # - For good form, make sure `col_serial` is consistent as well
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
-    files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)
+    files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)  # noqa: E501
     # TODO: check if stitching works with multiple cases
     # Also need new protein with easy IDR closure in the /example folder
     log.info("Stitching conformers onto the folded domain...")
@@ -1092,7 +1093,7 @@ def _build_conformers(
 
     atom_labels, residue_numbers, _residue_labels = next(builder)
     
-    for _ in range(nconfs): 
+    for _ in range(nconfs):
         while 1:
             energy, coords = next(builder)
 
@@ -1281,7 +1282,7 @@ def conformer_generator(
     # The first residue has no NH, prolines have no NH.
     non_pro = np.array(list(template_input_seq)[1:]) != 'P'
     # NHs index numbers in bb_real
-    bb_NH_nums = np.arange(3, (len(template_input_seq) - 1) * 3 + 1, 3)[non_pro]
+    bb_NH_nums = np.arange(3, (len(template_input_seq) - 1) * 3 + 1, 3)[non_pro]  # noqa: E501
     bb_NH_nums_p1 = bb_NH_nums + 1
     assert bb_NH.shape[0] == bb_NH_nums.size == bb_NH_idx.size
 
@@ -1416,7 +1417,6 @@ def conformer_generator(
                 else:
                     primer_template, agls = get_adj(bbi - 1)
                 
-
             # index at the start of the current cycle
             PRIMER = cycle(primer_template)
 

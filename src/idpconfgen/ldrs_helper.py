@@ -34,7 +34,7 @@ from idpconfgen.libs.libstructure import (
 
 disorder_cases = {
     0: "N-IDR",
-    1: "Break-IDR",
+    1: "Linker-IDR",
     2: "C-IDR",
     }
 
@@ -163,7 +163,7 @@ def create_combinations(lst, num_combinations):
     ----------
     lst : list
         Can be a list of lists, but normally in the order of
-        N-IDR, Break-IDR, C-IDR paths
+        N-IDR, Linker-IDR, C-IDR paths
     
     num_combinations : int
     
@@ -198,43 +198,43 @@ def create_all_combinations(folder, nconfs):
     -------
     combinations : list
         List of all combinations with first element being path for N-IDR,
-        then Break-IDR, and last element C-IDR if necessary.
+        then Linker-IDR, and last element C-IDR if necessary.
     """
     nidr_path = folder.joinpath(disorder_cases[0])
-    bidr_path = folder.joinpath(disorder_cases[1])
+    lidr_path = folder.joinpath(disorder_cases[1])
     cidr_path = folder.joinpath(disorder_cases[2])
     nidr_files = []
-    bidr_combinations = []
+    lidr_combinations = []
     cidr_files = []
     
     if os.path.isdir(nidr_path):
         nidr_confs = os.listdir(nidr_path)
         nidr_files = [Path(nidr_path.joinpath(cpath)) for cpath in nidr_confs]
-    if os.path.isdir(bidr_path):
-        bidr_cases_dir = os.listdir(bidr_path)
-        bidr_confs_lst = []
-        for c, cpath in enumerate(bidr_cases_dir):
-            bidr_matches = bidr_path.joinpath(cpath + f"/{c}_match")
-            bidr_confs = os.listdir(bidr_matches)
-            bidr_files = [Path(bidr_matches.joinpath(fpath)) for fpath in bidr_confs]
-            bidr_confs_lst.append(bidr_files)
-        bidr_combinations = create_combinations(bidr_confs_lst, nconfs)
+    if os.path.isdir(lidr_path):
+        lidr_cases_dir = os.listdir(lidr_path)
+        lidr_confs_lst = []
+        for c, cpath in enumerate(lidr_cases_dir):
+            lidr_matches = lidr_path.joinpath(cpath + f"/{c}_match")
+            lidr_confs = os.listdir(lidr_matches)
+            lidr_files = [Path(lidr_matches.joinpath(fpath)) for fpath in lidr_confs]
+            lidr_confs_lst.append(lidr_files)
+        lidr_combinations = create_combinations(lidr_confs_lst, nconfs)
     if os.path.isdir(cidr_path):
         cidr_confs = os.listdir(cidr_path)
         cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]
     
-    if len(nidr_files) and len(cidr_files) and len(bidr_combinations) > 0:
-        return create_combinations([nidr_files, bidr_combinations, cidr_files], nconfs)
-    elif len(nidr_files) and len(bidr_combinations) > 0:
-        return create_combinations([nidr_files, bidr_combinations], nconfs)
-    elif len(cidr_files) and len(bidr_combinations) > 0:
-        return create_combinations([bidr_combinations, cidr_files], nconfs)
+    if len(nidr_files) and len(cidr_files) and len(lidr_combinations) > 0:
+        return create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs)
+    elif len(nidr_files) and len(lidr_combinations) > 0:
+        return create_combinations([nidr_files, lidr_combinations], nconfs)
+    elif len(cidr_files) and len(lidr_combinations) > 0:
+        return create_combinations([lidr_combinations, cidr_files], nconfs)
     elif len(nidr_files) and len(cidr_files) > 0:
         return create_combinations([nidr_files, cidr_files], nconfs)
     elif len(nidr_files) > 0:
         return nidr_files
-    elif len(bidr_combinations) > 0:
-        return bidr_combinations
+    elif len(lidr_combinations) > 0:
+        return lidr_combinations
     elif len(cidr_files) > 0:
         return cidr_files
 
@@ -324,13 +324,13 @@ def align_coords(sample, target, case):
         Set of 3D coordinates representing positions of C, N, CA
         fixed points to align to.
         
-        For Break-IDR it would be (F, L), (CA, N) where "F" and "L"
+        For Linker-IDR it would be (F, L), (CA, N) where "F" and "L"
         are the positions of "C" for the first and last bit of the
         chain break respectively and "CA" is for alignment to
         first part of break while "N" is for the last part.
     
     case : str
-        IDR case as mentioned above (N-IDR, C-IDR, Break-IDR).
+        IDR case as mentioned above (N-IDR, C-IDR, Linker-IDR).
     
     Returns
     -------
@@ -613,7 +613,7 @@ def count_clashes(
     last_r = fragment_seq[-1]
     
     if case == disorder_cases[0] or case == disorder_cases[1]:
-        # N-IDR or Break-IDR, remove last 2 resiudes of fragment from consideration
+        # N-IDR or Linker-IDR, remove last 2 resiudes of fragment from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
@@ -666,16 +666,16 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
     Parameters
     ----------
     idp_lst : list of Path
-        Always in the order of [N-IDR, Break-IDR, C-IDR]
+        Always in the order of [N-IDR, Linker-IDR, C-IDR]
     
     case : list of str
-        Case could be `N-IDR`, `C-IDR`, or `Break-IDR` as defined above
+        Case could be `N-IDR`, `C-IDR`, or `Linker-IDR` as defined above
 
     fld_struc : Path or IDPConformerGenerator.Structure
         Folded structure to be grafted on
     
     ranges : list of tuple of int
-        For Break-IDR, what residue ranges for the chain break
+        For Linker-IDR, what residue ranges for the chain break
 
     Returns
     -------
@@ -785,7 +785,7 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
             idr_seq = idr.data_array[:, col_resSeq].astype(int)
             idr_data_array = idr.data_array
             last_res = idr_seq[-1]
-            # Break-IDR, remove first and last residue of fragment
+            # Linker-IDR, remove first and last residue of fragment
             # and the first residues on either side of the chain break
             for i, seq in enumerate(idr_seq):
                 next = idr_seq[i + 1]
@@ -832,137 +832,3 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
     new_struc_arr[:, col_segid] = "A"
     
     return new_struc_arr
-
-
-''' Deprecated code.
-def pmover(case, fld_xyz, idp_path):
-    """
-    Protein cartesian space mover.
-    
-    Shifts entire protein chain based on one point.
-
-    Parameters
-    ----------
-    case : string
-        Case could be `nidr`, `cidr`, or `break` as defined above.
-    
-    fld_xyz : tuple
-        Backbone N(x, y, z) float coordinates of interest
-        where we want to move the IDP chain relative to.
-    
-    idp_path : Path
-        Path to the IDP conformer we want to move.
-    
-    Returns
-    -------
-    Overwrites PDB of IDP conformer with new coordinates.
-    """
-    Nx = fld_xyz[0]
-    Ny = fld_xyz[1]
-    Nz = fld_xyz[2]
-    
-    structure = Structure(idp_path)
-    structure.build()
-    atom_names = structure.data_array[:, col_name]
-    
-    if case == disorder_cases[0]:  # N-IDR
-        # In the case of N-IDR, we want to move relative to C-term
-        # A little bit complicated, need to calculate difference between
-        # C-term Nitrogen on IDP and N(x,y,z)
-        for i, atom in enumerate(atom_names):
-            if atom_names[len(atom_names) - 1 - i] == "N":
-                index = len(atom_names) - 1 - i
-                break
-    elif case == disorder_cases[1]:  # break
-        pass
-    elif case == disorder_cases[2]:  # C-IDR
-        # In the case of C-IDR, we want to move relative to first N
-        for i, atom in enumerate(atom_names):
-            if atom == "N":
-                index = i
-                break
-    
-    idp_xyz = structure.data_array[index][cols_coords]
-    dx = Nx - float(idp_xyz[0])
-    dy = Ny - float(idp_xyz[1])
-    dz = Nz - float(idp_xyz[2])
-    
-    for i, coords in enumerate(structure.data_array[:, cols_coords]):
-        x = str(round(dx + float(coords[0]), 3))
-        y = str(round(dy + float(coords[1]), 3))
-        z = str(round(dz + float(coords[2]), 3))
-        
-        structure.data_array[i][col_x] = x
-        structure.data_array[i][col_y] = y
-        structure.data_array[i][col_z] = z
-    
-    structure.write_PDB(idp_path)
-    
-    return
-
-
-def rotator(chain, case):
-    """
-    Rotation function that rotates the protein chain randomly.
-    
-    The point of rotation depends on the case of IDR.
-    For example, with N-IDR, the point of rotation is about
-    the CA atom at the C-term of the IDR chain.
-    
-    Parameters
-    ----------
-    chain : Path or IDPConformerGenerator.Structure
-        Chain of interest we want to rotate.
-    
-    case : string
-        Disordered case of interest determines which point
-        to rotate about.
-
-    Returns
-    -------
-    idp : IDPConformerGenerator.Structure
-        Structure object with the new rotated coordinates.
-    """
-    minrad = 0
-    maxrad = 2 * np.pi
-    # Select random angle to rotate
-    angle = random.uniform(minrad, maxrad)
-    
-    if type(chain) is Path:
-        idp = Structure(chain)
-        idp.build()
-    else:
-        idp = chain
-        
-    atom_names = idp.data_array[:, col_name]
-    
-    if case == disorder_cases[0]:  # N-IDR
-        for i, atom in enumerate(atom_names):
-            if atom_names[len(atom_names) - 1 - i] == "N":
-                index = len(atom_names) - 1 - i
-                break
-    elif case == disorder_cases[2]:  # C-IDR
-        for i, atom in enumerate(atom_names):
-            if atom == "N":
-                index = i
-                break
-    
-    # Create a 3x3 rotation matrix
-    rotation_matrix = np.array(
-        [[np.cos(angle), -np.sin(angle), 0],
-        [np.sin(angle), np.cos(angle), 0],
-        [0, 0, 1]]
-    )
-    
-    # Mark the fixed point and translate point as the origin
-    point_xyz = idp.data_array[index][cols_coords].astype(float)
-    coords = idp.data_array[:, cols_coords].astype(float) - point_xyz
-    
-    # Rotate coordinates about a random angle and translate point back
-    rotated_coords = np.dot(rotation_matrix, coords.T).T
-    rotated_coords += point_xyz
-    
-    idp.data_array[:, cols_coords] = rotated_coords.astype(str)
-    
-    return idp, chain  # returns original chain/path also
-'''

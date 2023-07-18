@@ -17,6 +17,6 @@ output_stitched = f"./{case}_results/"
 
 # Execute stitching protocol
 for i, idr in enumerate(combos_list):
-    combined_struc = psurgeon([[Path(idr)]], Path(fld), ["Break-IDR"], [(lower, upper)])
+    combined_struc = psurgeon([[Path(idr)]], Path(fld), ["Linker-IDR"], [(lower, upper)])
     combined_pdb = structure_to_pdb(combined_struc)
     write_PDB(combined_pdb, output_stitched + f"conformer_{i + 1}.pdb")
