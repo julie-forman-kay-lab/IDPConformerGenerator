@@ -12,7 +12,7 @@ lower = 49
 upper = 135
 
 fld = "./7CH1_SLC26A9.pdb"
-combos_list = glob.glob(f"./{case}_sidechains/*.pdb")
+combos_list = glob.glob(f"./{case}_matches/*.pdb")
 output_stitched = f"./{case}_results/"
 
 # Execute stitching protocol

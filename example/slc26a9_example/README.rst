@@ -22,12 +22,13 @@ sequence: ``SLC26A9_STAS.fasta``, and a PDB of the folded region from PDB ID
 
 
 To continue the tutorial, navigate to the ``example/slc26a9_example`` directory.
-Ensure you have already compiled your preferred reusable IDPConformerGenerator
+Ensure you have already created your preferred reusable IDPConformerGenerator
 database. For instructions on the database, please visit the previous exercise,
 "A Real Case Scenario".
 
 We will be using the ``ldrs`` subclient to model 50 conformations of the
-intrinsically disordered region::
+intrinsically disordered region. Sidechain clashes may exist if you decide
+to use the FASPR method for generating sidechains like so below.::
 
     idpconfgen ldrs \
         -db <PATH TO DATABASE.JSON> \
@@ -45,6 +46,11 @@ From the `.fasta` file, the ``ldrs`` subclient will automatically identify the
 N-IDR, the C-IDR, and any IDRs missing between folded domains; and construct
 those.
 
+To guarantee no sidechain clashes, we recommend either lowering the steric-clash
+tolerance using the ``-tol`` flag above or generating backbone-only conformers first
+then packing sidechains later with MC-SCE as described below in the Advanced LDRS
+Usage section.
+
 Advanced LDRS Usage
 -------------------
 
@@ -57,8 +63,8 @@ IDRs by writing two new Python scripts that import IDPConfGen machinery.
 
 The logic behind the LDRS subclient for modeling and IDR connecting two folded
 domains assumes that we have an N-IDR-like case at the C-terminal region of the
-chain break and a C-IDR-like case at the N-terminal region of the other chain
-break. Thus, when defining the IDR sequence in the fast file given to the `-seq`
+first folded domain and a C-IDR-like case at the N-terminal region of the second
+domain. Thus, when defining the IDR sequence in the fast file given to the `-seq`
 parameter, we need to provide two overlapping residues at each. Those will be
 "QK" and "LA" in this example.
 
@@ -68,7 +74,7 @@ We have already prepared the IDR sequence for this example; see the
 where the IDR fits within the whole protein sequence.
 
 Here is a brief overview of what we will do to speed up the process of closing
-the chain break with an all-atom IDR model. We show two scripts you can use as
+the chain break (L-IDR) with an all-atom IDR model. We show two scripts you can use as
 templates for using the LDRS features of IDPConformgerGenerator.
 
 1. Generate 10,000 backbone-only structures (more = better sampling) of the IDR:
@@ -98,24 +104,32 @@ our candidates for sidechain addition.
         mkdir slc26a9_cterm
         mkdir slc26a9_nterm
         mkdir slc26a9_matches
-        mkdir slc26a9_sidechains
         mkdir slc26a9_results
+        mkdir slc26a9_sidechains
 
 3. Change the paths in the script ``slc26a9_shortcut.py`` and run it; always use
 the ``idpconfgen`` Python environment.
 
-4. Model the sidechains onto the conformers generated previously in the
-``matches`` folder using `MC-SCE software<https://github.com/THGLab/MCSCE>`_:
+4. Use ``psurgeon()`` in ``slc26a9_stitching.py`` script to attach the all-atom
+IDR models to the folded domain. The output for this will be in ``slc26a9_results``.
+
+5. Model the sidechains onto the backbone-only L-IDRs stitched onto the folded region
+   generated previously in the ``results`` folder using the `MC-SCE software<https://github.com/THGLab/MCSCE>`_:
 
     .. code-block:: bash
-        mcsce ./slc26a9_matches 64 -w -s -o ./slc26a9_sidechains -l ./mcsce_log
-
-5. Use ``psurgeon()`` in ``slc26a9_stitching.py`` script to attach the all-atom
-IDR models to the folded domain.
+        mcsce \
+            ./slc26a9_results \
+            64 \
+            -w \
+            -s \
+            -o ./slc26a9_sidechains \
+            -l ./mcsce_log \
+            -f 519-566+654-737
 
 To further save time, especially on a computing cluster, we can split the
-conformers in the ``cterm`` and ``nterm`` folders and run jobs in parallel or
-request more workers. Please note that this shortcut is not a memory-intensive
+conformers in the ``nterm`` folder and run jobs in parallel or request more workers.
+Furthermore, the conformers in ``slc26a9_results`` can be split to run ``mcsce`` in
+parallel as well. Please note that this shortcut is not a memory-intensive
 task, so 8 GB of RAM is sufficient to run the ``next-seeker`` protocol.
 
 .. end-description

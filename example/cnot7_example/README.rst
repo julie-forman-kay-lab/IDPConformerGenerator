@@ -22,7 +22,7 @@ PDB of the folded region from PDB ID 4GMJ: ``4GMJ_CNOT7.pdb``.
     Using the ``resre`` subclient can help you with this.
 
 Steps from now will assume you're in the ``example/cnot7_example`` directory and
-have already compiled your preferred reusable IDPConformerGenerator *database*.
+have already created your preferred reusable IDPConformerGenerator *database*.
 For instructions on the database, please visit the previous exercise "A Real
 Case Scenario".
 
@@ -41,6 +41,45 @@ To generate the disordered terminal tails on CNOT7 run the following command::
 The ``ldrs`` subclient with automatically detect the N-IDR and C-IDR tail based on mismatches
 in the primary sequence of the ``.fasta`` file (or input sequence from ``-seq``) and the PDB
 file of the folded domain.
+
+.. note::
+    Sidechain clashes may appear if you use the FASPR method for packing on sidechains
+    above. To guarantee no sidechain clashes, we recommended either lowering the steric-clash
+    tolerance using the ``-tol`` flag above or generating backbone-only conformers first
+    then packing sidechains later with MC-SCE as described below.
+
+To generate backbone-only IDR tails on CNOT7 then pack sidechains on the IDRs with MC-SCE.
+We will be using agnostic secondary structure sampling here with ``--dany``.::
+
+    idpconfgen ldrs \
+        -db <PATH TO DATABASE.JSON> \
+        -seq cnot7.fasta \
+        --dloop-off \
+        --dany \
+        -etbb 100 \
+        -dsd \
+        -nc 1000 \
+        -fld 4GMJ_CNOT7.pdb \
+        -of ./cnot7_ldrs_ANY_bb \
+        -n
+    
+    mkdir cnot7_ldrs_ANY_mcsce
+
+    mcsce \
+        ./cnot7_ldrs_ANY_bb \
+        64 \
+        -w \
+        -o ./cnot7_ldrs_ANY_mcsce \
+        -l ./mcsce_log \
+        -s \
+        -f 12-262
+
+.. note::
+    If you run into an error with ``mcsce`` and your input PDB has histines labled as ``HIS``,
+    please change the three-letter code in the PDB file to ``HIP`` to account for all
+    protonation states.
+
+    Using the ``resre`` subclient can help you with this.
 
 Any other parameters will only impact the disordered regions generated. Additional settings
 include ``-tol`` and ``-kt``, where the former sets a tolerance for clashes between the
