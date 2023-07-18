@@ -17,4 +17,4 @@ def test_aa_letter_dictionaries(aadict):
     """Test amino acids letter conversion dictionaries."""
     assert isinstance(aadict, dict)
     # there are 20 natural aminoacids + 3 His protonation states
-    assert len(aadict) == 23
+    assert len(aadict) == 25
