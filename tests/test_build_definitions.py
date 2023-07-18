@@ -115,7 +115,7 @@ def test_ff14SB_residue_atoms_names(ff14SB):
                     assert not diff, (key, diff)
 
                 except KeyError:
-                    warnings.warn(UserWarning(f'{key} is ignored'))
+                    warnings.warn(UserWarning(f'{key} is ignored'))  # noqa: B028 E501
 
 
 def test_residue_atoms_pdb_amber():
