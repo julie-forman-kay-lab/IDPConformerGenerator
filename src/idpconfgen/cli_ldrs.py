@@ -70,8 +70,8 @@ from idpconfgen.ldrs_helper import (
     count_clashes,
     create_all_combinations,
     disorder_cases,
-    psurgeon,
     next_seeker,
+    psurgeon,
     tolerance_calculator,
     )
 from idpconfgen.libs import libcli

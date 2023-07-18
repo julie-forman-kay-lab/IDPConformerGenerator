@@ -27,10 +27,10 @@ from idpconfgen import (
     cli_ldrs,
     cli_makecsss,
     cli_merge,
-    cli_resre,
     )
 from idpconfgen import cli_pdbdownloader as cli_pdbdl
 from idpconfgen import (
+    cli_resre,
     cli_search,
     cli_sethpc,
     cli_sscalc,

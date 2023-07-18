@@ -17,10 +17,7 @@ from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libstructure import (
     Structure,
-    structure_to_pdb,
-    write_PDB,
     col_chainID,
-    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -30,7 +27,10 @@ from idpconfgen.libs.libstructure import (
     col_y,
     col_z,
     cols_coords,
+    structure_to_pdb,
+    write_PDB,
     )
+
 
 disorder_cases = {
     0: "N-IDR",
@@ -184,7 +184,7 @@ def create_combinations(lst, num_combinations):
 
 def create_all_combinations(folder, nconfs):
     """
-    Creates combinations of all cases.
+    Generate combinations of all cases.
 
     Parameters
     ----------
@@ -216,7 +216,7 @@ def create_all_combinations(folder, nconfs):
         for c, cpath in enumerate(lidr_cases_dir):
             lidr_matches = lidr_path.joinpath(cpath + f"/{c}_match")
             lidr_confs = os.listdir(lidr_matches)
-            lidr_files = [Path(lidr_matches.joinpath(fpath)) for fpath in lidr_confs]
+            lidr_files = [Path(lidr_matches.joinpath(fpath)) for fpath in lidr_confs]  # noqa: E501
             lidr_confs_lst.append(lidr_files)
         lidr_combinations = create_combinations(lidr_confs_lst, nconfs)
     if os.path.isdir(cidr_path):
@@ -224,7 +224,7 @@ def create_all_combinations(folder, nconfs):
         cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]
     
     if len(nidr_files) and len(cidr_files) and len(lidr_combinations) > 0:
-        return create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs)
+        return create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs)  # noqa: E501
     elif len(nidr_files) and len(lidr_combinations) > 0:
         return create_combinations([nidr_files, lidr_combinations], nconfs)
     elif len(cidr_files) and len(lidr_combinations) > 0:
@@ -416,8 +416,7 @@ def next_seeker(
         output_folder,
         ):
     """
-    Next-seeker search protocol to find possible pairs of chains
-    that will close the break.
+    Next-seeker protocol to find possible matches that will close the break.
 
     Parameters
     ----------
@@ -542,7 +541,8 @@ def next_seeker(
                     final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
                     
                     if H_idx >= 0:
-                        # Bond length also taken from `core/build_definitions.py`
+                        # Bond length also taken from
+                        # `core/build_definitions.py`
                         NH_length = 1.0
                         CN_H_vec = curr_c - next_n
                         CAN_H_vec = next_ca - next_n
@@ -613,7 +613,8 @@ def count_clashes(
     last_r = fragment_seq[-1]
     
     if case == disorder_cases[0] or case == disorder_cases[1]:
-        # N-IDR or Linker-IDR, remove last 2 resiudes of fragment from consideration
+        # N-IDR or Linker-IDR, remove last 2 resiudes of fragment
+        # from consideration
         for i, _ in enumerate(fragment_seq):
             j = len(fragment_seq) - 1 - i
             try:  # In case the user wants to build less than 3 residues
