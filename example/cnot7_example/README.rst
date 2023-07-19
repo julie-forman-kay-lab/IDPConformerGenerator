@@ -40,7 +40,12 @@ To generate the disordered terminal tails on CNOT7 run the following command::
 
 The ``ldrs`` subclient with automatically detect the N-IDR and C-IDR tail based on mismatches
 in the primary sequence of the ``.fasta`` file (or input sequence from ``-seq``) and the PDB
-file of the folded domain.
+file of the folded domain. This command took approximately 5 minutes on a single workstation with
+64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
+
+To check your outputs against what is to be expected for this tutorial section. Please click
+`here<https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
+and download the archive named ``cnot7_ldrs_example.zip``.
 
 .. note::
     Sidechain clashes may appear if you use the FASPR method for packing on sidechains
@@ -63,15 +68,22 @@ We will be using agnostic secondary structure sampling here with ``--dany``.::
         -of ./cnot7_ldrs_ANY_bb \
         -n
     
+    idpconfgen resre \
+        ./cnot7_ldrs_ANY_bb/ \
+        -of ./cnot7_ldrs_ANY_bb_resre \
+        -pt 126:HIP,157:HIP,225:HIP,249:HIP,258:HIP, \
+        -n
+
     mkdir cnot7_ldrs_ANY_mcsce
 
     mcsce \
-        ./cnot7_ldrs_ANY_bb \
+        ./cnot7_ldrs_ANY_bb_resre \
         64 \
         -w \
         -o ./cnot7_ldrs_ANY_mcsce \
         -l ./mcsce_log \
         -s \
+        -m simple \
         -f 12-262
 
 .. note::
@@ -79,7 +91,7 @@ We will be using agnostic secondary structure sampling here with ``--dany``.::
     please change the three-letter code in the PDB file to ``HIP`` to account for all
     protonation states.
 
-    Using the ``resre`` subclient can help you with this.
+    Using the ``resre`` subclient like so above can help you with this.
 
 Any other parameters will only impact the disordered regions generated. Additional settings
 include ``-tol`` and ``-kt``, where the former sets a tolerance for clashes between the

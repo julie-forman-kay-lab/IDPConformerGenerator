@@ -32,7 +32,7 @@ to use the FASPR method for generating sidechains like so below.::
 
     idpconfgen ldrs \
         -db <PATH TO DATABASE.JSON> \
-        -seq slc26a9_example.fasta \
+        -seq SLC26A9_STAS.fasta \
         -etbb 100 \
         -etss 250 \
         -nc 50 \
@@ -42,14 +42,19 @@ to use the FASPR method for generating sidechains like so below.::
         -of ./slc26a9_ldrs_ANY_faspr \
         -n
 
-From the `.fasta` file, the ``ldrs`` subclient will automatically identify the
+From the ``.fasta`` file, the ``ldrs`` subclient will automatically identify the
 N-IDR, the C-IDR, and any IDRs missing between folded domains; and construct
-those.
+those. This command took approximately 1 hour on a single workstation with
+64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
 
 To guarantee no sidechain clashes, we recommend either lowering the steric-clash
 tolerance using the ``-tol`` flag above or generating backbone-only conformers first
 then packing sidechains later with MC-SCE as described below in the Advanced LDRS
 Usage section.
+
+To check your outputs against what is to be expected for this tutorial section. Please click
+`here<https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
+and download the archive named ``slc26a9_ldrs_example.zip``.
 
 Advanced LDRS Usage
 -------------------
@@ -113,12 +118,21 @@ the ``idpconfgen`` Python environment.
 4. Use ``psurgeon()`` in ``slc26a9_stitching.py`` script to attach the all-atom
 IDR models to the folded domain. The output for this will be in ``slc26a9_results``.
 
-5. Model the sidechains onto the backbone-only L-IDRs stitched onto the folded region
+5. Use the ``resre`` module to rename any ``HIS`` to ``HIP`` that exist after stitching:
+
+    .. code-block:: bash
+        idpconfgen resre \
+            ./slc26a9_results \
+            -of ./slc26a9_results_resre \
+            -pt 663:HIP,703:HIP,712:HIP,725:HIP,731:HIP, \
+            -n
+
+6. Model the sidechains onto the backbone-only L-IDRs stitched onto the folded region
    generated previously in the ``results`` folder using the `MC-SCE software<https://github.com/THGLab/MCSCE>`_:
 
     .. code-block:: bash
         mcsce \
-            ./slc26a9_results \
+            ./slc26a9_results_resre \
             64 \
             -w \
             -s \
