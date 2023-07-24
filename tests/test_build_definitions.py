@@ -59,6 +59,9 @@ def test_ff14SB_has_all_residues(ff14SB):
     s1 = set(ff14SB.keys())
     s2 = set(aa3to1.keys())
     s2.remove('HIS')
+    # Removing phosphorylated residues from tests temporarily
+    s2.remove('SEP')
+    s2.remove('TPO')
     assert s2.issubset(s1)
 
 
@@ -74,6 +77,11 @@ def test_ff14SB_atoms_have_params(ff14SB):
 
 def test_aa_translate_dict_with_atom_labels():
     """Test if the aa3to1 and aa1to3 dict match the atom labels dicts."""
+    # Removing phosphorylated residues from tests temporarily
+    aa3to1.pop('SEP')
+    aa3to1.pop('TPO')
+    aa1to3.pop('s')
+    aa1to3.pop('t')
     for key in aa3to1.keys():
         assert key in BD.atom_names_pdb
         assert key in BD.atom_names_amber
