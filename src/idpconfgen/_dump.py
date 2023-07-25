@@ -32,7 +32,7 @@ def calc_outer_sum_upper_diagonal(data):
     """
     # require
     assert data.ndim == 1, 'Array should have only one dimension.'
-    assert data.dtype in (np.int, np.float), data.dtype
+    assert data.dtype in (int, float), data.dtype
 
     indices = np.triu_indices(data.size, k=+1)
 

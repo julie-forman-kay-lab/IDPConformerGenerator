@@ -60,7 +60,7 @@ def vdw_clash_by_threshold_common_preparation(
     protein_elements : np.array, of shape (N,), dytpe compatible with '<U2'
         A sequence of the protein atom elements aligned with `protein_atoms`.
 
-    residue_numbers : np.array of shape (N,), dtype=np.int
+    residue_numbers : np.array of shape (N,), dtype=int
 
     atoms_to_consider : sequence, optional
         A tuple of the atom names to consider in the calculation.
@@ -279,7 +279,7 @@ def evaluate_vdw_clash_by_threshold_from_disk(
     best_observation_ele[elements_dont_exist] = \
         atom_elements_from_names[elements_dont_exist]
 
-    res_numbers = da[:, col_resSeq].astype(np.int)
+    res_numbers = da[:, col_resSeq].astype(int)
     coords = s.coords
 
     rows, cols, distances, radii_sum, overlap = vdw_clash_by_threshold(
