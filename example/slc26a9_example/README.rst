@@ -128,7 +128,7 @@ IDR models to the folded domain. The output for this will be in ``slc26a9_result
             -n
 
 6. Model the sidechains onto the backbone-only L-IDRs stitched onto the folded region
-   generated previously in the ``results`` folder using the `MC-SCE software<https://github.com/THGLab/MCSCE>`_:
+   generated previously in the ``results`` folder using the `MC-SCE software<https://github.com/Oufan75/MCSCE>`_:
 
     .. code-block:: bash
         mcsce \

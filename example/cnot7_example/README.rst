@@ -87,10 +87,13 @@ We will be using agnostic secondary structure sampling here with ``--dany``.::
         -f 12-262
 
 .. note::
+    You can access the in-development MC-SCE software `here<https://github.com/Oufan75/MCSCE>`_
+    to fix residue regions and add post-translational modifications.
+    
     If you run into an error with ``mcsce`` and your input PDB has histines labled as ``HIS``,
     please change the three-letter code in the PDB file to ``HIP`` to account for all
     protonation states.
-
+    
     Using the ``resre`` subclient like so above can help you with this.
 
 Any other parameters will only impact the disordered regions generated. Additional settings

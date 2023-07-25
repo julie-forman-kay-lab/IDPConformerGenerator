@@ -69,14 +69,14 @@ A Real Case Scenario
 .. include:: ../example/drksh3_example/README.rst
    :start-after: .. start-description
 
-Modelling Disordered Region Tails on a Folded Domain
-----------------------------------------------------
+Modeling Disordered Region Tails on a Folded Domain
+---------------------------------------------------
 
 .. include:: ../example/cnot7_example/README.rst
     :start-after: .. start-description
 
-Modelling Disordered Regions for a Chain Break Scenario
--------------------------------------------------------
+Modeling Disordered Regions Within Folded Domains
+-------------------------------------------------
 
 .. include:: ../example/slc26a9_example/README.rst
     :start-after: .. start-description
