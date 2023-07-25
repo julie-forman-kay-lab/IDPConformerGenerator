@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.0 (2023-07-25)
+------------------------------------------------------------
+
 * Added new module ``ldrs`` to build IDRs in the context of a folded region
 * Added new module ``resre`` to rename certain residue names of multiple PDB files
 * Minor bug-fixes to numpy references (#231)
