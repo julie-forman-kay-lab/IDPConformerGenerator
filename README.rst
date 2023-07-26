@@ -40,6 +40,10 @@ If you use IDPConformerGenerator, please cite::
     The Journal of Physical Chemistry A 2022 126 (35), 5985-6003
     DOI: 10.1021/acs.jpca.2c03726
 
+If you use the Local Disordered Region Sampling (LDRS) module, please cite::
+
+    TBD
+
 .. end-citing
 
 Version

@@ -11,6 +11,7 @@ Changelog
 
 * Update documentation formatting for LDRS
 * Update README citations
+* Temporarily removed MacOS GitHub actions tests
 
 v0.7.0 (2023-07-25)
 ------------------------------------------------------------
