@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update documentation formatting for LDRS
+* Update README citations
+
 v0.7.0 (2023-07-25)
 ------------------------------------------------------------
 
