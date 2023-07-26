@@ -3,6 +3,18 @@ IDPConformerGenerator
 
 .. start-description
 
+.. image:: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/actions/workflows/tests.yml/badge.svg?branch=main
+    :target: https://github.com/julie-forman-kay-lab/IDPConformerGenerator/actions/workflows/tests.yml
+    :alt: Test Status
+
+.. image:: https://readthedocs.org/projects/idpconformergenerator/badge/?version=latest
+    :target: https://idpconformergenerator.readthedocs.io/en/latest/?badge=latest
+    :alt: Documentation Status
+
+.. image:: https://img.shields.io/badge/idpconfgen-10.1021%2Facs.jpca.2c03726-blue
+    :target: https://doi.org/10.1021/acs.jpca.2c03726
+    :alt: IDPConformerGenerator Publication
+
 IDPConformerGenerator is a flexible, modular platform for generating ensembles
 of disordered protein states that builds conformers by sampling backbone torsion
 angles of relevant sequence fragments extracted from protein structures in the
