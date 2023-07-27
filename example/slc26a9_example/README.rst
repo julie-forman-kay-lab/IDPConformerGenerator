@@ -53,7 +53,7 @@ then packing sidechains later with MC-SCE as described below in the Advanced LDR
 Usage section.
 
 To check your outputs against what is to be expected for this tutorial section. Please click
-`here<https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
+`here <https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
 and download the archive named ``slc26a9_ldrs_example.zip``.
 
 Advanced LDRS Usage

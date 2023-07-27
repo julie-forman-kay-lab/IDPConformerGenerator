@@ -44,7 +44,7 @@ file of the folded domain. This command took approximately 5 minutes on a single
 64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
 
 To check your outputs against what is to be expected for this tutorial section. Please click
-`here<https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
+`here <https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
 and download the archive named ``cnot7_ldrs_example.zip``.
 
 .. note::
@@ -87,8 +87,9 @@ We will be using agnostic secondary structure sampling here with ``--dany``.::
         -f 12-262
 
 .. note::
-    You can access the in-development MC-SCE software `here<https://github.com/Oufan75/MCSCE>`_
-    to fix residue regions and add post-translational modifications.
+    You can access the MC-SCE software `here <https://github.com/THGLab/MCSCE>`_
+    to ignore folded regions and add post-translational modifications during the
+    sidechain packing process.
     
     If you run into an error with ``mcsce`` and your input PDB has histines labled as ``HIS``,
     please change the three-letter code in the PDB file to ``HIP`` to account for all
