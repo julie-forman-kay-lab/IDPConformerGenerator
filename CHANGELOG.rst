@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.1 (2023-07-27)
+------------------------------------------------------------
+
 * Update documentation formatting for LDRS
 * Update README citations
 * Temporarily removed MacOS GitHub actions tests
