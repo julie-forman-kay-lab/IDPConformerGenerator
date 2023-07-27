@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.2 (2023-07-27)
+------------------------------------------------------------
+
 * Correct documentation formatting reference to MC-SCE
 
 v0.7.1 (2023-07-27)
