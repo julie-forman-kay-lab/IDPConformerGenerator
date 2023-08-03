@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add select ionic radii from CRC Handbook of Chemistry and Physics, 82nd Ed
+
 v0.7.2 (2023-07-27)
 ------------------------------------------------------------
 
