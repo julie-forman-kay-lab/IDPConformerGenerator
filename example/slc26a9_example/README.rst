@@ -66,6 +66,11 @@ from better parallelization that allows modeling longer IDRs in a shorter time
 modularity of IDPConformerGenerator to exploit its total capacity for modeling
 IDRs by writing two new Python scripts that import IDPConfGen machinery.
 
+For template PDB structures, please ensure they have the element name at the
+second last column in the PDB file. If you're unsure about the formatting, you can
+use the :code:`Export Molecule` feature in `PyMOL <https://pymol.org/>`_.
+The element name column will be automatically added.
+
 The logic behind the LDRS subclient for modeling and IDR connecting two folded
 domains assumes that we have an N-IDR-like case at the C-terminal region of the
 first folded domain and a C-IDR-like case at the N-terminal region of the second
