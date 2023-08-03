@@ -12,7 +12,11 @@ from itertools import product
 import numpy as np
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import aa3to1, vdW_radii_tsai_1999
+from idpconfgen.core.definitions import (
+    aa3to1,
+    vdW_radii_ionic_CRC82,
+    vdW_radii_tsai_1999,
+    )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libstructure import (
@@ -647,7 +651,11 @@ def count_clashes(
             distance = calculate_distance(parent_coords[i], fragment_coords[j])
             
             # get vdW radii for each atom
-            vdw_radius1 = vdW_radii_tsai_1999[a1]
+            try:
+                vdw_radius1 = vdW_radii_tsai_1999[a1]
+            except KeyError:
+                # In case atom is an ion from the parent
+                vdw_radius1 = vdW_radii_ionic_CRC82[a1]
             vdw_radius2 = vdW_radii_tsai_1999[a2]
             
             # Check if a steric clash is detected by comparing
