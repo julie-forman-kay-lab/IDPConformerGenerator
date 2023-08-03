@@ -59,7 +59,7 @@ aa3set = set(aa3to1.keys())
 # heavy atoms
 heavy_atoms = {'C', 'O', 'N', 'S', 'P'}
 
-#
+# Default, Tsai, 1999
 # https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
 vdW_radii_tsai_1999 = {
     'C': 1.7,
@@ -81,9 +81,56 @@ vdW_radii_bondi_1964 = {
     'S': 1.8,
     }
 
+# CRC Handbook of Chemistry and Physics, 82nd Ed
+# All coordination numbers are 6 (default)
+# https://www.cgl.ucsf.edu/chimerax/docs/user/radii.html
+vdW_radii_ionic_CRC82 = {
+    'AL': 0.54,
+    'AS': 0.58,
+    'AU': 1.37,
+    'BA': 1.35,
+    'BE': 0.45,
+    'BI': 1.03,
+    'CA': 1.00,
+    'CD': 0.95,
+    'CO': 0.65,
+    'CR': 0.73,
+    'CS': 1.67,
+    'CU': 0.73,
+    'FE': 0.61,
+    'GA': 0.62,
+    'GE': 0.73,
+    'HG': 1.02,
+    'K': 1.38,
+    'LI': 0.76,
+    'MG': 0.72,
+    'MN': 0.83,
+    'MO': 0.69,
+    'NA': 1.02,
+    'NI': 0.69,
+    'PB': 1.19,
+    'PD': 0.86,
+    'PT': 0.80,
+    'RB': 1.52,
+    'SB': 0.76,
+    'SC': 0.75,
+    'SN': 0.69,
+    'SR': 1.18,
+    'TC': 0.65,
+    'TI': 0.86,
+    'V': 0.79,
+    'ZN': 0.74,
+    'ZR': 0.72,
+    'F': 1.33,
+    'CL': 1.81,
+    'BR': 1.96,
+    'I': 2.20,
+    }
+
 vdW_radii_dict = {
     'tsai1999': vdW_radii_tsai_1999,
     'bondi1964': vdW_radii_bondi_1964,
+    'crc82': vdW_radii_ionic_CRC82,
     }
 
 
