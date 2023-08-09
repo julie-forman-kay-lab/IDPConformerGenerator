@@ -640,28 +640,29 @@ def count_clashes(
             fragment_coords = fragment_coords[1:]
             if next - first_r == 3:
                 break
-
-    # Loop through all pairs of atoms in the 2 protein chains
-    # Take the first character of atom name as the element ID
-    for i, atom1 in enumerate(parent_atoms):
-        for j, atom2 in enumerate(fragment_atoms):
-            # calculate distance between atoms
-            distance = calculate_distance(parent_coords[i], fragment_coords[j])
-            
-            # get vdW radii for each atom
-            try:
-                vdw_radius1 = vdW_radii_tsai_1999[atom1]
-            except KeyError:
-                # In case atom is an ion from the parent
-                vdw_radius1 = vdW_radii_ionic_CRC82[atom1]
-            vdw_radius2 = vdW_radii_tsai_1999[atom2]
-            
-            # Check if a steric clash is detected by comparing
-            # distance between atoms to the sum of their vdW radii
-            if num_clashes > max_clash:
-                return True, fragment
-            if distance < vdw_radius1 + vdw_radius2 + tolerance:
-                num_clashes += 1
+    
+    # Use matrix solution instead of nested for-loop to improve
+    # clash checking speed at least 200-fold
+    
+    # Create dictionary with all possible radii
+    all_vdw_radii = {**vdW_radii_tsai_1999, **vdW_radii_ionic_CRC82}
+    
+    # Calculate all distances
+    distances = np.sqrt(np.sum((parent_coords[:, np.newaxis, :] - fragment_coords)**2, axis=-1))  # noqa: E501
+    
+    # Get all radii
+    vdw_radii1 = np.array([all_vdw_radii[atom] for atom in parent_atoms])
+    vdw_radii2 = np.array([all_vdw_radii[atom] for atom in fragment_atoms])
+    vdw_radii1 = vdw_radii1[:, np.newaxis]
+    vdw_radii2 = vdw_radii2[np.newaxis, :]
+    
+    # Get maximum radii and compare with distances
+    sum_radii = vdw_radii1 + vdw_radii2 + tolerance
+    clashes = distances < sum_radii
+    num_clashes = np.sum(clashes)
+    
+    if num_clashes > max_clash:
+        return True, fragment
     
     return num_clashes, fragment
 
