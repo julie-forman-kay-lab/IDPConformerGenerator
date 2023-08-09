@@ -139,9 +139,6 @@ def main(
         Number of workers to use.
     """
     init_files(log, LOGFILESNAME)
-    
-    # initialize some variables
-    count = 0
 
     if destination is None:
         destination = source
