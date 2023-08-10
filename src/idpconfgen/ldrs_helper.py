@@ -648,7 +648,24 @@ def count_clashes(
     all_vdw_radii = {**vdW_radii_tsai_1999, **vdW_radii_ionic_CRC82}
     
     # Calculate all distances
-    distances = np.sqrt(np.sum((parent_coords[:, np.newaxis, :] - fragment_coords)**2, axis=-1))  # noqa: E501
+    try:
+        distances = np.sqrt(
+            np.sum(
+                (parent_coords[:, np.newaxis, :] - fragment_coords)**2,
+                axis=-1
+                )
+            )
+    # In case there's too many atoms, we cannot use float64 or else we will
+    # run into a OOM (out of memory) error
+    except MemoryError:
+        distances = np.sqrt(
+            np.sum(
+                (parent_coords[:, np.newaxis, :] - fragment_coords)**2,
+                axis=-1,
+                dtype=np.float32
+                ),
+            dtype=np.float32
+            )
     
     # Get all radii
     vdw_radii1 = np.array([all_vdw_radii[atom] for atom in parent_atoms])
