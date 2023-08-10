@@ -47,8 +47,8 @@ the system.
 What's the difference between MC-SCE and FASPR?
 -----------------------------------------------
 
-IDPConfGen incorporates `FASPR <https://github.com/tommyhuangthu/FASPR>`_ to
-nativity build sidechains on the conformer's backbone.
+IDPConfGen incorporates `FASPR <https://github.com/tommyhuangthu/FASPR>`_
+to natively build sidechains on the conformer's backbone.
 
 A part from the algorithmic differences between FASPR and MC-SCE (please refer
 to their publications for details), FASPR does not add hydrogens to the
@@ -74,8 +74,8 @@ For the MC-SCE sidechain step, we recommend doing a small benchmark with 128 tri
 number of trials MC-SCE requires for a successful sidechain addition.
 
 
-What does it mean that IDPConfGen is deterministic?
----------------------------------------------------
+What does it mean that IDPConformerGenerator is deterministic?
+--------------------------------------------------------------
 
 Reproducibility is one of the most important pillars in scientific research. Thus, we've ensured
 reproducibility by implementing a :code:`--random-seed` flag while building. Therefore, generating
@@ -86,11 +86,20 @@ The random seed parameter is also helpful for appending to incomplete conformer 
 if your target was 3000 conformers and the requested job-time was not enough and only 2000 were generated,
 1000 more unique conformers can be generated simply by using a different integer for the :code:`-rs` flag.
 
-What forcefield does IDPConfGen use by default to generate PDB files?
----------------------------------------------------------------------
+What forcefield does IDPConformerGenerator use by default to generate PDB files?
+--------------------------------------------------------------------------------
 
 IDPConfGen uses the Amberff14SB forcefield by default from `OpenMM <https://github.com/openmm/openmmforcefields>`_.
 The forcefield can be changed via the :code:`--forcefield` flag, but no other is
 currently implemented. For more advanced information see
 https://github.com/julie-forman-kay-lab/IDPConformerGenerator/blob/master/src/idpconfgen/core/data/README.md.
 
+
+Out-of-memory (OOM) error when running the ``count_clashes`` function 
+---------------------------------------------------------------------
+
+If you are scripting the ``count_clashes`` function or using an exceptionally large template structure
+(e.g. greater than 450,000 atoms), you could run into a ``numpy.core._exceptions._ArrayMemoryError``.
+
+To avoid this, try reducing the number of cores/multiple processes with the ``--ncores`` flag. Or
+Decrease the size of your template structure, or request more RAM when submitting a job to a cluster.
