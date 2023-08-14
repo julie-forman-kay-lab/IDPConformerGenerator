@@ -109,6 +109,7 @@ from idpconfgen.libs.libstructure import (
     Structure,
     col_name,
     col_resSeq,
+    col_segid,
     cols_coords,
     parse_pdb_to_array,
     structure_to_pdb,
@@ -263,6 +264,15 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '--membrane',
+    help=(
+        "Include this flag if your folded-structure has a membrane generated "
+        "from PPM v3 and CHARMM-GUI's bilayer builder."
+        ),
+    action='store_true',
+    )
+
+ap.add_argument(
     '-kt',
     '--keep-temporary',
     help=(
@@ -382,6 +392,7 @@ def main(
         clash_tolerance=0.5,
         keep_temporary=False,
         folded_structure=None,
+        membrane=False,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -515,10 +526,10 @@ def main(
         pdb_raw = f.read()
     _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
     fld_fasta = fld_fasta.replace('X', '')
-    
+
     # Find out what our disordered sequences are
     # Can be C-term, N-term, in the middle, or all the above
-    linkers = break_check(pdb_raw)
+    linkers = break_check(pdb_raw, membrane)
     mod_input_seq = input_seq
     if linkers:
         for seq in linkers:
@@ -586,8 +597,26 @@ def main(
     
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
-    fld_name = fld_struc.data_array[:, col_name]
-    fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
+    
+    if membrane:
+        fld_pro = []
+        fld_arr = fld_struc.data_array.tolist()
+        fld_segid = fld_struc.data_array[:, col_segid]
+        
+        for i, segid in enumerate(fld_segid):
+            if "PRO" in segid:
+                fld_pro.append(fld_arr[i])
+        
+        fld_pro = np.array(fld_pro)
+        
+        fld_name = fld_pro[:, col_name]
+        fld_seq = fld_pro[:, col_resSeq].astype(int)
+        fld_xyz = fld_pro[:, cols_coords].astype(float)
+    else:
+        fld_name = fld_struc.data_array[:, col_name]
+        fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
+        fld_xyz = fld_struc.data_array[:, cols_coords].astype(float)
+    
     first_seq = fld_seq[0]
     last_seq = fld_seq[-1]
 
@@ -633,9 +662,6 @@ def main(
     sidechain_parameters = \
         get_sidechain_packing_parameters(kwargs, sidechain_method)
     
-    fStruct = Structure(Path(folded_structure))
-    fStruct.build()
-    
     # Generate library of conformers for each case
     for index, seq in enumerate(DISORDER_SEQS):
         fld_term_idx = {}
@@ -666,14 +692,14 @@ def main(
                         fld_term_idx['CAN'] = s
                 if aa > upper + 1:
                     break
-            fld_CLxyz = fld_struc.data_array[fld_term_idx["CC"]][cols_coords].astype(float)  # noqa: E501
-            fld_NLxyz = fld_struc.data_array[fld_term_idx["NC"]][cols_coords].astype(float)  # noqa: E501
-            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAC"]][cols_coords].astype(float)  # noqa: E501
+            fld_CLxyz = fld_xyz[fld_term_idx["CC"]]
+            fld_NLxyz = fld_xyz[fld_term_idx["NC"]]
+            fld_CALxyz = fld_xyz[fld_term_idx["CAC"]]
             fld_coords_C = np.array([fld_CLxyz, fld_NLxyz, fld_CALxyz])
             
-            fld_CUxyz = fld_struc.data_array[fld_term_idx["CN"]][cols_coords].astype(float)  # noqa: E501
-            fld_NUxyz = fld_struc.data_array[fld_term_idx["NN"]][cols_coords].astype(float)  # noqa: E501
-            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAN"]][cols_coords].astype(float)  # noqa: E501
+            fld_CUxyz = fld_xyz[fld_term_idx["CN"]]
+            fld_NUxyz = fld_xyz[fld_term_idx["NN"]]
+            fld_CAUxyz = fld_xyz[fld_term_idx["CAN"]]
             fld_coords_N = np.array([fld_CUxyz, fld_NUxyz, fld_CAUxyz])
 
             library_confs_per_core = library_nconfs // ncores
@@ -719,7 +745,7 @@ def main(
                 consume = partial(
                     _build_conformers,
                     fld_xyz=fld_coords_C,
-                    fld_struc=fStruct,
+                    fld_struc=fld_struc,
                     disorder_case=disorder_cases[2],  # Treating C-term as C-IDR  # noqa: E501
                     max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                     tolerance=dist_tolerance * 2,
@@ -766,7 +792,7 @@ def main(
                 consume = partial(
                     _build_conformers,
                     fld_xyz=fld_coords_N,
-                    fld_struc=fStruct,
+                    fld_struc=fld_struc,
                     disorder_case=disorder_cases[0],  # Treating N-term as N-IDR  # noqa: E501
                     max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                     tolerance=dist_tolerance * 2,
@@ -873,9 +899,9 @@ def main(
                     elif curr_seq == last_seq - 2:
                         break
                     
-            fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float)  # noqa: E501
-            fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float)  # noqa: E501
-            fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
+            fld_Cxyz = fld_xyz[fld_term_idx["C"]]
+            fld_Nxyz = fld_xyz[fld_term_idx["N"]]
+            fld_CAxyz = fld_xyz[fld_term_idx["CA"]]
             # Coordinates of boundary to stitch to later on
             fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
                         
@@ -898,14 +924,11 @@ def main(
                 "to facilitate reconstruction later on."
                 ))
 
-            fStruct = Structure(Path(folded_structure))
-            fStruct.build()
-
             # prepares execution function
             consume = partial(
                 _build_conformers,
                 fld_xyz=fld_coords,
-                fld_struc=fStruct,
+                fld_struc=fld_struc,
                 disorder_case=case,
                 max_clash=max_clash,
                 tolerance=dist_tolerance,

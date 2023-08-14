@@ -244,7 +244,7 @@ def create_all_combinations(folder, nconfs):
         return cidr_files
 
 
-def break_check(fdata):
+def break_check(fdata, membrane=False):
     """
     Calculate where breaks are in the backbone.
     
@@ -258,6 +258,11 @@ def break_check(fdata):
         In fact, accepts any type `:class:libstructure.Structure` would
         accept.
     
+    membrane : bool
+        If the PDB file containes a membrane built using CHARMM-GUI's
+        bilayer builder or not.
+        Defaults to False. No membrane.
+    
     Return
     ------
     fld_seqs : list
@@ -265,6 +270,17 @@ def break_check(fdata):
     """
     structure = Structure(fdata)
     structure.build()
+    if membrane:
+        fld_pro = []
+        fld_arr = structure.data_array.tolist()
+        fld_segid = structure.data_array[:, col_segid]
+        
+        for i, segid in enumerate(fld_segid):
+            if "PRO" in segid:
+                fld_pro.append(fld_arr[i])
+        fld_pro = np.array(fld_pro)
+        structure._data_array = fld_pro
+        
     structure.add_filter_backbone(minimal=True)
 
     data = structure.filtered_atoms
@@ -304,7 +320,17 @@ def break_check(fdata):
         fld_seqs = []
         for idx in whole:
             fld_idx = list(range(idx[0], idx[1], 3))
-            fld_seqs.append(''.join(aa3to1.get(f) for f in data[:, col_resName][fld_idx].tolist()))  # noqa: E501
+            
+            res3 = data[:, col_resName][fld_idx].tolist()
+            res1 = []
+            for rn in res3:
+                # Most likely exists a better solution than this.
+                # To account for residues with different 3 letter codes.
+                if rn == "HSD" or rn == "HIP":
+                    rn = "HIS"
+                res1.append(aa3to1.get(rn))
+            
+            fld_seqs.append(''.join(res1))
         
         return fld_seqs
     
