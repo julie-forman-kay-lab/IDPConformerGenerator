@@ -574,6 +574,7 @@ def count_clashes(
         case=None,
         max_clash=40,
         tolerance=0.4,
+        dtype=np.float32,
         ):
     """
     Check for steric clashes between two protein chains using vdW radii.
@@ -595,6 +596,11 @@ def count_clashes(
     
     tolerance : float, optional
         Tolerance applicable to vdW clash validation in Angstroms
+    
+    dtype : data type, optional
+        Data type for the array for clash-check matrix.
+        Defaults to np.float32
+        Can be np.float16, np.float32, np.float64, np.long, etc.
     
     Returns
     -------
@@ -654,9 +660,9 @@ def count_clashes(
         np.sum(
             (parent_coords[:, np.newaxis, :] - fragment_coords) ** 2,
             axis=-1,
-            dtype=np.float32
+            dtype=dtype
             ),
-        dtype=np.float32
+        dtype=dtype
         )
     
     # Get all radii
