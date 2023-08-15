@@ -705,7 +705,7 @@ def count_clashes(
     if num_clashes > max_clash:
         return True, fragment
     
-    return num_clashes, fragment
+    return int(num_clashes), fragment
 
 
 def psurgeon(idp_lst, fld_struc, case, ranges):
