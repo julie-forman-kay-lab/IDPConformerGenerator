@@ -978,31 +978,36 @@ def main(
     # - For good form, make sure `col_serial` is consistent as well
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
-    files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)  # noqa: E501
-    # TODO: check if stitching works with multiple cases
-    # Also need new protein with easy IDR closure in the /example folder
-    log.info("Stitching conformers onto the folded domain...")
-    consume = partial(
-        psurgeon,
-        fld_struc=Path(folded_structure),
-        case=DISORDER_CASES,
-        ranges=DISORDER_BOUNDS,
-        )
-    execute = partial(
-        report_on_crash,
-        consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
-    execute_pool = pool_function(execute, files, ncores=ncores)
+    if not stitching_off:
+        files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)  # noqa: E501
 
-    for i, conf in enumerate(execute_pool):
-        struc = structure_to_pdb(conf)
-        output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
-        with open(output, 'w') as f:
-            for line in struc:
-                f.write(line + "\n")
+        log.info("Stitching conformers onto the folded domain...")
+        if membrane:
+            log.info(S(
+                "Please note that the membrane was only used for clash-checking purposes. "  # noqa: E501
+                "The final stitched conformers will not have the membrane to save space."  # noqa: E501
+                ))
+        consume = partial(
+            psurgeon,
+            fld_struc=Path(folded_structure),
+            case=DISORDER_CASES,
+            ranges=DISORDER_BOUNDS,
+            )
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+        execute_pool = pool_function(execute, files, ncores=ncores)
+
+        for i, conf in enumerate(execute_pool):
+            struc = structure_to_pdb(conf)
+            output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
+            with open(output, 'w') as f:
+                for line in struc:
+                    f.write(line + "\n")
 
     if not keep_temporary and not stitching_off:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))

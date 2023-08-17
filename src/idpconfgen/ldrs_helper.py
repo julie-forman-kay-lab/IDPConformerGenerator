@@ -184,6 +184,9 @@ def create_combinations(lst, num_combinations):
     selected_combinations = \
         random.sample(all_combinations, min(num_combinations, max_combinations))
 
+    # TODO: add clash-checking step here to ensure IDRs are not clashing
+    # with each other
+    
     return np.array(selected_combinations).tolist()
 
 
@@ -708,7 +711,7 @@ def count_clashes(
     return int(num_clashes), fragment
 
 
-def psurgeon(idp_lst, fld_struc, case, ranges):
+def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
@@ -725,6 +728,11 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
     
     ranges : list of tuple of int
         For Linker-IDR, what residue ranges for the chain break
+    
+    membrane: Bool
+        Whether or not a membrane exists within the template structure.
+        Carried over from user-input in `ldrs` sub-client.
+        Defaults to False.
 
     Returns
     -------
@@ -740,6 +748,20 @@ def psurgeon(idp_lst, fld_struc, case, ranges):
         fld_seq = fld_struc.data_array[:, col_resSeq]
         fld_data_array = fld_struc.data_array
     
+    if membrane:
+        fld_pro = []
+        fld_arr = fld_data_array.tolist()
+        fld_segid = fld_data_array[:, col_segid]
+        
+        for i, segid in enumerate(fld_segid):
+            if "PRO" in segid:
+                fld_pro.append(fld_arr[i])
+        
+        # Split the protein and membrane
+        fld_pro = np.array(fld_pro)
+        fld_data_array = fld_pro
+        fld_seq = fld_pro[:, col_resSeq]
+
     if disorder_cases[0] in case:
         # N-IDR, remove last resiude of fragment
         # and remove the first residue of folded-domain
