@@ -273,6 +273,15 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '--stitching-off',
+    help=(
+        "Disables stitching process. IDRs modeled will only undergo alignment "
+        "and clash-checking. Also enables keep-temporary parameter."
+        ),
+    action='store_true',
+    )
+
+ap.add_argument(
     '-kt',
     '--keep-temporary',
     help=(
@@ -393,6 +402,7 @@ def main(
         keep_temporary=False,
         folded_structure=None,
         membrane=False,
+        stitching_off=False,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -428,7 +438,7 @@ def main(
     
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
-    if keep_temporary:
+    if keep_temporary or stitching_off:
         TEMP_DIRNAME = "ldrs_temp/"
     else:
         TEMP_DIRNAME = '.ldrs_temp/'
@@ -994,7 +1004,7 @@ def main(
             for line in struc:
                 f.write(line + "\n")
 
-    if not keep_temporary:
+    if keep_temporary == False and stitching_off == False:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 
     ENERGYLOGSAVER.close()
