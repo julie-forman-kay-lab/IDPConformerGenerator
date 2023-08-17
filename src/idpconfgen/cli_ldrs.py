@@ -1004,7 +1004,7 @@ def main(
             for line in struc:
                 f.write(line + "\n")
 
-    if keep_temporary == False and stitching_off == False:
+    if not keep_temporary and not stitching_off:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 
     ENERGYLOGSAVER.close()
