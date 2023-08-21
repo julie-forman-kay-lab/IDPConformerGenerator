@@ -979,7 +979,7 @@ def main(
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
     if not stitching_off:
-        files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)  # noqa: E501
+        files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs, ncores)  # noqa: E501
 
         log.info("Stitching conformers onto the folded domain...")
         if membrane:

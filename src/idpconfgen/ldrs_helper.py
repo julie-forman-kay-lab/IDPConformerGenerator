@@ -7,7 +7,7 @@ Name: FLDR/S (Folded disordered region/structure sampling)
 """
 import os
 import random
-from itertools import product
+from itertools import combinations, product
 
 import numpy as np
 
@@ -19,6 +19,8 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import calc_torsion_angles
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import convert_tuples_to_lists
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
@@ -156,7 +158,136 @@ def consecutive_grouper(seq):
     return bounds
 
 
-def create_combinations(lst, num_combinations):
+def combinations_clash_check(selected):
+    """
+    Clash-check IDRs within a combination against each other.
+
+    Parameters
+    ----------
+    selected : list
+        List of lists of different combinations as follows:
+        [[item from list 1, item from list 2], ...]
+    """
+    if len(selected) == 2:
+        first = selected[0]
+        second = selected[1]
+        # [L-IDR, C-IDR] case
+        if type(first) is tuple:
+            second_struc = Structure(second)
+            second_struc.build()
+            if len(first) > 1:
+                # Check all L-IDR against C-IDR
+                for l in first:    # noqa: E741
+                    l_struc = Structure(l)
+                    l_struc.build()
+                    l_arr = l_struc.data_array
+                    l_c, _ = count_clashes(l_arr, second_struc, tolerance=1.0)
+                    if type(l_c) is bool:
+                        return False
+                l_combos = list(combinations(first, 2))
+                # Check all L-IDR against each other
+                for combo in l_combos:
+                    l1 = Structure(combo[0])
+                    l1.build()
+                    l2 = Structure(combo[1])
+                    l2.build()
+                    lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
+                    if type(lx2) is bool:
+                        return False
+            else:
+                lidr = first[0]
+                lidr_struc = Structure(lidr)
+                lidr_arr = lidr_struc.data_array
+                l_c, _ = count_clashes(lidr_arr, second_struc, tolerance=1.0)
+                if type(l_c) is bool:
+                    return False
+        # [N-IDR, L-IDR] case
+        elif type(second) is tuple:
+            first_struc = Structure(second)
+            first_struc.build()
+            if len(second) > 1:
+                # Check all L-IDR against N-IDR
+                for l in second:    # noqa: E741
+                    l_struc = Structure(l)
+                    l_struc.build()
+                    l_arr = l_struc.data_array
+                    n_l, _ = count_clashes(l_arr, first_struc, tolerance=1.0)
+                    if type(n_l) is bool:
+                        return False
+                l_combos = list(combinations(second, 2))
+                # Check all L-IDR against each other
+                for combo in l_combos:
+                    l1 = Structure(combo[0])
+                    l1.build()
+                    l2 = Structure(combo[1])
+                    l2.build()
+                    lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
+                    if type(lx2) is bool:
+                        return False
+            else:
+                lidr = second[0]
+                lidr_struc = Structure(lidr)
+                lidr_arr = lidr_struc.data_array
+                n_l, _ = count_clashes(lidr_arr, first_struc, tolerance=1.0)
+                if type(n_l) is bool:
+                    return False
+        # [N-IDR, C-IDR] case
+        elif type(first) is Path and type(second) is Path:
+            first_struc = Structure(first)
+            first_struc.build()
+            first_arr = first_struc.data_array
+            second_struc = Structure(second)
+            second_struc.build()
+            n_c, _ = count_clashes(first_arr, second_struc, tolerance=1.0)
+            if type(n_c) is bool:
+                return False
+    # [N-IDR, L-IDR, C-IDR] case
+    elif len(selected) == 3:
+        nidr = selected[0]
+        nidr_struc = Structure(nidr)
+        nidr_struc.build()
+        cidr = selected[2]
+        cidr_struc = Structure(cidr)
+        cidr_struc.build()
+        
+        lidr = selected[1]
+        if len(lidr) > 1:
+            # Check all L-IDR against N-IDR and C-IDR
+            for l in lidr:    # noqa: E741
+                l_struc = Structure(l)
+                l_struc.build()
+                l_arr = l_struc.data_array
+                n_l, _ = count_clashes(l_arr, nidr_struc, tolerance=1.0)
+                l_c, _ = count_clashes(l_arr, cidr_struc, tolerance=1.0)
+                if type(n_l) is bool or type(l_c) is bool:
+                    return False
+            l_combos = list(combinations(lidr, 2))
+            # Check all L-IDR against each other
+            for combo in l_combos:
+                l1 = Structure(combo[0])
+                l1.build()
+                l2 = Structure(combo[1])
+                l2.build()
+                lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
+                if type(lx2) is bool:
+                    return False
+        # We just have 1 L-IDR
+        else:
+            lidr_struc = Structure(lidr[0])
+            lidr_struc.build()
+            lidr_arr = lidr_struc.data_array
+            nidr_arr = nidr_struc.data_array
+            n_i, _ = count_clashes(nidr_arr, lidr_struc, tolerance=1.0)
+            i_c, _ = count_clashes(lidr_arr, cidr_struc, tolerance=1.0)
+            n_c, _ = count_clashes(nidr_arr, cidr_struc, tolerance=1.0)
+            
+            if type(n_i) is bool or type(i_c) is bool or type(n_c) is bool:
+                return False
+    
+    return selected
+
+
+def create_combinations(lst, num_combinations, ncores=1):
     """
     Create unique combinations between list of lists.
     
@@ -171,6 +302,11 @@ def create_combinations(lst, num_combinations):
         N-IDR, Linker-IDR, C-IDR paths
     
     num_combinations : int
+        Number of combinations to create.
+    
+    ncores : int
+        Number of cores to use for clash-checking against multiple IDR
+        combinations.
     
     Return
     ------
@@ -182,15 +318,33 @@ def create_combinations(lst, num_combinations):
     max_combinations = len(all_combinations)
 
     selected_combinations = \
-        random.sample(all_combinations, min(num_combinations, max_combinations))
-
-    # TODO: add clash-checking step here to ensure IDRs are not clashing
-    # with each other
+        random.sample(all_combinations, min(num_combinations, max_combinations))  # noqa: E501
     
-    return np.array(selected_combinations).tolist()
+    if len(lst) == 1:
+        return convert_tuples_to_lists(selected_combinations)
+    else:
+        execute_clash = pool_function(combinations_clash_check, selected_combinations, ncores=ncores)  # noqa: E501
+        passed = []
+        for result in execute_clash:
+            if result is not False:
+                passed.append(result)
+        
+        while len(passed) < num_combinations:
+            selected_combinations = \
+                random.sample(all_combinations, min(num_combinations, max_combinations))  # noqa: E501
+            execute_clash = pool_function(combinations_clash_check, selected_combinations, ncores=ncores)  # noqa: E501
+            for result in execute_clash:
+                if result is not False:
+                    passed.append(result)
+            passed = list(set(passed))
+        
+        if len(passed) > num_combinations:
+            passed = passed[0:num_combinations]
+
+        return convert_tuples_to_lists(passed)
 
 
-def create_all_combinations(folder, nconfs):
+def create_all_combinations(folder, nconfs, ncores=1):
     """
     Generate combinations of all cases.
 
@@ -201,6 +355,10 @@ def create_all_combinations(folder, nconfs):
     
     nconfs : int
         Desired number of list elements based on number of conformers.
+    
+    ncores : int
+        Number of cores to perform multiprocessing with.
+        Exists for clash-checking step for all combinations.
     
     Returns
     -------
@@ -232,19 +390,19 @@ def create_all_combinations(folder, nconfs):
         cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]
     
     if len(nidr_files) and len(cidr_files) and len(lidr_combinations) > 0:
-        return create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs)  # noqa: E501
+        return create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs, ncores)  # noqa: E501
     elif len(nidr_files) and len(lidr_combinations) > 0:
-        return create_combinations([nidr_files, lidr_combinations], nconfs)
+        return create_combinations([nidr_files, lidr_combinations], nconfs, ncores)  # noqa: E501
     elif len(cidr_files) and len(lidr_combinations) > 0:
-        return create_combinations([lidr_combinations, cidr_files], nconfs)
+        return create_combinations([lidr_combinations, cidr_files], nconfs, ncores)  # noqa: E501
     elif len(nidr_files) and len(cidr_files) > 0:
-        return create_combinations([nidr_files, cidr_files], nconfs)
+        return create_combinations([nidr_files, cidr_files], nconfs, ncores)
     elif len(nidr_files) > 0:
-        return nidr_files
+        return nidr_files[0:nconfs]
     elif len(lidr_combinations) > 0:
         return lidr_combinations
     elif len(cidr_files) > 0:
-        return cidr_files
+        return cidr_files[0:nconfs]
 
 
 def break_check(fdata, membrane=False):

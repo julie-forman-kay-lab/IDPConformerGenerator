@@ -12,6 +12,8 @@ Changelog
 * Add select ionic radii from CRC Handbook of Chemistry and Physics, 82nd Ed
 * Update ``merge`` module to use multiprocessing
 * Increase efficiency of clash-checking algorithm in ``ldrs_helper.py``
+* Acceptance and automated processing of proteins with a membrane/bilayer
+* Automated clash-checking between all combinations of IDRs built
 
 v0.7.2 (2023-07-27)
 ------------------------------------------------------------
