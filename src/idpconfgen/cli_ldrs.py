@@ -107,6 +107,7 @@ from idpconfgen.libs.libparse import (
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_chainID,
     col_name,
     col_resSeq,
     col_segid,
@@ -623,6 +624,20 @@ def main(
     
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
+    
+    fld_chain = fld_struc.data_array[:, col_chainID]
+    if len(set(fld_chain)) > 1:
+        if MULTICHAIN:
+            # TODO check for the same chain ID in FASTA and PDB file
+            # if not, make an assumption based on overlap and inform the user
+            pass
+        else:
+            log.info(
+                'More than one unique protein chain detected in template '
+                'structure. Please provide more than one sequence in the '
+                'FASTA file.'
+                )
+            return
     
     if membrane:
         fld_pro = []
