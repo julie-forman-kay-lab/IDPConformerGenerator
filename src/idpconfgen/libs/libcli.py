@@ -137,7 +137,9 @@ class SeqOrFasta(argparse.Action):
             seq = value
         elif is_valid_fasta_file(value):
             seqdict = read_FASTAS_from_file_to_strings(value)
-            seq = list(seqdict.values())[0]
+            # Minor change made here to accommodate multiple FASTA
+            # sequences for multiple chains
+            seq = seqdict
         else:
             raise parser.error('Input sequence not valid.')
 

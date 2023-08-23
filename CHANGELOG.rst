@@ -14,6 +14,7 @@ Changelog
 * Increase efficiency of clash-checking algorithm in ``ldrs_helper.py``
 * Acceptance and automated processing of proteins with a membrane/bilayer
 * Automated clash-checking between all combinations of IDRs built
+* Added ability for multi-chain protein detection and processing
 
 v0.7.2 (2023-07-27)
 ------------------------------------------------------------

@@ -155,6 +155,10 @@ DISORDER_BOUNDS = None
 DISORDER_INDEX = None
 DISORDER_SEQS = None
 
+# If there are multiple-chains detected
+# the default is false, working with only single chains
+MULTICHAIN = False
+
 # keeps a record of the conformer numbers written to disk across the different
 # cores
 CONF_NUMBER = Queue()
@@ -465,7 +469,19 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(T('starting the building process'))
-    log.info(S(f'input sequence: {input_seq}'))
+    
+    # Accomodate multiple chains in template
+    global MULTICHAIN
+    if len(input_seq) > 1:
+        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+        for chain in input_seq:
+            c = chain.replace('>', '')
+            log.info(S(f'chain {c}: {input_seq[chain]}'))
+        MULTICHAIN = True
+    else:
+        input_seq = list(input_seq.values())[0]
+        log.info(S(f'input sequence: {input_seq}'))
+    
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
