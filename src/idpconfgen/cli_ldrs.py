@@ -979,6 +979,8 @@ def main(
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
     if not stitching_off:
+        log.info("Creating combinations of IDRs for stitching process...")
+        log.info(S("Interchain clash-checking will be performed at this stage."))  # noqa: E501
         files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs, ncores)  # noqa: E501
 
         log.info("Stitching conformers onto the folded domain...")
