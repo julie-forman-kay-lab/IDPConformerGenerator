@@ -476,8 +476,7 @@ def main(
     if len(input_seq) > 1:
         log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
         for chain in input_seq:
-            c = chain.replace('>', '')
-            log.info(S(f'chain {c}: {input_seq[chain]}'))
+            log.info(S(f'{chain}: {input_seq[chain]}'))
         MULTICHAIN = True
     else:
         input_seq = list(input_seq.values())[0]
@@ -549,26 +548,43 @@ def main(
     
     log.info(T('Initializing folded domain information'))
     
+    fld_struc = Structure(Path(folded_structure))
+    fld_struc.build()
+    
     with open(folded_structure) as f:
         pdb_raw = f.read()
     _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
     fld_fasta = fld_fasta.replace('X', '')
+    
+    fld_chain = fld_struc.data_array[:, col_chainID]
+    unique_chains = set(fld_chain)
+    if len(unique_chains) > 1:
+        if not MULTICHAIN:
+            log.info(
+                'More than one unique protein chain detected in template '
+                'structure. But only one sequence was provided. Attempting to '
+                'identify which chain sequence is for.'
+                )
+        # TODO instead of taking chain ID at every line of PDB just take
+        # at every residue (use the col_resid)
+        # Then we can compare to the fld_fasta and make dictionary of chains and
+        # their respective sequences to compare to the input sequences.
+    else:
+        # Find out what our disordered sequences are
+        # Can be C-term, N-term, in the middle, or all the above
+        linkers = break_check(pdb_raw, membrane)
+        mod_input_seq = input_seq
+        if linkers:
+            for seq in linkers:
+                mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
 
-    # Find out what our disordered sequences are
-    # Can be C-term, N-term, in the middle, or all the above
-    linkers = break_check(pdb_raw, membrane)
-    mod_input_seq = input_seq
-    if linkers:
-        for seq in linkers:
-            mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
-            
-    mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
-    assert len(mod_input_seq) == len(input_seq)
-    # Treats folded residues as "*" to ignore in IDP building process
-    disordered_res = []
-    for i, res in enumerate(mod_input_seq):
-        if res != "*":
-            disordered_res.append(i)
+        mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
+        assert len(mod_input_seq) == len(input_seq)
+        # Treats folded residues as "*" to ignore in IDP building process
+        disordered_res = []
+        for i, res in enumerate(mod_input_seq):
+            if res != "*":
+                disordered_res.append(i)
     
     DISORDER_BOUNDS = consecutive_grouper(disordered_res)
     DISORDER_SEQS = []
@@ -621,24 +637,7 @@ def main(
     if residue_tolerance is not None:
         _restol = str(residue_tolerance)[1:-1]
         log.info(S(f"Building with residue tolerances: {_restol}"))
-    
-    fld_struc = Structure(Path(folded_structure))
-    fld_struc.build()
-    
-    fld_chain = fld_struc.data_array[:, col_chainID]
-    if len(set(fld_chain)) > 1:
-        if MULTICHAIN:
-            # TODO check for the same chain ID in FASTA and PDB file
-            # if not, make an assumption based on overlap and inform the user
-            pass
-        else:
-            log.info(
-                'More than one unique protein chain detected in template '
-                'structure. Please provide more than one sequence in the '
-                'FASTA file.'
-                )
-            return
-    
+            
     if membrane:
         fld_pro = []
         fld_arr = fld_struc.data_array.tolist()
