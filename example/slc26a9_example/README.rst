@@ -44,8 +44,8 @@ to use the FASPR method for generating sidechains like so below.::
 
 From the ``.fasta`` file, the ``ldrs`` subclient will automatically identify the
 N-IDR, the C-IDR, and any IDRs missing between folded domains; and construct
-those. This command took approximately 1 hour on a single workstation with
-64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
+those. The speed of Linker-IDR generation varies with sequence length as well as its relative
+position to the folded domain.
 
 To guarantee no sidechain clashes, we recommend either lowering the steric-clash
 tolerance using the ``-tol`` flag above or generating backbone-only conformers first

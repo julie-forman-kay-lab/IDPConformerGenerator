@@ -40,7 +40,7 @@ To generate the disordered terminal tails on CNOT7 run the following command::
 
 The ``ldrs`` subclient with automatically detect the N-IDR and C-IDR tail based on mismatches
 in the primary sequence of the ``.fasta`` file (or input sequence from ``-seq``) and the PDB
-file of the folded domain. This command took approximately 5 minutes on a single workstation with
+file of the folded domain. This command took approximately 3 minutes on a single workstation with
 64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
 
 To check your outputs against what is to be expected for this tutorial section. Please click
