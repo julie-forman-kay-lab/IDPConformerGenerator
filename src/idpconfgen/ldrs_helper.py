@@ -336,7 +336,10 @@ def create_combinations(lst, num_combinations, ncores=1):
             for result in execute_clash:
                 if result is not False:
                     passed.append(result)
-            passed = list(set(passed))
+            try:
+                passed = list(set(passed))
+            except TypeError:
+                continue
         
         if len(passed) > num_combinations:
             passed = passed[0:num_combinations]
@@ -372,10 +375,10 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
     """
     combinations = {}
     for c in chains:
-        folder = folder.joinpath(f"chain{c}")
-        nidr_path = folder.joinpath(disorder_cases[0])
-        lidr_path = folder.joinpath(disorder_cases[1])
-        cidr_path = folder.joinpath(disorder_cases[2])
+        chain_path = folder.joinpath(f"chain{c}")
+        nidr_path = chain_path.joinpath(disorder_cases[0])
+        lidr_path = chain_path.joinpath(disorder_cases[1])
+        cidr_path = chain_path.joinpath(disorder_cases[2])
         nidr_files = []
         lidr_combinations = []
         cidr_files = []
@@ -1016,7 +1019,7 @@ def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
 
             # Fix residue connectivity issue
             last_residue_fld = int(fld_data_seg[:, col_resSeq][-1])
-            curr_residue = last_residue_fld + 1
+            curr_residue = last_residue_fld
             cidr_seq = cidr.data_array[:, col_resSeq]
             for i, seq in enumerate(cidr_seq):
                 curr = seq
@@ -1047,7 +1050,7 @@ def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
                 upper = minmax[1]
                 new_struc_lst = new_struc_arr.tolist()
 
-                idr = Structure(idp_lst[chain][idx])
+                idr = Structure(idp_lst[chain][0][idx])
                 idr.build()
 
                 idr_seq = idr.data_array[:, col_resSeq].astype(int)

@@ -558,6 +558,9 @@ def main(
     fld_fasta = fld_fasta.replace('X', '')
     
     fld_chain = fld_struc.data_array[:, col_chainID]
+    # Check if missing chain ID but there should be segment ID
+    if not all(c for c in fld_chain):
+        fld_chain = fld_struc.data_array[:, col_segid]
     unique_chains = set(fld_chain)
     if len(unique_chains) > 1:
         log.info(T("Processing multiple protein chains"))
@@ -567,8 +570,21 @@ def main(
                 'structure. But only one sequence was provided. Attempting to '
                 'identify which chain sequence is for.'
                 ))
+        if membrane:
+            fld_pro = []
+            fld_struc_data = fld_struc.data_array
+            fld_arr = fld_struc_data.tolist()
+            fld_segid = fld_struc_data[:, col_segid]
+
+            for i, segid in enumerate(fld_segid):
+                if "PRO" in segid:
+                    fld_pro.append(fld_arr[i])
+
+            fld_struc_data = np.array(fld_pro)
+        else:
+            fld_struc_data = fld_struc.data_array
         
-        fld_chainseq = process_multichain_pdb(fld_struc, input_seq)
+        fld_chainseq = process_multichain_pdb(fld_struc_data, input_seq)
         for chain in fld_chainseq:
             match_index = fld_chainseq[chain][1]
             seq_id = list(input_seq)[match_index]
@@ -576,7 +592,9 @@ def main(
     else:
         chain = list(unique_chains)[0]
         fld_chainseq = {chain: (fld_fasta, 0, fld_struc.data_array)}
-        
+
+    DISORDER_BOUNDS = {}
+    DISORDER_CASES = {}
     for chain in fld_chainseq:
         log.info(f"Building IDRs onto chain {chain}")
         fld_fasta = fld_chainseq[chain][0]
@@ -599,10 +617,8 @@ def main(
             if res != "*":
                 disordered_res.append(i)
 
-        DISORDER_BOUNDS = {}
-        DISORDER_CASES = {}
-        DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
         DISORDER_SEQS = []
+        DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
         DISORDER_CASES[chain] = []
         for i, bounds in enumerate(DISORDER_BOUNDS[chain]):
             lower = bounds[0]
