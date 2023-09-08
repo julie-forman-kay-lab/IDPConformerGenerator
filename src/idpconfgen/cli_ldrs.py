@@ -582,7 +582,7 @@ def main(
         fld_fasta = fld_chainseq[chain][0]
         in_seq = list(input_seq.values())[fld_chainseq[chain][1]]
         chain_arr = fld_chainseq[chain][2]
-        TEMP_DIRNAME += f"chain{chain}/"
+        temp_dir = TEMP_DIRNAME + f"chain{chain}/"
         
         # Find out what our disordered sequences are
         # Can be C-term, N-term, in the middle, or all the above
@@ -599,10 +599,12 @@ def main(
             if res != "*":
                 disordered_res.append(i)
 
-        DISORDER_BOUNDS = consecutive_grouper(disordered_res)
+        DISORDER_BOUNDS = {}
+        DISORDER_CASES = {}
+        DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
         DISORDER_SEQS = []
-        DISORDER_CASES = []
-        for i, bounds in enumerate(DISORDER_BOUNDS):
+        DISORDER_CASES[chain] = []
+        for i, bounds in enumerate(DISORDER_BOUNDS[chain]):
             lower = bounds[0]
             upper = bounds[1]
             dis_seq = in_seq[lower:upper]
@@ -615,13 +617,13 @@ def main(
             # disordered bits (need 2 extra residues at the beginning or end)
             if lower == 0:
                 dis_seq = in_seq[lower: upper + 2]
-                DISORDER_CASES.append(disorder_cases[0])
+                DISORDER_CASES[chain].append(disorder_cases[0])
             elif upper == len(in_seq):
                 dis_seq = in_seq[lower - 2: upper]
-                DISORDER_CASES.append(disorder_cases[2])
+                DISORDER_CASES[chain].append(disorder_cases[2])
             else:
                 dis_seq = in_seq[lower - 2: upper + 2]
-                DISORDER_CASES.append(disorder_cases[1])
+                DISORDER_CASES[chain].append(disorder_cases[1])
 
             DISORDER_SEQS.append(dis_seq)
 
@@ -719,13 +721,13 @@ def main(
         # Generate library of conformers for each case
         for index, seq in enumerate(DISORDER_SEQS):
             fld_term_idx = {}
-            case = DISORDER_CASES[index]
-            if disorder_cases[0] not in DISORDER_CASES:
-                lower = DISORDER_BOUNDS[index][0] + first_seq - 1
-                upper = DISORDER_BOUNDS[index][1] + first_seq
+            case = DISORDER_CASES[chain][index]
+            if disorder_cases[0] not in DISORDER_CASES[chain]:
+                lower = DISORDER_BOUNDS[chain][index][0] + first_seq - 1
+                upper = DISORDER_BOUNDS[chain][index][1] + first_seq
             else:
-                lower = DISORDER_BOUNDS[index][0]
-                upper = DISORDER_BOUNDS[index][1] + 1
+                lower = DISORDER_BOUNDS[chain][index][0]
+                upper = DISORDER_BOUNDS[chain][index][1] + 1
             linkeridr_num = 0
             library_nconfs = 640
             if case == disorder_cases[1]:
@@ -761,7 +763,7 @@ def main(
 
                 # Initialize directories
                 linker_parent_of = make_folder_or_cwd(
-                    output_folder.joinpath(TEMP_DIRNAME + case)
+                    output_folder.joinpath(temp_dir + case)
                     )
                 linker_of = make_folder_or_cwd(
                     linker_parent_of.joinpath(f"linker_{linkeridr_num}")
@@ -969,7 +971,7 @@ def main(
                 # create the temporary folders housing the disordered PDBs
                 # folder will be deleted when everything is grafted together
                 temp_of = make_folder_or_cwd(
-                    output_folder.joinpath(TEMP_DIRNAME + case)
+                    output_folder.joinpath(temp_dir + case)
                     )
 
                 log.info(S(f"Generating temporary disordered conformers for: {seq}"))  # noqa: E501
@@ -1025,8 +1027,20 @@ def main(
     if not stitching_off:
         log.info("Creating combinations of IDRs for stitching process...")
         log.info(S("Interchain clash-checking will be performed at this stage."))  # noqa: E501
-        files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs, ncores)  # noqa: E501
-        
+        chains = list(fld_chainseq.keys())
+        all_files = create_all_combinations(
+            output_folder.joinpath(TEMP_DIRNAME),
+            chains,
+            nconfs,
+            ncores
+            )
+        files = []
+        for i in range(len(list(all_files.values())[0])):
+            new_dict = {}
+            for key, value_list in all_files.items():
+                new_dict[key] = value_list[i]
+
+            files.append(new_dict.copy())
         log.info("Stitching conformers onto the folded domain...")
         if membrane:
             log.info(S(
