@@ -92,6 +92,12 @@ Modeling Disordered Regions Within Folded Domains
 .. include:: ../example/slc26a9_example/README.rst
     :start-after: .. start-description
 
+Modeling Disordered Regions in a Multi-Chain Protein Complex
+------------------------------------------------------------
+
+.. include:: ../example/complex_example/README.rst
+    :start-after: .. start-description
+
 Exploring IDPConfGen Analysis Functions
 ---------------------------------------
 

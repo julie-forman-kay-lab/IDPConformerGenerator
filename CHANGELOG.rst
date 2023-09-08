@@ -15,6 +15,7 @@ Changelog
 * Acceptance and automated processing of proteins with a membrane/bilayer
 * Automated clash-checking between all combinations of IDRs built
 * Added ability for multi-chain protein detection and processing
+* Added ability to build IDRs on multi-chain complexes
 * Change default backbone energy ``-etbb`` to 100.0
 * Change default sidechain energy ``-etss`` to 250.0
 
