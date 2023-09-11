@@ -9,6 +9,10 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add ``--long`` and ``--long-ranges`` to the ``build`` subclient to build long (300+ AA) IDPs much quicker
+* Change default backbone energy ``-etbb`` in ``build`` to 100.0
+* Change default sidechain energy ``-etss`` in ``build`` to 250.0
+
 v0.7.3 (2023-09-11)
 ------------------------------------------------------------
 
@@ -19,8 +23,8 @@ v0.7.3 (2023-09-11)
 * Automated clash-checking between all combinations of IDRs built
 * Added ability for multi-chain protein detection and processing
 * Added ability to build IDRs on multi-chain complexes
-* Change default backbone energy ``-etbb`` to 100.0
-* Change default sidechain energy ``-etss`` to 250.0
+* Change default backbone energy ``-etbb`` in ``ldrs`` to 100.0
+* Change default sidechain energy ``-etss`` in ``ldrs`` to 250.0
 
 v0.7.2 (2023-07-27)
 ------------------------------------------------------------
