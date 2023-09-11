@@ -1,5 +1,6 @@
 """Contain  handlers of PDB information."""
 import functools
+import os
 import re
 from collections import defaultdict
 
@@ -204,9 +205,9 @@ atom_format_funcs = [
 def get_fasta_from_PDB(pdbid):
     """Extract FASTA from PDB."""
     try:
-        lines = pdbid[1].decode('utf_8').split('\n')
+        lines = pdbid[1].decode('utf_8').split(os.linesep)
     except AttributeError:
-        lines = pdbid[1].split('\n')
+        lines = pdbid[1].split(os.linesep)
     rn = {line[atom_resSeq].strip(): line[atom_resName] for line in lines}
     fasta = (aa3to1.get(f, 'X') for f in rn.values())
     return Path(pdbid[0]).stem, ''.join(fasta)
