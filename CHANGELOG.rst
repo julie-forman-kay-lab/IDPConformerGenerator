@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.4 (2023-09-11)
+------------------------------------------------------------
+
 * Add ``--long`` and ``--long-ranges`` to the ``build`` subclient to build long (300+ AA) IDPs much quicker
 * Change default backbone energy ``-etbb`` in ``build`` to 100.0
 * Change default sidechain energy ``-etss`` in ``build`` to 250.0
