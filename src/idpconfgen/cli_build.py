@@ -318,9 +318,9 @@ ap.add_argument(
     '--energy-threshold-backbone',
     help=(
         'The energy threshold above which fragments will be rejected '
-        'when building the BACKBONE atoms. Defaults to 10.'
+        'when building the BACKBONE atoms. Defaults to 100 kJ.'
         ),
-    default=10.0,
+    default=100.0,
     type=float,
     )
 
@@ -330,9 +330,9 @@ ap.add_argument(
     help=(
         'The energy threshold above which conformers will be rejected '
         'after packing the sidechains (ignored if `-dsd`). '
-        'Defaults to 1000.'
+        'Defaults to 250 kJ.'
         ),
-    default=1000.0,
+    default=250.0,
     type=float,
     )
 
@@ -476,12 +476,14 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(T('starting the building process'))
+    # We only are interested in the first (one) sequence
+    input_seq = list(input_seq.values())[0]
     log.info(S(f'input sequence: {input_seq}'))
     
     if len(input_seq) > 300:
         if long is False:
             log.info(
-                "TIP: if your IDP is longer than ~350 residues, consider "
+                "TIP: if your IDP is longer than ~300 residues, consider "
                 "enabling the `--long` flag for faster generation."
                 )
         else:
@@ -996,7 +998,7 @@ def _build_conformers(
                             fout.write(line + "\n")
                     final = psurgeon(
                         {"A": [Path(output_folder, fname_temp)]},
-                        {"A": [Path(output_folder, prev_struc_name)]},
+                        Path(output_folder, prev_struc_name),
                         {"A": [disorder_cases[2]]},
                         {"A": [(0, 0)]},  # placeholder
                         )
