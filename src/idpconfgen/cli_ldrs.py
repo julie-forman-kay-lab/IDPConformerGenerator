@@ -97,6 +97,7 @@ from idpconfgen.libs.libcalc import (
 from idpconfgen.libs.libfilter import aligndb
 from idpconfgen.libs.libhigherlevel import bgeo_reduce
 from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
+from idpconfgen.libs.libmultichain import process_multichain_pdb
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import (
     get_trimer_seq_njit,
@@ -107,8 +108,10 @@ from idpconfgen.libs.libparse import (
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
+    col_chainID,
     col_name,
     col_resSeq,
+    col_segid,
     cols_coords,
     parse_pdb_to_array,
     structure_to_pdb,
@@ -153,6 +156,10 @@ DISORDER_CASES = None
 DISORDER_BOUNDS = None
 DISORDER_INDEX = None
 DISORDER_SEQS = None
+
+# If there are multiple-chains detected
+# the default is false, working with only single chains
+MULTICHAIN = False
 
 # keeps a record of the conformer numbers written to disk across the different
 # cores
@@ -263,6 +270,24 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '--membrane',
+    help=(
+        "Include this flag if your folded-structure has a membrane generated "
+        "from PPM v3 and CHARMM-GUI's bilayer builder."
+        ),
+    action='store_true',
+    )
+
+ap.add_argument(
+    '--stitching-off',
+    help=(
+        "Disables stitching process. IDRs modeled will only undergo alignment "
+        "and clash-checking. Also enables keep-temporary parameter."
+        ),
+    action='store_true',
+    )
+
+ap.add_argument(
     '-kt',
     '--keep-temporary',
     help=(
@@ -310,10 +335,10 @@ ap.add_argument(
     '-etbb',
     '--energy-threshold-backbone',
     help=(
-        'The energy threshold above which fragments will be rejected '
-        'when building the BACKBONE atoms. Defaults to 10.'
+        'The energy (kJ) threshold above which fragments will be rejected '
+        'when building the BACKBONE atoms. Defaults to 100.'
         ),
-    default=10.0,
+    default=100.0,
     type=float,
     )
 
@@ -321,11 +346,11 @@ ap.add_argument(
     '-etss',
     '--energy-threshold-sidechains',
     help=(
-        'The energy threshold above which conformers will be rejected '
+        'The energy (kJ) threshold above which conformers will be rejected '
         'after packing the sidechains (ignored if `-dsd`). '
-        'Defaults to 1000.'
+        'Defaults to 250.'
         ),
-    default=1000.0,
+    default=250.0,
     type=float,
     )
 
@@ -382,6 +407,8 @@ def main(
         clash_tolerance=0.5,
         keep_temporary=False,
         folded_structure=None,
+        membrane=False,
+        stitching_off=False,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -417,7 +444,7 @@ def main(
     
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
-    if keep_temporary:
+    if keep_temporary or stitching_off:
         TEMP_DIRNAME = "ldrs_temp/"
     else:
         TEMP_DIRNAME = '.ldrs_temp/'
@@ -444,7 +471,18 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(T('starting the building process'))
-    log.info(S(f'input sequence: {input_seq}'))
+    
+    # Accomodate multiple chains in template
+    global MULTICHAIN
+    if len(input_seq) > 1:
+        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+        for chain in input_seq:
+            log.info(S(f'{chain}: {input_seq[chain]}'))
+        MULTICHAIN = True
+    else:
+        single_seq = list(input_seq.values())[0]
+        log.info(S(f'input sequence: {single_seq}'))
+    
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -511,196 +549,434 @@ def main(
     
     log.info(T('Initializing folded domain information'))
     
+    fld_struc = Structure(Path(folded_structure))
+    fld_struc.build()
+    
     with open(folded_structure) as f:
         pdb_raw = f.read()
     _pdbid, fld_fasta = get_fasta_from_PDB([folded_structure, pdb_raw])
     fld_fasta = fld_fasta.replace('X', '')
     
-    # Find out what our disordered sequences are
-    # Can be C-term, N-term, in the middle, or all the above
-    linkers = break_check(pdb_raw)
-    mod_input_seq = input_seq
-    if linkers:
-        for seq in linkers:
-            mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
-            
-    mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
-    assert len(mod_input_seq) == len(input_seq)
-    # Treats folded residues as "*" to ignore in IDP building process
-    disordered_res = []
-    for i, res in enumerate(mod_input_seq):
-        if res != "*":
-            disordered_res.append(i)
-    
-    DISORDER_BOUNDS = consecutive_grouper(disordered_res)
-    DISORDER_SEQS = []
-    DISORDER_CASES = []
-    for i, bounds in enumerate(DISORDER_BOUNDS):
-        lower = bounds[0]
-        upper = bounds[1]
-        dis_seq = input_seq[lower:upper]
-        log.info(S(
-            f'Disordered region #{i + 1} = residue {lower + 1} to {upper} '
-            f'with the sequence {dis_seq}.'
-            ))
-        
-        # Different than what we tell user due to internal processing for
-        # disordered bits (need 2 extra residues at the beginning or end)
-        if lower == 0:
-            dis_seq = input_seq[lower: upper + 2]
-            DISORDER_CASES.append(disorder_cases[0])
-        elif upper == len(input_seq):
-            dis_seq = input_seq[lower - 2: upper]
-            DISORDER_CASES.append(disorder_cases[2])
-        else:
-            dis_seq = input_seq[lower - 2: upper + 2]
-            DISORDER_CASES.append(disorder_cases[1])
-        
-        DISORDER_SEQS.append(dis_seq)
-        
-    log.info(S('done'))
-
-    db = read_dictionary_from_disk(database)
-
-    if bgeo_strategy == bgeo_exact_name:
-        try:
-            _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
-        except KeyError:
-            log.info(S('!!!!!!!!!!!!!!!'))
+    fld_chain = fld_struc.data_array[:, col_chainID]
+    # Check if missing chain ID but there should be segment ID
+    if not all(c for c in fld_chain):
+        fld_chain = fld_struc.data_array[:, col_segid]
+    unique_chains = set(fld_chain)
+    if len(unique_chains) > 1:
+        log.info(T("Processing multiple protein chains"))
+        if not MULTICHAIN:
             log.info(S(
-                'DATABASE ERROR: '
-                'the `database` requested is invalid. Please give the database '
-                'generated with `bgeodb`. See the usage documentation for '
-                'details while using `--bgeo-strategy exact`.'
+                'More than one unique protein chain detected in template '
+                'structure. But only one sequence was provided. Attempting to '
+                'identify which chain sequence is for.'
                 ))
-            return
+        if membrane:
+            fld_pro = []
+            fld_struc_data = fld_struc.data_array
+            fld_arr = fld_struc_data.tolist()
+            fld_segid = fld_struc_data[:, col_segid]
 
-    else:
-        _, ANGLES, secondary, primary = aligndb(db)
+            for i, segid in enumerate(fld_segid):
+                if "PRO" in segid:
+                    fld_pro.append(fld_arr[i])
 
-    del db
-
-    if residue_tolerance is not None:
-        _restol = str(residue_tolerance)[1:-1]
-        log.info(S(f"Building with residue tolerances: {_restol}"))
-    
-    fld_struc = Structure(Path(folded_structure))
-    fld_struc.build()
-    fld_name = fld_struc.data_array[:, col_name]
-    fld_seq = fld_struc.data_array[:, col_resSeq].astype(int)
-    first_seq = fld_seq[0]
-    last_seq = fld_seq[-1]
-
-    # these are the slices with which to sample the ANGLES array
-    SLICEDICT_XMERS = []
-    XMERPROBS = []
-    GET_ADJ = []
-    for i, seq in enumerate(DISORDER_SEQS):
-        log.info(S(f"Preparing database for sequence: {seq}"))
-        
-        SLICEDICT_XMERS.append(prepare_slice_dict(
-            primary,
-            seq,
-            dssp_regexes=dssp_regexes,
-            secondary=secondary,
-            mers_size=xmer_probs_tmp.sizes,
-            res_tolerance=residue_tolerance,
-            ncores=ncores,
-            ))
-
-        remove_empty_keys(SLICEDICT_XMERS[i])
-        # updates user defined fragment sizes and probabilities to the
-        # ones actually observed
-        _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
-        XMERPROBS.append(_.probs)
-
-        GET_ADJ.append(get_adjacent_angles(
-            sorted(SLICEDICT_XMERS[i].keys()),
-            XMERPROBS[i],
-            seq,
-            ANGLES,
-            bgeo_strategy,
-            SLICEDICT_XMERS[i],
-            csss=None,
-            residue_tolerance=residue_tolerance,
-            ))
-        
-        log.info(S("done"))
-
-    ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
-
-    # get sidechain dedicated parameters
-    sidechain_parameters = \
-        get_sidechain_packing_parameters(kwargs, sidechain_method)
-    
-    fStruct = Structure(Path(folded_structure))
-    fStruct.build()
-    
-    # Generate library of conformers for each case
-    for index, seq in enumerate(DISORDER_SEQS):
-        fld_term_idx = {}
-        case = DISORDER_CASES[index]
-        if disorder_cases[0] not in DISORDER_CASES:
-            lower = DISORDER_BOUNDS[index][0] + first_seq - 1
-            upper = DISORDER_BOUNDS[index][1] + first_seq
+            fld_struc_data = np.array(fld_pro)
         else:
-            lower = DISORDER_BOUNDS[index][0]
-            upper = DISORDER_BOUNDS[index][1] + 1
-        linkeridr_num = 0
-        library_nconfs = 640
-        if case == disorder_cases[1]:
-            for s, aa in enumerate(fld_seq):
-                if aa == lower - 1 and fld_name[s] == 'C':
-                    fld_term_idx["CC"] = s
-                elif aa == lower:
-                    if fld_name[s] == 'N':
-                        fld_term_idx["NC"] = s
-                    elif fld_name[s] == 'CA':
-                        fld_term_idx["CAC"] = s
-                elif aa == upper and fld_name[s] == 'C':
-                    fld_term_idx['CN'] = s
-                elif aa == upper + 1:
-                    if fld_name[s] == 'N':
-                        fld_term_idx['NN'] = s
-                    elif fld_name[s] == 'CA':
-                        fld_term_idx['CAN'] = s
-                if aa > upper + 1:
-                    break
-            fld_CLxyz = fld_struc.data_array[fld_term_idx["CC"]][cols_coords].astype(float)  # noqa: E501
-            fld_NLxyz = fld_struc.data_array[fld_term_idx["NC"]][cols_coords].astype(float)  # noqa: E501
-            fld_CALxyz = fld_struc.data_array[fld_term_idx["CAC"]][cols_coords].astype(float)  # noqa: E501
-            fld_coords_C = np.array([fld_CLxyz, fld_NLxyz, fld_CALxyz])
-            
-            fld_CUxyz = fld_struc.data_array[fld_term_idx["CN"]][cols_coords].astype(float)  # noqa: E501
-            fld_NUxyz = fld_struc.data_array[fld_term_idx["NN"]][cols_coords].astype(float)  # noqa: E501
-            fld_CAUxyz = fld_struc.data_array[fld_term_idx["CAN"]][cols_coords].astype(float)  # noqa: E501
-            fld_coords_N = np.array([fld_CUxyz, fld_NUxyz, fld_CAUxyz])
+            fld_struc_data = fld_struc.data_array
+        
+        fld_chainseq = process_multichain_pdb(fld_struc_data, input_seq)
+        for chain in fld_chainseq:
+            match_index = fld_chainseq[chain][1]
+            seq_id = list(input_seq)[match_index]
+            log.info(S(f"sequence {seq_id} is matched with chain {chain}"))
+    else:
+        chain = list(unique_chains)[0]
+        fld_chainseq = {chain: (fld_fasta, 0, fld_struc.data_array)}
 
-            library_confs_per_core = library_nconfs // ncores
-            library_remaining_confs = library_nconfs % ncores
-            
-            # Initialize directories
-            linker_parent_of = make_folder_or_cwd(
-                output_folder.joinpath(TEMP_DIRNAME + case)
-                )
-            linker_of = make_folder_or_cwd(
-                linker_parent_of.joinpath(f"linker_{linkeridr_num}")
-                )
-            match_of = make_folder_or_cwd(
-                linker_of.joinpath(f"{linkeridr_num}_match")
-                )
-            
-            match_of_files = next(os.walk(match_of))[2]
-            num_files = len(match_of_files)
-            prev_combinations = []
-            lidr_set = 0
-            start = time()
-            while num_files < nconfs:
-                for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
-                for i in range(1, library_nconfs + 1):
+    DISORDER_BOUNDS = {}
+    DISORDER_CASES = {}
+    for chain in fld_chainseq:
+        log.info(f"Building IDRs onto chain {chain}")
+        fld_fasta = fld_chainseq[chain][0]
+        in_seq = list(input_seq.values())[fld_chainseq[chain][1]]
+        chain_arr = fld_chainseq[chain][2]
+        temp_dir = TEMP_DIRNAME + f"chain{chain}/"
+        
+        # Find out what our disordered sequences are
+        # Can be C-term, N-term, in the middle, or all the above
+        linkers = break_check(pdb_raw, membrane)
+        mod_input_seq = in_seq
+        if linkers:
+            for seq in linkers:
+                mod_input_seq = mod_input_seq.replace(seq, len(seq) * '*')
+        mod_input_seq = mod_input_seq.replace(fld_fasta, len(fld_fasta) * '*')
+        assert len(mod_input_seq) == len(in_seq)
+        # Treats folded residues as "*" to ignore in IDP building process
+        disordered_res = []
+        for i, res in enumerate(mod_input_seq):
+            if res != "*":
+                disordered_res.append(i)
+
+        DISORDER_SEQS = []
+        DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
+        DISORDER_CASES[chain] = []
+        for i, bounds in enumerate(DISORDER_BOUNDS[chain]):
+            lower = bounds[0]
+            upper = bounds[1]
+            dis_seq = in_seq[lower:upper]
+            log.info(S(
+                f'Disordered region #{i + 1} = residue {lower + 1} to {upper} '
+                f'with the sequence {dis_seq}.'
+                ))
+
+            # Different than what we tell user due to internal processing for
+            # disordered bits (need 2 extra residues at the beginning or end)
+            if lower == 0:
+                dis_seq = in_seq[lower: upper + 2]
+                DISORDER_CASES[chain].append(disorder_cases[0])
+            elif upper == len(in_seq):
+                dis_seq = in_seq[lower - 2: upper]
+                DISORDER_CASES[chain].append(disorder_cases[2])
+            else:
+                dis_seq = in_seq[lower - 2: upper + 2]
+                DISORDER_CASES[chain].append(disorder_cases[1])
+
+            DISORDER_SEQS.append(dis_seq)
+
+        log.info(S('done'))
+
+        db = read_dictionary_from_disk(database)
+
+        if bgeo_strategy == bgeo_exact_name:
+            try:
+                _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
+            except KeyError:
+                log.info(S('!!!!!!!!!!!!!!!'))
+                log.info(S(
+                    'DATABASE ERROR: '
+                    'the `database` requested is invalid. Please give the '
+                    'database generated with `bgeodb`. See the usage '
+                    'documentation for details while using '
+                    '`--bgeo-strategy exact`.'
+                    ))
+                return
+
+        else:
+            _, ANGLES, secondary, primary = aligndb(db)
+
+        del db
+
+        if residue_tolerance is not None:
+            _restol = str(residue_tolerance)[1:-1]
+            log.info(S(f"Building with residue tolerances: {_restol}"))
+
+        if membrane:
+            fld_pro = []
+            fld_arr = chain_arr.tolist()
+            fld_segid = chain_arr[:, col_segid]
+
+            for i, segid in enumerate(fld_segid):
+                if "PRO" in segid:
+                    fld_pro.append(fld_arr[i])
+
+            fld_pro = np.array(fld_pro)
+
+            fld_name = fld_pro[:, col_name]
+            fld_seq = fld_pro[:, col_resSeq].astype(int)
+            fld_xyz = fld_pro[:, cols_coords].astype(float)
+        else:
+            fld_name = chain_arr[:, col_name]
+            fld_seq = chain_arr[:, col_resSeq].astype(int)
+            fld_xyz = chain_arr[:, cols_coords].astype(float)
+
+        first_seq = fld_seq[0]
+        last_seq = fld_seq[-1]
+
+        # these are the slices with which to sample the ANGLES array
+        SLICEDICT_XMERS = []
+        XMERPROBS = []
+        GET_ADJ = []
+        for i, seq in enumerate(DISORDER_SEQS):
+            log.info(S(f"Preparing database for sequence: {seq}"))
+
+            SLICEDICT_XMERS.append(prepare_slice_dict(
+                primary,
+                seq,
+                dssp_regexes=dssp_regexes,
+                secondary=secondary,
+                mers_size=xmer_probs_tmp.sizes,
+                res_tolerance=residue_tolerance,
+                ncores=ncores,
+                ))
+
+            remove_empty_keys(SLICEDICT_XMERS[i])
+            # updates user defined fragment sizes and probabilities to the
+            # ones actually observed
+            _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
+            XMERPROBS.append(_.probs)
+
+            GET_ADJ.append(get_adjacent_angles(
+                sorted(SLICEDICT_XMERS[i].keys()),
+                XMERPROBS[i],
+                seq,
+                ANGLES,
+                bgeo_strategy,
+                SLICEDICT_XMERS[i],
+                csss=None,
+                residue_tolerance=residue_tolerance,
+                ))
+
+            log.info(S("done"))
+
+        ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
+
+        # get sidechain dedicated parameters
+        sidechain_parameters = \
+            get_sidechain_packing_parameters(kwargs, sidechain_method)
+
+        # Generate library of conformers for each case
+        for index, seq in enumerate(DISORDER_SEQS):
+            fld_term_idx = {}
+            case = DISORDER_CASES[chain][index]
+            if disorder_cases[0] not in DISORDER_CASES[chain]:
+                lower = DISORDER_BOUNDS[chain][index][0] + first_seq - 1
+                upper = DISORDER_BOUNDS[chain][index][1] + first_seq
+            else:
+                lower = DISORDER_BOUNDS[chain][index][0]
+                upper = DISORDER_BOUNDS[chain][index][1] + 1
+            linkeridr_num = 0
+            library_nconfs = 640
+            if case == disorder_cases[1]:
+                for s, aa in enumerate(fld_seq):
+                    if aa == lower - 1 and fld_name[s] == 'C':
+                        fld_term_idx["CC"] = s
+                    elif aa == lower:
+                        if fld_name[s] == 'N':
+                            fld_term_idx["NC"] = s
+                        elif fld_name[s] == 'CA':
+                            fld_term_idx["CAC"] = s
+                    elif aa == upper and fld_name[s] == 'C':
+                        fld_term_idx['CN'] = s
+                    elif aa == upper + 1:
+                        if fld_name[s] == 'N':
+                            fld_term_idx['NN'] = s
+                        elif fld_name[s] == 'CA':
+                            fld_term_idx['CAN'] = s
+                    if aa > upper + 1:
+                        break
+                fld_CLxyz = fld_xyz[fld_term_idx["CC"]]
+                fld_NLxyz = fld_xyz[fld_term_idx["NC"]]
+                fld_CALxyz = fld_xyz[fld_term_idx["CAC"]]
+                fld_coords_C = np.array([fld_CLxyz, fld_NLxyz, fld_CALxyz])
+
+                fld_CUxyz = fld_xyz[fld_term_idx["CN"]]
+                fld_NUxyz = fld_xyz[fld_term_idx["NN"]]
+                fld_CAUxyz = fld_xyz[fld_term_idx["CAN"]]
+                fld_coords_N = np.array([fld_CUxyz, fld_NUxyz, fld_CAUxyz])
+
+                library_confs_per_core = library_nconfs // ncores
+                library_remaining_confs = library_nconfs % ncores
+
+                # Initialize directories
+                linker_parent_of = make_folder_or_cwd(
+                    output_folder.joinpath(temp_dir + case)
+                    )
+                linker_of = make_folder_or_cwd(
+                    linker_parent_of.joinpath(f"linker_{linkeridr_num}")
+                    )
+                match_of = make_folder_or_cwd(
+                    linker_of.joinpath(f"{linkeridr_num}_match")
+                    )
+
+                match_of_files = next(os.walk(match_of))[2]
+                num_files = len(match_of_files)
+                prev_combinations = []
+                lidr_set = 0
+                start = time()
+                while num_files < nconfs:
+                    for i in range(ncores + bool(library_remaining_confs)):
+                        RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
+                    for i in range(1, library_nconfs + 1):
+                        CONF_NUMBER.put(i)
+
+                    populate_globals(
+                        input_seq=seq,
+                        bgeo_strategy=bgeo_strategy,
+                        bgeo_path=bgeo_path,
+                        forcefield=forcefields[forcefield],
+                        **kwargs)
+
+                    # Build the C-term of linker first
+                    temp_of_C = make_folder_or_cwd(
+                        linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_C")
+                        )
+
+                    log.info(S(f"Generating temporary disordered library for C-terminus of linker: {seq}"))  # noqa: E501
+
+                    # prepares execution function
+                    consume = partial(
+                        _build_conformers,
+                        fld_xyz=fld_coords_C,
+                        fld_struc=fld_struc,
+                        disorder_case=disorder_cases[2],  # Treating C-term as C-IDR  # noqa: E501
+                        max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
+                        tolerance=dist_tolerance * 2,
+                        index=index,
+                        conformer_name=f"{linkeridr_num}_{lidr_set}_C",
+                        input_seq=seq,  # string
+                        output_folder=temp_of_C,
+                        nconfs=library_confs_per_core,  # int
+                        sidechain_parameters=sidechain_parameters,
+                        sidechain_method=sidechain_method,  # goes back to kwargs  # noqa: E501
+                        bgeo_strategy=bgeo_strategy,
+                        **kwargs,
+                        )
+
+                    execute = partial(
+                        report_on_crash,
+                        consume,
+                        ROC_exception=Exception,
+                        ROC_folder=output_folder,
+                        ROC_prefix=_name,
+                        )
+
+                    with Pool(ncores) as pool:
+                        imap = pool.imap(execute, range(ncores))
+                        for _ in imap:
+                            pass
+                        
+                    if remaining_confs:
+                        execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
+
+                    # Do the same but for N-term end of linker-IDR
+                    for i in range(ncores + bool(library_remaining_confs)):
+                        RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
+                    for i in range(1, library_nconfs + 1):
+                        CONF_NUMBER.put(i)
+
+                    temp_of_N = make_folder_or_cwd(
+                        linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_N")
+                        )
+
+                    log.info(S(f"Generating temporary disordered library for N-terminus of linker: {seq}"))  # noqa: E501
+
+                    # prepares execution function
+                    consume = partial(
+                        _build_conformers,
+                        fld_xyz=fld_coords_N,
+                        fld_struc=fld_struc,
+                        disorder_case=disorder_cases[0],  # Treating N-term as N-IDR  # noqa: E501
+                        max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
+                        tolerance=dist_tolerance * 2,
+                        index=index,
+                        conformer_name=f"{linkeridr_num}_{lidr_set}_N",
+                        input_seq=seq,  # string
+                        output_folder=temp_of_N,
+                        nconfs=library_confs_per_core,  # int
+                        sidechain_parameters=sidechain_parameters,
+                        sidechain_method=sidechain_method,  # goes back to kwargs  # noqa: E501
+                        bgeo_strategy=bgeo_strategy,
+                        **kwargs,
+                        )
+
+                    execute = partial(
+                        report_on_crash,
+                        consume,
+                        ROC_exception=Exception,
+                        ROC_folder=output_folder,
+                        ROC_prefix=_name,
+                        )
+
+                    with Pool(ncores) as pool:
+                        imap = pool.imap(execute, range(ncores))
+                        for _ in imap:
+                            pass
+                        
+                    if remaining_confs:
+                        execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
+
+                    log.info(f"Finished generating library for {seq}.")
+                    log.info("Commencing next-seeker protocol for Linker-IDR...")  # noqa: E501
+
+                    # We need to make only new comparisons of files
+                    # we haven't seen before
+                    C_files = glob(str(linker_of) + "/*_C/*.pdb")
+                    N_files = glob(str(linker_of) + "/*_N/*.pdb")
+
+                    all_combinations = list(product(C_files, N_files))
+                    new_combinations = list(set(all_combinations) - set(prev_combinations))  # noqa: E501
+                    prev_combinations = all_combinations
+
+                    tocheck_C = list(set([item[0] for item in new_combinations]))  # noqa: E501
+                    tocheck_N = list(set([item[1] for item in new_combinations]))  # noqa: E501
+
+                    execute = partial(
+                        next_seeker,
+                        nterm_idr_lib=tocheck_N,
+                        max_clash=max_clash,
+                        tolerance=dist_tolerance,
+                        output_folder=match_of,
+                        )
+                    execute_pool = pool_function(execute, tocheck_C, ncores=ncores)  # noqa: E501
+                    for _ in execute_pool:
+                        pass
+                    
+                    match_of_files = next(os.walk(match_of))[2]
+                    num_files = len(match_of_files)
+                    log.info(f"Generated {num_files} L-IDR models this run.")
+                    lidr_set += 1
+
+                linkeridr_num += 1
+
+                all_C = glob(str(linker_of) + "/*_C/")
+                all_N = glob(str(linker_of) + "/*_N/")
+
+                for i, c in enumerate(all_C):
+                    shutil.rmtree(c)
+                    shutil.rmtree(all_N[i])
+
+            else:
+                for i in range(ncores + bool(remaining_confs)):
+                    RANDOMSEEDS.put(random_seed + i)
+
+                for i in range(1, nconfs + 1):
                     CONF_NUMBER.put(i)
-                
+
+                # Use the second folded residue's backbone C-N-CA
+                # for rotation and alignment where the `C` atom
+                # is from the previous resiude
+                if case == disorder_cases[0]:  # N-IDR case
+                    for j, atom in enumerate(fld_name):
+                        curr_seq = fld_seq[j]
+
+                        if curr_seq == first_seq + 1 and atom == "N":
+                            fld_term_idx["N"] = j
+                        elif curr_seq == first_seq + 1 and atom == "CA":
+                            fld_term_idx["CA"] = j
+                        elif curr_seq == first_seq and atom == "C":
+                            fld_term_idx["C"] = j
+                        elif curr_seq == first_seq + 2:
+                            break
+                elif case == disorder_cases[2]:  # C-IDR case
+                    for j, _atom in enumerate(fld_name):
+                        k = len(fld_name) - 1 - j
+                        curr_seq = fld_seq[k]
+
+                        if curr_seq == last_seq and fld_name[k] == "N":
+                            fld_term_idx["N"] = k
+                        elif curr_seq == last_seq and fld_name[k] == "CA":
+                            fld_term_idx["CA"] = k
+                        elif curr_seq == last_seq - 1 and fld_name[k] == "C":
+                            fld_term_idx["C"] = k
+                        elif curr_seq == last_seq - 2:
+                            break
+                        
+                fld_Cxyz = fld_xyz[fld_term_idx["C"]]
+                fld_Nxyz = fld_xyz[fld_term_idx["N"]]
+                fld_CAxyz = fld_xyz[fld_term_idx["CA"]]
+                # Coordinates of boundary to stitch to later on
+                fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
+
                 populate_globals(
                     input_seq=seq,
                     bgeo_strategy=bgeo_strategy,
@@ -708,236 +984,55 @@ def main(
                     forcefield=forcefields[forcefield],
                     **kwargs)
 
-                # Build the C-term of linker first
-                temp_of_C = make_folder_or_cwd(
-                    linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_C")
+                # create the temporary folders housing the disordered PDBs
+                # folder will be deleted when everything is grafted together
+                temp_of = make_folder_or_cwd(
+                    output_folder.joinpath(temp_dir + case)
                     )
 
-                log.info(S(f"Generating temporary disordered library for C-terminus of linker: {seq}"))  # noqa: E501
+                log.info(S(f"Generating temporary disordered conformers for: {seq}"))  # noqa: E501
+                log.info(S(
+                    "Please note that sequence will contain 2 extra residues "
+                    "to facilitate reconstruction later on."
+                    ))
 
                 # prepares execution function
                 consume = partial(
                     _build_conformers,
-                    fld_xyz=fld_coords_C,
-                    fld_struc=fStruct,
-                    disorder_case=disorder_cases[2],  # Treating C-term as C-IDR  # noqa: E501
-                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
-                    tolerance=dist_tolerance * 2,
-                    index=index,
-                    conformer_name=f"{linkeridr_num}_{lidr_set}_C",
-                    input_seq=seq,  # string
-                    output_folder=temp_of_C,
-                    nconfs=library_confs_per_core,  # int
-                    sidechain_parameters=sidechain_parameters,
-                    sidechain_method=sidechain_method,  # goes back to kwargs
-                    bgeo_strategy=bgeo_strategy,
-                    **kwargs,
-                    )
-
-                execute = partial(
-                    report_on_crash,
-                    consume,
-                    ROC_exception=Exception,
-                    ROC_folder=output_folder,
-                    ROC_prefix=_name,
-                    )
-
-                with Pool(ncores) as pool:
-                    imap = pool.imap(execute, range(ncores))
-                    for _ in imap:
-                        pass
-                    
-                if remaining_confs:
-                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
-
-                # Do the same but for N-term end of linker-IDR
-                for i in range(ncores + bool(library_remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
-                for i in range(1, library_nconfs + 1):
-                    CONF_NUMBER.put(i)
-                
-                temp_of_N = make_folder_or_cwd(
-                    linker_of.joinpath(f"{linkeridr_num}_{lidr_set}_N")
-                    )
-
-                log.info(S(f"Generating temporary disordered library for N-terminus of linker: {seq}"))  # noqa: E501
-
-                # prepares execution function
-                consume = partial(
-                    _build_conformers,
-                    fld_xyz=fld_coords_N,
-                    fld_struc=fStruct,
-                    disorder_case=disorder_cases[0],  # Treating N-term as N-IDR  # noqa: E501
-                    max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
-                    tolerance=dist_tolerance * 2,
-                    index=index,
-                    conformer_name=f"{linkeridr_num}_{lidr_set}_N",
-                    input_seq=seq,  # string
-                    output_folder=temp_of_N,
-                    nconfs=library_confs_per_core,  # int
-                    sidechain_parameters=sidechain_parameters,
-                    sidechain_method=sidechain_method,  # goes back to kwargs
-                    bgeo_strategy=bgeo_strategy,
-                    **kwargs,
-                    )
-
-                execute = partial(
-                    report_on_crash,
-                    consume,
-                    ROC_exception=Exception,
-                    ROC_folder=output_folder,
-                    ROC_prefix=_name,
-                    )
-
-                with Pool(ncores) as pool:
-                    imap = pool.imap(execute, range(ncores))
-                    for _ in imap:
-                        pass
-                    
-                if remaining_confs:
-                    execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
-                
-                log.info(f"Finished generating library for {seq}.")
-                log.info("Commencing next-seeker protocol for Linker-IDR...")
-                
-                # We need to make only new comparisons of files
-                # we haven't seen before
-                C_files = glob(str(linker_of) + "/*_C/*.pdb")
-                N_files = glob(str(linker_of) + "/*_N/*.pdb")
-                
-                all_combinations = list(product(C_files, N_files))
-                new_combinations = list(set(all_combinations) - set(prev_combinations))  # noqa: E501
-                prev_combinations = all_combinations
-                
-                tocheck_C = list(set([item[0] for item in new_combinations]))
-                tocheck_N = list(set([item[1] for item in new_combinations]))
-                
-                execute = partial(
-                    next_seeker,
-                    nterm_idr_lib=tocheck_N,
+                    fld_xyz=fld_coords,
+                    fld_struc=fld_struc,
+                    disorder_case=case,
                     max_clash=max_clash,
                     tolerance=dist_tolerance,
-                    output_folder=match_of,
+                    index=index,
+                    conformer_name="conformer_" + case,
+                    input_seq=seq,  # string
+                    output_folder=temp_of,
+                    nconfs=conformers_per_core,  # int
+                    sidechain_parameters=sidechain_parameters,
+                    sidechain_method=sidechain_method,  # goes back to kwargs
+                    bgeo_strategy=bgeo_strategy,
+                    **kwargs,
                     )
-                execute_pool = pool_function(execute, tocheck_C, ncores=ncores)
-                for _ in execute_pool:
-                    pass
-                
-                match_of_files = next(os.walk(match_of))[2]
-                num_files = len(match_of_files)
-                log.info(f"Generated {num_files} closed IDR models this run.")
-                lidr_set += 1
-            
-            linkeridr_num += 1
-            
-            all_C = glob(str(linker_of) + "/*_C/")
-            all_N = glob(str(linker_of) + "/*_N/")
-            
-            for i, c in enumerate(all_C):
-                shutil.rmtree(c)
-                shutil.rmtree(all_N[i])
 
-        else:
-            for i in range(ncores + bool(remaining_confs)):
-                RANDOMSEEDS.put(random_seed + i)
+                execute = partial(
+                    report_on_crash,
+                    consume,
+                    ROC_exception=Exception,
+                    ROC_folder=output_folder,
+                    ROC_prefix=_name,
+                    )
 
-            for i in range(1, nconfs + 1):
-                CONF_NUMBER.put(i)
+                start = time()
+                with Pool(ncores) as pool:
+                    imap = pool.imap(execute, range(ncores))
+                    for _ in imap:
+                        pass
 
-            # Use the second folded residue's backbone C-N-CA
-            # for rotation and alignment where the `C` atom
-            # is from the previous resiude
-            if case == disorder_cases[0]:  # N-IDR case
-                for j, atom in enumerate(fld_name):
-                    curr_seq = fld_seq[j]
+                if remaining_confs:
+                    execute(conformers_per_core * ncores, nconfs=remaining_confs)  # noqa: E501
 
-                    if curr_seq == first_seq + 1 and atom == "N":
-                        fld_term_idx["N"] = j
-                    elif curr_seq == first_seq + 1 and atom == "CA":
-                        fld_term_idx["CA"] = j
-                    elif curr_seq == first_seq and atom == "C":
-                        fld_term_idx["C"] = j
-                    elif curr_seq == first_seq + 2:
-                        break
-            elif case == disorder_cases[2]:  # C-IDR case
-                for j, _atom in enumerate(fld_name):
-                    k = len(fld_name) - 1 - j
-                    curr_seq = fld_seq[k]
-
-                    if curr_seq == last_seq and fld_name[k] == "N":
-                        fld_term_idx["N"] = k
-                    elif curr_seq == last_seq and fld_name[k] == "CA":
-                        fld_term_idx["CA"] = k
-                    elif curr_seq == last_seq - 1 and fld_name[k] == "C":
-                        fld_term_idx["C"] = k
-                    elif curr_seq == last_seq - 2:
-                        break
-                    
-            fld_Cxyz = fld_struc.data_array[fld_term_idx["C"]][cols_coords].astype(float)  # noqa: E501
-            fld_Nxyz = fld_struc.data_array[fld_term_idx["N"]][cols_coords].astype(float)  # noqa: E501
-            fld_CAxyz = fld_struc.data_array[fld_term_idx["CA"]][cols_coords].astype(float)  # noqa: E501
-            # Coordinates of boundary to stitch to later on
-            fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
-                        
-            populate_globals(
-                input_seq=seq,
-                bgeo_strategy=bgeo_strategy,
-                bgeo_path=bgeo_path,
-                forcefield=forcefields[forcefield],
-                **kwargs)
-
-            # create the temporary folders housing the disordered PDBs
-            # this folder will be deleted when everything is grafted together
-            temp_of = make_folder_or_cwd(
-                output_folder.joinpath(TEMP_DIRNAME + case)
-                )
-
-            log.info(S(f"Generating temporary disordered conformers for: {seq}"))  # noqa: E501
-            log.info(S(
-                "Please note that sequence will contain 2 extra residues "
-                "to facilitate reconstruction later on."
-                ))
-
-            fStruct = Structure(Path(folded_structure))
-            fStruct.build()
-
-            # prepares execution function
-            consume = partial(
-                _build_conformers,
-                fld_xyz=fld_coords,
-                fld_struc=fStruct,
-                disorder_case=case,
-                max_clash=max_clash,
-                tolerance=dist_tolerance,
-                index=index,
-                conformer_name="conformer_" + case,
-                input_seq=seq,  # string
-                output_folder=temp_of,
-                nconfs=conformers_per_core,  # int
-                sidechain_parameters=sidechain_parameters,
-                sidechain_method=sidechain_method,  # goes back to kwargs
-                bgeo_strategy=bgeo_strategy,
-                **kwargs,
-                )
-
-            execute = partial(
-                report_on_crash,
-                consume,
-                ROC_exception=Exception,
-                ROC_folder=output_folder,
-                ROC_prefix=_name,
-                )
-
-            start = time()
-            with Pool(ncores) as pool:
-                imap = pool.imap(execute, range(ncores))
-                for _ in imap:
-                    pass
-
-            if remaining_confs:
-                execute(conformers_per_core * ncores, nconfs=remaining_confs)
-        
-        log.info(f'{nconfs} {case} conformers built in {time() - start:.3f} seconds')  # noqa: E501
+            log.info(f'{nconfs} {case} conformers built in {time() - start:.3f} seconds')  # noqa: E501
 
     # After conformer construction and moving, time to graft structures together
     # - Keep an eye out for `col_chainID` and `col_segid` -> make all chain A
@@ -945,33 +1040,52 @@ def main(
     # - For good form, make sure `col_serial` is consistent as well
     # - When grafting remove the tether residue on donor chain
     # - Generate a tuple database of which pairs have already been generated
-    files = create_all_combinations(output_folder.joinpath(TEMP_DIRNAME), nconfs)  # noqa: E501
-    # TODO: check if stitching works with multiple cases
-    # Also need new protein with easy IDR closure in the /example folder
-    log.info("Stitching conformers onto the folded domain...")
-    consume = partial(
-        psurgeon,
-        fld_struc=Path(folded_structure),
-        case=DISORDER_CASES,
-        ranges=DISORDER_BOUNDS,
-        )
-    execute = partial(
-        report_on_crash,
-        consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
-    execute_pool = pool_function(execute, files, ncores=ncores)
+    if not stitching_off:
+        log.info("Creating combinations of IDRs for stitching process...")
+        log.info(S("Interchain clash-checking will be performed at this stage."))  # noqa: E501
+        chains = list(fld_chainseq.keys())
+        all_files = create_all_combinations(
+            output_folder.joinpath(TEMP_DIRNAME),
+            chains,
+            nconfs,
+            ncores
+            )
+        files = []
+        for i in range(len(list(all_files.values())[0])):
+            new_dict = {}
+            for key, value_list in all_files.items():
+                new_dict[key] = value_list[i]
 
-    for i, conf in enumerate(execute_pool):
-        struc = structure_to_pdb(conf)
-        output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
-        with open(output, 'w') as f:
-            for line in struc:
-                f.write(line + "\n")
+            files.append(new_dict.copy())
+        log.info("Stitching conformers onto the folded domain...")
+        if membrane:
+            log.info(S(
+                "Please note that the membrane was only used for clash-checking purposes. "  # noqa: E501
+                "The final stitched conformers will not have the membrane to save space."  # noqa: E501
+                ))
+        consume = partial(
+            psurgeon,
+            fld_struc=Path(folded_structure),
+            case=DISORDER_CASES,
+            ranges=DISORDER_BOUNDS,
+            )
+        execute = partial(
+            report_on_crash,
+            consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+        execute_pool = pool_function(execute, files, ncores=ncores)
+        
+        for i, conf in enumerate(execute_pool):
+            struc = structure_to_pdb(conf)
+            output = output_folder.joinpath(f"conformer_{i + 1}.pdb")
+            with open(output, 'w') as f:
+                for line in struc:
+                    f.write(line + "\n")
 
-    if not keep_temporary:
+    if not keep_temporary and not stitching_off:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
 
     ENERGYLOGSAVER.close()

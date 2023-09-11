@@ -137,7 +137,9 @@ class SeqOrFasta(argparse.Action):
             seq = value
         elif is_valid_fasta_file(value):
             seqdict = read_FASTAS_from_file_to_strings(value)
-            seq = list(seqdict.values())[0]
+            # Minor change made here to accommodate multiple FASTA
+            # sequences for multiple chains
+            seq = seqdict
         else:
             raise parser.error('Input sequence not valid.')
 
@@ -448,7 +450,12 @@ def add_argument_seq(parser):
     parser.add_argument(
         '-seq',
         '--input_seq',
-        help='The Conformer residue sequence. String or FASTA file.',
+        help=(
+            'The Conformer residue sequence. String or FASTA file. '
+            'If you have multiple chains please designate the chain ID '
+            'after the `>` and be sure to leave no blank lines. '
+            'A more detailed example can be found in the documentation.'
+            ),
         required=True,
         nargs='?',
         action=SeqOrFasta,

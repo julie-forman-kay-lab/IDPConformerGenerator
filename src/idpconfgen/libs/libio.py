@@ -463,6 +463,11 @@ def read_FASTAS_from_file_to_strings(fpath):
     Read FASTA sequences from file.
 
     FASTA is output as string.
+    
+    Note that there should be no blank spaces between different
+    sequences. The final return will be a dictionary where the
+    key value will be ">XYZ" header and the value will be a list
+    of individual residue letters ['X', 'Y', 'Z'].
     """
     fastad = read_FASTAS_from_file(fpath)
     return {key: ''.join(value) for key, value in fastad.items()}

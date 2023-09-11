@@ -91,11 +91,16 @@ def test_checkext(ext, args):
     assert result.e == args
 
 
+# Changed the expected value for fasta files to the
+# dictionary equivalent to handle multi-chain processing
 @pytest.mark.parametrize(
     'arg,expected',
     (
         ['ASDERTGYI', 'ASDERTGYI'],
-        [os.fspath(tcommons.fasta1.resolve()), 'ASDFGHKLQWERTYIP'],
+        [
+            os.fspath(tcommons.fasta1.resolve()),
+            {'>some_protein': 'ASDFGHKLQWERTYIP'}
+            ],
         ),
     )
 def test_SeqOrFasta(arg, expected):

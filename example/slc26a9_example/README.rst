@@ -44,8 +44,8 @@ to use the FASPR method for generating sidechains like so below.::
 
 From the ``.fasta`` file, the ``ldrs`` subclient will automatically identify the
 N-IDR, the C-IDR, and any IDRs missing between folded domains; and construct
-those. This command took approximately 1 hour on a single workstation with
-64 GB DDR4 RAM and 50 CPU threads (``-n 50``) clocked at 3.0 GHz.
+those. The speed of Linker-IDR generation varies with sequence length as well as its relative
+position to the folded domain.
 
 To guarantee no sidechain clashes, we recommend either lowering the steric-clash
 tolerance using the ``-tol`` flag above or generating backbone-only conformers first
@@ -65,6 +65,11 @@ from better parallelization that allows modeling longer IDRs in a shorter time
 (e.g., 221 residues in one or two days). Here, we explain how to use the
 modularity of IDPConformerGenerator to exploit its total capacity for modeling
 IDRs by writing two new Python scripts that import IDPConfGen machinery.
+
+For template PDB structures, please ensure they have the element name at the
+second last column in the PDB file. If you're unsure about the formatting, you can
+use the :code:`Export Molecule` feature in `PyMOL <https://pymol.org/>`_.
+The element name column will be automatically added.
 
 The logic behind the LDRS subclient for modeling and IDR connecting two folded
 domains assumes that we have an N-IDR-like case at the C-terminal region of the

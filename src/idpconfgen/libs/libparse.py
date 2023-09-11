@@ -485,6 +485,27 @@ def values_to_dict(values):
     return param_dict
 
 
+def convert_tuples_to_lists(data):
+    """
+    Recursively processes input data and converts it all to list of lists.
+
+    Parameter
+    ---------
+    data : list of tuple
+    
+    Return
+    ------
+    result : list of list
+    """
+    result = []
+    for item in data:
+        if isinstance(item, tuple):
+            result.append(convert_tuples_to_lists(item))
+        else:
+            result.append(item)
+    return result
+
+
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)

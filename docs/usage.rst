@@ -72,6 +72,17 @@ A Real Case Scenario
 Modeling Disordered Region Tails on a Folded Domain
 ---------------------------------------------------
 
+.. note::
+    
+    When modeling multi-chain complexes with the ``ldrs`` subclient,
+    the FASTA file format for the ``-seq`` parameter must be as follows with no
+    blank spaces.
+    
+    ``>A
+    Sequence for chain A
+    >B
+    Sequence for chain B``
+
 .. include:: ../example/cnot7_example/README.rst
     :start-after: .. start-description
 
@@ -79,6 +90,12 @@ Modeling Disordered Regions Within Folded Domains
 -------------------------------------------------
 
 .. include:: ../example/slc26a9_example/README.rst
+    :start-after: .. start-description
+
+Modeling Disordered Regions in a Multi-Chain Protein Complex
+------------------------------------------------------------
+
+.. include:: ../example/complex_example/README.rst
     :start-after: .. start-description
 
 Exploring IDPConfGen Analysis Functions

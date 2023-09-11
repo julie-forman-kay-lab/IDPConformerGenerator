@@ -12,17 +12,20 @@ USAGE:
         --source <PATH_TO_SUBFOLDERS> \
         --destination <PATH_TO_OUTPUT> \
         --prefix <CUSTOM_NAME> \
+        --ncores <
         --delete
 """
 import argparse
 import glob
 import shutil
+from functools import partial
 from pathlib import Path
 
 from idpconfgen import log
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import make_folder_or_cwd
-from idpconfgen.logger import S, T, init_files
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 LOGFILESNAME = '.idpconfgen_merge'
@@ -78,12 +81,40 @@ ap.add_argument(
     action='store_true',
     )
 
+libcli.add_argument_ncores(ap)
+
+
+def copy_paste(combo, destination, prefix):
+    """
+    Copy file and names them for batch processing.
+
+    Parameters
+    ----------
+    combo : tuple
+        Has the count and file path as the first and second element
+    
+    destination : str
+        Destination path as a string
+    
+    prefix : str
+        Prefix for file to copy
+    """
+    count = combo[0]
+    path = combo[1]
+    
+    # using copy2 to preserve metadata and file permissions
+    try:
+        shutil.copy2(path, Path(destination, f'{prefix}_{count}.pdb'))
+    except OSError as e:
+        log.info(S(f'Error: {path} : {e.strerror}'))
+
 
 def main(
         source,
         destination=None,
         prefix='conformer',
         delete=False,
+        ncores=1,
         **kwargs,
         ):
     """
@@ -103,11 +134,11 @@ def main(
     delete : bool, optional
         Flag to turn on deletion of conformers and subfolders of interest.
         Defaults to True.
+    
+    ncores : int, optional
+        Number of workers to use.
     """
     init_files(log, LOGFILESNAME)
-    
-    # initialize some variables
-    count = 0
 
     if destination is None:
         destination = source
@@ -120,17 +151,27 @@ def main(
     # get all the paths to the subfolders
     subpaths = list(glob.glob(f'{source}/*/'))
     pdbpaths = list(glob.glob(f'{source}/*/*.pdb', recursive=True))
-
+    count_and_path = []
+    for i, path in enumerate(pdbpaths):
+        count_and_path.append((i + 1, path))
     log.info(S('done'))
 
     log.info(S(f'Copying {len(pdbpaths)} files with prefix {prefix}...'))
-    for path in pdbpaths:
-        # using copy2 to preserve metadata and file permissions
-        try:
-            shutil.copy2(path, Path(destination, f'{prefix}_{count}.pdb'))
-        except OSError as e:
-            log.info(S(f'Error: {path} : {e.strerror}'))
-        count += 1
+    consume = partial(
+        copy_paste,
+        destination=destination,
+        prefix=prefix,
+        )
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_folder=destination,
+        ROC_prefix=_name
+        )
+    execute_pool = pool_function(execute, count_and_path, ncores=ncores)
+    for _ in execute_pool:
+        pass
     log.info(S('done'))
 
     if delete:
