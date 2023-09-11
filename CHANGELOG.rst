@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.3 (2023-09-11)
+------------------------------------------------------------
+
 * Add select ionic radii from CRC Handbook of Chemistry and Physics, 82nd Ed
 * Update ``merge`` module to use multiprocessing
 * Increase efficiency of clash-checking algorithm in ``ldrs_helper.py``
