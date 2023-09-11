@@ -477,7 +477,8 @@ def main(
     init_files(log, Path(output_folder, LOGFILESNAME))
     log.info(T('starting the building process'))
     # We only are interested in the first (one) sequence
-    input_seq = list(input_seq.values())[0]
+    if type(input_seq) is dict:
+        input_seq = list(input_seq.values())[0]
     log.info(S(f'input sequence: {input_seq}'))
     
     if len(input_seq) > 300:
