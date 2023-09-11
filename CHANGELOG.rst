@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Fix tests for ``cli_build.py`` that arose from #245
+
 v0.7.4 (2023-09-11)
 ------------------------------------------------------------
 
