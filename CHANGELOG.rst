@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add ``--long`` and ``--long-ranges`` to the ``build`` subclient to build long (300+ AA) IDPs much quicker
+
 v0.7.3 (2023-09-11)
 ------------------------------------------------------------
 
