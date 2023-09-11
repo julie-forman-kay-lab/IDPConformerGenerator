@@ -509,3 +509,61 @@ def convert_tuples_to_lists(data):
 get_trimer_seq_njit = njit(get_trimer_seq)
 get_seq_chunk_njit = njit(get_seq_chunk)
 get_seq_next_residue_njit = njit(get_seq_next_residue)
+
+
+def split_into_chunks(string, size=150):
+    """
+    Split a string into chunks of characters.
+    
+    The last chunk may be longer or shoter.
+    
+    Parameters
+    ----------
+    string : str
+        String of characters to split
+    
+    size : int
+        Integer value of chunk sizes.
+        Defaults to 200.
+    
+    Returns
+    -------
+    chunks : list
+        List of strings split into chunks of
+        pre-determined sizes.
+    """
+    chunks = []
+    while len(string) > size:
+        chunks.append(string[:size])
+        string = string[size:]
+    if len(string) > 0:
+        chunks.append(string)
+    return chunks
+
+
+def split_by_ranges(seq, ranges):
+    """
+    Split a string into substrings based on a list of custom ranges.
+    
+    Parameters
+    ----------
+    seq : str
+        String or sequence of desire to be split.
+    
+    ranges : list of int
+        Integers represent the index of which the split will occur.
+        Each value is not inclusive.
+    
+    Returns
+    -------
+    chunks : list
+        List of split strings at their desired locations.
+    """
+    chunks = []
+    start = 0
+    for end in ranges:
+        chunks.append(seq[start:end])
+        start = end
+    if start < len(seq):
+        chunks.append(seq[start:])
+    return chunks
