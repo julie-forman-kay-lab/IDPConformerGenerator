@@ -49,10 +49,10 @@ from idpconfgen.libs.libpdb import (
     )
 from idpconfgen.libs.libstructure import (
     Structure,
-    col_chainID, 
+    col_chainID,
     col_name,
-    col_resName,
     col_record,
+    col_resName,
     cols_coords,
     gen_empty_structure_data_array,
     )
@@ -934,6 +934,7 @@ def bgeo_reduce(bgeo):
 def calc_intrachain_ca_contacts(pdb, max_dist):
     """
     Find the residues that are in contact with each other.
+    
     Parameters
     ----------
     pdb : Path
@@ -942,6 +943,7 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
     max_dist : int or float
         Maximum distance allowed between CA to be considered a contact.
         Default is 6.
+    
     Returns
     -------
     contacts : dict
@@ -962,7 +964,8 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
 
     num_residues = len(ca_coordinates)
     contacts = []
-    counter=0
+    counter = 0
+    
     for i in range(num_residues):
         for j in range(i + 1, num_residues):
             ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
@@ -991,6 +994,7 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
 
 
 def remove_empty_lists(d):
+    """Delete empty lists from dictionary of lists."""
     for key, value in list(d.items()):
         if isinstance(value, dict):
             remove_empty_lists(value)
@@ -1039,7 +1043,7 @@ def calc_interchain_ca_contacts(pdb, max_dist):
         Maximum distance between CA to be considered a contact.
     
     Returns
-    -------    
+    -------
     chain_contacts : dict
         Dictionary of pairs of sequences, CA distances, and torsion angles.
     """
@@ -1047,7 +1051,7 @@ def calc_interchain_ca_contacts(pdb, max_dist):
     # value contains another dictionary
     # secondary dictionary of chain combos in tuple e.g. ('A', 'B')
     # contain two dictionaries of sequence, torsions, and CA_distances
-    with open (pdb) as f:
+    with open(pdb) as f:
         pdb_raw = f.read()
     pdbid, _fasta = get_fasta_from_PDB([pdb, pdb_raw])
 
@@ -1085,7 +1089,7 @@ def calc_interchain_ca_contacts(pdb, max_dist):
 
         backbone_struc = []
         for i, atom in enumerate(new_struc[:, col_name]):
-            if new_struc[:, col_record][i] == 'ATOM' and (atom == "N" or atom == "CA" or atom == "C"):
+            if new_struc[:, col_record][i] == 'ATOM' and (atom == "N" or atom == "CA" or atom == "C"):  # noqa: E501
                 backbone_struc.append(new_struc[i].tolist())
 
         if len(backbone_struc) == 0:
@@ -1094,12 +1098,6 @@ def calc_interchain_ca_contacts(pdb, max_dist):
         chain_struc[chain] = new_struc
         chain_tors[chain] = {}
         backbone_struc = np.array(backbone_struc)
-        #backbone_tors = calc_torsion_angles(backbone_struc[:, cols_coords].astype(float))
-
-        #chain_tors[chain]['omega'] = backbone_tors[1::3].tolist()
-        #chain_tors[chain]['phi'] = backbone_tors[2::3].tolist()
-        #chain_tors[chain]['psi'] = backbone_tors[::3].tolist()
-
 
     chain_combo = [comb for comb in combinations(list(chain_struc.keys()), 2)]
 
@@ -1128,12 +1126,10 @@ def calc_interchain_ca_contacts(pdb, max_dist):
         chain_contacts[combo] = {
             chainID_1: {
                 "fasta": [],
-                #"torsions": [],
                 "ca_dist": [],
                 },
             chainID_2: {
                 "fasta": [],
-                #"torsions": [],
                 },
             }
         chain1_CA_coords = chain1_CA_arr[:, cols_coords].astype(float)
@@ -1146,35 +1142,22 @@ def calc_interchain_ca_contacts(pdb, max_dist):
                 if ca_dist <= max_dist:
                     counter += 1
                     chain_dist = []
-                    #torsions1 = []
-                    #torsions2 = []
                     chain1_seq = ""
                     chain2_seq = ""
                     for k in range(i - 2, i + 3):
                         if 0 <= k < chain1_nres:
-                            ca_dist = np.linalg.norm(chain1_CA_coords[k] - chain2_CA_coords[j])
+                            ca_dist = np.linalg.norm(chain1_CA_coords[k] - chain2_CA_coords[j])  # noqa: E501
                             chain_dist.append(ca_dist)
-                            res1 = aa3to1.get(chain1_CA_arr[:, col_resName][k], "X")
+                            res1 = aa3to1.get(chain1_CA_arr[:, col_resName][k], "X")  # noqa: E501
                             chain1_seq += res1
-                            #omega = chain_tors[chainID_1]['omega'][k - 1]
-                            #phi = chain_tors[chainID_1]['phi'][k - 1]
-                            #psi = chain_tors[chainID_1]['psi'][k - 1]
-                            #torsions1.append((omega, phi, psi))
                     for k in range(j - 2, j + 3):
                         if 0 <= k < chain2_nres:
-                            res2 = aa3to1.get(chain2_CA_arr[:, col_resName][k], "X")
+                            res2 = aa3to1.get(chain2_CA_arr[:, col_resName][k], "X")  # noqa: E501
                             chain2_seq += res2
-                            #omega = chain_tors[chainID_2]['omega'][k - 1]
-                            #phi = chain_tors[chainID_2]['phi'][k - 1]
-                            #si = chain_tors[chainID_2]['psi'][k - 1]
-                            #torsions2.append((omega, phi, psi))
-                    chain_contacts[combo][chainID_1]["fasta"].append(chain1_seq)
-                    chain_contacts[combo][chainID_1]["ca_dist"].append(chain_dist)
-                    #chain_contacts[combo][chainID_1]["torsions"].append(torsions1)
-                    chain_contacts[combo][chainID_2]["fasta"].append(chain2_seq)
-                    #chain_contacts[combo][chainID_2]["torsions"].append(torsions2)
-                    assert len(chain1_seq) == len(chain_dist) # == len(torsions1)
-                    #assert len(chain2_seq) == len(torsions2)
+                    chain_contacts[combo][chainID_1]["fasta"].append(chain1_seq)  # noqa: E501
+                    chain_contacts[combo][chainID_1]["ca_dist"].append(chain_dist)  # noqa: E501
+                    chain_contacts[combo][chainID_2]["fasta"].append(chain2_seq)  # noqa: E501
+                    assert len(chain1_seq) == len(chain_dist)
 
     if counter == 0:
         return False

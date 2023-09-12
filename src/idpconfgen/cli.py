@@ -20,6 +20,7 @@ from idpconfgen import (
     cli_bgeo,
     cli_bgeodb,
     cli_build,
+    cli_contacts,
     cli_csssconv,
     cli_dssppii,
     cli_fastaext,
@@ -38,7 +39,6 @@ from idpconfgen import (
     cli_stats,
     cli_torsions,
     cli_torsionsJ,
-    cli_contacts,
     cli_validate,
     log,
     )

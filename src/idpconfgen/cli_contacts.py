@@ -1,5 +1,6 @@
-"""
-Finds CA contacts from PDBs.
+"""# noqa: D205 D400 D411
+Find intramolecular and intermolecular CA contacts from PDBs.
+
 PROTOCOL:
 1. Reads backbone coordinates (N, CA, C) from PDB files.
 2. Calculates CA-CA distances within a chain and between chains.
@@ -14,9 +15,11 @@ PROTOCOL:
     in PDB format.
 5. If 'source' JSON file is given, updates that file with the new information.
     Preexisting keys (input file names) are deleted.
+
 CONTROLLED CHECKS:
 The same checks are as implemented in `torsions`.
 Failed PDBs are registered in `.rpr_on_crash` files and are ignored.
+
 USAGE:
     $ idpconfgen contacts [PDBS]
     $ idpconfgen contacts [PDBS] -sc file.json -o mycontacts.json -n
@@ -27,19 +30,20 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libhigherlevel import (
+    calc_interchain_ca_contacts,
+    calc_intrachain_ca_contacts,
+    )
 from idpconfgen.libs.libio import (
     extract_from_tar,
-    read_path_bundle,
     read_dictionary_from_disk,
+    read_path_bundle,
     save_dict_to_json,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import pop_difference_with_log
-from idpconfgen.libs.libhigherlevel import (
-    calc_intrachain_ca_contacts,
-    calc_interchain_ca_contacts,
-    )
 from idpconfgen.logger import S, T, init_files, report_on_crash
+
 
 LOGFILESNAME = '.idpconfgen_contacts'
 TMPDIR = '__tmpcontacts__'
@@ -105,6 +109,7 @@ def main(
         ):
     """
     Execute main client logic.
+    
     Parameters
     ----------
     pdb_files : str or Path, required
