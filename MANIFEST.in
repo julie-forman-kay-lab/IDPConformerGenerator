@@ -9,7 +9,7 @@ prune tests
 include .bumpversion.cfg
 include .coveragerc
 include .editorconfig
-include .readthedocs.yml
+include .readthedocs.yaml
 include requirements.yml
 include requirements.txt
 include pyproject.toml
