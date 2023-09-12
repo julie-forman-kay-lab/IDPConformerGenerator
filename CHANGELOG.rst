@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
+
 v0.7.5 (2023-09-11)
 ------------------------------------------------------------
 
