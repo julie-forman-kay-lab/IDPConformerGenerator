@@ -4,7 +4,7 @@ Find intramolecular and intermolecular CA contacts from PDBs.
 PROTOCOL:
 1. Reads backbone coordinates (N, CA, C) from PDB files.
 2. Calculates CA-CA distances within a chain and between chains.
-3. If CA-CA distances are found to be between 5A (default) and the atoms are
+3. If CA-CA distances are found to be between 6A (default) and the atoms are
     not within 5 residues apart (default). Residues from either side of the
     CA are saved.
     * If consecutive residues observe 5A interactions, take the residue with
@@ -68,18 +68,11 @@ ap.add_argument(
     help=(
         "Maximum distance in angstroms allowed for a contact between "
         "residues. Defaults to 6 for intrachain and 12 for interchain."
+        "Example: --distance 5 10 or --distance 0 10 for only interchain."
         ),
     type=int,
-    )
-
-ap.add_argument(
-    '-inter',
-    '--interchain',
-    help=(
-        "Switches mode to interchain contacts."
-        "Defaults to False, only considers intrachain contacts."
-        ),
-    action='store_true',
+    nargs="+",
+    default=[6, 12],
     )
 
 libcli.add_argument_source(ap)
@@ -99,8 +92,7 @@ ap.add_argument(
 
 def main(
         pdb_files,
-        distance=None,
-        interchain=False,
+        distance=(6, 12),
         source=None,
         output=None,
         ncores=1,
@@ -115,16 +107,19 @@ def main(
     pdb_files : str or Path, required
         Location for PDB files to operate on, can be within a folder
         or inside .TAR file.
-    distance : int, optional
+
+    distance : tuple, optional
         Maximum distance in angstroms to be considered a contact.
         Defaults to 6 for intrachain and 12 for interchain.
-    
+        
     source : string or Path, optional
         If given, updates a preexisting torsions.JSON file.
         Defaults to `None`.
+
     output : string or Path, optional
         If given prints output to that file, else prints to console.
         Defaults to `None`.
+
     ncores : int
         The numbers of cores to use.
     """
@@ -135,14 +130,17 @@ def main(
     output = output or 'contacts.json'
     if not output.endswith('.json'):
         raise ValueError('Output file should have `.json` extension.')
-
-    if distance is None:
-        if interchain:
-            distance = 12
-        else:
-            distance = 6
-
-    log.info(T('Extracting torsion angles'))
+    
+    if len(distance) >= 2:
+        log.info(S(
+            f"Taking only the firs two values of {distance} for intramolecular"
+            " and intermolecular distance maxima respectively."
+            ))
+        inter_dist = distance[1]
+    elif len(distance) < 2:
+        inter_dist = 12
+    intra_dist = distance[0]
+    
     init_files(log, LOGFILESNAME)
 
     if source:
@@ -157,25 +155,17 @@ def main(
         _istarfile = False
     log.info(S('done'))
 
-    log.info(T('preparing task execution'))
-    if interchain:
-        consume = partial(
-            calc_interchain_ca_contacts,
-            max_dist=distance,
-            )
-    else:
-        consume = partial(
-            calc_intrachain_ca_contacts,
-            max_dist=distance,
-            )
-
+    log.info(T(f'Finding intramolecular contacts of Cα within {intra_dist} Å'))
+    consume = partial(
+        calc_intrachain_ca_contacts,
+        max_dist=intra_dist,
+        )
     execute = partial(
         report_on_crash,
         consume,
         ROC_exception=Exception,
         ROC_prefix=_name,
         )
-
     contacts_results = {}
     final_count = 0
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
@@ -186,9 +176,32 @@ def main(
         contacts = result[1]
         final_count += result[2]
         contacts_results[pdbid] = contacts
+        contacts_results[pdbid] = {}
+        contacts_results[pdbid]["intra"] = contacts
+
+    log.info(T(f'Finding intermolecular contacts of Cα within {inter_dist} Å'))
+    consume = partial(
+        calc_interchain_ca_contacts,
+        max_dist=inter_dist,
+        )
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_prefix=_name,
+        )
+    execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
+    for result in execute_pool:
+        if result is False:
+            continue
+        pdbid = result[0]
+        contacts = result[1]
+        final_count += result[2]
+        contacts_results[pdbid] = {}
+        contacts_results[pdbid]["inter"] = contacts
 
     log.info(S('done'))
-    log.info(S(f'Total number of {final_count} contacts found.'))
+    log.info(f'Total number of {final_count} contacts found.')
 
     if source:
         pop_difference_with_log(database_dict, contacts_results)

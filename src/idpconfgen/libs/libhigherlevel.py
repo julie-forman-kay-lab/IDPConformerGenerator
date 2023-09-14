@@ -968,26 +968,24 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
     
     for i in range(num_residues):
         for j in range(i + 1, num_residues):
-            ca_dist = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
-            chain1 = []
-            chain2 = []
+            d_ca = np.linalg.norm(np.array(ca_coordinates[i]) - np.array(ca_coordinates[j]))  # noqa: E501
+            ca_dists = []
             chain1_seq = ""
             chain2_seq = ""
             # Euclidian distance must be within range (default is 6 A)
             # residues must be at least 5 apart
-            if ca_dist <= max_dist and j > i + 4:
+            if d_ca <= max_dist and j > i + 4:
                 for k in range(i - 2, i + 3):
                     if 0 <= k < num_residues:
-                        ca_dist = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
-                        chain1.append((k, ca_dist))
+                        d_ca = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
+                        ca_dists.append(d_ca)
                         chain1_seq += fasta[k]
 
                 for k in range(j - 2, j + 3):
                     if 0 <= k < num_residues:
-                        chain2.append(k)
                         chain2_seq += fasta[k]
 
-                contacts.append({chain1_seq: chain1, chain2_seq: chain2})
+                contacts.append({chain2_seq: [chain1_seq, ca_dists]})
                 counter += 1
 
     return pdbid, contacts, counter
