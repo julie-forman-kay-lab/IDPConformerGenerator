@@ -133,7 +133,7 @@ def main(
     
     if len(distance) >= 2:
         log.info(S(
-            f"Taking only the firs two values of {distance} for intramolecular"
+            f"Taking only the first two values of {distance} for intramolecular"
             " and intermolecular distance maxima respectively."
             ))
         inter_dist = distance[1]
@@ -167,18 +167,18 @@ def main(
         ROC_prefix=_name,
         )
     contacts_results = {}
-    final_count = 0
+    count = 0
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
     for result in execute_pool:
         if result is False:
             continue
         pdbid = result[0]
         contacts = result[1]
-        final_count += result[2]
+        count += result[2]
         contacts_results[pdbid] = contacts
         contacts_results[pdbid] = {}
         contacts_results[pdbid]["intra"] = contacts
-
+    log.info(f'{count} intramolecular contacts found.')
     log.info(T(f'Finding intermolecular contacts of Cα within {inter_dist} Å'))
     consume = partial(
         calc_interchain_ca_contacts,
@@ -191,22 +191,25 @@ def main(
         ROC_prefix=_name,
         )
     execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
+    count = 0
     for result in execute_pool:
         if result is False:
             continue
         pdbid = result[0]
         contacts = result[1]
-        final_count += result[2]
+        count += result[2]
         contacts_results[pdbid] = {}
         contacts_results[pdbid]["inter"] = contacts
-
+    log.info(f'{count} intermolecular contacts found.')
     log.info(S('done'))
-    log.info(f'Total number of {final_count} contacts found.')
 
     if source:
         pop_difference_with_log(database_dict, contacts_results)
         for key, value in contacts_results.items():
-            database_dict[key].update(value)
+            try:
+                database_dict[key].update(value)
+            except KeyError:
+                continue
         save_dict_to_json(database_dict, output=output)
     else:
         save_dict_to_json(contacts_results, output=output)
