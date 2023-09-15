@@ -30,15 +30,16 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libhigherlevel import (
-    calc_interchain_ca_contacts,
-    calc_intrachain_ca_contacts,
-    )
 from idpconfgen.libs.libio import (
     extract_from_tar,
     read_dictionary_from_disk,
     read_path_bundle,
     save_dict_to_json,
+    )
+from idpconfgen.libs.libmultichain import (
+    calc_interchain_ca_contacts,
+    calc_intrachain_ca_contacts,
+    group_chains,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import pop_difference_with_log
@@ -133,8 +134,8 @@ def main(
     
     if len(distance) >= 2:
         log.info(S(
-            f"Taking only the first two values of {distance} for intramolecular"
-            " and intermolecular distance maxima respectively."
+            f"Taking the first two Å values of {distance} for intramolecular"
+            " and intermolecular distance limit respectively."
             ))
         inter_dist = distance[1]
     elif len(distance) < 2:
@@ -178,8 +179,10 @@ def main(
         contacts_results[pdbid] = contacts
         contacts_results[pdbid] = {}
         contacts_results[pdbid]["intra"] = contacts
-    log.info(f'{count} intramolecular contacts found.')
+    log.info(f'Total intramolecular contacts: {count} found.')
+    
     log.info(T(f'Finding intermolecular contacts of Cα within {inter_dist} Å'))
+    pdb_grouped = group_chains(pdbs2operate)
     consume = partial(
         calc_interchain_ca_contacts,
         max_dist=inter_dist,
@@ -190,17 +193,19 @@ def main(
         ROC_exception=Exception,
         ROC_prefix=_name,
         )
-    execute_pool = pool_function(execute, pdbs2operate, ncores=ncores)
+    execute_pool = pool_function(execute, pdb_grouped, ncores=ncores)
     count = 0
+    contacts_results = {}
+    # TODO: modify handling of return data if necessary
     for result in execute_pool:
         if result is False:
             continue
-        pdbid = result[0]
-        contacts = result[1]
+        pdbids = result[0]
         count += result[2]
-        contacts_results[pdbid] = {}
-        contacts_results[pdbid]["inter"] = contacts
-    log.info(f'{count} intermolecular contacts found.')
+        for i, ids in enumerate(pdbids):
+            contacts_results[ids] = {}
+            contacts_results[ids]["inter"] = result[1][i]
+    log.info(f'Total intermolecular contacts: {count} found.')
     log.info(S('done'))
 
     if source:
