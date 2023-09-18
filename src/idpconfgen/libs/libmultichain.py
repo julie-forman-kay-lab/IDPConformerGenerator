@@ -310,3 +310,63 @@ def calc_interchain_ca_contacts(pdb_groups, max_dist):
         return False
     
     return pdb_ids, chain_contacts, counter
+
+
+def count_substring_occurrences(substring, string):
+    """Count the number of occurences of a sub-sequence within a sequence."""
+    count = 0
+    start = 0
+    while start < len(string):
+        start = string.find(substring, start)
+        if start == -1:
+            break
+        count += 1
+        start += 1
+    return count
+
+
+def contact_heatmap(database, sequence):
+    """
+    Generate a matrix of the sequence against database of pairs of contacts.
+    
+    Parameters
+    ----------
+    database : list of dict
+        Minimized version of the database that only contains
+        information of the sequence pairs. There will also be
+        positional information so matches can be back-mapped
+        to the full database.
+    
+    sequence : str
+        Input protein sequence
+
+    plot : Bool
+        Whether or not to plot the heatmap
+    
+    Returns
+    -------
+    positions : list
+        List of positions corresponding to input database
+    
+    matrix : np.ndarray
+        Disitrubtion matrix of all the matches and weights
+    """
+    num_pairs = len(database)
+    matrix_size = (num_pairs, 1)
+    matrix = np.zeros(matrix_size)
+    
+    positions = []
+    
+    for i, pair_dict in enumerate(database):
+        for seq1, seq2 in pair_dict.items():
+            weighted_score = 0
+            for frag1 in seq1:
+                for frag2 in seq2:
+                    weighted_score += \
+                        count_substring_occurrences(frag1, sequence) * \
+                        count_substring_occurrences(frag2, sequence)
+            
+            matrix[i, 0] = weighted_score
+            positions.append((i, weighted_score))
+    
+    return matrix, positions
