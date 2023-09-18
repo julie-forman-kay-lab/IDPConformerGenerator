@@ -437,20 +437,6 @@ def remove_empty_keys(ddict):
     consume(map(ddict.pop, empty_keys))
 
 
-def remove_empty_lists(ddict):
-    """Delete empty lists from dictionary of lists."""
-    # TODO: Remove this function if not needed
-    for key, value in list(ddict.items()):
-        if isinstance(value, dict):
-            remove_empty_lists(value)
-            if not value:
-                ddict.pop(key)
-        elif isinstance(value, list):
-            if not value:
-                ddict.pop(key)
-    return ddict
-
-
 def values_to_dict(values):
     """
     Generalization of converting parameters to dict.

@@ -1,5 +1,6 @@
 """Functions for recognizing and processing multiple protein chains."""
 from difflib import SequenceMatcher
+from itertools import combinations
 
 import numpy as np
 
@@ -171,15 +172,18 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
             # Euclidian distance must be within range (default is 6 A)
             # residues must be at least 5 apart
             if d_ca <= max_dist and j > i + 4:
-                for k in range(i - 2, i + 3):
-                    if 0 <= k < num_residues:
-                        d_ca = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
-                        ca_dists.append(d_ca)
-                        chain1_seq += fasta[k]
+                try:
+                    for k in range(i - 2, i + 3):
+                        if 0 <= k < num_residues:
+                            d_ca = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
+                            ca_dists.append(d_ca)
+                            chain1_seq += fasta[k]
 
-                for k in range(j - 2, j + 3):
-                    if 0 <= k < num_residues:
-                        chain2_seq += fasta[k]
+                    for k in range(j - 2, j + 3):
+                        if 0 <= k < num_residues:
+                            chain2_seq += fasta[k]
+                except IndexError:
+                    return False
 
                 contacts.append({chain2_seq: [chain1_seq, ca_dists]})
                 counter += 1
@@ -190,14 +194,14 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
     return pdbid, contacts, counter
 
 
-def calc_interchain_ca_contacts(pdb, max_dist):
+def calc_interchain_ca_contacts(pdb_groups, max_dist):
     """
     Find CA contacts below a certain distance between different chains.
     
     Returns contact information based on specific chains.
-    Has an additional datapoint compared to intrachain ca contacts.
+    Has an additional datapoint compared to intrachain CA contacts.
     
-    Format of return:
+    Format of chain_contacts:
     [
         {
             "SEQUENCE":[
@@ -236,13 +240,71 @@ def calc_interchain_ca_contacts(pdb, max_dist):
     counter : int
         Number of intermolecular contacts.
     """
-    chain_contacts = []
+    chain_contacts = {}
     counter = 0
     pdb_ids = []
+    pdb_strucs = {}
     
-    # TODO: when making comparisons, don't make comparisons
-    # between different segments of the same chain.
-    # We need to keep things between unique chains.
+    for path in pdb_groups:
+        struc = Structure(path)
+        struc.build()
+        struc_arr = struc.data_array
+        chain = path.stem[5]
+        seg = path.stem[10]
+        pdb_strucs[chain + seg] = (struc_arr, path)
+    
+    chains = list(pdb_strucs.keys())
+    chain_combos = [combo for combo in combinations(chains, 2) if combo[0][0] != combo[1][0]]  # noqa: E501
+    
+    for combo in chain_combos:
+        c1 = combo[0]
+        c2 = combo[1]
+        c1_arr = pdb_strucs[c1][0]
+        c2_arr = pdb_strucs[c2][0]
+        c1_path = pdb_strucs[c1][1]
+        c2_path = pdb_strucs[c2][1]
+        
+        with open(c1_path) as f1:
+            c1_raw = f1.read()
+        c1_pdbid, c1_fasta = get_fasta_from_PDB([c1_path, c1_raw])
+        with open(c2_path) as f2:
+            c2_raw = f2.read()
+        c2_pdbid, c2_fasta = get_fasta_from_PDB([c2_path, c2_raw])
+        
+        c1_ca_arr = np.array([c1_arr[i] for i, data in enumerate(c1_arr[:, col_name]) if data == 'CA'])  # noqa: E501
+        c1_ca_coords = c1_ca_arr[:, cols_coords].astype(float)
+        c2_ca_arr = np.array([c2_arr[i] for i, data in enumerate(c2_arr[:, col_name]) if data == 'CA'])  # noqa: E501
+        c2_ca_coords = c2_ca_arr[:, cols_coords].astype(float)
+        
+        c1_res_tot = len(c1_ca_coords)
+        c2_res_tot = len(c2_ca_coords)
+
+        for i in range(c1_res_tot):
+            for j in range(c2_res_tot):
+                d_ca = np.linalg.norm(np.array(c1_ca_coords[i]) - np.array(c2_ca_coords[j]))  # noqa: E501
+                ca_dists = []
+                chain1_seq = ""
+                chain2_seq = ""
+                # Euclidian distance must be within range (default is 12 A)
+                if d_ca <= max_dist:
+                    try:
+                        for k in range(i - 2, i + 3):
+                            if 0 <= k < c1_res_tot:
+                                d_ca = np.linalg.norm(np.array(c1_ca_coords[k]) - np.array(c2_ca_coords[j]))  # noqa: E501
+                                ca_dists.append(d_ca)
+                                chain1_seq += c1_fasta[k]
+
+                        for k in range(j - 2, j + 3):
+                            if 0 <= k < c2_res_tot:
+                                chain2_seq += c2_fasta[k]
+                    except IndexError:
+                        return False
+                    
+                    if c1_pdbid not in chain_contacts:
+                        chain_contacts[c1_pdbid] = []
+                    chain_contacts[c1_pdbid].append({chain1_seq: [c2_pdbid, chain2_seq, ca_dists]})  # noqa: E501
+                    pdb_ids.append(c1_pdbid)
+                    counter += 1
     
     if counter == 0:
         return False

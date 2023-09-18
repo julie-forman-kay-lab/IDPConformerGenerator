@@ -42,7 +42,6 @@ from idpconfgen.libs.libmultichain import (
     group_chains,
     )
 from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libparse import pop_difference_with_log
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -134,7 +133,7 @@ def main(
     
     if len(distance) >= 2:
         log.info(S(
-            f"Taking the first two Å values of {distance} for intramolecular"
+            f"Taking the first two values of {distance} Å for intramolecular"
             " and intermolecular distance limit respectively."
             ))
         inter_dist = distance[1]
@@ -155,7 +154,7 @@ def main(
         pdbs2operate = list(read_path_bundle(pdb_files, ext='pdb'))
         _istarfile = False
     log.info(S('done'))
-
+    
     log.info(T(f'Finding intramolecular contacts of Cα within {intra_dist} Å'))
     consume = partial(
         calc_intrachain_ca_contacts,
@@ -195,21 +194,21 @@ def main(
         )
     execute_pool = pool_function(execute, pdb_grouped, ncores=ncores)
     count = 0
-    contacts_results = {}
-    # TODO: modify handling of return data if necessary
+
     for result in execute_pool:
         if result is False:
             continue
         pdbids = result[0]
         count += result[2]
-        for i, ids in enumerate(pdbids):
-            contacts_results[ids] = {}
-            contacts_results[ids]["inter"] = result[1][i]
+        for _, ids in enumerate(pdbids):
+            if ids not in contacts_results:
+                contacts_results[ids] = {}
+            contacts_results[ids]["inter"] = result[1][ids]
     log.info(f'Total intermolecular contacts: {count} found.')
     log.info(S('done'))
 
+    log.info('Writing new database to disk...')
     if source:
-        pop_difference_with_log(database_dict, contacts_results)
         for key, value in contacts_results.items():
             try:
                 database_dict[key].update(value)
@@ -218,6 +217,7 @@ def main(
         save_dict_to_json(database_dict, output=output)
     else:
         save_dict_to_json(contacts_results, output=output)
+    log.info(S('done'))
 
     if _istarfile:
         shutil.rmtree(tmpdir)
