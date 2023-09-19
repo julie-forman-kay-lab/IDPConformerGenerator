@@ -1,6 +1,7 @@
 """Functions for recognizing and processing multiple protein chains."""
 from difflib import SequenceMatcher
 from itertools import combinations
+from math import ceil, floor
 
 import numpy as np
 
@@ -172,20 +173,21 @@ def calc_intrachain_ca_contacts(pdb, max_dist):
             # Euclidian distance must be within range (default is 6 A)
             # residues must be at least 5 apart
             if d_ca <= max_dist and j > i + 4:
-                try:
-                    for k in range(i - 2, i + 3):
-                        if 0 <= k < num_residues:
-                            d_ca = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
-                            ca_dists.append(d_ca)
-                            chain1_seq += fasta[k]
+                c1_count = 0
+                for k in range(i - 2, i + 3):
+                    if 0 <= k < num_residues:
+                        d_ca = np.linalg.norm(np.array(ca_coordinates[k]) - np.array(ca_coordinates[j]))  # noqa: E501
+                        ca_dists.append(d_ca)
+                        chain1_seq += f"{k},"
+                        c1_count += 1
+                half_res = c1_count / 2
+                upper = ceil(half_res)
+                lower = floor(half_res)
+                for k in range(j - lower, j + upper):
+                    if 0 <= k < num_residues:
+                        chain2_seq += f"{k},"
 
-                    for k in range(j - 2, j + 3):
-                        if 0 <= k < num_residues:
-                            chain2_seq += fasta[k]
-                except IndexError:
-                    return False
-
-                contacts.append({chain2_seq: [chain1_seq, ca_dists]})
+                contacts.append({chain1_seq: [chain2_seq, ca_dists]})
                 counter += 1
     
     if counter == 0:
@@ -204,9 +206,9 @@ def calc_interchain_ca_contacts(pdb_groups, max_dist):
     Format of chain_contacts:
     [
         {
-            "SEQUENCE":[
+            "SEQ_IDX":[
                 "pdbid_B_seg0",
-                "SEQUENCE",
+                "SEQ_IDX",
                 [
                     distance1,
                     distance2,
@@ -266,10 +268,10 @@ def calc_interchain_ca_contacts(pdb_groups, max_dist):
         
         with open(c1_path) as f1:
             c1_raw = f1.read()
-        c1_pdbid, c1_fasta = get_fasta_from_PDB([c1_path, c1_raw])
+        c1_pdbid, _ = get_fasta_from_PDB([c1_path, c1_raw])
         with open(c2_path) as f2:
             c2_raw = f2.read()
-        c2_pdbid, c2_fasta = get_fasta_from_PDB([c2_path, c2_raw])
+        c2_pdbid, _ = get_fasta_from_PDB([c2_path, c2_raw])
         
         c1_ca_arr = np.array([c1_arr[i] for i, data in enumerate(c1_arr[:, col_name]) if data == 'CA'])  # noqa: E501
         c1_ca_coords = c1_ca_arr[:, cols_coords].astype(float)
@@ -287,18 +289,19 @@ def calc_interchain_ca_contacts(pdb_groups, max_dist):
                 chain2_seq = ""
                 # Euclidian distance must be within range (default is 12 A)
                 if d_ca <= max_dist:
-                    try:
-                        for k in range(i - 2, i + 3):
-                            if 0 <= k < c1_res_tot:
-                                d_ca = np.linalg.norm(np.array(c1_ca_coords[k]) - np.array(c2_ca_coords[j]))  # noqa: E501
-                                ca_dists.append(d_ca)
-                                chain1_seq += c1_fasta[k]
-
-                        for k in range(j - 2, j + 3):
-                            if 0 <= k < c2_res_tot:
-                                chain2_seq += c2_fasta[k]
-                    except IndexError:
-                        return False
+                    c1_count = 0
+                    for k in range(i - 2, i + 3):
+                        if 0 <= k < c1_res_tot:
+                            d_ca = np.linalg.norm(np.array(c1_ca_coords[k]) - np.array(c2_ca_coords[j]))  # noqa: E501
+                            ca_dists.append(d_ca)
+                            chain1_seq += f"{k},"
+                            c1_count += 1
+                    half_res = c1_count / 2
+                    upper = ceil(half_res)
+                    lower = floor(half_res)
+                    for k in range(j - lower, j + upper):
+                        if 0 <= k < c2_res_tot:
+                            chain2_seq += f"{k},"
                     
                     if c1_pdbid not in chain_contacts:
                         chain_contacts[c1_pdbid] = []
