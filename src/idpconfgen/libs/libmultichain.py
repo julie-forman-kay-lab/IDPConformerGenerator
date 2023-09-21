@@ -4,6 +4,7 @@ from itertools import combinations
 from math import ceil, floor
 
 import numpy as np
+from matplotlib.pyplot import plt
 
 from idpconfgen import Path
 from idpconfgen.core.definitions import aa3to1
@@ -315,30 +316,32 @@ def calc_interchain_ca_contacts(pdb_groups, max_dist):
     return pdb_ids, chain_contacts, counter
 
 
-def count_substring_occurrences(substring, string):
-    """Count the number of occurences of a sub-sequence within a sequence."""
-    count = 0
-    start = 0
-    while start < len(string):
-        start = string.find(substring, start)
-        if start == -1:
-            break
-        count += 1
-        start += 1
-    return count
+def calc_match_frequency(database, s1, s2):
+    """Calculate the percentage frequency of matching residues."""
+    matching_count = 0
+    total_count = max(len(s1), len(s2))
+    positions = []
+    for i, pair in enumerate(database):
+        f1, f2 = pair
+        if f1 in s1 and f2 in s2:
+            matching_count += 1
+            positions.append(i)
+    
+    return (matching_count / total_count), positions
 
 
-def contact_heatmap(database, sequence):
+def contact_heatmap(database, sequence, plot=False):
     """
     Generate a matrix of the sequence against database of pairs of contacts.
     
     Parameters
     ----------
-    database : list of dict
+    database : list of tuple pairs
         Minimized version of the database that only contains
         information of the sequence pairs. There will also be
         positional information so matches can be back-mapped
         to the full database.
+        E.g. [("ABC", "DEF"),]
     
     sequence : str
         Input protein sequence
@@ -354,22 +357,88 @@ def contact_heatmap(database, sequence):
     matrix : np.ndarray
         Disitrubtion matrix of all the matches and weights
     """
-    num_pairs = len(database)
-    matrix_size = (num_pairs, 1)
-    matrix = np.zeros(matrix_size)
+    sequence_length = len(sequence)
+    matrix_size = (sequence_length, sequence_length)
+    matrix = np.zeros(matrix_size, dtype=float)
+    matching_pair_positions = [[] for _ in range(sequence_length)]
     
-    positions = []
-    
-    for i, pair_dict in enumerate(database):
-        for seq1, seq2 in pair_dict.items():
-            weighted_score = 0
-            for frag1 in seq1:
-                for frag2 in seq2:
-                    weighted_score += \
-                        count_substring_occurrences(frag1, sequence) * \
-                        count_substring_occurrences(frag2, sequence)
+    for i in range(sequence_length):
+        for j in range(sequence_length):
+            match_count = 0
+            total_residue_count = 0
             
-            matrix[i, 0] = weighted_score
-            positions.append((i, weighted_score))
+            for k in range(2, len(sequence) + 1):
+                frag1 = sequence[i:i + k]
+                db_idx = 0
+                
+                for pair in database:
+                    frag2 = pair[0][:k]
+                    
+                    freq, positions = \
+                        calc_match_frequency(database[db_idx:], frag1, frag2)
+                    
+                    if positions:
+                        positions = [db_idx + p for p in positions]
+                        matching_pair_positions[i].extend(positions)
+                        
+                        match_count += freq
+                        total_residue_count += 1
+                    
+                    db_idx += 1
+            
+            if total_residue_count > 0:
+                matrix[i, j] = match_count / total_residue_count
     
-    return matrix, positions
+    if plot:
+        plt.imshow(matrix, cmap='hot', interpolation='nearest', vmin=0.0, vmax=1.0)  # noqa: E501
+        plt.colorbar(label='Frequency')
+        plt.xticks(range(sequence_length), list(sequence))
+        plt.yticks(range(sequence_length), list(sequence))
+        plt.xlabel('Residues')
+        plt.ylabel('Residues')
+        plt.title('Frequency Heatmap of Matching Contact Pairs')
+        plt.show()
+    
+    return matrix, matching_pair_positions
+
+
+def extract_pairs_from_db(seg, ncores=1):
+    """
+    Extract the pairs of both inter- and intra- contacts.
+
+    Parameters
+    ----------
+    seg : dict
+        PDB segment from IDPConformerGenerator extended database
+    
+    ncores : int
+        Number of workers for multiprocessing
+    
+    Return
+    ------
+    contact_pairs : list
+        List of tuple pairs of contacts in order
+    """
+    seg_vals = list(seg.values())[0]
+    seq = seg_vals["fasta"]
+    contact_pairs = []
+    if "intra" in seg_vals:
+        intra = seg_vals["intra"]
+        for contact in intra:
+            s1 = next(iter(contact))
+            s2 = contact[s1][0]
+            f1 = s1.split(",")
+            f1.pop(-1)
+            f2 = s2.split(",")
+            f2.pop(-1)
+            r1 = ""
+            r2 = ""
+            for r in f1:
+                r1 += seq[int(r)]
+            for r in f2:
+                r2 += seq[int(r)]
+            contact_pairs.append((r1, r2))
+    
+    # TODO: rework algorithm for "inter"
+    
+    return contact_pairs
