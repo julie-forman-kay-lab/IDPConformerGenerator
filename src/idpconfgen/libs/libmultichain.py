@@ -374,7 +374,9 @@ def contact_matrix(db, sequence):
                     p2_c2 = has_consecutive_match(p2, c2)
                     if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
                         hit_matrix[i, j] += 1
+                        hit_matrix[j, i] += 1
     
+    hit_matrix = np.flipud(hit_matrix)
     return hit_matrix
 
 
