@@ -31,7 +31,7 @@ characters.
 
 Run the following command to download the PDB files::
 
-    idpconfgen pdbdl cull100 -u -n 2 -d pdbs.tar
+    idpconfgen pdbdl cull100 -u -n -d pdbs.tar
 
 You can inspect all options of this (and any other) subclient with :code:`-h`::
 
@@ -50,7 +50,7 @@ To install DSSP follow these instructions: https://github.com/julie-forman-kay-l
 The following command will operate on the :code:`pdbs.tar` file and will create
 temporary files and a result file with the DSSP information::
 
-    idpconfgen sscalc pdbs.tar -m 3 -rd -cmd <DSSP EXEC>
+    idpconfgen sscalc pdbs.tar -rd -n
 
 You will see that the files :code:`sscalc.json` and :code:`sscalc_splittled.tar`
 were created. :code:`sscalc.json` matches the sequence information with that of
@@ -60,7 +60,7 @@ chains split into continuous chains.
 Now we need to calculate the torsion angles. There are several options available
 in the command line but these are good defaults::
 
-    idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -o idpconfgen_database.json
+    idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -o idpconfgen_database.json -n
 
 This will create the final file :code:`idpconfgen_database.json`. This is the
 file IDPConfGen needs to generate conformers. This is the torsion angle database
@@ -72,7 +72,7 @@ conformer construction protocol. You can read deeper instructions in the
 documentation and client help. The following is a good default that uses 
 the FASPR method for adding side chains::
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 --dhelix --dstrand -et 'pairs' -rs 0
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 --dloop-off --dany -n
 
 After some time you will see 10 conformers in the folder.
 Please note that searching for loops is enabled by default for :code:`--dloop`.
@@ -93,7 +93,7 @@ If you do not want this grouping feature, please build the database above withou
 and run :code:`csssconv` with :code:`--full` to avoid grouping. 
 To build with the CSSS file, :code:`-csss` would have to point to the CSSS.JSON file::
 
-    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json -et 'pairs' -rs 0 --dloop-off
+    idpconfgen build -db idpconfgen_database.json -seq EGAAGAASS -nc 10 -csss csss_ex.json --dloop-off -n
 
 After some time you will see 10 conformers in the folder with the probabilistic CSSS.
 
