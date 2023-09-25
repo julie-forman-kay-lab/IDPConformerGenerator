@@ -142,24 +142,23 @@ backbone conformers it generates, on the fly. For that you need to install
 MC-SCE on top of the `idpconfgen` Python environment. First, install IDPConfGen
 as described above. Next, follow these steps::
 
-    # ensure you are in the IDPConformerGenerator GitHub folder
+    # ensure you are in the parent IDPConformerGenerator GitHub folder
     # clone and enter the MC-SCE GitHub repository
     git clone https://github.com/THGLab/MCSCE
     cd MCSCE
 
-    # Make sure you're in the base environment then
-    # install MC-SCE on top of idpconfgen
-    conda deactivate
-    conda env update --file requirements.yml --name idpconfgen
+    # Make sure you're in the idpconfgen environment then
+    # install the additional dependencies using pip
+    pip install tensorflow
+    pip install tqdm
+    pip install pathos
 
-    # Re-activate the idpconfgen environment and install MC-SCE within
-    # the `idpconfgen` environment
-    conda activate idpconfgen
+    # Install MC-SCE on top of IDPConformerGenerator
     python setup.py develop --no-deps
 
     # Navigate back to the IDPConformerGenerator GitHub folder and install
-    # `idpconfgen` again
-    cd ..
+    # `idpconfgen` again if needed
+    cd ../IDPConformerGenerator
     python setup.py develop --no-deps
 
 Now, if you choose the flag :code:`-scm mcsce` in ``idpconfgen build`` command,
