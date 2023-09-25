@@ -47,17 +47,13 @@ can be created with the :code:`torsions` subclient::
     idpconfgen torsions sscalc_splitted.tar -sc sscalc.json -n -o idpconfgen_database.json
 
 Now we're ready to construct multiple conformer ensembles for the unfolded states of the drkN SH3 domain. To build 100 conformers,
-sampling only the loop region, limiting the backbone and side chain L-J energy potentials to 
+sampling only the loop region, the default limits to the backbone and side chain L-J energy potentials are 
 be 100 kJ and 250 kJ respectively, using default fragment sizes, no substitutions, and to have side chains added with FASPR::
 
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
-        -rs 0 \
-        -et 'pairs' \
         -of ./drk_L+_nosub_faspr \
         -n
 
@@ -70,18 +66,37 @@ Please re-visit the :ref:`installation <Installation>` page to get MC-SCE set up
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
-        -rs 0 \
-        -et 'pairs' \
         -scm mcsce \
         -of ./drk_L+_nosub_mcsce \
         -n
 
 The defaults for :code:`--mcsce-n_trials` is 16 while using the :code:`--mcsce-mode exhaustive`, however
-we recommend trials larger than 100 for smaller conformer pools. In this exercise, we will be using the
+we recommend trials larger or equal to 100 for smaller conformer pools. In this exercise, we will be using the
 default MC-SCE side chain building mode :code:`simple`.
+
+However, if you're encountering an error with MC-SCE running interally through IDPConformerGenerator,
+we recommend you to generate backbones first, then pack sidechains after. For example, these would be the commands,
+required to generate backbones first and then sidechains.::
+
+    idpconfgen build \
+        -db idpconfgen_database.json \
+        -seq drksh3.fasta \
+        -nc 100 \
+        -dsd \
+        -of ./drk_L+_nosub_bb \
+        -n
+    
+    # Make the output folder for MC-SCE
+    mkdir ./drk_L+_nosub_mcsce
+
+    # Run MC-SCE in the idpconfgen environment because it's already installed
+    mcsce ./drk_L+_nosub_bb 100 \
+        -w \
+        -o ./drk_L+_nosub_mcsce \
+        -s \
+        -m simple \
+        -l drk_L+_nosub_mcsce_log
 
 As stated in the :code:`idpconfgen build -h`, sampling using other secondary structure
 parameters required :code:`--dloop` to be turned off :code:`--dloop-off`. For example, if we'd like to 
@@ -90,16 +105,12 @@ sample only helices and extended strands::
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
-        -rs 0 \
         -et 'pairs' \
         --dstrand \
         --dhelix \
         --dloop-off \
-        -scm mcsce \
-        -of ./drk_H+E+_nosub_mcsce \
+        -of ./drk_H+E+_nosub \
         -n
 
 For sampling loops, helices, and strands, we would specify :code:`--dhelix --dstrand`
@@ -135,14 +146,11 @@ energy and MC-SCE as above::
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
         -csss csss_drk_d2D.json \
         --dloop-off \
         -et 'pairs' \
-        -scm mcsce \
-        -of ./drk_CSSSd2D_nosub_mcsce \
+        -of ./drk_CSSSd2D_nosub \
         -n
 
 The default fragment size probabilities for building are (1, 1, 3, 3, 2) for fragment sizes of (1, 2, 3, 4, 5) respectively.
@@ -153,15 +161,12 @@ from lowest to highest, the second specifying their relative probabilities. We h
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
         -xp customFragments.txt \
         -csss csss_drk_d2D.txt \
         --dloop-off \
         -et 'pairs' \
-        -scm mcsce \
-        -of ./drk_fragN_CSSSd2D_nosub_mcsce \
+        -of ./drk_fragN_CSSSd2D_nosub \
         -n
 
 Finally, to expand torsion angle sampling beyond the residue identity, we can provide a residue tolerance map using the :code:`-urestol` flag in the
@@ -171,15 +176,12 @@ substitution matrix::
     idpconfgen build \
         -db idpconfgen_database.json \
         -seq drksh3.fasta \
-        -etbb 100 \
-        -etss 250 \
         -nc 100 \
         --dany \
         --dloop-off \
         -urestol '{"R":"RK","D":"DE","C":"CY","C":"CW","Q":"QH","E":"ED","H":"HYQ","I":"IVM","I":"IL","K":"KR","M":"MI","M":"MVL","F":"FY","F":"FWL","W":"WYFC","Y":"YF","Y":"YC","Y":"YWH"}' \
         -et 'pairs' \
-        -scm mcsce \
-        -of ./drk_ANY_sub532_mcsce \
+        -of ./drk_ANY_sub532 \
         -n
 
 Please note for the above run, we are sampling the torsion angle database disregarding secondary structure
