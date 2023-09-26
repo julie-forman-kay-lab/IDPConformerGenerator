@@ -113,7 +113,7 @@ def init_mcsce_sidechains(
     s.build()
 
     ff = build_definitions.forcefields["Amberff14SB"]
-    ff_obj = ff(add_OXT=True, add_Nterminal_H=True)
+    ff_obj = ff(Cterminal='OXT', Nterminal='HN')
 
     _mode = params.pop('mode')
     mcsce_sampling_options = {'simple': True, 'exhaustive': False}

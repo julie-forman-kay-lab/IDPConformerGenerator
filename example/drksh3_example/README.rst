@@ -71,11 +71,16 @@ Please re-visit the :ref:`installation <Installation>` page to get MC-SCE set up
         -of ./drk_L+_nosub_mcsce \
         -n
 
+.. note::
+    Running MC-SCE within IDPConformerGenerator can be memory (RAM) intensive.
+    Consider running with a lower number of CPU threads using the `-n` flag if
+    necessary.
+
 The defaults for :code:`--mcsce-n_trials` is 16 while using the :code:`--mcsce-mode exhaustive`, however
 we recommend trials larger or equal to 100 for smaller conformer pools. In this exercise, we will be using the
 default MC-SCE side chain building mode :code:`simple`.
 
-However, if you're encountering an error with MC-SCE running interally through IDPConformerGenerator,
+If you're encountering an error with MC-SCE running interally through IDPConformerGenerator,
 we recommend you to generate backbones first, then pack sidechains after. For example, these would be the commands,
 required to generate backbones first and then sidechains.::
 
