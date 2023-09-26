@@ -11,6 +11,11 @@ Changelog
 
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 
+v0.7.6 (2023-09-25)
+------------------------------------------------------------
+
+* Update documentation for installation and usage
+
 v0.7.5 (2023-09-11)
 ------------------------------------------------------------
 
