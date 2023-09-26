@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Bug-fix MC-SCE integration with force-field topology generation
+
 v0.7.6 (2023-09-25)
 ------------------------------------------------------------
 
