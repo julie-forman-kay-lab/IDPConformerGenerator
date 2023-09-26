@@ -9,8 +9,11 @@ USAGE:
     $ idpconfgen complex -db contacts.json -seq sequence.fasta --plot
 """
 import argparse
+from functools import partial
 
-from idpconfgen import Path
+import numpy as np
+
+from idpconfgen import Path, log
 from idpconfgen.components.bgeo_strategies import (
     add_bgeo_strategy_arg,
     bgeo_strategies_default,
@@ -25,6 +28,14 @@ from idpconfgen.components.sidechain_packing import (
 from idpconfgen.components.xmer_probs import add_xmer_arg
 from idpconfgen.core.build_definitions import forcefields
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
+from idpconfgen.libs.libmultichain import (
+    contact_matrix,
+    extract_interpairs_from_db,
+    extract_intrapairs_from_db,
+    )
+from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
 _file = Path(__file__).myparents()
@@ -146,7 +157,80 @@ def main(
 
     Distributes over processors.
     """
-    pass
+    db = read_dictionary_from_disk(database)
+    db_lst = [{k: v} for k, v in db.items()]
+    db_inter_lst = []
+    for seg, values in db.items():
+        if "inter" in values:
+            inter_dict = {}
+            inter_dict[seg] = values
+            for contact in values["inter"]:
+                s1 = next(iter(contact))
+                s2 = contact[s1][0]
+                inter_dict[s2] = database[s2]
+            db_inter_lst.append(inter_dict)
+        continue
+    
+    output_folder = make_folder_or_cwd(output_folder)
+    init_files(log, Path(output_folder, LOGFILESNAME))
+    
+    if len(input_seq) > 1:
+        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+        for chain in input_seq:
+            log.info(S(f'{chain}: {input_seq[chain]}'))
+    else:
+        input_seq = list(input_seq.values())[0]
+        seq_len = len(input_seq)
+        log.info(S(f'input sequence: {input_seq}'))
+    
+    log.info(T("analyzing intramolecular contacts from the database"))
+    intra_consume = partial(extract_intrapairs_from_db)
+    intra_execute = partial(
+        report_on_crash,
+        intra_consume,
+        ROC_exception=Exception,
+        ROC_folder=output_folder,
+        ROC_prefix=_name,
+        )
+    intra_execute_pool = pool_function(intra_execute, db_lst, ncores=ncores)
+    intra_contacts = []
+    for result in intra_execute_pool:
+        intra_contacts.append(result)
+    log.info(S("done"))
+    
+    log.info(T("analyzing intermolecular contacts from the database"))
+    inter_consume = partial(extract_interpairs_from_db)
+    inter_execute = partial(
+        report_on_crash,
+        inter_consume,
+        ROC_exception=Exception,
+        ROC_folder=output_folder,
+        ROC_prefix=_name,
+        )
+    inter_execute_pool = pool_function(inter_execute, db_inter_lst, ncores=ncores)  # noqa: E501
+    inter_contacts = []
+    for result in inter_execute_pool:
+        if result is False:
+            continue
+        inter_contacts.append(result)
+    log.info(S("done"))
+    
+    all_contacts = intra_contacts + inter_contacts
+    log.info(T("Calculating all-contacts probability matrix"))
+    matrix_consume = partial(contact_matrix, sequence=input_seq)
+    matrix_execute = partial(
+        report_on_crash,
+        matrix_consume,
+        ROC_exception=Exception,
+        ROC_folder=output_folder,
+        ROC_prefix=_name,
+        )
+    matrix_execute_pool = pool_function(matrix_execute, all_contacts, ncores=ncores)  # noqa: E501
+    contact_mtx = np.zeros((seq_len, seq_len))
+    for result in matrix_execute_pool:
+        contact_mtx = np.add(contact_mtx, result)
+    
+    # norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
 
 
 if __name__ == "__main__":

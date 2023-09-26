@@ -10,6 +10,7 @@ Changelog
 =========
 
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
+* Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
 
 v0.7.7 (2023-09-26)
 ------------------------------------------------------------
