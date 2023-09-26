@@ -11,6 +11,11 @@ Changelog
 
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 
+v0.7.7 (2023-09-26)
+------------------------------------------------------------
+
+* Bug-fix MC-SCE integration with force-field topology generation
+
 v0.7.6 (2023-09-25)
 ------------------------------------------------------------
 
