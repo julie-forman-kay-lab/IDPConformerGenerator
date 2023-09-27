@@ -35,6 +35,7 @@ from idpconfgen.libs.libmultichain import (
     extract_intrapairs_from_db,
     )
 from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libplot import plot_contacts_matrix
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -126,6 +127,12 @@ ap.add_argument(
 add_sidechain_method(ap)
 add_mcsce_subparser(ap)
 libcli.add_argument_output_folder(ap)
+ap.add_argument(
+    '--plot-name',
+    nargs='?',
+    help='Change the name of the heatmap plot saved on disk.',
+    default="complex_heatmap.png",
+    )
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
@@ -150,6 +157,7 @@ def main(
         output_folder=None,
         energy_log='energies.log',
         sidechain_method=DEFAULT_SDM,
+        plot_name="complex_heatmap.png",
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -167,7 +175,7 @@ def main(
             for contact in values["inter"]:
                 s1 = next(iter(contact))
                 s2 = contact[s1][0]
-                inter_dict[s2] = database[s2]
+                inter_dict[s2] = db[s2]
             db_inter_lst.append(inter_dict)
         continue
     
@@ -229,8 +237,16 @@ def main(
     contact_mtx = np.zeros((seq_len, seq_len))
     for result in matrix_execute_pool:
         contact_mtx = np.add(contact_mtx, result)
+
+    norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
+    log.info(S('done'))
     
-    # norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
+    log.info(T('saving heatmap distribution plot to disk'))
+    if not (plot_name.endswith(".png") or plot_name.endswith(".jpg")):
+        plot_path = Path(plot_name)
+        plot_name = plot_path.with_suffix('.png')
+    plot_contacts_matrix(norm_contact_mtx, input_seq, plot_name)
+    log.info(S('done'))
 
 
 if __name__ == "__main__":
