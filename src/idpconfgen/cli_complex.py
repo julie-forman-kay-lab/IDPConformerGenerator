@@ -19,6 +19,7 @@ from idpconfgen.components.bgeo_strategies import (
     bgeo_strategies_default,
     )
 from idpconfgen.components.energy_threshold_type import add_et_type_arg
+from idpconfgen.components.plots.plotfuncs import plot_contacts_matrix
 from idpconfgen.components.residue_tolerance import add_res_tolerance_groups
 from idpconfgen.components.sidechain_packing import (
     DEFAULT_SDM,
@@ -35,7 +36,6 @@ from idpconfgen.libs.libmultichain import (
     extract_intrapairs_from_db,
     )
 from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libplot import plot_contacts_matrix
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 

@@ -302,3 +302,57 @@ def plot_bend_angles(
     plt.close("all")
 
     return errmsg
+
+
+def plot_contacts_matrix(matrix, sequence, output, dpi=300):
+    """
+    Plot matrix heatmap from `contact_matrix` function.
+
+    Parameters
+    ----------
+    matrix : np.ndarray
+        Probability matrix of contacts
+    
+    sequence : str or list
+        Single sequence for intra- or two sequences for inter-
+    
+    output : str
+        Path/filename to output the plot
+    
+    dpi : int
+        dpi of plot to save
+    """
+    lw = 10
+    plt.figure(figsize=(lw, lw))
+    im = plt.imshow(matrix, cmap='plasma', interpolation='nearest')
+    plt.title('Contacts Frequency Heatmap', fontsize=18)
+    plt.colorbar().set_label(label="Frequency", size=16)
+    im.figure.axes[1].tick_params(axis="y", labelsize=16)
+    
+    if type(sequence) is list:
+        seq1 = sequence[0]
+        seq2 = sequence[1]
+        
+        len_s1 = len(seq1)
+        len_s2 = len(seq2)
+        if len_s1 > 100:
+            fs1 = len_s1 / 30
+        else:
+            fs1 = len_s1 / lw
+        if len_s2 > 100:
+            fs2 = len_s2 / 30
+        else:
+            fs2 = len_s2 / lw
+        plt.xticks(np.arange(len_s1), seq1, fontsize=fs1)
+        plt.yticks(np.arange(len_s2), seq2, fontsize=fs2)
+    else:
+        len_seq = len(sequence)
+        if len_seq > 100:
+            fs = len_seq / 30
+        else:
+            fs = len_seq / lw
+        plt.xticks(np.arange(len_seq), sequence, fontsize=fs)
+        plt.yticks(np.arange(len_seq), sequence, fontsize=fs)
+    
+    plt.tight_layout(h_pad=0.01, w_pad=0.04)
+    plt.savefig(output, dpi=dpi)
