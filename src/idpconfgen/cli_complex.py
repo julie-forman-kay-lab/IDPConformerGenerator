@@ -215,7 +215,11 @@ def main(
         ROC_folder=output_folder,
         ROC_prefix=_name,
         )
-    inter_execute_pool = pool_function(inter_execute, db_inter_lst, ncores=ncores)  # noqa: E501
+    inter_execute_pool = pool_function(
+        inter_execute,
+        db_inter_lst,
+        ncores=ncores,
+        )
     inter_contacts = []
     for result in inter_execute_pool:
         if result is False:
@@ -224,6 +228,7 @@ def main(
     log.info(S("done"))
     
     all_contacts = intra_contacts + inter_contacts
+    all_contacts_filtered = [c for c in all_contacts if c]
     log.info(T("Calculating all-contacts probability matrix"))
     matrix_consume = partial(contact_matrix, sequence=input_seq)
     matrix_execute = partial(
@@ -233,7 +238,11 @@ def main(
         ROC_folder=output_folder,
         ROC_prefix=_name,
         )
-    matrix_execute_pool = pool_function(matrix_execute, all_contacts, ncores=ncores)  # noqa: E501
+    matrix_execute_pool = pool_function(
+        matrix_execute,
+        all_contacts_filtered,
+        ncores=ncores,
+        )
     contact_mtx = np.zeros((seq_len, seq_len))
     for result in matrix_execute_pool:
         contact_mtx = np.add(contact_mtx, result)
