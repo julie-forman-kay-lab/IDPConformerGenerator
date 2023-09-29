@@ -244,8 +244,10 @@ def main(
         ncores=ncores,
         )
     contact_mtx = np.zeros((seq_len, seq_len))
-    for result in matrix_execute_pool:
-        contact_mtx = np.add(contact_mtx, result)
+    location_mtx = {}
+    for id, hit, loc in matrix_execute_pool:
+        contact_mtx = np.add(contact_mtx, hit)
+        location_mtx[id] = loc
 
     norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
     log.info(S('done'))

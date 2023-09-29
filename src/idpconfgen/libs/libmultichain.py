@@ -354,9 +354,12 @@ def contact_matrix(db, sequence):
     """
     seq_len = len(sequence)
     hit_matrix = np.zeros((seq_len, seq_len))
-
+    loc_matrix = np.empty((seq_len, seq_len), dtype=object)
+    loc_matrix.fill([])
+    segid = next(iter(db))
+    
     for pairs in db.values():
-        for pair in pairs:
+        for idx, pair in enumerate(pairs):
             p1, p2 = pair
             for i in range(seq_len):
                 for j in range(i + 1, seq_len):
@@ -375,9 +378,11 @@ def contact_matrix(db, sequence):
                     if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
                         hit_matrix[i, j] += 1
                         hit_matrix[j, i] += 1
+                        loc_matrix[i, j].append(idx)
     
     hit_matrix = np.flipud(hit_matrix)
-    return hit_matrix
+    loc_matrix = np.flipud(loc_matrix)
+    return segid, hit_matrix, loc_matrix
 
 
 def extract_intrapairs_from_db(intra_seg):
