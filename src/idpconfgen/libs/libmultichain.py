@@ -467,3 +467,29 @@ def extract_interpairs_from_db(inter_segs):
                 contact_pairs[seg].append((r1, r2))
     
     return contact_pairs
+
+
+def reverse_position_lookup(coords, location_mtx, database):
+    """
+    Return database entry based on a point in the contacts frequency heatmap.
+
+    Parameters
+    ----------
+    coords : tuple of int
+        The location of the contact per the contacts frequency heatmap.
+    
+    location_mtx : dict of np.ndarray
+        Keys are the segid as seen in the database. Values are an array
+        of list of indicies of where the contact is.
+    
+    database : dict
+        IDPConformerGenerator database
+    
+    Returns
+    -------
+    entry : dict
+        Key-value pairs of the entry for a specific segid in the database.
+        TODO: this return can be changed to only the torsion angle? or remain
+        as we need information on the secondary structure as well
+    """
+    return
