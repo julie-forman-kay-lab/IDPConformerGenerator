@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Bug-fix in ``ldrs`` for input sequence recognition
+
 v0.7.7 (2023-09-26)
 ------------------------------------------------------------
 

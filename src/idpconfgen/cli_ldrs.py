@@ -474,14 +474,20 @@ def main(
     
     # Accomodate multiple chains in template
     global MULTICHAIN
-    if len(input_seq) > 1:
-        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
-        for chain in input_seq:
-            log.info(S(f'{chain}: {input_seq[chain]}'))
-        MULTICHAIN = True
+    if type(input_seq) is dict:
+        if len(input_seq) > 1:
+            log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+            for chain in input_seq:
+                log.info(S(f'{chain}: {input_seq[chain]}'))
+            MULTICHAIN = True
+        else:
+            single_seq = list(input_seq.values())[0]
+            log.info(S(f'input sequence: {single_seq}'))
+    # For the case when the user just enters sequence without .fasta
     else:
-        single_seq = list(input_seq.values())[0]
-        log.info(S(f'input sequence: {single_seq}'))
+        log.info(S(f'input sequence: {input_seq}'))
+        # convert input_seq to a dict because that's how we will process
+        input_seq = {"A": input_seq}
     
     # Calculates how many conformers are built per core
     if nconfs < ncores:
