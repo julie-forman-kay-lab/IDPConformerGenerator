@@ -182,12 +182,16 @@ def main(
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
     
-    if len(input_seq) > 1:
-        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
-        for chain in input_seq:
-            log.info(S(f'{chain}: {input_seq[chain]}'))
+    if type(input_seq) is dict:
+        if len(input_seq) > 1:
+            log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+            for chain in input_seq:
+                log.info(S(f'{chain}: {input_seq[chain]}'))
+        else:
+            input_seq = list(input_seq.values())[0]
+            seq_len = len(input_seq)
+            log.info(S(f'input sequence: {input_seq}'))
     else:
-        input_seq = list(input_seq.values())[0]
         seq_len = len(input_seq)
         log.info(S(f'input sequence: {input_seq}'))
     

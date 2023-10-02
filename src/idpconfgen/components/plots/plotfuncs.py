@@ -352,7 +352,7 @@ def plot_contacts_matrix(matrix, sequence, output, dpi=300):
         else:
             fs = len_seq / lw
         plt.xticks(np.arange(len_seq), sequence, fontsize=fs)
-        plt.yticks(np.arange(len_seq), sequence, fontsize=fs)
+        plt.yticks(np.arange(len_seq), sequence[::-1], fontsize=fs)
     
     plt.tight_layout(h_pad=0.01, w_pad=0.04)
     plt.savefig(output, dpi=dpi)
