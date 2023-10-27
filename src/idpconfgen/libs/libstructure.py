@@ -585,7 +585,7 @@ def write_PDB(lines, filename):
             fh.write(concat_lines)
             fh.write('\n')
     else:
-        warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)
+        warnings.warn('Empty lines, nothing to write, ignoring.', UserWarning)  # noqa: E501 B028
 
 
 def structure_to_pdb(atoms):
