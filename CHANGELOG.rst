@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Correct reading CIF files without `#` end block.
+
 v0.7.9 (2023-10-27)
 ------------------------------------------------------------
 
