@@ -263,6 +263,9 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
     """
     Populate mmCIF dictionary.
 
+    Expects atom coordinate information to be consecutive, otherwise
+    reading will be incomplete or errors will occur.
+
     Parameters
     ----------
     lines : list
@@ -270,7 +273,8 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
     start_index : int
         The line index, that is, line number 0-indexed, where the
-        actual `atom_site.` structural information starts.
+        actual `atom_site.` structural information starts, that is,
+        the first ATOM/HETATM line.
 
     cif_dict : dict
         The mmCIF dictionary to populate. The dict keys should be
