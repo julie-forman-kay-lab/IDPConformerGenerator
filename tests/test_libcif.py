@@ -16,7 +16,6 @@ from .tcommons import (
     cif_example_auth,
     cif_example_headers,
     cif_example_noasymid,
-    cif_nohash,
     )
 
 
@@ -75,10 +74,14 @@ def test_find_cif_atom_site_headers_keys(fix_find_cif_atom_site_headers):
     assert all(k.startswith('_atom_site.') for k in cif_pdb.keys())
 
 
-def test_fine_cif_atom_site_headers_error():
+@pytest.mark.parametrize(
+    'input_',
+    ([' ', 'something'], ['']),
+    )
+def test_fine_cif_atom_site_headers_error(input_):
     """Test missing atom_site headers error."""
     with pytest.raises(EXCPTS.CIFFileError):
-        find_cif_atom_site_headers([' ', 'somestring'], {})
+        find_cif_atom_site_headers(input_, {})
 
 
 def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
@@ -102,16 +105,19 @@ def test_populate_cif_dictionary(fix_find_cif_atom_site_headers):
             22,
             {i: [] for i in cif_example_headers},
             ),
-        (
-            cif_nohash.read_text().split('\n'),
-            22,
-            {i: [] for i in cif_example_headers},
-            ),
-        (
-            [''],
-            0,
-            {'_atom_site.id': []},
-            ),
+        # removed after #255, no hash is no longer a problem
+        # (
+        #     cif_nohash.read_text().split('\n'),
+        #     22,
+        #     {i: [] for i in cif_example_headers},
+        #     ),
+        # should not modify the dictionary if not coordinate lines
+        # are present.
+        # (
+        #     [''],
+        #     0,
+        #     {'_atom_site.id': []},
+        #     ),
         ]
     )
 def test_populate_cif_dictionary_errors(args):
