@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.10 (2023-10-27)
+------------------------------------------------------------
+
 * Correct reading CIF files without `#` end block.
 * Fix minor bugs for reading CIF templates in ``ldrs``
 
