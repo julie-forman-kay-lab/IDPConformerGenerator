@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update `libstructure.Structure` documentation.
+
 v0.7.8 (2023-10-02)
 ------------------------------------------------------------
 
