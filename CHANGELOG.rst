@@ -10,6 +10,7 @@ Changelog
 =========
 
 * Correct reading CIF files without `#` end block.
+* Fix minor bugs for reading CIF templates in ``ldrs``
 
 v0.7.9 (2023-10-27)
 ------------------------------------------------------------

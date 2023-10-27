@@ -549,14 +549,24 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    # TODO: in the future, can give a tarball or folder of .PDB
-    # randomly select which one to attach disordered regions onto
-    assert folded_structure.endswith('.pdb')
+    # TODO can give a tarball or folder of template files of the same system
+    # randomly select which one to attach disordered regions onto.
     
     log.info(T('Initializing folded domain information'))
     
+    # Process the structure with either PDB or PDBx/mmCIF formatting
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
+
+    # Create a temporary PDB formatted structure file if given PDBx/mmCIF
+    # to use the `get_fasta_from_PDB` function
+    if folded_structure.endswith('.cif'):
+        pdb_struc = structure_to_pdb(fld_struc.data_array)
+        pdb_output = output_folder.joinpath(f".temp_{Path(folded_structure).stem}.pdb")  # noqa: E501
+        with open(pdb_output, 'w') as f:
+            for line in pdb_struc:
+                f.write(line + "\n")
+        folded_structure = pdb_output
     
     with open(folded_structure) as f:
         pdb_raw = f.read()
@@ -1093,6 +1103,9 @@ def main(
 
     if not keep_temporary and not stitching_off:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
+
+    if Path(folded_structure).stem.startswith('.temp'):
+        Path(folded_structure).unlink()
 
     ENERGYLOGSAVER.close()
 
