@@ -42,21 +42,29 @@ class Structure:
     ----------
     data : str, bytes, Path
         Raw structural data from PDB/mmCIF formatted files.
+        If `data` is a path to a file it *must* be a `pathlib.Path`
+        object. If string or bytes, it must be the raw content of the
+        input file.
 
     Examples
     --------
     Opens a PDB file, selects only chain 'A' and saves selection to a file.
-    >>> s = Structure('1ABC.pdb')
+    >>> s = Structure(Path('1ABC.pdb'))
     >>> s.build()
     >>> s.add_filter_chain('A')
     >>> s.write_PDB('out.pdb')
 
     Opens a mmCIF file, selects only residues above 50 and saves
     selection to a file.
-    >>> s = Structure('1ABC.cif')
+    >>> s = Structure(Path('1ABC.cif'))
     >>> s.build()
     >>> s.add_filter(lambda x: int(x[col_resSeq]) > 50)
     >>> s.write_PDB('out.pdb')
+
+    >>> with open('1ABC.pdb', 'r') as fin:
+    >>>     lines = fin.read()
+    >>> s = Structure(lines)
+    >>> s.build()
     """
 
     __slots__ = [

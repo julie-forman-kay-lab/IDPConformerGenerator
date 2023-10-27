@@ -1,4 +1,5 @@
 """Handle CIF data."""
+import os
 import re
 
 from idpconfgen.core import exceptions as EXCPTS
@@ -13,7 +14,7 @@ class CIFParser:
     Parameters
     ----------
     datastr : str
-        The contect of the mmCIF file in string format.
+        The content of the mmCIF file in string format.
     """
 
     __slots__ = [
@@ -37,7 +38,7 @@ class CIFParser:
 
     def read_cif(self, datastr):
         """Read 'atom_site.' entries to dictionary."""
-        lines = datastr.split('\n')
+        lines = datastr.split(os.linesep)
         atom_start_index = find_cif_atom_site_headers(lines, self.cif_dict)
         self._len = populate_cif_dictionary(
             lines,
@@ -262,6 +263,9 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
     """
     Populate mmCIF dictionary.
 
+    Expects atom coordinate information to be consecutive, otherwise
+    reading will be incomplete or errors will occur.
+
     Parameters
     ----------
     lines : list
@@ -269,7 +273,8 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
     start_index : int
         The line index, that is, line number 0-indexed, where the
-        actual `atom_site.` structural information starts.
+        actual `atom_site.` structural information starts, that is,
+        the first ATOM/HETATM line.
 
     cif_dict : dict
         The mmCIF dictionary to populate. The dict keys should be
@@ -294,7 +299,12 @@ def populate_cif_dictionary(lines, start_index, cif_dict):
 
     valid_len = len(cif_dict)
     for counter, line in enumerate(lines[start_index:]):
-        if line.startswith('#'):
+        # expects all coordinate related lines to be consecutive
+        # Usually the coordinate block ends with an "#"
+        # but if the coordinate block is the end of the file the "#"
+        # may be missing. Hence the `or not line`.
+        # Closes issue #
+        if line.startswith('#') or not line:
             return counter
 
         ls = parse_cif_line(line)

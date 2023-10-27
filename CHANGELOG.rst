@@ -12,6 +12,22 @@ Changelog
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 * Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
 
+v0.7.10 (2023-10-27)
+------------------------------------------------------------
+
+* Correct reading CIF files without `#` end block.
+* Fix minor bugs for reading CIF templates in ``ldrs``
+
+v0.7.9 (2023-10-27)
+------------------------------------------------------------
+
+* Update `libstructure.Structure` documentation.
+
+v0.7.8 (2023-10-02)
+------------------------------------------------------------
+
+* Bug-fix in ``ldrs`` for input sequence recognition
+
 v0.7.7 (2023-09-26)
 ------------------------------------------------------------
 

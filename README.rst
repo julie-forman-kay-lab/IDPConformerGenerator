@@ -66,4 +66,4 @@ If you use the Local Disordered Region Sampling (LDRS) module, please cite::
 
 Version
 -------
-v0.7.7
+v0.7.10

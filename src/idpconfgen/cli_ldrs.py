@@ -474,14 +474,20 @@ def main(
     
     # Accomodate multiple chains in template
     global MULTICHAIN
-    if len(input_seq) > 1:
-        log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
-        for chain in input_seq:
-            log.info(S(f'{chain}: {input_seq[chain]}'))
-        MULTICHAIN = True
+    if type(input_seq) is dict:
+        if len(input_seq) > 1:
+            log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
+            for chain in input_seq:
+                log.info(S(f'{chain}: {input_seq[chain]}'))
+            MULTICHAIN = True
+        else:
+            single_seq = list(input_seq.values())[0]
+            log.info(S(f'input sequence: {single_seq}'))
+    # For the case when the user just enters sequence without .fasta
     else:
-        single_seq = list(input_seq.values())[0]
-        log.info(S(f'input sequence: {single_seq}'))
+        log.info(S(f'input sequence: {input_seq}'))
+        # convert input_seq to a dict because that's how we will process
+        input_seq = {"A": input_seq}
     
     # Calculates how many conformers are built per core
     if nconfs < ncores:
@@ -543,14 +549,24 @@ def main(
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
         
-    # TODO: in the future, can give a tarball or folder of .PDB
-    # randomly select which one to attach disordered regions onto
-    assert folded_structure.endswith('.pdb')
+    # TODO can give a tarball or folder of template files of the same system
+    # randomly select which one to attach disordered regions onto.
     
     log.info(T('Initializing folded domain information'))
     
+    # Process the structure with either PDB or PDBx/mmCIF formatting
     fld_struc = Structure(Path(folded_structure))
     fld_struc.build()
+
+    # Create a temporary PDB formatted structure file if given PDBx/mmCIF
+    # to use the `get_fasta_from_PDB` function
+    if folded_structure.endswith('.cif'):
+        pdb_struc = structure_to_pdb(fld_struc.data_array)
+        pdb_output = output_folder.joinpath(f".temp_{Path(folded_structure).stem}.pdb")  # noqa: E501
+        with open(pdb_output, 'w') as f:
+            for line in pdb_struc:
+                f.write(line + "\n")
+        folded_structure = pdb_output
     
     with open(folded_structure) as f:
         pdb_raw = f.read()
@@ -1087,6 +1103,9 @@ def main(
 
     if not keep_temporary and not stitching_off:
         shutil.rmtree(output_folder.joinpath(TEMP_DIRNAME))
+
+    if Path(folded_structure).stem.startswith('.temp'):
+        Path(folded_structure).unlink()
 
     ENERGYLOGSAVER.close()
 
