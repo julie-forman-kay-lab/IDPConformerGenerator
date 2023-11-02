@@ -187,6 +187,7 @@ def main(
             log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
             for chain in input_seq:
                 log.info(S(f'{chain}: {input_seq[chain]}'))
+            # TODO cover the case of multiple sequences
         else:
             input_seq = list(input_seq.values())[0]
             seq_len = len(input_seq)
@@ -207,6 +208,8 @@ def main(
     intra_execute_pool = pool_function(intra_execute, db_lst, ncores=ncores)
     intra_contacts = []
     for result in intra_execute_pool:
+        if result is False:
+            continue
         intra_contacts.append(result)
     log.info(S("done"))
     
@@ -256,11 +259,12 @@ def main(
     norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
     log.info(S('done'))
     
-    log.info(T('saving heatmap distribution plot to disk'))
+    log.info(T('saving heatmap distribution plot to output directory'))
     if not (plot_name.endswith(".png") or plot_name.endswith(".jpg")):
         plot_path = Path(plot_name)
         plot_name = plot_path.with_suffix('.png')
-    plot_contacts_matrix(norm_contact_mtx, input_seq, plot_name)
+    plot_out = str(output_folder) + '/' + plot_name
+    plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
     log.info(S('done'))
 
 

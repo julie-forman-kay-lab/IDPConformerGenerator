@@ -341,9 +341,6 @@ def contact_matrix(db, sequence):
     sequence : str
         Input protein sequence
     
-    ncores : int
-        Number of workers to execute search
-    
     Returns
     -------
     matrix : np.ndarray
@@ -396,8 +393,9 @@ def extract_intrapairs_from_db(intra_seg):
     
     Return
     ------
-    contact_pairs : list
-        List of tuple pairs of sequences in order
+    contact_pairs : dict
+        dict of list of tuple pairs of sequences in order
+        Key value being the seg ID from database entry
     """
     seg_id = next(iter(intra_seg))
     seg_vals = list(intra_seg.values())[0]
@@ -420,6 +418,8 @@ def extract_intrapairs_from_db(intra_seg):
             for r in f2:
                 r2 += seq[int(r)]
             contact_pairs[seg_id].append((r1, r2))
+    else:
+        return False
 
     return contact_pairs
 
@@ -467,6 +467,36 @@ def extract_interpairs_from_db(inter_segs):
                 contact_pairs[seg].append((r1, r2))
     
     return contact_pairs
+
+
+def pick_point_from_heatmap(prob_mtx):
+    """
+    Select one point from the probability heatmap.
+    
+    Parameters
+    ----------
+    prob_mtx : 2D np array heatmap
+        Should be normalized ranging from 0 - 1.
+    
+    Returns
+    -------
+    coords : tuple
+        Coordinate of where the selected point is
+    """
+    flat_heatmap = prob_mtx.flatten()
+    
+    prob_distribution = flat_heatmap / np.sum(flat_heatmap)
+    
+    picked_index = np.random.choice(
+        len(prob_distribution),
+        p=prob_distribution
+        )
+    
+    _, num_cols = prob_mtx.shape
+    x = picked_index // num_cols
+    y = picked_index % num_cols
+    
+    return (x, y)
 
 
 def reverse_position_lookup(coords, location_mtx, database):
