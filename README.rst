@@ -49,14 +49,14 @@ How to cite
 
 .. start-citing
 
-If you use IDPConformerGenerator, please cite::
+If you use IDPConformerGenerator, please always cite its original publication::
 
     IDPConformerGenerator: A Flexible Software Suite for Sampling the Conformational Space of Disordered Protein States
     João M. C. Teixeira, Zi Hao Liu, Ashley Namini, Jie Li, Robert M. Vernon, Mickaël Krzeminski, Alaa A. Shamandy, Oufan Zhang, Mojtaba Haghighatlari, Lei Yu, Teresa Head-Gordon, and Julie D. Forman-Kay
     The Journal of Physical Chemistry A 2022 126 (35), 5985-6003
     DOI: 10.1021/acs.jpca.2c03726
 
-If you use the Local Disordered Region Sampling (LDRS) module, please cite::
+If you use the Local Disordered Region Sampling (LDRS) module, please also cite::
 
     Local Disordered Region Sampling (LDRS) for Ensemble Modeling of Proteins with Experimentally Undetermined or Low Confidence Prediction Segments
     Zi Hao Liu, João M.C. Teixeira, Oufan Zhang, Thomas E. Tsangaris, Jie Li, Claudiu C. Gradinaru, Teresa Head-Gordon, Julie D. Forman-Kay
@@ -66,4 +66,4 @@ If you use the Local Disordered Region Sampling (LDRS) module, please cite::
 
 Version
 -------
-v0.7.10
+v0.7.11
