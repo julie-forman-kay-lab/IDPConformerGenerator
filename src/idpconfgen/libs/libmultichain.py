@@ -469,7 +469,7 @@ def extract_interpairs_from_db(inter_segs):
     return contact_pairs
 
 
-def pick_point_from_heatmap(prob_mtx):
+def pick_point_from_heatmap(prob_mtx, max_num=1):
     """
     Select one point from the probability heatmap.
     
@@ -478,25 +478,71 @@ def pick_point_from_heatmap(prob_mtx):
     prob_mtx : 2D np array heatmap
         Should be normalized ranging from 0 - 1.
     
+    max_num : int
+        Maximum number of contacts to select from matrix.
+    
     Returns
     -------
-    coords : tuple
-        Coordinate of where the selected point is
+    picked_points : list of tuple
+        Coordinates of where the selected point is
     """
     flat_heatmap = prob_mtx.flatten()
     
     prob_distribution = flat_heatmap / np.sum(flat_heatmap)
     
-    picked_index = np.random.choice(
-        len(prob_distribution),
-        p=prob_distribution
-        )
+    num_to_pick = np.random.randint(1, max_num + 1)
     
-    _, num_cols = prob_mtx.shape
-    x = picked_index // num_cols
-    y = picked_index % num_cols
+    picked_points = []
+    for _ in range(num_to_pick):
+        picked_index = np.random.choice(
+            len(prob_distribution),
+            p=prob_distribution
+            )
+        _, num_cols = prob_mtx.shape
+        x = picked_index // num_cols
+        y = picked_index % num_cols
+        picked_points.append((x, y))
     
-    return (x, y)
+    return picked_points
+
+
+def calculate_max_contacts(sequences):
+    """
+    Calculate the maximum number of possible contacts.
+    
+    Calculation is based on multiples of '5' since maximum of
+    up to 5 residues is stored in the extended database.
+
+    Parameters
+    ----------
+    sequences : dict or str
+        Can accept multiple sequences based on `input_seq`
+        variable from `cli_complex.py`.
+    
+    Returns
+    -------
+    num_contacts : dict
+        Key is the chain value is the maximum number of contacts
+        that chain can make.
+    """
+    assert (type(sequences) is dict) or (type(sequences) is str)
+    num_contacts = {}
+    if type(sequences) is dict:
+        # Add check here for modularity
+        if len(sequences) > 1:
+            for chain in sequences:
+                seq = sequences[chain]
+                len_seq = len(seq)
+                num_contacts[chain] = len_seq // 5
+        else:
+            seq = list(sequences.values())[0]
+            len_seq = len(seq)
+            num_contacts['A'] = len_seq // 5
+    else:
+        len_seq = len(sequences)
+        num_contacts['A'] = len_seq // 5
+    
+    return num_contacts
 
 
 def reverse_position_lookup(coords, location_mtx, database):

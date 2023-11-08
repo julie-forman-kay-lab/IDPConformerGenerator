@@ -31,9 +31,11 @@ from idpconfgen.core.build_definitions import forcefields
 from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
 from idpconfgen.libs.libmultichain import (
+    calculate_max_contacts,
     contact_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
+    pick_point_from_heatmap,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.logger import S, T, init_files, report_on_crash
@@ -266,6 +268,17 @@ def main(
     plot_out = str(output_folder) + '/' + plot_name
     plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
     log.info(S('done'))
+    
+    # Calculates the maximum number of contacts for each input sequence
+    max_contacts = calculate_max_contacts(input_seq)
+    preselected_contacts = {}
+    # Pre-select contacts for each sequence based on maximum number and matrix
+    for chain in max_contacts:
+        chosen_contacts = []
+        max_num = max_contacts[chain]
+        for _ in range(nconfs):
+            chosen_contacts.append(pick_point_from_heatmap(norm_contact_mtx, max_num))  # noqa: E501
+        preselected_contacts[chain] = chosen_contacts
 
 
 if __name__ == "__main__":
