@@ -134,6 +134,32 @@ vdW_radii_dict = {
     }
 
 
+# pKa (COO), pKb (NH3), and pKx (side chain) of common amino-acids
+# D.R. Lide, Handbook of Chemistry and Physics, 72nd Edition, CRC Press, 1991
+pk_aa_dict = {
+    'A': {'pKa': 2.34, 'pKb': 9.69, 'pKx': None},
+    'R': {'pKa': 2.17, 'pKb': 9.04, 'pKx': 12.48},
+    'N': {'pKa': 2.02, 'pKb': 8.80, 'pKx': None},
+    'D': {'pKa': 1.88, 'pKb': 9.60, 'pKx': 3.65},
+    'C': {'pKa': 1.96, 'pKb': 10.28, 'pKx': 8.18},
+    'E': {'pKa': 2.19, 'pKb': 9.67, 'pKx': 4.25},
+    'Q': {'pKa': 2.17, 'pKb': 9.13, 'pKx': None},
+    'G': {'pKa': 2.34, 'pKb': 9.60, 'pKx': None},
+    'H': {'pKa': 1.82, 'pKb': 9.17, 'pKx': 6.00},
+    'I': {'pKa': 2.36, 'pKb': 9.60, 'pKx': None},
+    'L': {'pKa': 2.36, 'pKb': 9.60, 'pKx': None},
+    'K': {'pKa': 2.18, 'pKb': 8.95, 'pKx': 10.53},
+    'M': {'pKa': 2.28, 'pKb': 9.21, 'pKx': None},
+    'F': {'pKa': 1.83, 'pKb': 9.13, 'pKx': None},
+    'P': {'pKa': 1.99, 'pKb': 10.60, 'pKx': None},
+    'S': {'pKa': 2.21, 'pKb': 9.15, 'pKx': None},
+    'T': {'pKa': 2.09, 'pKb': 9.10, 'pKx': None},
+    'W': {'pKa': 2.83, 'pKb': 9.39, 'pKx': None},
+    'Y': {'pKa': 2.20, 'pKb': 9.11, 'pKx': 10.07},
+    'V': {'pKa': 2.32, 'pKb': 9.62, 'pKx': None},
+    }
+
+
 # JSON structure parameter keys
 JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')
 jsonparameters = JsonParameters(
