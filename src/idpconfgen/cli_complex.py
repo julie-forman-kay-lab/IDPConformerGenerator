@@ -33,6 +33,7 @@ from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
 from idpconfgen.libs.libmultichain import (
     calculate_max_contacts,
     contact_matrix,
+    electropotential_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
     pick_point_from_heatmap,
@@ -65,6 +66,16 @@ ap.add_argument(
     help='Number of conformers to build.',
     default=1,
     type=int,
+    )
+
+ap.add_argument(
+    '-ph',
+    help=(
+        'The pH condition for calculating electrostatic potentials.'
+        'Defaults to 7.'
+        ),
+    default=7.0,
+    type=float,
     )
 
 #########################################
@@ -154,6 +165,7 @@ def main(
         residue_tolerance=None,
         nconfs=1,
         ncores=1,
+        ph=7,
         random_seed=0,
         xmer_probs=None,
         output_folder=None,
@@ -257,7 +269,9 @@ def main(
     for id, hit, loc in matrix_execute_pool:
         contact_mtx = np.add(contact_mtx, hit)
         location_mtx[id] = loc
-
+    
+    electro_mtx = electropotential_matrix(input_seq, ph)
+    
     norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
     log.info(S('done'))
     
@@ -266,7 +280,9 @@ def main(
         plot_path = Path(plot_name)
         plot_name = plot_path.with_suffix('.png')
     plot_out = str(output_folder) + '/' + plot_name
+    plot_electro_out = str(output_folder) + '/electro_' + plot_name
     plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
+    plot_contacts_matrix(electro_mtx, input_seq, plot_electro_out)
     log.info(S('done'))
     
     # Calculates the maximum number of contacts for each input sequence

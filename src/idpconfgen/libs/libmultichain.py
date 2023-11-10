@@ -6,7 +6,7 @@ from math import ceil, floor
 import numpy as np
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import aa3to1
+from idpconfgen.core.definitions import aa3to1, pk_aa_dict
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
@@ -382,6 +382,75 @@ def contact_matrix(db, sequence):
     return segid, hit_matrix, loc_matrix
 
 
+def electropotential_matrix(sequences, pH=7.0):
+    """
+    Generate a matrix of contacts based on pH and residue electrostatics.
+    
+    Parameters
+    ----------
+    sequences : dict or str
+        Can accept multiple sequences based on `input_seq`
+        variable from `cli_complex.py`.
+    
+    pH : int or float
+        Desired pH value of interest.
+        Defaults to 7.0.
+    
+    Returns
+    -------
+    matrix : np.ndarray
+        Disitrubtion matrix of all the matches and weights
+    """
+    assert (type(sequences) is dict) or (type(sequences) is str)
+    # TODO complete the multi-sequence case
+    if type(sequences) is dict:
+        seq = list(sequences.values())
+        combos = [c for c in combinations(seq, 2)]
+        len_seq = [(len(s[0]), len(s[1])) for s in combos]
+    else:
+        len_seq = len(sequences)
+        aa = [*sequences]
+        net_charge = []
+        for a in aa:
+            charge = 0
+            pKa, pKb, pKx = pk_aa_dict[a]
+            
+            if pKa > pH:
+                charge += 1
+            elif pKa == pH:
+                charge += 0.5
+            if pKb < pH:
+                charge -= 1
+            elif pKb == pH:
+                charge -= 0.5
+            
+            if a in ["R", "H", "K"]:
+                if pKx > pH:
+                    charge += 1
+                elif pKx == pH:
+                    charge += 0.5
+            elif a in ["D", "C", "E", "Y"]:
+                if pKx < pH:
+                    charge -= 1
+                elif pKx == pH:
+                    charge -= 0.5
+
+            net_charge.append(charge)
+        
+        charge_matrix = np.zeros((len_seq, len_seq))
+        for i in range(len_seq):
+            for j in range(i + 5, len_seq):
+                window1 = net_charge[i:i + 5]
+                window2 = net_charge[j:j + 5]
+                avg1 = sum(window1) / 5
+                avg2 = sum(window2) / 5
+                charge_matrix[i, j] = abs(avg1 - avg2)
+                charge_matrix[j, i] = abs(avg1 - avg2)
+
+    charge_matrix = np.flipud(charge_matrix)
+    return charge_matrix
+
+
 def extract_intrapairs_from_db(intra_seg):
     """
     Extract the sequence pairs of intra- contacts.
@@ -528,16 +597,13 @@ def calculate_max_contacts(sequences):
     assert (type(sequences) is dict) or (type(sequences) is str)
     num_contacts = {}
     if type(sequences) is dict:
-        # Add check here for modularity
-        if len(sequences) > 1:
-            for chain in sequences:
-                seq = sequences[chain]
-                len_seq = len(seq)
-                num_contacts[chain] = len_seq // 5
-        else:
-            seq = list(sequences.values())[0]
-            len_seq = len(seq)
-            num_contacts['A'] = len_seq // 5
+        chain = list(sequences.keys())
+        seq = list(sequences.values())
+        len_seq = [len(s) for s in seq]
+        for c, idx in enumerate(chain):
+            if c == "":
+                c = "A"
+            num_contacts[c] = len_seq[idx] // 5
     else:
         len_seq = len(sequences)
         num_contacts['A'] = len_seq // 5
