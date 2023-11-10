@@ -304,7 +304,13 @@ def plot_bend_angles(
     return errmsg
 
 
-def plot_contacts_matrix(matrix, sequence, output, dpi=300):
+def plot_contacts_matrix(
+        matrix,
+        sequence,
+        output,
+        dpi=300,
+        title="Contacts Frequency Heatmap (Sequence)"
+        ):
     """
     Plot matrix heatmap from `contact_matrix` function.
 
@@ -325,7 +331,7 @@ def plot_contacts_matrix(matrix, sequence, output, dpi=300):
     lw = 10
     plt.figure(figsize=(lw, lw))
     im = plt.imshow(matrix, cmap='plasma', interpolation='nearest')
-    plt.title('Contacts Frequency Heatmap', fontsize=18)
+    plt.title(title, fontsize=18)
     plt.colorbar().set_label(label="Frequency", size=16)
     im.figure.axes[1].tick_params(axis="y", labelsize=16)
     

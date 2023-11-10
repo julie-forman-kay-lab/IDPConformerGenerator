@@ -250,29 +250,38 @@ def main(
     
     all_contacts = intra_contacts + inter_contacts
     all_contacts_filtered = [c for c in all_contacts if c]
-    log.info(T("Calculating all-contacts probability matrix"))
-    matrix_consume = partial(contact_matrix, sequence=input_seq)
-    matrix_execute = partial(
-        report_on_crash,
-        matrix_consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
-    matrix_execute_pool = pool_function(
-        matrix_execute,
-        all_contacts_filtered,
-        ncores=ncores,
-        )
-    contact_mtx = np.zeros((seq_len, seq_len))
-    location_mtx = {}
-    for id, hit, loc in matrix_execute_pool:
-        contact_mtx = np.add(contact_mtx, hit)
-        location_mtx[id] = loc
+    if len(all_contacts_filtered) == 0:
+        log.info("WARNING: No contacts found. Your sequence is invalid.")
+        log.info("Only using electropotential contact frequencies.")
+    else:
+        log.info(T("Calculating all-contacts probability matrix"))
+        matrix_consume = partial(contact_matrix, sequence=input_seq)
+        matrix_execute = partial(
+            report_on_crash,
+            matrix_consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+        matrix_execute_pool = pool_function(
+            matrix_execute,
+            all_contacts_filtered,
+            ncores=ncores,
+            )
+        
+        contact_mtx = np.zeros((seq_len, seq_len))
+        location_mtx = {}
+        
+        for id, hit, loc in matrix_execute_pool:
+            contact_mtx = np.add(contact_mtx, hit)
+            location_mtx[id] = loc
+        
+        norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
+        log.info(S('done'))
     
+    log.info(T("Calculating electropotential contact matrix"))
     electro_mtx = electropotential_matrix(input_seq, ph)
-    
-    norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
+    norm_electro_mtx = (electro_mtx - np.min(electro_mtx)) / (np.max(electro_mtx) - np.min(electro_mtx))  # noqa: E501
     log.info(S('done'))
     
     log.info(T('saving heatmap distribution plot to output directory'))
@@ -281,8 +290,16 @@ def main(
         plot_name = plot_path.with_suffix('.png')
     plot_out = str(output_folder) + '/' + plot_name
     plot_electro_out = str(output_folder) + '/electro_' + plot_name
-    plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
-    plot_contacts_matrix(electro_mtx, input_seq, plot_electro_out)
+    if len(all_contacts_filtered) > 0:
+        plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
+    else:
+        norm_contact_mtx = norm_electro_mtx
+    plot_contacts_matrix(
+        norm_electro_mtx,
+        input_seq,
+        plot_electro_out,
+        title="Contacts Frequency Heatmap (Electrostatic)"
+        )
     log.info(S('done'))
     
     # Calculates the maximum number of contacts for each input sequence
