@@ -6,11 +6,17 @@ from math import ceil, floor
 import numpy as np
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import aa3to1, pk_aa_dict
+from idpconfgen.core.definitions import (
+    aa3to1,
+    pk_aa_dict,
+    vdW_radii_ionic_CRC82,
+    vdW_radii_tsai_1999,
+    )
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
+    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -609,6 +615,75 @@ def calculate_max_contacts(sequences):
         num_contacts['A'] = len_seq // 5
     
     return num_contacts
+
+
+def identify_surface_residues(structure_arr, inv_tolerance=0.8):
+    """
+    Look for surface accessible resiudes on a given structure.
+
+    Parameters
+    ----------
+    structure_arr : np.array
+        Array format of PDB/mmCIF structure.
+    
+    inv_tolerance : float
+        Number of angstroms for inverse tolerance, where higher
+        the value the more restrictive the clash check.
+        Defaults to 0.8.
+    
+    Returns
+    -------
+    non_clashing_idx : list
+        List of indices corresponding to primary sequence
+        of where the surface residues are predicted to be.
+    """
+    all_vdw_radii = {**vdW_radii_tsai_1999, **vdW_radii_ionic_CRC82}
+
+    coords = structure_arr[:, cols_coords].astype(float)
+    atoms = structure_arr[:, col_element]
+    vdw_radii = np.array([all_vdw_radii[a] for a in atoms])
+    resseq = structure_arr[:, col_resSeq]
+    res_coords = []
+    res_radii = []
+    
+    curr_coords = []
+    curr_radii = []
+    last = False
+    for i, num in enumerate(resseq):
+        try:
+            next_num = resseq[i + 1]
+        except IndexError:
+            last = True
+            continue
+        
+        curr_coords.append(coords[i])
+        curr_radii.append(vdw_radii[i])
+        
+        if (next_num != num) or last:
+            curr_coords = np.array(curr_coords)
+            centroid = np.mean(curr_coords, axis=0)
+            
+            distances = np.linalg.norm(curr_coords - centroid, axis=1)
+            effective_radius = np.mean(distances)
+            
+            res_radii.append(effective_radius)
+            res_coords.append(centroid)
+            
+            curr_coords = []
+            curr_radii = []
+
+    res_coords = np.array(res_coords)
+    res_radii = np.array(res_radii)
+    
+    distances = np.linalg.norm(res_coords[:, np.newaxis, :] - res_coords, axis=2)  # noqa: E501
+    radii_sum = res_radii[:, np.newaxis] + res_radii
+    
+    clash_matrix = distances < radii_sum + inv_tolerance
+    np.fill_diagonal(clash_matrix, False)
+    
+    non_clashing_idx = np.where(~np.any(clash_matrix, axis=0))[0]
+    
+    return non_clashing_idx.tolist()
 
 
 def reverse_position_lookup(coords, location_mtx, database):
