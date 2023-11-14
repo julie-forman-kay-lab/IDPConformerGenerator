@@ -78,6 +78,18 @@ ap.add_argument(
     type=float,
     )
 
+ap.add_argument(
+    '--blend-weight',
+    help=(
+        'Integer weight from 0-100. Where 100 only uses the electrostatic '
+        'potential contacts frequency and a value of 0 only uses the '
+        'sequence-based contacts frequency. '
+        'Defaults to 50.'
+        ),
+    default=50,
+    type=int,
+    )
+
 #########################################
 libcli.add_argument_dloopoff(ap)
 libcli.add_argument_dhelix(ap)
@@ -166,6 +178,7 @@ def main(
         nconfs=1,
         ncores=1,
         ph=7,
+        blend_weight=50,
         random_seed=0,
         xmer_probs=None,
         output_folder=None,
@@ -302,6 +315,20 @@ def main(
         )
     log.info(S('done'))
     
+    log.info(T('Blending contact map frequencies and plotting'))
+    blend_weight = np.clip(blend_weight, 0, 100)  # ensure it's between 0-100
+    minimized_blend_weight = blend_weight / 100.0
+    blended_contacts_mtx = (1 - minimized_blend_weight) * norm_contact_mtx + minimized_blend_weight * norm_electro_mtx  # noqa: E501
+    norm_blended_mtx = (blended_contacts_mtx - np.min(blended_contacts_mtx)) / (np.max(blended_contacts_mtx) - np.min(blended_contacts_mtx))  # noqa: E501
+    plot_blended_out = str(output_folder) + f'/blend_{blend_weight}_' + plot_name  # noqa: E501
+    plot_contacts_matrix(
+        norm_blended_mtx,
+        input_seq,
+        plot_blended_out,
+        title=f"Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
+        )
+    log.info(S('done'))
+    
     # Calculates the maximum number of contacts for each input sequence
     max_contacts = calculate_max_contacts(input_seq)
     preselected_contacts = {}
@@ -310,7 +337,7 @@ def main(
         chosen_contacts = []
         max_num = max_contacts[chain]
         for _ in range(nconfs):
-            chosen_contacts.append(pick_point_from_heatmap(norm_contact_mtx, max_num))  # noqa: E501
+            chosen_contacts.append(pick_point_from_heatmap(norm_blended_mtx, max_num))  # noqa: E501
         preselected_contacts[chain] = chosen_contacts
 
 
