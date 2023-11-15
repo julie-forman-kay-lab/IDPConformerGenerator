@@ -388,6 +388,53 @@ def contact_matrix(db, sequence):
     return segid, hit_matrix, loc_matrix
 
 
+def find_sequence_net_charge(seq, pH):
+    """
+    Find the net charge of a given sequence based on pK and pH.
+
+    Parameters
+    ----------
+    seq : str
+        String of 1 letter AAs.
+    
+    pH : int or float
+        pH of interest.
+    
+    Returns
+    -------
+    net_charge : list of float
+        Net charge per residue.
+    """
+    aa = [*seq]
+    net_charge = []
+    for a in aa:
+        charge = 0
+        pKa, pKb, pKx = pk_aa_dict[a]
+        
+        if pKa > pH:
+            charge += 1
+        elif pKa == pH:
+            charge += 0.5
+        if pKb < pH:
+            charge -= 1
+        elif pKb == pH:
+            charge -= 0.5
+        
+        if a in ["R", "H", "K"]:
+            if pKx > pH:
+                charge += 1
+            elif pKx == pH:
+                charge += 0.5
+        elif a in ["D", "C", "E", "Y"]:
+            if pKx < pH:
+                charge -= 1
+            elif pKx == pH:
+                charge -= 0.5
+        net_charge.append(charge)
+    
+    return net_charge
+
+
 def electropotential_matrix(sequences, pH=7.0):
     """
     Generate a matrix of contacts based on pH and residue electrostatics.
@@ -408,40 +455,32 @@ def electropotential_matrix(sequences, pH=7.0):
         Disitrubtion matrix of all the matches and weights
     """
     assert (type(sequences) is dict) or (type(sequences) is str)
-    # TODO complete the multi-sequence case
+    # For multiple sequences, calculate heatmap between all combinations
     if type(sequences) is dict:
+        # We need a dictionary of matrices for each combination
+        charge_matrix = {}
         seq = list(sequences.values())
         combos = [c for c in combinations(seq, 2)]
-        len_seq = [(len(s[0]), len(s[1])) for s in combos]
-    else:
+        for i, pairs in enumerate(combos):
+            seq1 = pairs[0]
+            len1 = len(seq1)
+            seq2 = pairs[1]
+            len2 = len(seq2)
+            charge1 = find_sequence_net_charge(seq1, pH)
+            charge2 = find_sequence_net_charge(seq2, pH)
+            
+            charge_mtx = np.zeros((len1, len2))
+            for i in range(len1):
+                for j in range(len2):
+                    window1 = charge1[i:i + 5]
+                    window2 = charge2[j:j + 5]
+                    avg1 = sum(window1) / 5
+                    avg2 = sum(window2) / 5
+                    charge_mtx[i, j] = abs(avg1 - avg2)
+            charge_matrix[pairs] = np.flipud(charge_mtx)
+    else:  # For single sequences only, intramolecular
         len_seq = len(sequences)
-        aa = [*sequences]
-        net_charge = []
-        for a in aa:
-            charge = 0
-            pKa, pKb, pKx = pk_aa_dict[a]
-            
-            if pKa > pH:
-                charge += 1
-            elif pKa == pH:
-                charge += 0.5
-            if pKb < pH:
-                charge -= 1
-            elif pKb == pH:
-                charge -= 0.5
-            
-            if a in ["R", "H", "K"]:
-                if pKx > pH:
-                    charge += 1
-                elif pKx == pH:
-                    charge += 0.5
-            elif a in ["D", "C", "E", "Y"]:
-                if pKx < pH:
-                    charge -= 1
-                elif pKx == pH:
-                    charge -= 0.5
-
-            net_charge.append(charge)
+        net_charge = find_sequence_net_charge(sequences, pH)
         
         charge_matrix = np.zeros((len_seq, len_seq))
         for i in range(len_seq):
@@ -452,8 +491,8 @@ def electropotential_matrix(sequences, pH=7.0):
                 avg2 = sum(window2) / 5
                 charge_matrix[i, j] = abs(avg1 - avg2)
                 charge_matrix[j, i] = abs(avg1 - avg2)
-
-    charge_matrix = np.flipud(charge_matrix)
+        charge_matrix = np.flipud(charge_matrix)
+    
     return charge_matrix
 
 
