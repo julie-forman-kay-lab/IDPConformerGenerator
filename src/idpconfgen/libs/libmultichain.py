@@ -344,8 +344,9 @@ def contact_matrix(db, sequence):
         to the full database.
         E.g. {"seg1": [("ABC", "DEF"),]}
     
-    sequence : str
-        Input protein sequence
+    sequence : dict or str
+        Input protein sequence.
+        Can be multiple sequences.
     
     Returns
     -------
@@ -355,36 +356,76 @@ def contact_matrix(db, sequence):
     positions : list
         List of positions corresponding to input database
     """
-    seq_len = len(sequence)
-    hit_matrix = np.zeros((seq_len, seq_len))
-    loc_matrix = np.empty((seq_len, seq_len), dtype=object)
-    loc_matrix.fill([])
     segid = next(iter(db))
     
-    for pairs in db.values():
-        for idx, pair in enumerate(pairs):
-            p1, p2 = pair
-            for i in range(seq_len):
-                for j in range(i + 1, seq_len):
-                    c1 = ""
-                    c2 = ""
-                    for k in range(i - 2, i + 3):
-                        if 0 <= k < seq_len:
-                            c1 += f"{sequence[k]}"
-                    for k in range(j - 2, j + 3):
-                        if 0 <= k < seq_len:
-                            c2 += f"{sequence[k]}"
-                    p1_c1 = has_consecutive_match(p1, c1)
-                    p1_c2 = has_consecutive_match(p1, c2)
-                    p2_c1 = has_consecutive_match(p2, c1)
-                    p2_c2 = has_consecutive_match(p2, c2)
-                    if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
-                        hit_matrix[i, j] += 1
-                        hit_matrix[j, i] += 1
-                        loc_matrix[i, j].append(idx)
-    
-    hit_matrix = np.flipud(hit_matrix)
-    loc_matrix = np.flipud(loc_matrix)
+    if type(sequence) is dict:
+        seqs = list(sequence.values())
+        combos = [c for c in combinations(seqs, 2)]
+        hit_matrix = {}
+        loc_matrix = {}
+        for i, c in enumerate(combos):
+            seq1 = c[0]
+            len1 = len(seq1)
+            seq2 = c[1]
+            len2 = len(seq2)
+            
+            h_mtx = np.zeros((len1, len2))
+            l_mtx = np.empty((len1, len2), dtype=object)
+            l_mtx.fill([])
+            
+            for pairs in db.values():
+                for idx, pair in enumerate(pairs):
+                    p1, p2 = pair
+                    for i in range(len1):
+                        for j in range(len2):
+                            c1 = ""
+                            c2 = ""
+                            for k in range(i - 2, i + 3):
+                                if 0 <= k < len1:
+                                    c1 += f"{seq1[k]}"
+                            for k in range(j - 2, j + 3):
+                                if 0 <= k < len2:
+                                    c2 += f"{seq2[k]}"
+                            p1_c1 = has_consecutive_match(p1, c1)
+                            p1_c2 = has_consecutive_match(p1, c2)
+                            p2_c1 = has_consecutive_match(p2, c1)
+                            p2_c2 = has_consecutive_match(p2, c2)
+                            if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
+                                h_mtx[i, j] += 1
+                                l_mtx[i, j].append(idx)
+            
+            hit_matrix[c] = np.flipud(h_mtx)
+            loc_matrix[c] = np.flipud(l_mtx)
+    else:
+        seq_len = len(sequence)
+        hit_matrix = np.zeros((seq_len, seq_len))
+        loc_matrix = np.empty((seq_len, seq_len), dtype=object)
+        loc_matrix.fill([])
+        
+        for pairs in db.values():
+            for idx, pair in enumerate(pairs):
+                p1, p2 = pair
+                for i in range(seq_len):
+                    for j in range(i + 1, seq_len):
+                        c1 = ""
+                        c2 = ""
+                        for k in range(i - 2, i + 3):
+                            if 0 <= k < seq_len:
+                                c1 += f"{sequence[k]}"
+                        for k in range(j - 2, j + 3):
+                            if 0 <= k < seq_len:
+                                c2 += f"{sequence[k]}"
+                        p1_c1 = has_consecutive_match(p1, c1)
+                        p1_c2 = has_consecutive_match(p1, c2)
+                        p2_c1 = has_consecutive_match(p2, c1)
+                        p2_c2 = has_consecutive_match(p2, c2)
+                        if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
+                            hit_matrix[i, j] += 1
+                            hit_matrix[j, i] += 1
+                            loc_matrix[i, j].append(idx)
+
+        hit_matrix = np.flipud(hit_matrix)
+        loc_matrix = np.flipud(loc_matrix)
     return segid, hit_matrix, loc_matrix
 
 

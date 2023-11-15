@@ -214,7 +214,6 @@ def main(
             log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
             for chain in input_seq:
                 log.info(S(f'{chain}: {input_seq[chain]}'))
-            # TODO cover the case of multiple sequences
         else:
             input_seq = list(input_seq.values())[0]
             seq_len = len(input_seq)
