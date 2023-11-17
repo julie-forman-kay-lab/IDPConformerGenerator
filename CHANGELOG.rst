@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update documentation for DSSP due to clarity with version requirements
+* Set default of ``-cmd`` in ``sscalc`` to ``mkdssp``
+
 v0.7.11 (2023-11-02)
 ------------------------------------------------------------
 
