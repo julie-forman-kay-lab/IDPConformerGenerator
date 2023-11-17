@@ -60,8 +60,8 @@ libcli.add_argument_pdb_files(ap)
 ap.add_argument(
     '-cmd',
     '--dssp_cmd',
-    help="Path the do DSSP executable. Defaults to `dssp`.",
-    default="dssp",
+    help="Shell command for the DSSP executable. Defaults to `mkdssp`.",
+    default="mkdssp",
     )
 
 ap.add_argument(
