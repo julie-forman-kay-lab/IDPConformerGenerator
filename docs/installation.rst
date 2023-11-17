@@ -131,8 +131,10 @@ structures. However, you only need DSSP if you are generated the database from
 scratch. If you use a prepared database JSON file you don't need to install
 DSSP.
 
-To install DSSP, please refer to:
-https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48
+Please note we are only compatible with DSSP versions 2 and 3. If you have
+installed DSSP version 4 (check by using the command ``mkdssp --version``) please
+refer `to this issue <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48>`_
+for a proper re-installation after removing DSSP version 4.
 
 Install MC-SCE
 ``````````````
