@@ -11,6 +11,7 @@ Changelog
 
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 * Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
+* Add BioPython as a dependency for calulation purposes
 
 v0.7.12 (2023-11-17)
 ------------------------------------------------------------

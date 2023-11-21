@@ -4,19 +4,15 @@ from itertools import combinations
 from math import ceil, floor
 
 import numpy as np
+from Bio.PDB import MMCIFParser, PDBParser
+from Bio.PDB.SASA import ShrakeRupley
 
 from idpconfgen import Path
-from idpconfgen.core.definitions import (
-    aa3to1,
-    pk_aa_dict,
-    vdW_radii_ionic_CRC82,
-    vdW_radii_tsai_1999,
-    )
+from idpconfgen.core.definitions import aa3to1, pk_aa_dict
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
-    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -697,73 +693,65 @@ def calculate_max_contacts(sequences):
     return num_contacts
 
 
-def identify_surface_residues(structure_arr, inv_tolerance=0.8):
+def find_sa_residues(
+        structure_path,
+        min_area=63.3,
+        probe_radius=1.40,
+        n_points=500
+        ):
     """
-    Look for surface accessible resiudes on a given structure.
+    Use SASA module in BioPython to find surface accessible resiudes.
+    
+    Reference: https://biopython.org/docs/dev/api/Bio.PDB.SASA.html
 
     Parameters
     ----------
-    structure_arr : np.array
-        Array format of PDB/mmCIF structure.
+    structure_path : string
+        Path to the .PDB structure of interest.
     
-    inv_tolerance : float
-        Number of angstroms for inverse tolerance, where higher
-        the value the more restrictive the clash check.
-        Defaults to 0.8.
+    min_area : float
+        Minimum SASA to consider to be on the surface.
+        Defaults to 63.3 Å^2, surface area of Glycine.
+    
+    probe_radius : float
+        Radius of rolling-ball, defaults to 1.4 A,
+        radius of a water molecule.
+    
+    n_points : int
+        Resolution of the surface of each atom.
+        Defaults to 500.
     
     Returns
     -------
-    non_clashing_idx : list
-        List of indices corresponding to primary sequence
-        of where the surface residues are predicted to be.
+    residue_sasa : list of float
+        Solvent accessible surface area for each residue
+        that is considered on the surface to make a contact.
+        
+    residue_idx : list of int
+        Indices for the residues that are considered on the
+        surface to make a contact.
     """
-    all_vdw_radii = {**vdW_radii_tsai_1999, **vdW_radii_ionic_CRC82}
-
-    coords = structure_arr[:, cols_coords].astype(float)
-    atoms = structure_arr[:, col_element]
-    vdw_radii = np.array([all_vdw_radii[a] for a in atoms])
-    resseq = structure_arr[:, col_resSeq]
-    res_coords = []
-    res_radii = []
+    if structure_path.endswith('.pdb'):
+        p = PDBParser(QUIET=1)
+    elif structure_path.endswith('.cif'):
+        p = MMCIFParser(QUIET=1)
     
-    curr_coords = []
-    curr_radii = []
-    last = False
-    for i, num in enumerate(resseq):
-        try:
-            next_num = resseq[i + 1]
-        except IndexError:
-            last = True
-            continue
-        
-        curr_coords.append(coords[i])
-        curr_radii.append(vdw_radii[i])
-        
-        if (next_num != num) or last:
-            curr_coords = np.array(curr_coords)
-            centroid = np.mean(curr_coords, axis=0)
-            
-            distances = np.linalg.norm(curr_coords - centroid, axis=1)
-            effective_radius = np.mean(distances)
-            
-            res_radii.append(effective_radius)
-            res_coords.append(centroid)
-            
-            curr_coords = []
-            curr_radii = []
-
-    res_coords = np.array(res_coords)
-    res_radii = np.array(res_radii)
+    sr = ShrakeRupley(
+        probe_radius=probe_radius,
+        n_points=n_points,
+        )
+    struc = p.get_structure("structure", structure_path)
+    sr.compute(struc, level="R")
     
-    distances = np.linalg.norm(res_coords[:, np.newaxis, :] - res_coords, axis=2)  # noqa: E501
-    radii_sum = res_radii[:, np.newaxis] + res_radii
+    residue_sasa = []
+    residue_idx = []
+    for i, res in enumerate(struc.get_residues()):
+        area = res.sasa
+        if area > min_area:
+            residue_sasa.append(res.sasa)
+            residue_idx.append(i)
     
-    clash_matrix = distances < radii_sum + inv_tolerance
-    np.fill_diagonal(clash_matrix, False)
-    
-    non_clashing_idx = np.where(~np.any(clash_matrix, axis=0))[0]
-    
-    return non_clashing_idx.tolist()
+    return residue_sasa, residue_idx
 
 
 def reverse_position_lookup(coords, location_mtx, database):
