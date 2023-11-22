@@ -97,10 +97,13 @@ def calculate_angle(a, b, c):
     Parameters
     ----------
     a : np.ndarray
+        Array of shape (n, 3) representing n sets of 3D coordinates.
     
     b : np.ndarray
+        Array of shape (n, 3) representing n sets of 3D coordinates.
     
     c : np.ndarray
+        Array of shape (n, 3) representing n sets of 3D coordinates.
     
     Return
     ------
@@ -641,8 +644,8 @@ def next_seeker(
     
     Returns
     -------
-    False
-        If no matches have been found. Otherwise write them to output folder.
+    matches : int
+        The number of matches found.
     """
     matches = 0
     idr_struc = Structure(Path(cterm_idr))
@@ -652,18 +655,10 @@ def next_seeker(
     idr_coords = idr_arr[:, cols_coords].astype(float)
     idr_resseq = idr_arr[:, col_resSeq].astype(int)
     
-    idr_C = []
-    idr_CA = []
-    idr_O = []
-    idr_res = []
-    for n, name in enumerate(idr_name):
-        if name == 'C':
-            idr_C.append(idr_coords[n])
-            idr_res.append(idr_resseq[n])
-        elif name == 'CA':
-            idr_CA.append(idr_coords[n])
-        elif name == 'O':
-            idr_O.append(idr_coords[n])
+    idr_C = idr_coords[idr_name == 'C']
+    idr_CA = idr_coords[idr_name == 'CA']
+    idr_O = idr_coords[idr_name == 'O']
+    idr_res = idr_resseq[idr_name == 'C']
     
     for nterm_idr in nterm_idr_lib:
         nterm_idr_struc = Structure(Path(nterm_idr))
@@ -672,13 +667,8 @@ def next_seeker(
         nterm_idr_name = nterm_idr_arr[:, col_name]
         nterm_idr_coords = nterm_idr_arr[:, cols_coords].astype(float)
         
-        nterm_idr_N = []
-        nterm_idr_CA = []
-        for n, name in enumerate(nterm_idr_name):
-            if name == 'N':
-                nterm_idr_N.append(nterm_idr_coords[n])
-            elif name == 'CA':
-                nterm_idr_CA.append(nterm_idr_coords[n])
+        nterm_idr_N = nterm_idr_coords[nterm_idr_name == 'N']
+        nterm_idr_CA = nterm_idr_coords[nterm_idr_name == 'CA']
         
         for i, curr_c in enumerate(idr_C):
             try:
