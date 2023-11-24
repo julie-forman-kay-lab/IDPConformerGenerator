@@ -698,14 +698,19 @@ def next_seeker(
         distances_CCA = calculate_distances(idr_C, nterm_idr_CA)
         CACN_angs = calculate_angles(idr_CA, idr_C, nterm_idr_N)
 
-        omegas = calculate_multiple_torsions(idr_CA, idr_C, nterm_idr_N, nterm_idr_CA)
+        omegas = calculate_multiple_torsions(
+            idr_CA,
+            idr_C,
+            nterm_idr_N,
+            nterm_idr_CA
+            )
 
         valid_indices = np.where(
-            (1.32 <= distances_CN) & (distances_CN <= 1.56) &
-            (1.91 <= CACN_angs) & (CACN_angs <= 2.15) &
-            (2.2 <= distances_CCA) & (distances_CCA <= 2.7) &
+            (1.32 <= distances_CN) & (distances_CN <= 1.56) &  # noqa: W504
+            (1.91 <= CACN_angs) & (CACN_angs <= 2.15) &  # noqa: W504
+            (2.2 <= distances_CCA) & (distances_CCA <= 2.7) &  # noqa: W504
             (np.abs(omegas) >= 2.61)
-        )
+            )
         
         for i in valid_indices[0]:
             term_residue = idr_res[i]
@@ -746,7 +751,7 @@ def next_seeker(
                         break
                 
                 # Fix the position of the Carbonyl O and Nitrogen H
-                CO_length =  np.sqrt(np.sum((idr_C[i] - idr_O[i]) ** 2))
+                CO_length = np.sqrt(np.sum((idr_C[i] - idr_O[i])**2))
                 CAC_O_vec = idr_CA[i] - idr_C[i]
                 NC_O_vec = nterm_idr_N[i] - idr_C[i]
                 O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
