@@ -18,7 +18,6 @@ from idpconfgen.core.definitions import (
     vdW_radii_tsai_1999,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import convert_tuples_to_lists
 from idpconfgen.libs.libstructure import (
@@ -70,61 +69,86 @@ def tolerance_calculator(tolerance):
     return max_clash, dist_tolerance
 
 
-def calculate_distance(coords1, coords2):
+def calculate_distances(coords1, coords2):
     """
-    Calculate the distance between two 3D coordinates.
+    Calculate the distance between two arrays of 3D coordinates.
     
     Calculates the distance between 2 coordinates using Euclidean distance
     formula.
     
     Parameters
     ----------
-    coords1 : np.ndarray
-    
-    coords2 : np.ndarray
+    coords1, coords2 : np.ndarray (N, 3) of coordinates
     
     Return
     ------
-    float distance
+    np.ndarray (N,) distance
     """
-    return np.sqrt(np.sum((coords1 - coords2) ** 2))
+    return np.sqrt(np.sum((coords1 - coords2) ** 2, axis=1))
 
 
-def calculate_angle(a, b, c):
+def calculate_angles(a, b, c):
     """
-    Calculate angle between three 3D coordinates.
+    Calculate angles between arrays of 3D coordinates.
 
     Parameters
     ----------
-    a : np.ndarray
-        Array of shape (n, 3) representing n sets of 3D coordinates.
-    
-    b : np.ndarray
-        Array of shape (n, 3) representing n sets of 3D coordinates.
-    
-    c : np.ndarray
-        Array of shape (n, 3) representing n sets of 3D coordinates.
+    a, b, c : np.ndarray
+        Array of shape (N, 3) representing n sets of 3D coordinates.
     
     Return
     ------
-    float angle in radians
+    np.ndarray (N,) of float angles in radians.
     """
     ab = a - b
     cb = c - b
 
     # Calculate the dot product
-    dot_product = np.dot(ab, cb)
+    dot_product = np.sum(ab * cb, axis=-1)
 
     # Calculate the magnitudes of the vectors
-    mag_ab = np.linalg.norm(ab)
-    mag_cb = np.linalg.norm(cb)
+    mag_ab = np.linalg.norm(ab, axis=-1)
+    mag_cb = np.linalg.norm(cb, axis=-1)
 
     # Calculate the cosine of the angle between the vectors
     cos_angle = dot_product / (mag_ab * mag_cb)
-    # Calculate the angle in radians
+    
     angle = np.arccos(cos_angle)
 
     return angle
+
+
+def calculate_multiple_torsions(a1, a2, a3, a4):
+    """
+    Calculate torsion angles from arrays of sequential coordinates.
+    
+    Modified function from `calc_torsion_angles()` in `libcalc.py`.
+    
+    A1---A2
+           \
+            \
+            A3---A4
+
+    Calculates the torsion angle in A2-A3 that would place A4 in respect
+    to the plane (A1, A2, A3).
+    
+    Parameters
+    ----------
+    a1, a2, a3, a4 : np.ndarray (N, 3) of coordinates
+    
+    Returns
+    -------
+    np.ndarray of shape (N,) torsion angles in radians.
+    """
+    u0 = np.cross(a2 - a1, a3 - a2)
+    u1 = np.cross(a3 - a2, a4 - a3)
+    u3 = (a3 - a2) / np.linalg.norm(a3 - a2, axis=1)[:, np.newaxis]
+    u2 = np.cross(u3, u1)
+
+    cos_theta = np.einsum('ij,ij->i', u0, u1)
+    sin_theta = np.einsum('ij,ij->i', u0, u2)
+    
+    return -np.arctan2(sin_theta, cos_theta)
 
 
 def consecutive_grouper(seq):
@@ -655,10 +679,10 @@ def next_seeker(
     idr_coords = idr_arr[:, cols_coords].astype(float)
     idr_resseq = idr_arr[:, col_resSeq].astype(int)
     
-    idr_C = idr_coords[idr_name == 'C']
-    idr_CA = idr_coords[idr_name == 'CA']
-    idr_O = idr_coords[idr_name == 'O']
-    idr_res = idr_resseq[idr_name == 'C']
+    idr_C = idr_coords[idr_name == 'C'][:-1]
+    idr_CA = idr_coords[idr_name == 'CA'][:-1]
+    idr_O = idr_coords[idr_name == 'O'][:-1]
+    idr_res = idr_resseq[idr_name == 'C'][:-1]
     
     for nterm_idr in nterm_idr_lib:
         nterm_idr_struc = Structure(Path(nterm_idr))
@@ -667,92 +691,91 @@ def next_seeker(
         nterm_idr_name = nterm_idr_arr[:, col_name]
         nterm_idr_coords = nterm_idr_arr[:, cols_coords].astype(float)
         
-        nterm_idr_N = nterm_idr_coords[nterm_idr_name == 'N']
-        nterm_idr_CA = nterm_idr_coords[nterm_idr_name == 'CA']
+        nterm_idr_N = nterm_idr_coords[nterm_idr_name == 'N'][1:]
+        nterm_idr_CA = nterm_idr_coords[nterm_idr_name == 'CA'][1:]
         
-        for i, curr_c in enumerate(idr_C):
-            try:
-                next_n = nterm_idr_N[i + 1]
-                next_ca = nterm_idr_CA[i + 1]
-            except IndexError:
-                break
-            CN_dist = calculate_distance(curr_c, next_n)
-            CCA_dist = calculate_distance(curr_c, next_ca)
-            CACN_ang = calculate_angle(idr_CA[i], curr_c, next_n)
-            CACNCA_coords = np.array([idr_CA[i], curr_c, next_n, next_ca])
-            omega = calc_torsion_angles(CACNCA_coords)
-            # Here is a set of geometric checks to ensure we have closure
-            # Refer to distances and angles in `core/build_definitions.py`
-            # |omega| angle must be greater than 150 deg
-            if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7 and np.abs(omega) >= 2.61:  # noqa: E501
-                term_residue = idr_res[i]
+        distances_CN = calculate_distances(idr_C, nterm_idr_N)
+        distances_CCA = calculate_distances(idr_C, nterm_idr_CA)
+        CACN_angs = calculate_angles(idr_CA, idr_C, nterm_idr_N)
+
+        omegas = calculate_multiple_torsions(idr_CA, idr_C, nterm_idr_N, nterm_idr_CA)
+
+        valid_indices = np.where(
+            (1.32 <= distances_CN) & (distances_CN <= 1.56) &
+            (1.91 <= CACN_angs) & (CACN_angs <= 2.15) &
+            (2.2 <= distances_CCA) & (distances_CCA <= 2.7) &
+            (np.abs(omegas) >= 2.61)
+        )
+        
+        for i in valid_indices[0]:
+            term_residue = idr_res[i]
+            
+            idr_list = []
+            for p, _ in enumerate(idr_resseq):
+                next = idr_resseq[p + 1]
+                idr_list.append(idr_arr[p])
+                nterm_idr_arr = nterm_idr_arr[1:]
+                if next == term_residue + 1:
+                    break
+            idr_arr = np.array(idr_list)
                 
-                idr_list = []
-                for p, _ in enumerate(idr_resseq):
-                    next = idr_resseq[p + 1]
-                    idr_list.append(idr_arr[p])
-                    nterm_idr_arr = nterm_idr_arr[1:]
-                    if next == term_residue + 1:
+            nterm_idr_struc._data_array = nterm_idr_arr
+            
+            clashes, _ = count_clashes(
+                idr_arr,
+                nterm_idr_struc,
+                disorder_cases[1],
+                max_clash,
+                tolerance,
+                )
+            
+            if type(clashes) is int:
+                nterm_idr_list = nterm_idr_arr.tolist()
+                final_struc_arr = np.array(idr_list + nterm_idr_list)
+                final_struc_name = final_struc_arr[:, col_name]
+                final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
+                H_idx = -1  # for cases like Proline without "H"
+                for idx, name in enumerate(final_struc_name):
+                    if final_struc_res[idx] == term_residue:
+                        if name == 'O':
+                            O_idx = idx
+                    elif final_struc_res[idx] == term_residue + 1:
+                        if name == 'H':
+                            H_idx = idx
+                    elif final_struc_res[idx] == term_residue + 2:
                         break
-                idr_arr = np.array(idr_list)
-                    
-                nterm_idr_struc._data_array = nterm_idr_arr
                 
-                clashes, _ = count_clashes(
-                    idr_arr,
-                    nterm_idr_struc,
-                    disorder_cases[1],
-                    max_clash,
-                    tolerance,
-                    )
+                # Fix the position of the Carbonyl O and Nitrogen H
+                CO_length =  np.sqrt(np.sum((idr_C[i] - idr_O[i]) ** 2))
+                CAC_O_vec = idr_CA[i] - idr_C[i]
+                NC_O_vec = nterm_idr_N[i] - idr_C[i]
+                O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
+                O_vector = CO_length * np.sin(O_angle / 2) * (CAC_O_vec / np.linalg.norm(CAC_O_vec)) + CO_length * np.sin(O_angle / 2) * (NC_O_vec / np.linalg.norm(NC_O_vec))  # noqa: E501
+                new_O_xyz = idr_C[i] - O_vector
+
+                final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
+                final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
+                final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
                 
-                if type(clashes) is int:
-                    nterm_idr_list = nterm_idr_arr.tolist()
-                    final_struc_arr = np.array(idr_list + nterm_idr_list)
-                    final_struc_name = final_struc_arr[:, col_name]
-                    final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
-                    H_idx = -1  # for cases like Proline without "H"
-                    for idx, name in enumerate(final_struc_name):
-                        if final_struc_res[idx] == term_residue:
-                            if name == 'O':
-                                O_idx = idx
-                        elif final_struc_res[idx] == term_residue + 1:
-                            if name == 'H':
-                                H_idx = idx
-                        elif final_struc_res[idx] == term_residue + 2:
-                            break
+                if H_idx >= 0:
+                    # Bond length also taken from
+                    # `core/build_definitions.py`
+                    NH_length = 1.0
+                    CN_H_vec = idr_C[i] - nterm_idr_N[i]
+                    CAN_H_vec = nterm_idr_CA[i] - nterm_idr_N[i]
+                    H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
+                    H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
+                    new_H_xyz = nterm_idr_N[i] - H_vector
                     
-                    # Fix the position of the Carbonyl O and Nitrogen H
-                    CO_length = calculate_distance(curr_c, idr_O[i])
-                    CAC_O_vec = idr_CA[i] - curr_c
-                    NC_O_vec = next_n - curr_c
-                    O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
-                    O_vector = CO_length * np.sin(O_angle / 2) * (CAC_O_vec / np.linalg.norm(CAC_O_vec)) + CO_length * np.sin(O_angle / 2) * (NC_O_vec / np.linalg.norm(NC_O_vec))  # noqa: E501
-                    new_O_xyz = curr_c - O_vector
-  
-                    final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
-                    final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
-                    final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
-                    
-                    if H_idx >= 0:
-                        # Bond length also taken from
-                        # `core/build_definitions.py`
-                        NH_length = 1.0
-                        CN_H_vec = curr_c - next_n
-                        CAN_H_vec = next_ca - next_n
-                        H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
-                        H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
-                        new_H_xyz = next_n - H_vector
-                        
-                        final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
-                        final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
-                        final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
-                    
-                    final_struc = structure_to_pdb(final_struc_arr)
-                    cterm_idr_stem = Path(cterm_idr).stem
-                    nterm_idr_stem = Path(nterm_idr).stem
-                    matches += 1
-                    write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
+                    final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
+                    final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
+                    final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
+                
+                final_struc = structure_to_pdb(final_struc_arr)
+                cterm_idr_stem = Path(cterm_idr).stem
+                nterm_idr_stem = Path(nterm_idr).stem
+                matches += 1
+                write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
 
     return matches
 
