@@ -10,6 +10,7 @@ USAGE:
 """
 import argparse
 from functools import partial
+from itertools import combinations
 
 import numpy as np
 
@@ -36,9 +37,11 @@ from idpconfgen.libs.libmultichain import (
     electropotential_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
+    find_sa_residues,
     pick_point_from_heatmap,
     )
 from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libstructure import Structure
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 
@@ -59,6 +62,17 @@ ap = libcli.CustomParser(
 
 libcli.add_argument_idb(ap)
 libcli.add_argument_seq(ap)
+
+ap.add_argument(
+    '-fld',
+    '--folded-structure',
+    help=(
+        "Input .PDB or .CIF file for folded structure of interest. "
+        "If given folded-structure, only surface residues will be "
+        "considered for intermolecular contacts with the sequence."
+        ),
+    default=None,
+    )
 
 ap.add_argument(
     '-nc',
@@ -165,6 +179,7 @@ libcli.add_argument_ncores(ap)
 def main(
         input_seq,
         database,
+        folded_structure=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -262,12 +277,37 @@ def main(
     
     all_contacts = intra_contacts + inter_contacts
     all_contacts_filtered = [c for c in all_contacts if c]
+    
+    if folded_structure:
+        assert folded_structure.endswith('.pdb') or \
+            folded_structure.endswith('.cif')
+
+        fld_struc = Structure(Path(folded_structure))
+        fld_struc.build()
+        fld_seq = fld_struc.fasta
+        fld_seq = list(fld_seq.values())[0]
+
+        sa_idx = find_sa_residues(folded_structure)
+        combo_seqs = []
+        # TODO retrofit for multiple chains in fld_struc and sequences
+        for group in sa_idx:
+            res = ""
+            for i in group:
+                res += fld_seq[i]
+            combo_seqs.append((input_seq, res))
+    else:
+        if type(input_seq) is dict:
+            seqs = list(input_seq.values())
+            combo_seqs = [c for c in combinations(seqs, 2)]
+        else:
+            combo_seqs = input_seq
+    
     if len(all_contacts_filtered) == 0:
-        log.info("WARNING: No contacts found. Your sequence is invalid.")
+        log.info("WARNING: No contacts found. Your database is invalid.")
         log.info("Only using electropotential contact frequencies.")
     else:
         log.info(T("Calculating all-contacts probability matrix"))
-        matrix_consume = partial(contact_matrix, sequence=input_seq)
+        matrix_consume = partial(contact_matrix, sequence=combo_seqs)
         matrix_execute = partial(
             report_on_crash,
             matrix_consume,
@@ -283,16 +323,16 @@ def main(
         
         contact_mtx = np.zeros((seq_len, seq_len))
         location_mtx = {}
-        
+        # TODO Change contact and location mtx to handle multiple matrices
         for id, hit, loc in matrix_execute_pool:
             contact_mtx = np.add(contact_mtx, hit)
             location_mtx[id] = loc
-        
+        # TODO change normalization to handle multiple matrices
         norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
         log.info(S('done'))
-    
+    # TODO modify calculations to handle multiple heatmaps for different combos
     log.info(T("Calculating electropotential contact matrix"))
-    electro_mtx = electropotential_matrix(input_seq, ph)
+    electro_mtx = electropotential_matrix(combo_seqs, ph)
     norm_electro_mtx = (electro_mtx - np.min(electro_mtx)) / (np.max(electro_mtx) - np.min(electro_mtx))  # noqa: E501
     log.info(S('done'))
     
@@ -329,6 +369,7 @@ def main(
     log.info(S('done'))
     
     # Calculates the maximum number of contacts for each input sequence
+    # TODO modify this to accept multiple sequences
     max_contacts = calculate_max_contacts(input_seq)
     preselected_contacts = {}
     # Pre-select contacts for each sequence based on maximum number and matrix

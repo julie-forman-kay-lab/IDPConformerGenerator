@@ -9,6 +9,7 @@ from Bio.PDB.SASA import ShrakeRupley
 
 from idpconfgen import Path
 from idpconfgen.core.definitions import aa3to1, pk_aa_dict
+from idpconfgen.libs.libparse import split_consecutive_groups
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
     Structure,
@@ -340,9 +341,9 @@ def contact_matrix(db, sequence):
         to the full database.
         E.g. {"seg1": [("ABC", "DEF"),]}
     
-    sequence : dict or str
-        Input protein sequence.
-        Can be multiple sequences.
+    sequence : list or str
+        Combination of input protein sequences.
+        Can be singular or multiple sequences.
     
     Returns
     -------
@@ -354,9 +355,8 @@ def contact_matrix(db, sequence):
     """
     segid = next(iter(db))
     
-    if type(sequence) is dict:
-        seqs = list(sequence.values())
-        combos = [c for c in combinations(seqs, 2)]
+    if type(sequence) is list:
+        combos = sequence
         hit_matrix = {}
         loc_matrix = {}
         for i, c in enumerate(combos):
@@ -478,7 +478,7 @@ def electropotential_matrix(sequences, pH=7.0):
     
     Parameters
     ----------
-    sequences : dict or str
+    sequences : list or str
         Can accept multiple sequences based on `input_seq`
         variable from `cli_complex.py`.
     
@@ -491,13 +491,12 @@ def electropotential_matrix(sequences, pH=7.0):
     matrix : np.ndarray
         Disitrubtion matrix of all the matches and weights
     """
-    assert (type(sequences) is dict) or (type(sequences) is str)
+    assert (type(sequences) is list) or (type(sequences) is str)
     # For multiple sequences, calculate heatmap between all combinations
-    if type(sequences) is dict:
+    if type(sequences) is list:
         # We need a dictionary of matrices for each combination
         charge_matrix = {}
-        seq = list(sequences.values())
-        combos = [c for c in combinations(seq, 2)]
+        combos = sequences
         for i, pairs in enumerate(combos):
             seq1 = pairs[0]
             len1 = len(seq1)
@@ -723,13 +722,9 @@ def find_sa_residues(
     
     Returns
     -------
-    residue_sasa : list of float
-        Solvent accessible surface area for each residue
-        that is considered on the surface to make a contact.
-        
-    residue_idx : list of int
-        Indices for the residues that are considered on the
-        surface to make a contact.
+    consecutive_idx : list of lists of int
+        Indices for the consecutive residues that are
+        considered on the surface to make a contact.
     """
     if structure_path.endswith('.pdb'):
         p = PDBParser(QUIET=1)
@@ -743,15 +738,15 @@ def find_sa_residues(
     struc = p.get_structure("structure", structure_path)
     sr.compute(struc, level="R")
     
-    residue_sasa = []
     residue_idx = []
     for i, res in enumerate(struc.get_residues()):
         area = res.sasa
         if area > min_area:
-            residue_sasa.append(res.sasa)
             residue_idx.append(i)
     
-    return residue_sasa, residue_idx
+    consecutive_idx = split_consecutive_groups(residue_idx)
+    
+    return consecutive_idx
 
 
 def reverse_position_lookup(coords, location_mtx, database):

@@ -567,3 +567,38 @@ def split_by_ranges(seq, ranges):
     if start < len(seq):
         chunks.append(seq[start:])
     return chunks
+
+
+def split_consecutive_groups(query, minimum=3):
+    """
+    Process a list of numbers into list of consecutive integers.
+
+    Parameters
+    ----------
+    query : list of int
+        List of integers we want to process.
+    
+    minimum : int
+        Minimum number of allowed consecutive residues.
+        Defaults to 3.
+
+    Return
+    ------
+    result : list of lists of int
+        Consecutive indexes
+    """
+    result = []
+    current_group = []
+
+    for num in query:
+        if not current_group or num == current_group[-1] + 1:
+            current_group.append(num)
+        else:
+            if len(current_group) >= minimum:
+                result.append(current_group)
+            current_group = [num]
+
+    if len(current_group) >= minimum:
+        result.append(current_group)
+
+    return result
