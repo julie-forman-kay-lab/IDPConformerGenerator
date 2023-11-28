@@ -743,8 +743,14 @@ def find_sa_residues(
         area = res.sasa
         if area > min_area:
             residue_idx.append(i)
-    
     consecutive_idx = split_consecutive_groups(residue_idx)
+    # Check that the last set of indices does not go over
+    last_idx = consecutive_idx[-1][-1]
+    fld_struc = Structure(Path(structure_path))
+    fld_struc.build()
+    len_residues = len(fld_struc.fasta)
+    if last_idx == len_residues:
+        consecutive_idx[-1] = consecutive_idx[-1][:-1]
     
     return consecutive_idx
 

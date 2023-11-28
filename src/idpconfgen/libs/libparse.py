@@ -569,9 +569,16 @@ def split_by_ranges(seq, ranges):
     return chunks
 
 
-def split_consecutive_groups(query, minimum=3):
+def split_consecutive_groups(query, minimum=2):
     """
     Process a list of numbers into list of consecutive integers.
+    
+    Fills in the blank for residues that are alone by 3.
+    
+    Example
+    -------
+    query = [1, 2, 3, 4, 6, 8, 11, 12]
+    output = [[1, 2, 3, 4, 5, 6, 7, 8], [11, 12]]
 
     Parameters
     ----------
@@ -580,7 +587,7 @@ def split_consecutive_groups(query, minimum=3):
     
     minimum : int
         Minimum number of allowed consecutive residues.
-        Defaults to 3.
+        Defaults to 2.
 
     Return
     ------
@@ -593,9 +600,14 @@ def split_consecutive_groups(query, minimum=3):
     for num in query:
         if not current_group or num == current_group[-1] + 1:
             current_group.append(num)
+        elif num - 1 == current_group[-1] + 1:
+            current_group.append(num - 1)
+            current_group.append(num)
         else:
             if len(current_group) >= minimum:
                 result.append(current_group)
+            elif len(current_group) == 1:
+                result.append([num - 1, num, num + 1])
             current_group = [num]
 
     if len(current_group) >= minimum:
