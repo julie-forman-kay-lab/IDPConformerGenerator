@@ -10,7 +10,7 @@ USAGE:
 """
 import argparse
 from functools import partial
-from itertools import combinations
+from itertools import combinations, product
 
 import numpy as np
 
@@ -69,7 +69,8 @@ ap.add_argument(
     help=(
         "Input .PDB or .CIF file for folded structure of interest. "
         "If given folded-structure, only surface residues will be "
-        "considered for intermolecular contacts with the sequence."
+        "considered for intermolecular contacts with the sequence. "
+        "Please remove all waters before input."
         ),
     default=None,
     )
@@ -230,12 +231,13 @@ def main(
             for chain in input_seq:
                 log.info(S(f'{chain}: {input_seq[chain]}'))
         else:
-            input_seq = list(input_seq.values())[0]
-            seq_len = len(input_seq)
-            log.info(S(f'input sequence: {input_seq}'))
+            seq = list(input_seq.values())[0]
+            seq_len = len(seq)
+            log.info(S(f'input sequence: {seq}'))
     else:
         seq_len = len(input_seq)
         log.info(S(f'input sequence: {input_seq}'))
+        input_seq = {"IDP": input_seq}
     
     log.info(T("analyzing intramolecular contacts from the database"))
     intra_consume = partial(extract_intrapairs_from_db)
@@ -278,30 +280,30 @@ def main(
     all_contacts = intra_contacts + inter_contacts
     all_contacts_filtered = [c for c in all_contacts if c]
     
+    in_seqs = list(input_seq.values())
+    combo_seqs = [c for c in combinations(in_seqs, 2)]
     if folded_structure:
         assert folded_structure.endswith('.pdb') or \
             folded_structure.endswith('.cif')
 
         fld_struc = Structure(Path(folded_structure))
         fld_struc.build()
-        fld_seq = fld_struc.fasta
-        fld_seq = list(fld_seq.values())[0]
-
+        fld_seqs = fld_struc.fasta
         sa_idx = find_sa_residues(folded_structure)
-        combo_seqs = []
-        # TODO retrofit for multiple chains in fld_struc and sequences
-        for group in sa_idx:
-            res = ""
-            for i in group:
-                res += fld_seq[i]
-            combo_seqs.append((input_seq, res))
-    else:
-        if type(input_seq) is dict:
-            seqs = list(input_seq.values())
-            combo_seqs = [c for c in combinations(seqs, 2)]
-        else:
-            combo_seqs = input_seq
-    
+        
+        sa_seqs = {}
+        for chain, combos in sa_idx.items():
+            temp_seq = []
+            for c in combos:
+                res = ""
+                for i in c:
+                    res += fld_seqs[chain][i]
+                temp_seq.append(res)
+            sa_seqs[chain] = temp_seq
+
+        fld_sa_seqs = list(sa_seqs.values())
+        combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
+
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
         log.info("Only using electropotential contact frequencies.")

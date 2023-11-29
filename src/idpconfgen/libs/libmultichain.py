@@ -722,9 +722,10 @@ def find_sa_residues(
     
     Returns
     -------
-    consecutive_idx : list of lists of int
+    residue_idx : dict
         Indices for the consecutive residues that are
         considered on the surface to make a contact.
+        Keys are the chain ID of interest.
     """
     if structure_path.endswith('.pdb'):
         p = PDBParser(QUIET=1)
@@ -738,21 +739,25 @@ def find_sa_residues(
     struc = p.get_structure("structure", structure_path)
     sr.compute(struc, level="R")
     
-    residue_idx = []
-    for i, res in enumerate(struc.get_residues()):
-        area = res.sasa
-        if area > min_area:
-            residue_idx.append(i)
-    consecutive_idx = split_consecutive_groups(residue_idx)
+    residue_idx = {}
+    for chain in struc.get_chains():
+        temp_res_idx = []
+        for i, res in enumerate(list(chain.get_residues())):
+            area = res.sasa
+            if area > min_area:
+                temp_res_idx.append(i)
+        consecutive_idx = split_consecutive_groups(temp_res_idx)
+        residue_idx[chain.id] = consecutive_idx
+
     # Check that the last set of indices does not go over
-    last_idx = consecutive_idx[-1][-1]
     fld_struc = Structure(Path(structure_path))
     fld_struc.build()
-    len_residues = len(fld_struc.fasta)
-    if last_idx == len_residues:
-        consecutive_idx[-1] = consecutive_idx[-1][:-1]
+    for chain, sequence in fld_struc.fasta.items():
+        last_idx = residue_idx[chain][-1][-1]
+        if last_idx == len(sequence):
+            residue_idx[chain][-1][-1] = residue_idx[chain][-1][-1][:-1]
     
-    return consecutive_idx
+    return residue_idx
 
 
 def reverse_position_lookup(coords, location_mtx, database):
