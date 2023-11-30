@@ -343,7 +343,8 @@ def contact_matrix(db, sequence):
     
     sequence : list or str
         Combination of input protein sequences.
-        Can be singular or multiple sequences.
+        Can be single or dual sequences for intra- or
+        intermolecular contacts respectfully.
     
     Returns
     -------
@@ -356,42 +357,38 @@ def contact_matrix(db, sequence):
     segid = next(iter(db))
     
     if type(sequence) is list:
-        combos = sequence
-        hit_matrix = {}
-        loc_matrix = {}
-        for i, c in enumerate(combos):
-            seq1 = c[0]
-            len1 = len(seq1)
-            seq2 = c[1]
-            len2 = len(seq2)
-            
-            h_mtx = np.zeros((len1, len2))
-            l_mtx = np.empty((len1, len2), dtype=object)
-            l_mtx.fill([])
-            
-            for pairs in db.values():
-                for idx, pair in enumerate(pairs):
-                    p1, p2 = pair
-                    for i in range(len1):
-                        for j in range(len2):
-                            c1 = ""
-                            c2 = ""
-                            for k in range(i - 2, i + 3):
-                                if 0 <= k < len1:
-                                    c1 += f"{seq1[k]}"
-                            for k in range(j - 2, j + 3):
-                                if 0 <= k < len2:
-                                    c2 += f"{seq2[k]}"
-                            p1_c1 = has_consecutive_match(p1, c1)
-                            p1_c2 = has_consecutive_match(p1, c2)
-                            p2_c1 = has_consecutive_match(p2, c1)
-                            p2_c2 = has_consecutive_match(p2, c2)
-                            if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
-                                h_mtx[i, j] += 1
-                                l_mtx[i, j].append(idx)
-            
-            hit_matrix[c] = np.flipud(h_mtx)
-            loc_matrix[c] = np.flipud(l_mtx)
+        seq1 = sequence[0]
+        len1 = len(seq1)
+        seq2 = sequence[1]
+        len2 = len(seq2)
+        
+        h_mtx = np.zeros((len1, len2))
+        l_mtx = np.empty((len1, len2), dtype=object)
+        l_mtx.fill([])
+        
+        for pairs in db.values():
+            for idx, pair in enumerate(pairs):
+                p1, p2 = pair
+                for i in range(len1):
+                    for j in range(len2):
+                        c1 = ""
+                        c2 = ""
+                        for k in range(i - 2, i + 3):
+                            if 0 <= k < len1:
+                                c1 += f"{seq1[k]}"
+                        for k in range(j - 2, j + 3):
+                            if 0 <= k < len2:
+                                c2 += f"{seq2[k]}"
+                        p1_c1 = has_consecutive_match(p1, c1)
+                        p1_c2 = has_consecutive_match(p1, c2)
+                        p2_c1 = has_consecutive_match(p2, c1)
+                        p2_c2 = has_consecutive_match(p2, c2)
+                        if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
+                            h_mtx[i, j] += 1
+                            l_mtx[i, j].append(idx)
+        
+        hit_matrix = np.flipud(h_mtx)
+        loc_matrix = np.flipud(l_mtx)
     else:
         seq_len = len(sequence)
         hit_matrix = np.zeros((seq_len, seq_len))
@@ -479,8 +476,8 @@ def electropotential_matrix(sequences, pH=7.0):
     Parameters
     ----------
     sequences : list or str
-        Can accept multiple sequences based on `input_seq`
-        variable from `cli_complex.py`.
+        Can accept single or dual sequences based on
+        intra- or intermolecular contacts respectively.
     
     pH : int or float
         Desired pH value of interest.
@@ -492,28 +489,24 @@ def electropotential_matrix(sequences, pH=7.0):
         Disitrubtion matrix of all the matches and weights
     """
     assert (type(sequences) is list) or (type(sequences) is str)
-    # For multiple sequences, calculate heatmap between all combinations
+
     if type(sequences) is list:
-        # We need a dictionary of matrices for each combination
-        charge_matrix = {}
-        combos = sequences
-        for i, pairs in enumerate(combos):
-            seq1 = pairs[0]
-            len1 = len(seq1)
-            seq2 = pairs[1]
-            len2 = len(seq2)
-            charge1 = find_sequence_net_charge(seq1, pH)
-            charge2 = find_sequence_net_charge(seq2, pH)
-            
-            charge_mtx = np.zeros((len1, len2))
-            for i in range(len1):
-                for j in range(len2):
-                    window1 = charge1[i:i + 5]
-                    window2 = charge2[j:j + 5]
-                    avg1 = sum(window1) / 5
-                    avg2 = sum(window2) / 5
-                    charge_mtx[i, j] = abs(avg1 - avg2)
-            charge_matrix[pairs] = np.flipud(charge_mtx)
+        seq1 = sequences[0]
+        len1 = len(seq1)
+        seq2 = sequences[1]
+        len2 = len(seq2)
+        charge1 = find_sequence_net_charge(seq1, pH)
+        charge2 = find_sequence_net_charge(seq2, pH)
+        
+        charge_matrix = np.zeros((len1, len2))
+        for i in range(len1):
+            for j in range(len2):
+                window1 = charge1[i:i + 5]
+                window2 = charge2[j:j + 5]
+                avg1 = sum(window1) / 5
+                avg2 = sum(window2) / 5
+                charge_matrix[i, j] = abs(avg1 - avg2)
+        charge_matrix = np.flipud(charge_matrix)
     else:  # For single sequences only, intramolecular
         len_seq = len(sequences)
         net_charge = find_sequence_net_charge(sequences, pH)

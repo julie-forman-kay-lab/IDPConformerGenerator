@@ -232,10 +232,8 @@ def main(
                 log.info(S(f'{chain}: {input_seq[chain]}'))
         else:
             seq = list(input_seq.values())[0]
-            seq_len = len(seq)
             log.info(S(f'input sequence: {seq}'))
     else:
-        seq_len = len(input_seq)
         log.info(S(f'input sequence: {input_seq}'))
         input_seq = {"IDP": input_seq}
     
@@ -283,6 +281,7 @@ def main(
     in_seqs = list(input_seq.values())
     combo_seqs = [c for c in combinations(in_seqs, 2)]
     if folded_structure:
+        log.info(T("Folded structure found, identifying surface accessible resiudes"))  # noqa: E501
         assert folded_structure.endswith('.pdb') or \
             folded_structure.endswith('.cif')
 
@@ -302,6 +301,10 @@ def main(
             sa_seqs[chain] = temp_seq
 
         fld_sa_seqs = list(sa_seqs.values())
+        log.info("Found the folowing sequences to be surface accessible:")
+        for chain in sa_seqs:
+            log.info(f"Chain {chain}: {sa_seqs[chain]}")
+        log.info(S("done"))
         combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
 
     if len(all_contacts_filtered) == 0:
@@ -309,35 +312,119 @@ def main(
         log.info("Only using electropotential contact frequencies.")
     else:
         log.info(T("Calculating all-contacts probability matrix"))
-        matrix_consume = partial(contact_matrix, sequence=combo_seqs)
-        matrix_execute = partial(
-            report_on_crash,
-            matrix_consume,
-            ROC_exception=Exception,
-            ROC_folder=output_folder,
-            ROC_prefix=_name,
-            )
-        matrix_execute_pool = pool_function(
-            matrix_execute,
-            all_contacts_filtered,
-            ncores=ncores,
-            )
+        inter_mtxs = []
+        inter_seqs = []
+        # TODO need a way to delineate the indices and chain IDs
+        # from folded template
+        for combo in combo_seqs:
+            c1 = combo[0]
+            c2 = combo[1]
+            if type(c1) is list:
+                temp_mtxs = np.zeros(shape=(1, len(c2)))
+                temp_seq = ""
+                for seq in c1:
+                    log.info(S(f"calculating intermolecular probabilities between {c2} and {seq}"))  # noqa: E501
+                    matrix_consume = partial(contact_matrix, sequence=[seq, c2])  # noqa: E501
+                    matrix_execute = partial(
+                        report_on_crash,
+                        matrix_consume,
+                        ROC_exception=Exception,
+                        ROC_folder=output_folder,
+                        ROC_prefix=_name,
+                        )
+                    matrix_execute_pool = pool_function(
+                        matrix_execute,
+                        all_contacts_filtered,
+                        ncores=ncores,
+                        )
+                    mtx = np.zeros((len(seq), len(c2)))
+                    location_mtx = {}
+                    for id, hit, loc in matrix_execute_pool:
+                        mtx = np.add(mtx, hit)
+                        location_mtx[id] = loc
+                    # TODO figure out what to do with the relative
+                    # locations of data
+                    # temp_mtxs.append((mtx, location_mtx))
+                    temp_seq += seq
+                    temp_mtxs = np.vstack((mtx, temp_mtxs))
+                    log.info(S("done"))
+                # First row will be all zeroes
+                mtx = temp_mtxs[:-1]
+                norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
+                inter_mtxs.append(norm_mtx)
+                inter_seqs.append((c2, temp_seq))
+            else:
+                log.info(S(f"calculating intermolecular probabilities between {c1} and {c2}"))  # noqa: E501
+                matrix_consume = partial(contact_matrix, sequence=[c1, c2])
+                matrix_execute = partial(
+                    report_on_crash,
+                    matrix_consume,
+                    ROC_exception=Exception,
+                    ROC_folder=output_folder,
+                    ROC_prefix=_name,
+                    )
+                matrix_execute_pool = pool_function(
+                    matrix_execute,
+                    all_contacts_filtered,
+                    ncores=ncores,
+                    )
+                mtx = np.zeros((len(c1), len(c2)))
+                location_mtx = {}
+                for id, hit, loc in matrix_execute_pool:
+                    mtx = np.add(mtx, hit)
+                    location_mtx[id] = loc
+                norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
+                inter_mtxs.append((norm_mtx, location_mtx))
+                inter_seqs.append((c1, c2))
+                log.info(S("done"))
         
-        contact_mtx = np.zeros((seq_len, seq_len))
-        location_mtx = {}
-        # TODO Change contact and location mtx to handle multiple matrices
-        for id, hit, loc in matrix_execute_pool:
-            contact_mtx = np.add(contact_mtx, hit)
-            location_mtx[id] = loc
-        # TODO change normalization to handle multiple matrices
-        norm_contact_mtx = (contact_mtx - np.min(contact_mtx)) / (np.max(contact_mtx) - np.min(contact_mtx))  # noqa: E501
-        log.info(S('done'))
-    # TODO modify calculations to handle multiple heatmaps for different combos
-    log.info(T("Calculating electropotential contact matrix"))
-    electro_mtx = electropotential_matrix(combo_seqs, ph)
-    norm_electro_mtx = (electro_mtx - np.min(electro_mtx)) / (np.max(electro_mtx) - np.min(electro_mtx))  # noqa: E501
-    log.info(S('done'))
+        log.info(T("Calculating intramolecular-contacts probability matrix"))
+        intra_mtxs = []
+        # Don't need `intra_seqs` variable here because `in_seqs` is the same
+        for seq in in_seqs:
+            matrix_consume = partial(contact_matrix, sequence=seq)
+            matrix_execute = partial(
+                report_on_crash,
+                matrix_consume,
+                ROC_exception=Exception,
+                ROC_folder=output_folder,
+                ROC_prefix=_name,
+                )
+            matrix_execute_pool = pool_function(
+                matrix_execute,
+                all_contacts_filtered,
+                ncores=ncores,
+                )
+            mtx = np.zeros((len(seq), len(seq)))
+            location_mtx = {}
+            for id, hit, loc in matrix_execute_pool:
+                mtx = np.add(mtx, hit)
+                location_mtx[id] = loc
+            norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
+            intra_mtxs.append((norm_mtx, location_mtx))
     
+    log.info(T("Calculating electropotential contact matrix"))
+    inter_electro_mtx = []
+    for combo in combo_seqs:
+        c1 = combo[0]
+        c2 = combo[1]
+        if type(c1) is list:
+            tmp_electro_mtx = np.zeros(shape=(1, len(c2)))
+            for seq in c1:
+                mtx = electropotential_matrix([seq, c2], ph)
+                tmp_electro_mtx = np.vstack(mtx, tmp_electro_mtx)
+            mtx = tmp_electro_mtx[:-1]
+            norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
+            inter_electro_mtx.append(norm_electro_mtx)
+        else:
+            mtx = electropotential_matrix([c1, c2])
+            norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
+            inter_electro_mtx.append(norm_electro_mtx)
+    intra_electro_mtx = []
+    for seq in in_seqs:
+        intra_electro_mtx.append(electropotential_matrix(seq, ph))
+    log.info(S('done'))
+
     log.info(T('saving heatmap distribution plot to output directory'))
     if not (plot_name.endswith(".png") or plot_name.endswith(".jpg")):
         plot_path = Path(plot_name)
@@ -345,7 +432,7 @@ def main(
     plot_out = str(output_folder) + '/' + plot_name
     plot_electro_out = str(output_folder) + '/electro_' + plot_name
     if len(all_contacts_filtered) > 0:
-        plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)
+        plot_contacts_matrix(norm_contact_mtx, input_seq, plot_out)  # noqa: F821, E501
     else:
         norm_contact_mtx = norm_electro_mtx
     plot_contacts_matrix(
