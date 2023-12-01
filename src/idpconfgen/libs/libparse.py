@@ -595,6 +595,7 @@ def split_consecutive_groups(query, minimum=2):
         Consecutive indexes
     """
     result = []
+    pre_result = []
     current_group = []
 
     for num in query:
@@ -605,12 +606,20 @@ def split_consecutive_groups(query, minimum=2):
             current_group.append(num)
         else:
             if len(current_group) >= minimum:
-                result.append(current_group)
+                pre_result.append(current_group)
             elif len(current_group) == 1:
-                result.append([num - 1, num, num + 1])
+                pre_result.append([num - 1, num, num + 1])
             current_group = [num]
 
     if len(current_group) >= minimum:
-        result.append(current_group)
+        pre_result.append(current_group)
+    
+    # Fix overlapping residues
+    pre_result.sort()
+    for sublist in pre_result:
+        if not result or sublist[0] > result[-1][-1] + 1:
+            result.append(sublist)
+        else:
+            result[-1] = [min(result[-1][0], sublist[0])] + list(range(min(result[-1][1], sublist[1]), max(result[-1][-1], sublist[-1]) + 1))  # noqa: E501
 
     return result
