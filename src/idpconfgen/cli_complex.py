@@ -374,7 +374,7 @@ def main(
                         location_mtx[id] = loc
                     norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
                     inter_mtxs.append(norm_mtx)
-                    inter_seqs.append([c1, c2])
+                    inter_seqs.append([c2, c1])
                     log.info(S("done"))
         
         log.info(T("Calculating intramolecular contacts probability matrix"))
@@ -412,7 +412,7 @@ def main(
                 tmp_electro_mtx = np.zeros(shape=(1, len(c2)))
                 for seq in c1:
                     mtx = electropotential_matrix([seq, c2], ph)
-                    tmp_electro_mtx = np.vstack(mtx, tmp_electro_mtx)
+                    tmp_electro_mtx = np.vstack((mtx, tmp_electro_mtx))
                 mtx = tmp_electro_mtx[:-1]
                 norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
                 inter_electro_mtx.append(norm_electro_mtx)
@@ -451,7 +451,7 @@ def main(
                 title="Contacts Frequency Heatmap (Electrostatic)"
                 )
     for e, mtx in enumerate(intra_electro_mtx):
-        plot_electro_out = str(output_folder) + f'/electro_inter_{e}_' + plot_name  # noqa: E501
+        plot_electro_out = str(output_folder) + f'/electro_intra_{e}_' + plot_name  # noqa: E501
         plot_contacts_matrix(
             mtx,
             in_seqs[e],
@@ -460,21 +460,35 @@ def main(
             )
     log.info(S('done'))
 
-    '''
     log.info(T('Blending contact map frequencies and plotting'))
     blend_weight = np.clip(blend_weight, 0, 100)  # ensure it's between 0-100
     minimized_blend_weight = blend_weight / 100.0
-    blended_contacts_mtx = (1 - minimized_blend_weight) * norm_contact_mtx + minimized_blend_weight * norm_electro_mtx  # noqa: E501
-    norm_blended_mtx = (blended_contacts_mtx - np.min(blended_contacts_mtx)) / (np.max(blended_contacts_mtx) - np.min(blended_contacts_mtx))  # noqa: E501
-    plot_blended_out = str(output_folder) + f'/blend_{blend_weight}_' + plot_name  # noqa: E501
-    plot_contacts_matrix(
-        norm_blended_mtx,
-        input_seq,
-        plot_blended_out,
-        title=f"Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
-        )
+    if len(all_contacts_filtered) > 0:
+        if len(inter_mtxs) >= 1:
+            for i, mtx in enumerate(inter_mtxs):
+                e_mtx = inter_electro_mtx[i]
+                plot_out = str(output_folder) + f'/blend_inter_{i}_' + plot_name
+                blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
+                norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+                plot_contacts_matrix(
+                    norm_blended_mtx,
+                    inter_seqs[i],
+                    plot_out,
+                    title=f"Inter Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
+                    )
+        for i, mtx in enumerate(intra_mtxs):
+            e_mtx = intra_electro_mtx[i]
+            plot_out = str(output_folder) + f'/blend_intra_{i}_' + plot_name
+            blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
+            norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+            plot_contacts_matrix(
+                norm_blended_mtx,
+                in_seqs[i],
+                plot_out,
+                title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
+                )
     log.info(S('done'))
-    
+    '''
     # Calculates the maximum number of contacts for each input sequence
     # TODO modify this to accept multiple sequences
     max_contacts = calculate_max_contacts(input_seq)

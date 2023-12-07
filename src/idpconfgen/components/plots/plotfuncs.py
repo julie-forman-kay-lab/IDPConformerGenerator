@@ -349,8 +349,8 @@ def plot_contacts_matrix(
             fs2 = len_s2 / 30
         else:
             fs2 = len_s2 / lw
-        plt.yticks(np.arange(len_s1), seq1[::-1], fontsize=fs1)
-        plt.xticks(np.arange(len_s2), seq2, fontsize=fs2)
+        plt.yticks(np.arange(len_s2), seq2[::-1], fontsize=fs2)
+        plt.xticks(np.arange(len_s1), seq1, fontsize=fs1)
     else:
         len_seq = len(sequence)
         if len_seq > 100:
@@ -362,3 +362,4 @@ def plot_contacts_matrix(
     
     plt.tight_layout(h_pad=0.01, w_pad=0.04)
     plt.savefig(output, dpi=dpi)
+    plt.close()
