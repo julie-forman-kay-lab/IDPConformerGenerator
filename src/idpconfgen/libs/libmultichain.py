@@ -383,7 +383,7 @@ def contact_matrix(db, sequence):
                         p1_c2 = has_consecutive_match(p1, c2)
                         p2_c1 = has_consecutive_match(p2, c1)
                         p2_c2 = has_consecutive_match(p2, c2)
-                        if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
+                        if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)):
                             h_mtx[i, j] += 1
                             l_mtx[i, j].append(idx)
         

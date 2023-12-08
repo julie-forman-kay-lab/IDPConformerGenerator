@@ -17,6 +17,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
+def calculate_fontsize(len_ticks, lw):
+    """
+    Calculate the fontsize depending on length of ticks and size of plot.
+
+    Parameters
+    ----------
+    len_ticks : int
+        Length of sequence or numbers to plot
+    
+    lw : int
+        Length and width of figure
+    """
+    return len_ticks / (lw * 3) if len_ticks > 100 else len_ticks / (lw * 2)
+
+
 def get_xtick_lbl(xticks):
     """# noqa: D205, D400
     Mainly for residues, reworks the first x-tick label to
@@ -341,22 +356,13 @@ def plot_contacts_matrix(
         
         len_s1 = len(seq1)
         len_s2 = len(seq2)
-        if len_s1 > 100:
-            fs1 = len_s1 / 30
-        else:
-            fs1 = len_s1 / lw
-        if len_s2 > 100:
-            fs2 = len_s2 / 30
-        else:
-            fs2 = len_s2 / lw
+        fs1 = calculate_fontsize(len_s1, lw)
+        fs2 = calculate_fontsize(len_s2, lw)
         plt.yticks(np.arange(len_s2), seq2[::-1], fontsize=fs2)
         plt.xticks(np.arange(len_s1), seq1, fontsize=fs1)
     else:
         len_seq = len(sequence)
-        if len_seq > 100:
-            fs = len_seq / 30
-        else:
-            fs = len_seq / lw
+        fs = calculate_fontsize(len_seq, lw)
         plt.xticks(np.arange(len_seq), sequence, fontsize=fs)
         plt.yticks(np.arange(len_seq), sequence[::-1], fontsize=fs)
     
