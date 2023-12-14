@@ -9,6 +9,7 @@ USAGE:
     $ idpconfgen complex -db contacts.json -seq sequence.fasta --plot
 """
 import argparse
+import re
 from functools import partial
 from itertools import combinations, product
 
@@ -60,6 +61,20 @@ ap = libcli.CustomParser(
 
 libcli.add_argument_idb(ap)
 libcli.add_argument_seq(ap)
+
+ap.add_argument(
+    '--phos',
+    help=(
+        "Indicates which residues on which chain in the FASTA file is "
+        "phosphorylated. Chains are denoted by colons and phosphorylated "
+        "residues for that chain are separated by commas. Additional "
+        "chains are delimited by slash and pattern must end at a slash. "
+        "The name of the chain will correspond to the >Name in the FASTA "
+        "file. For e.g. --phos A:12,14,15/B:13,10/"
+        ),
+    nargs='?',
+    default=None,
+    )
 
 ap.add_argument(
     '-fld',
@@ -178,6 +193,7 @@ libcli.add_argument_ncores(ap)
 def main(
         input_seq,
         database,
+        phos=None,
         folded_structure=None,
         dloop_off=False,
         dstrand=False,
@@ -219,9 +235,22 @@ def main(
                 inter_dict[s2] = db[s2]
             db_inter_lst.append(inter_dict)
         continue
-    
+    REGEX_PATTERN = re.compile(r"(.*:([0-9,])*[/])+")
     output_folder = make_folder_or_cwd(output_folder)
     init_files(log, Path(output_folder, LOGFILESNAME))
+    
+    phos_ptm = {}
+    if REGEX_PATTERN.match(phos):
+        phos_residues = phos.split('/')
+        phos_residues.pop()  # last element should be empty
+        for c in phos_residues:
+            chain = c.split(':')
+            residues = chain[1].split(',')
+            residues.pop()
+            phos_ptm[chain[0]] = [int(r) for r in residues]
+    else:
+        log.info(S('Incorrect pattern input for --phos.'))
+        log.info(S('Pattern is as follows: A:1,3,4,/B:3,9,5,/'))
     
     if type(input_seq) is dict:
         if len(input_seq) > 1:

@@ -443,6 +443,10 @@ def find_sequence_net_charge(seq, pH):
     net_charge = []
     for a in aa:
         charge = 0
+        # Accounts for phosphorylation, add a negative charge
+        if a.islower():
+            charge -= 1
+            
         pKa, pKb, pKx = pk_aa_dict[a]
         
         if pKa > pH:
@@ -687,7 +691,7 @@ def calculate_max_contacts(sequences):
 
 def find_sa_residues(
         structure_path,
-        min_area=63.3,
+        min_area=31.65,
         probe_radius=1.40,
         n_points=500
         ):
@@ -703,10 +707,10 @@ def find_sa_residues(
     
     min_area : float
         Minimum SASA to consider to be on the surface.
-        Defaults to 63.3 Å^2, surface area of Glycine.
+        Defaults to 31.65 Å^2, half the surface area of Glycine.
     
     probe_radius : float
-        Radius of rolling-ball, defaults to 1.4 A,
+        Radius of rolling-ball, defaults to 1.4 Å,
         radius of a water molecule.
     
     n_points : int
