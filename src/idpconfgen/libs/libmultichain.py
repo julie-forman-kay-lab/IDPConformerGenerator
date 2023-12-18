@@ -446,6 +446,7 @@ def find_sequence_net_charge(seq, pH):
         # Accounts for phosphorylation, add a negative charge
         if a.islower():
             charge -= 1
+            a = a.upper()
             
         pKa, pKb, pKx = pk_aa_dict[a]
         

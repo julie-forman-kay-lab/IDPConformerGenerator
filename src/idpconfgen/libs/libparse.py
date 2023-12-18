@@ -623,3 +623,30 @@ def split_consecutive_groups(query, minimum=2):
             result[-1] = [min(result[-1][0], sublist[0])] + list(range(min(result[-1][1], sublist[1]), max(result[-1][-1], sublist[-1]) + 1))  # noqa: E501
 
     return result
+
+
+def update_chars_lower(string, indices):
+    """
+    Change specific characters of a string lowercase.
+
+    Parameters
+    ----------
+    string : str
+        String to modify
+    
+    indices : list
+        List of indices in the string to make lower case
+
+    Returns
+    -------
+    updated_string : str
+        Updated stirng with speicific characters made lowercase
+    """
+    char_list = list(string)
+    
+    for index in indices:
+        if 0 <= index < len(char_list):
+            char_list[index] = char_list[index].lower()
+
+    updated_string = ''.join(char_list)
+    return updated_string

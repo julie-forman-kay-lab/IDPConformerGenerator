@@ -28,8 +28,20 @@ def calculate_fontsize(len_ticks, lw):
     
     lw : int
         Length and width of figure
+    
+    Returns
+    -------
+    fs : int
+        Fontsize
     """
-    return len_ticks / (lw * 3) if len_ticks > 100 else len_ticks / (lw * 2)
+    if len_ticks >= 200:
+        fs = len_ticks / (lw * 8)
+    elif len_ticks >= 100:
+        fs = len_ticks / (lw * 4)
+    else:
+        fs = len_ticks / (lw * 2)
+    
+    return fs
 
 
 def get_xtick_lbl(xticks):

@@ -40,6 +40,7 @@ from idpconfgen.libs.libmultichain import (
     find_sa_residues,
     )
 from idpconfgen.libs.libmulticore import pool_function
+from idpconfgen.libs.libparse import update_chars_lower
 from idpconfgen.libs.libstructure import Structure
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
@@ -66,11 +67,11 @@ ap.add_argument(
     '--phos',
     help=(
         "Indicates which residues on which chain in the FASTA file is "
-        "phosphorylated. Chains are denoted by colons and phosphorylated "
-        "residues for that chain are separated by commas. Additional "
-        "chains are delimited by slash and pattern must end at a slash. "
-        "The name of the chain will correspond to the >Name in the FASTA "
-        "file. For e.g. --phos A:12,14,15/B:13,10/"
+        "phosphorylated, thus adding a negative charge. Chains are denoted "
+        "by colons and phosphorylated residues for that chain are separated "
+        "by commas. Additional chains are delimited by slash and pattern must "
+        "end at a slash. The name of the chain will correspond to the >Name "
+        "in the FASTA file. For e.g. --phos Name:12,14,15/B:13,10/"
         ),
     nargs='?',
     default=None,
@@ -112,9 +113,9 @@ ap.add_argument(
         'Integer weight from 0-100. Where 100 only uses the electrostatic '
         'potential contacts frequency and a value of 0 only uses the '
         'sequence-based contacts frequency. '
-        'Defaults to 50.'
+        'Defaults to 60.'
         ),
-    default=50,
+    default=60,
     type=int,
     )
 
@@ -208,7 +209,7 @@ def main(
         nconfs=1,
         ncores=1,
         ph=7,
-        blend_weight=50,
+        blend_weight=60,
         random_seed=0,
         xmer_probs=None,
         output_folder=None,
@@ -222,6 +223,10 @@ def main(
 
     Distributes over processors.
     """
+    output_folder = make_folder_or_cwd(output_folder)
+    init_files(log, Path(output_folder, LOGFILESNAME))
+    
+    log.info(T('Reading extended database from disk'))
     db = read_dictionary_from_disk(database)
     db_lst = [{k: v} for k, v in db.items()]
     db_inter_lst = []
@@ -235,22 +240,7 @@ def main(
                 inter_dict[s2] = db[s2]
             db_inter_lst.append(inter_dict)
         continue
-    REGEX_PATTERN = re.compile(r"(.*:([0-9,])*[/])+")
-    output_folder = make_folder_or_cwd(output_folder)
-    init_files(log, Path(output_folder, LOGFILESNAME))
-    
-    phos_ptm = {}
-    if REGEX_PATTERN.match(phos):
-        phos_residues = phos.split('/')
-        phos_residues.pop()  # last element should be empty
-        for c in phos_residues:
-            chain = c.split(':')
-            residues = chain[1].split(',')
-            residues.pop()
-            phos_ptm[chain[0]] = [int(r) for r in residues]
-    else:
-        log.info(S('Incorrect pattern input for --phos.'))
-        log.info(S('Pattern is as follows: A:1,3,4,/B:3,9,5,/'))
+    log.info(S('done'))
     
     if type(input_seq) is dict:
         if len(input_seq) > 1:
@@ -262,7 +252,31 @@ def main(
             log.info(S(f'input sequence: {seq}'))
     else:
         log.info(S(f'input sequence: {input_seq}'))
-        input_seq = {"IDP": input_seq}
+        input_seq = {1: input_seq}
+    
+    if phos:
+        REGEX_PATTERN = re.compile(r"(.*:([0-9,])*[/])+")
+        phos_ptm = {}
+        if REGEX_PATTERN.match(phos):
+            phos_residues = phos.split('/')
+            phos_residues.pop()  # last element should be empty
+            for c in phos_residues:
+                chain = c.split(':')
+                residues = chain[1].split(',')
+                residues.pop()
+                if len([input_seq.values()]) == 1:
+                    phos_ptm[1] = [int(r) for r in residues]
+                else:
+                    phos_ptm[f">{chain[0]}"] = [int(r) for r in residues]
+        else:
+            log.info(S('Incorrect pattern input for --phos.'))
+            log.info(S('Pattern is as follows: A:1,3,4,/B:3,9,5,/'))
+         
+        mod_in_seqs = []
+        for key, sequence in input_seq.items():
+            phos_idx = [x - 1 for x in phos_ptm[key]]
+            mod_in_seqs.append(update_chars_lower(sequence, phos_idx))
+        combo_mod_seqs = [c for c in combinations(mod_in_seqs, 2)]
     
     log.info(T("analyzing intramolecular contacts from the database"))
     intra_consume = partial(extract_intrapairs_from_db)
@@ -333,6 +347,8 @@ def main(
             log.info(f"Chain {chain}: {sa_seqs[chain]}")
         log.info(S("done"))
         combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
+        if phos:
+            combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
 
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
@@ -432,6 +448,9 @@ def main(
             intra_mtxs.append(norm_mtx)
     
     log.info(T("Calculating electropotential contact matrix"))
+    if phos:
+        combo_seqs = combo_mod_seqs
+        in_seqs = mod_in_seqs
     inter_electro_mtx = []
     if len(combo_seqs) >= 1:
         for combo in combo_seqs:
@@ -468,7 +487,7 @@ def main(
                 plot_contacts_matrix(mtx, inter_seqs[i], plot_out)
         for i, mtx in enumerate(intra_mtxs):
             plot_out = str(output_folder) + f'/intra_{i}_' + plot_name
-            plot_contacts_matrix(mtx, in_seqs[i], plot_out)
+            plot_contacts_matrix(mtx, in_seqs[i].upper(), plot_out)
 
     if len(inter_electro_mtx) >= 1:
         for e, mtx in enumerate(inter_electro_mtx):
@@ -483,7 +502,7 @@ def main(
         plot_electro_out = str(output_folder) + f'/electro_intra_{e}_' + plot_name  # noqa: E501
         plot_contacts_matrix(
             mtx,
-            in_seqs[e],
+            in_seqs[e].upper(),
             plot_electro_out,
             title="Contacts Frequency Heatmap (Electrostatic)"
             )
@@ -512,7 +531,7 @@ def main(
             norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
             plot_contacts_matrix(
                 norm_blended_mtx,
-                in_seqs[i],
+                in_seqs[i].upper(),
                 plot_out,
                 title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
                 )
