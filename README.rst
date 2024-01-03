@@ -36,13 +36,13 @@ sub-setting algorithms.
 How to Install
 --------------
 
-Installation instructions are described in ``docs/installation.rst``.
+Installation instructions are described on the `installation page <https://idpconformergenerator.readthedocs.io/en/latest/installation.html>`_.
 
 How to Use
 ----------
 
-Usage instructions are described in the file ``docs/usage.rst``. See also
-the example in the ``example/`` folder.
+Usage instructions are described in the `usage page <https://idpconformergenerator.readthedocs.io/en/latest/usage.html>`_. See also
+tutorial examples in the ``example/`` folder or by following different sections on the usage page.
 
 How to cite
 -----------
