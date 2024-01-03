@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update documentation for clarity
+* Update example folder with processing AlphaFold structures
+
 v0.7.12 (2023-11-17)
 ------------------------------------------------------------
 
