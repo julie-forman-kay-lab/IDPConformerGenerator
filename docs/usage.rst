@@ -92,6 +92,12 @@ Modeling Disordered Regions Within Folded Domains
 .. include:: ../example/slc26a9_example/README.rst
     :start-after: .. start-description
 
+Processing Low-Confidence Predicted Residues
+--------------------------------------------
+
+.. include:: ../example/AF_example/README.rst
+    :start-after: .. start-description
+
 Modeling Disordered Regions in a Multi-Chain Protein Complex
 ------------------------------------------------------------
 
