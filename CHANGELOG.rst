@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.14 (2024-01-04)
+------------------------------------------------------------
+
 * Correct reference hyperlink in usage documentation
 
 v0.7.13 (2024-01-03)
