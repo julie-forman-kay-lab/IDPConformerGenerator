@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Bug-fix for ``ldrs`` file processing during ``psurgeon`` stage for single IDR cases
+
 v0.7.14 (2024-01-04)
 ------------------------------------------------------------
 
