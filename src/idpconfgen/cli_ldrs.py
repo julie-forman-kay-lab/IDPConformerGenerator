@@ -1070,7 +1070,10 @@ def main(
         for i in range(len(list(all_files.values())[0])):
             new_dict = {}
             for key, value_list in all_files.items():
-                new_dict[key] = value_list[i]
+                if type(value_list[i]) is list:
+                    new_dict[key] = value_list[i]
+                else:  # make sure we have a list of paths
+                    new_dict[key] = [value_list[i]]
 
             files.append(new_dict.copy())
         log.info("Stitching conformers onto the folded domain...")
