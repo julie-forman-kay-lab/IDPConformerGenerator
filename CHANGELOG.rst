@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.16 (2024-01-11)
+------------------------------------------------------------
+
 * Update citation for ``ldrs`` module to Bioinformatics paper
 
 v0.7.15 (2024-01-05)
