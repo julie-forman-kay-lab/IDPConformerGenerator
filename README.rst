@@ -15,9 +15,9 @@ IDPConformerGenerator
     :target: https://doi.org/10.1021/acs.jpca.2c03726
     :alt: IDPConformerGenerator Publication
 
-.. image:: https://img.shields.io/badge/LDRS-10.1101%2F2023.07.25.550520-blue
-    :target: https://doi.org/10.1101/2023.07.25.550520
-    :alt: LDRS Preprint
+.. image:: https://img.shields.io/badge/LDRS-10.1093%2Fbioinformatics%2Fbtad739-blue
+    :target: https://doi.org/10.1093/bioinformatics/btad739
+    :alt: LDRS Publication
 
 IDPConformerGenerator is a flexible, modular platform for generating ensembles
 of disordered protein states that builds conformers by sampling backbone torsion
@@ -58,9 +58,10 @@ If you use IDPConformerGenerator, please always cite its original publication::
 
 If you use the Local Disordered Region Sampling (LDRS) module, please also cite::
 
-    Local Disordered Region Sampling (LDRS) for Ensemble Modeling of Proteins with Experimentally Undetermined or Low Confidence Prediction Segments
-    Zi Hao Liu, João M.C. Teixeira, Oufan Zhang, Thomas E. Tsangaris, Jie Li, Claudiu C. Gradinaru, Teresa Head-Gordon, Julie D. Forman-Kay
-    bioRxiv 2023.07.25.550520; doi: https://doi.org/10.1101/2023.07.25.550520
+    Zi Hao Liu, João M C Teixeira, Oufan Zhang, Thomas E Tsangaris, Jie Li, Claudiu C Gradinaru, Teresa Head-Gordon,
+    Julie D Forman-Kay, Local Disordered Region Sampling (LDRS) for ensemble modeling of proteins with experimentally undetermined
+    or low confidence prediction segments, Bioinformatics, Volume 39, Issue 12, December 2023, btad739,
+    https://doi.org/10.1093/bioinformatics/btad739
 
 .. end-citing
 
