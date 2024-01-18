@@ -444,8 +444,16 @@ def find_sequence_net_charge(seq, pH):
     for a in aa:
         charge = 0
         # Accounts for phosphorylation, add a negative charge
+        # Uses the pKa of phosphoate bioesters
         if a.islower():
-            charge -= 1
+            if pH > 1.5:
+                charge -= 1
+            elif pH == 1.5:
+                charge -= 0.5
+            if pH > 6.3:
+                charge -= 1
+            elif pH == 6.3:
+                charge -= 0.5
             a = a.upper()
             
         pKa, pKb, pKx = pk_aa_dict[a]

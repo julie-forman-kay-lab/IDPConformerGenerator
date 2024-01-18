@@ -67,11 +67,12 @@ ap.add_argument(
     '--phos',
     help=(
         "Indicates which residues on which chain in the FASTA file is "
-        "phosphorylated, thus adding a negative charge. Chains are denoted "
-        "by colons and phosphorylated residues for that chain are separated "
-        "by commas. Additional chains are delimited by slash and pattern must "
-        "end at a slash. The name of the chain will correspond to the >Name "
-        "in the FASTA file. For e.g. --phos Name:12,14,15/B:13,10/"
+        "phosphorylated, thus adding more negative charges depending on "
+        "the pH. Chains are denoted by colons and phosphorylated residues "
+        "for that chain are separated by commas. Additional chains are "
+        "delimited by slash and pattern must end at a slash. The name "
+        "of the chain will correspond to the >Name in the FASTA file. "
+        "For e.g. --phos Name:12,14,15/B:13,10/"
         ),
     nargs='?',
     default=None,
