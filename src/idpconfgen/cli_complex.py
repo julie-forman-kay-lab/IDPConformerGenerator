@@ -79,6 +79,23 @@ ap.add_argument(
     )
 
 ap.add_argument(
+    '--custom-contact',
+    help=(
+        "Input text (.txt) file containing known contacts between certain "
+        "residues in the provided protein sequences/templates. "
+        "Each new line in the format file will be a new known contact. "
+        "Intramolecular contacts are separated by two slashes (//) while "
+        "intermolecular contacts are separated by a single slash (/). "
+        "The name of the IDP chain will correspond to the >Name in the FASTA "
+        "file while single letter chains suggest a folded template. "
+        "For example: (sic1:1,3,4,5/B:13,14,15) will indicate an "
+        "intermolecular contact between the IDP sequence >sic1 and chain B "
+        "of the folded protein template."
+        ),
+    default=None,
+    )
+
+ap.add_argument(
     '-fld',
     '--folded-structure',
     help=(
@@ -197,6 +214,7 @@ def main(
         database,
         phos=None,
         folded_structure=None,
+        custom_contact=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -321,7 +339,9 @@ def main(
     all_contacts_filtered = [c for c in all_contacts if c]
     
     in_seqs = list(input_seq.values())
+    in_chains = list(input_seq.keys())
     combo_seqs = [c for c in combinations(in_seqs, 2)]
+    combo_chains = [c for c in combinations(in_chains, 2)]
     if folded_structure:
         log.info(T("Folded structure found, identifying surface accessible resiudes"))  # noqa: E501
         assert folded_structure.endswith('.pdb') or \
@@ -343,14 +363,21 @@ def main(
             sa_seqs[chain] = temp_seq
 
         fld_sa_seqs = list(sa_seqs.values())
+        fld_sa_chains = list(sa_seqs.keys())
         log.info("Found the folowing sequences to be surface accessible:")
         for chain in sa_seqs:
             log.info(f"Chain {chain}: {sa_seqs[chain]}")
         log.info(S("done"))
         combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
+        combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains
         if phos:
             combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
-
+        # Combo seqs and combo chains should be aligned now to give locations
+    # TODO: based on chain information, see if any of the residues in
+    # custom contacts are in the ones with folded protein chains.
+    # If custom contacts not found within surface residues, prompt the user
+    # If custom contacts are found within surface resiudes, store the matrix
+    # position then change the value to 1.0 after normalization.
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
         log.info("Only using electropotential contact frequencies.")
