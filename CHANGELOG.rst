@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Fix bug where torsion angles from ``ldrs`` would be swapped sometimes due to mirroring in rotation matrix
+
 v0.7.16 (2024-01-11)
 ------------------------------------------------------------
 
