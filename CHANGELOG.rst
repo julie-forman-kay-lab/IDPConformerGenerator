@@ -14,6 +14,32 @@ Changelog
 * Add BioPython as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 
+v0.7.17 (2024-01-20)
+------------------------------------------------------------
+
+* Fix bug where torsion angles from ``ldrs`` would be swapped sometimes due to mirroring in rotation matrix
+
+v0.7.16 (2024-01-11)
+------------------------------------------------------------
+
+* Update citation for ``ldrs`` module to Bioinformatics paper
+
+v0.7.15 (2024-01-05)
+------------------------------------------------------------
+
+* Bug-fix for ``ldrs`` file processing during ``psurgeon`` stage for single IDR cases
+
+v0.7.14 (2024-01-04)
+------------------------------------------------------------
+
+* Correct reference hyperlink in usage documentation
+
+v0.7.13 (2024-01-03)
+------------------------------------------------------------
+
+* Update documentation for clarity
+* Update example folder with processing AlphaFold structures
+
 v0.7.12 (2023-11-17)
 ------------------------------------------------------------
 
