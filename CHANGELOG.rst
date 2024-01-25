@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Correct case where multiple chains are given in a template and only some need ``ldrs``
+* Update documentation to clarify sequence formatting example for complexes
+
 v0.7.17 (2024-01-20)
 ------------------------------------------------------------
 
