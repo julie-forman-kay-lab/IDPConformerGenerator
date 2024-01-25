@@ -1055,7 +1055,11 @@ def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
                 upper = minmax[1]
                 new_struc_lst = new_struc_arr.tolist()
 
-                idr = Structure(idp_lst[chain][0][idx])
+                try:
+                    idr = Structure(idp_lst[chain][0][idx])
+                except TypeError:
+                    # For cases where there's only 1 L-IDR
+                    idr = Structure(idp_lst[chain][0])
                 idr.build()
 
                 idr_seq = idr.data_array[:, col_resSeq].astype(int)

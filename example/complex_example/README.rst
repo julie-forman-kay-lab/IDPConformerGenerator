@@ -7,6 +7,13 @@ The following example will walk you through building intrinsically disordered
 regions on multiple chains of a protein complex using the Local Disordered
 Region Sampling (LDRS ``ldrs`` subclient).
 
+.. note::
+    Please ensure all sequences are within the .FASTA file even for chains
+    you are not interested in LDRS processing. This will help LDRS determine
+    which chain to process.
+
+    Please refer to ``D1D2.fasta`` for a formating example.
+
 For this exercise, we will be constructing a combination of the three cases of
 N-IDR, L-IDR, and C-IDR on both chain A and chain B of the crystal structure of the
 D1D2 sub-complex from the human SNRNP core domain. Please enter the example 
