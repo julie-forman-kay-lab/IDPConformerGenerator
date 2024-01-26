@@ -14,6 +14,12 @@ Changelog
 * Add BioPython as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 
+v0.7.18 (2024-01-25)
+------------------------------------------------------------
+
+* Correct case where multiple chains are given in a template and only some need ``ldrs``
+* Update documentation to clarify sequence formatting example for complexes
+
 v0.7.17 (2024-01-20)
 ------------------------------------------------------------
 

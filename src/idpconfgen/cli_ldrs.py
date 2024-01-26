@@ -634,7 +634,11 @@ def main(
                 disordered_res.append(i)
 
         DISORDER_SEQS = []
-        DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
+        try:
+            DISORDER_BOUNDS[chain] = consecutive_grouper(disordered_res)
+        except IndexError:
+            log.info(S(f'Skipping chain {chain} because of complete overlap.'))
+            break
         DISORDER_CASES[chain] = []
         for i, bounds in enumerate(DISORDER_BOUNDS[chain]):
             lower = bounds[0]
