@@ -14,6 +14,11 @@ Changelog
 * Add BioPython as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 
+v0.7.19 (2024-01-29)
+------------------------------------------------------------
+
+* Update Sphinx requirement to v5 to fix ``docs`` workflow and ``tox`` error
+
 v0.7.18 (2024-01-25)
 ------------------------------------------------------------
 
