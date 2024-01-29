@@ -13,6 +13,7 @@ Changelog
 * Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
 * Add ``BioPython`` as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
+* Add a new property ``residues_splitted`` in ``libstructure.py`` to get the residue numbers in all chains
 
 v0.7.19 (2024-01-29)
 ------------------------------------------------------------
