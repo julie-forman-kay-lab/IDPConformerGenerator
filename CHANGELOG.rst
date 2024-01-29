@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.19 (2024-01-29)
+------------------------------------------------------------
+
 * Update Sphinx requirement to v5 to fix ``docs`` workflow and ``tox`` error
 
 v0.7.18 (2024-01-25)
