@@ -11,7 +11,7 @@ Changelog
 
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 * Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
-* Add BioPython as a dependency for calulation purposes (Shrake-Rupley SASA method)
+* Add ``BioPython`` as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 
 v0.7.19 (2024-01-29)
