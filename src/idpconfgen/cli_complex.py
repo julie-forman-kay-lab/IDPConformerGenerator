@@ -38,6 +38,7 @@ from idpconfgen.libs.libmultichain import (
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
     find_sa_residues,
+    process_custom_contacts,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import update_chars_lower
@@ -79,13 +80,12 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '--custom-contact',
+    '--custom-contacts',
     help=(
         "Input text (.txt) file containing known contacts between certain "
         "residues in the provided protein sequences/templates. "
         "Each new line in the format file will be a new known contact. "
-        "Intramolecular contacts are separated by two slashes (//) while "
-        "intermolecular contacts are separated by a single slash (/). "
+        "Intra- and inter-contacts are separated by a single slash (/). "
         "The name of the IDP chain will correspond to the >Name in the FASTA "
         "file while single letter chains suggest a folded template. "
         "For example: (sic1:1,3,4,5/B:13,14,15) will indicate an "
@@ -214,7 +214,7 @@ def main(
         database,
         phos=None,
         folded_structure=None,
-        custom_contact=None,
+        custom_contacts=None,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -339,7 +339,11 @@ def main(
     all_contacts_filtered = [c for c in all_contacts if c]
     
     in_seqs = list(input_seq.values())
+    in_res = []
+    for seq in in_seqs:
+        in_res.append([i for i in range(1, len(seq))])
     in_chains = list(input_seq.keys())
+    combo_res = [c for c in combinations(in_res, 2)]
     combo_seqs = [c for c in combinations(in_seqs, 2)]
     combo_chains = [c for c in combinations(in_chains, 2)]
     if folded_structure:
@@ -349,35 +353,50 @@ def main(
 
         fld_struc = Structure(Path(folded_structure))
         fld_struc.build()
+        fld_res = fld_struc.residues_splitted
         fld_seqs = fld_struc.fasta
         sa_idx = find_sa_residues(folded_structure)
         
         sa_seqs = {}
+        sa_res = {}
         for chain, combos in sa_idx.items():
             temp_seq = []
+            temp_res = []
             for c in combos:
                 res = ""
+                real_res = []
                 for i in c:
                     res += fld_seqs[chain][i]
+                    real_res.append(fld_res[chain][i])
                 temp_seq.append(res)
+                temp_res.append(real_res)
             sa_seqs[chain] = temp_seq
-
+            sa_res[chain] = temp_res
+        fld_sa_res = list(sa_res.values())
         fld_sa_seqs = list(sa_seqs.values())
         fld_sa_chains = list(sa_seqs.keys())
         log.info("Found the folowing sequences to be surface accessible:")
         for chain in sa_seqs:
             log.info(f"Chain {chain}: {sa_seqs[chain]}")
         log.info(S("done"))
+        # Combo seqs and combo chains are aligned to give locations
+        combo_res = list(product(fld_sa_res, in_res)) + combo_res
         combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
         combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains
         if phos:
             combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
-        # Combo seqs and combo chains should be aligned now to give locations
+    
     # TODO: based on chain information, see if any of the residues in
     # custom contacts are in the ones with folded protein chains.
     # If custom contacts not found within surface residues, prompt the user
     # If custom contacts are found within surface resiudes, store the matrix
     # position then change the value to 1.0 after normalization.
+    if custom_contacts is not None:
+        combo_res, positions = process_custom_contacts(
+            custom_contacts,
+            combo_chains,
+            )
+    
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
         log.info("Only using electropotential contact frequencies.")

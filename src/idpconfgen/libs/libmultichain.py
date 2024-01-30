@@ -9,6 +9,7 @@ from Bio.PDB.SASA import ShrakeRupley
 
 from idpconfgen import Path
 from idpconfgen.core.definitions import aa3to1, pk_aa_dict
+from idpconfgen.ldrs_helper import consecutive_grouper
 from idpconfgen.libs.libparse import split_consecutive_groups
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
@@ -765,6 +766,106 @@ def find_sa_residues(
     
     return residue_idx
 
+
+def process_custom_contacts(file, res_combos, chain_combos):
+    """
+    Process text (.txt) file containing inter- and/or intra- contacts.
+    
+    Follows the following format:
+        Each new line is a new contact.
+        Inter- and intra-contacts are denoted by a single slash (/).
+        IDP sequences are given as string (multi-character).
+        Chains are given as single upper case character.
+        
+    For example:
+        seq1:1,2,3,4,5/A:33,34,35,36,37
+        seq1:6,7,8,9/seq2:1,2,3,4,5,6,7
+        seq2:20,21,27,35,39/B:1,10,12,13,14
+        seq1:15,17,19,20,21/seq1:37,38,40,42,44
+
+    Parameters
+    ----------
+    file : string or Path
+        Path to the custom contacts file of interest.
+    
+    res_combos : list
+        List of combinations of residues for each of the respected chains
+
+    chain_combos : list
+        List of combinations of different chains and sequences by their
+        name.
+    
+    Returns
+    -------
+    custom_res_combo : list
+        New residue combinations now with certain resiudes
+    
+    positions : list
+        List of positions/coordinates for each of the combinations
+        we know for sure to make a contact.
+    """
+    custom_res_combo = []
+    custom_chain_combo = []
+    positions = []
+    
+    with open(file) as cc_file:
+        lines = cc_file.readlines()
+        for line in lines:
+            try:
+                splitted = line.split("/")
+                chain1 = splitted[0]
+                chain2 = splitted[1]
+                
+                chain1_split = chain1.split(":")
+                chain2_split = chain2.split(":")
+                
+                chain1ID = chain1_split[0]
+                chain2ID = chain2_split[0]
+                chain1Seq_grouped = \
+                    consecutive_grouper([int(s) for s in chain1_split[1].split(',')])  # noqa: E501
+                chain2Seq_grouped = \
+                    consecutive_grouper([int(s) for s in chain2_split[1].split(',')])  # noqa: E501
+                
+                chain1Seq = []
+                chain2Seq = []
+                for g1 in chain1Seq_grouped:
+                    chain1Seq.append([s for s in range(g1[0], g1[1])])
+                for g2 in chain2Seq_grouped:
+                    chain2Seq.append([s for s in range(g2[0], g2[1])])
+                
+                if len(chain1ID) > 1:
+                    chain1ID = f">{chain1ID}"
+                if len(chain2ID) > 1:
+                    chain2ID = f">{chain2ID}"
+                
+                custom_chain_combo.append((chain1ID, chain2ID))
+                custom_res_combo.append((chain1Seq, chain2Seq))
+            except Exception:
+                # We have to skip lines that don't follow the correct formatting
+                continue
+    
+    for c, combo in enumerate(custom_chain_combo):
+        try:
+            combo_rev = combo[::-1]
+            if combo in chain_combos:
+                idx = chain_combos.index(combo)
+            elif combo_rev in chain_combos:
+                custom_chain_combo[c] = combo_rev
+                custom_res_combo[c] = custom_res_combo[c][::-1]
+                idx = chain_combos.index(combo_rev)  # noqa: F841
+            else:
+                continue
+        except ValueError:
+            continue
+    # NOTE: wouldn't make sense to include combos of both IDP and folded
+    # just have the folded segments appended to the master combination list
+    # would suffice.
+    # NOTE: need to consider overlapping positions for folded segments
+    # just extend the existing one by however many overlaps and keep in mind
+    # of the positions.
+    
+    return custom_res_combo, positions
+        
 
 def reverse_position_lookup(coords, location_mtx, database):
     """
