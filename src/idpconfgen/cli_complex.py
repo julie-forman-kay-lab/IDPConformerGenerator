@@ -395,6 +395,7 @@ def main(
         combo_res, positions = process_custom_contacts(
             custom_contacts,
             combo_chains,
+            combo_res
             )
     
     if len(all_contacts_filtered) == 0:

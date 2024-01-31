@@ -767,6 +767,39 @@ def find_sa_residues(
     return residue_idx
 
 
+def create_coordinate_combinations(data, modifier=0):
+    """
+    Create coordinates based on a tuple of two sets of residues of interest.
+    
+    Parameters
+    ----------
+    data : tuple, N = 2
+        Tuple of lists ([[]], [[]])
+    
+    modifier : int
+        Change the values of coordinates for indexing purposes
+    
+    Returns
+    -------
+    coordinates : list of tuple
+        Combination of coordinates between each of the lists of lists
+        within the tuple [(,)]
+    """
+    if len(data) != 2:
+        raise ValueError("Input must be a tuple of two elements.")
+
+    list1, list2 = data
+
+    coordinates = []
+    for sublist1 in list1:
+        for item1 in sublist1:
+            for sublist2 in list2:
+                for item2 in sublist2:
+                    coordinates.append((item1 + modifier, item2 + modifier))
+
+    return coordinates
+
+
 def process_custom_contacts(file, res_combos, chain_combos):
     """
     Process text (.txt) file containing inter- and/or intra- contacts.
@@ -845,6 +878,21 @@ def process_custom_contacts(file, res_combos, chain_combos):
                 continue
     
     for c, combo in enumerate(custom_chain_combo):
+        to_add = -1
+        c1, c2 = combo
+        if len(c1) == 1 and len(c2) == 1:
+            # Ignore improperly formatted files
+            # i.e. cannot have both folded domains
+            continue
+        elif len(c1) > 1 and len(c2) > 1:
+            # Get the positions straight up since they're both IDPs
+            temp_coordinates = create_coordinate_combinations(
+                data=custom_res_combo[c],
+                modifier=-1
+                )
+            positions.append(temp_coordinates)
+            # No need to update the residue combinations
+            continue
         try:
             combo_rev = combo[::-1]
             if combo in chain_combos:
@@ -852,18 +900,23 @@ def process_custom_contacts(file, res_combos, chain_combos):
             elif combo_rev in chain_combos:
                 custom_chain_combo[c] = combo_rev
                 custom_res_combo[c] = custom_res_combo[c][::-1]
-                idx = chain_combos.index(combo_rev)  # noqa: F841
+                idx = chain_combos.index(combo_rev)
             else:
+                # If the chains do not match input files
                 continue
         except ValueError:
+            # Catches improper formatting
             continue
-    # NOTE: wouldn't make sense to include combos of both IDP and folded
-    # just have the folded segments appended to the master combination list
-    # would suffice.
-    # NOTE: need to consider overlapping positions for folded segments
-    # just extend the existing one by however many overlaps and keep in mind
-    # of the positions.
-    
+
+        # Make sure we're only considering the folded domain
+        if c1.isupper() and len(c1) == 1:
+            to_add = 0
+        elif c2.isupper() and len(c2) == 1:
+            to_add = 1
+        
+        custom_fld_res = custom_res_combo[c][to_add]  # noqa: F841
+        original_fld_res = res_combos[idx]  # noqa: F841
+        
     return custom_res_combo, positions
         
 
