@@ -31,6 +31,11 @@ NMR chemical shift data. These conformer pools are intended to be utilized as
 input for further approaches to match experimental data, such as re-weighting or
 sub-setting algorithms.
 
+**Note to users:** IDR conformers generated with ``ldrs``, specifically processed
+using the ``align_coords()`` function in ``ldrs_helper.py`` prior to v0.7.17
+may have the wrong stereochemistry. This bug has since been fixed. Thank you for
+your understanding and we apologize for any inconvenience this has caused.
+
 .. end-description
 
 How to Install
