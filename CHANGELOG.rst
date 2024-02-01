@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Add a note for users in the ``README.rst`` regarding conformers generated with ``ldrs`` prior to version 0.7.17
+
 v0.7.19 (2024-01-29)
 ------------------------------------------------------------
 
