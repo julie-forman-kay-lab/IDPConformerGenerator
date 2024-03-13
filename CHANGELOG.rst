@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.21 (2024-03-13)
+------------------------------------------------------------
+
 * When a given sequence overlaps with sequence from folded template in ``ldrs``, ignore building on that chain
 * Fixes issue #269
 
