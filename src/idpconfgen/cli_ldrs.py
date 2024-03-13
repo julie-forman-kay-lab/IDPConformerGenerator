@@ -265,7 +265,12 @@ libcli.add_argument_duser(ap)
 ap.add_argument(
     '-fld',
     '--folded-structure',
-    help="Input .PDB file for folded structure of interest.",
+    help=(
+        "Input .PDB file for folded structure of interest. "
+        "If you would like to skip chains in a multi-chain template "
+        "you must have its identical sequence .fasta submitted in the -seq "
+        "flag."
+        ),
     required=True,
     )
 
