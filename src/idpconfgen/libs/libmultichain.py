@@ -807,7 +807,7 @@ def create_coordinate_combinations(data, modifier=0):
     return coordinates
 
 
-def process_custom_contacts(file, res_combos, chain_combos):
+def process_custom_contacts(file, res_combos, chain_combos, ignore_sasa=False):
     """
     Process text (.txt) file containing inter- and/or intra- contacts.
     
@@ -817,10 +817,12 @@ def process_custom_contacts(file, res_combos, chain_combos):
         IDP sequences are given as string (multi-character).
         Chains are given as single upper case character.
         
+        Folded chains MUST be before IDP sequences.
+        
     For example:
-        seq1:1,2,3,4,5/A:33,34,35,36,37
+        A:33,34,35,36,37/seq1:1,2,3,4,5
         seq1:6,7,8,9/seq2:1,2,3,4,5,6,7
-        seq2:20,21,27,35,39/B:1,10,12,13,14
+        B:1,10,12,13,14/seq2:20,21,27,35,39/
         seq1:15,17,19,20,21/seq1:37,38,40,42,44
 
     Parameters
@@ -834,6 +836,10 @@ def process_custom_contacts(file, res_combos, chain_combos):
     chain_combos : list
         List of combinations of different chains and sequences by their
         name.
+    
+    ignore_sasa : Bool
+        Whether or not to include custom sequences that are not found to be
+        surface accessible.
     
     Returns
     -------
@@ -902,15 +908,18 @@ def process_custom_contacts(file, res_combos, chain_combos):
             continue
         try:
             combo_rev = combo[::-1]
-            if combo in chain_combos:
-                idx = chain_combos.index(combo)
-            elif combo_rev in chain_combos:
-                custom_chain_combo[c] = combo_rev
-                custom_res_combo[c] = custom_res_combo[c][::-1]
-                idx = chain_combos.index(combo_rev)
-            else:
-                # If the chains do not match input files
-                continue
+            if not ignore_sasa:
+                if combo in chain_combos:
+                    idx = chain_combos.index(combo)
+                elif combo_rev in chain_combos:
+                    custom_chain_combo[c] = combo_rev
+                    custom_res_combo[c] = custom_res_combo[c][::-1]
+                    idx = chain_combos.index(combo_rev)
+                else:
+                    # If the chains do not match input files tell the user
+                    log.info(S(f"Specified residues {combo} were not identified as surface residues."))  # noqa: E501
+                    log.info(S("Please use the flag --ignore-sasa if you would like to use these residues."))  # noqa: E501
+                    continue
         except ValueError:
             # Catches improper formatting
             continue

@@ -88,9 +88,10 @@ ap.add_argument(
         "Intra- and inter-contacts are separated by a single slash (/). "
         "The name of the IDP chain will correspond to the >Name in the FASTA "
         "file while single letter chains suggest a folded template. "
-        "For example: (sic1:1,3,4,5/B:13,14,15) will indicate an "
+        "For example: (B:13,14,15/sic1:1,3,4,5) will indicate an "
         "intermolecular contact between the IDP sequence >sic1 and chain B "
         "of the folded protein template."
+        "Folded chains MUST be before IDP sequence as indicated above."
         ),
     default=None,
     )
@@ -135,6 +136,23 @@ ap.add_argument(
         ),
     default=60,
     type=int,
+    )
+
+ap.add_argument(
+    '-max',
+    '--max-contacts',
+    help=(
+        'Integer maximum of contacts built between chains. '
+        'Defaults to 10.'
+        ),
+    default=10,
+    type=int,
+    )
+
+ap.add_argument(
+    '--ignore-sasa',
+    help="Ignores SASA limit of 31.65 Å² for custom contacts.",
+    action='store_true',
     )
 
 #########################################
@@ -215,6 +233,7 @@ def main(
         phos=None,
         folded_structure=None,
         custom_contacts=None,
+        ignore_sasa=False,
         dloop_off=False,
         dstrand=False,
         dhelix=False,
@@ -229,6 +248,7 @@ def main(
         ncores=1,
         ph=7,
         blend_weight=60,
+        max_contacts=10,
         random_seed=0,
         xmer_probs=None,
         output_folder=None,
@@ -386,16 +406,18 @@ def main(
         if phos:
             combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
     
-    # TODO: based on chain information, see if any of the residues in
+    # NOTE: based on chain information, see if any of the residues in
     # custom contacts are in the ones with folded protein chains.
-    # If custom contacts not found within surface residues, prompt the user
-    # If custom contacts are found within surface resiudes, store the matrix
-    # position then change the value to 1.0 after normalization.
+    # If custom contacts not within surface residues, log it for the user
+    # If custom contacts are within surface resiudes, store the position
+    # For re-weighting with custom contacts, make the weight of custom
+    # contact 90% and the knowledge database as 10%.
     if custom_contacts is not None:
-        combo_res, positions = process_custom_contacts(
+        custom_res, positions = process_custom_contacts(
             custom_contacts,
             combo_chains,
-            combo_res
+            combo_res,
+            ignore_sasa=ignore_sasa,
             )
     
     if len(all_contacts_filtered) == 0:
