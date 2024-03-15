@@ -78,10 +78,16 @@ Modeling Disordered Region Tails on a Folded Domain
     the FASTA file format for the ``-seq`` parameter must be as follows with no
     blank spaces.
     
-    ``>A
-    Sequence for chain A
-    >B
-    Sequence for chain B``
+    ``>A``
+    ``Sequence for chain A``
+    ``>B``
+    ``Sequence for chain B``
+
+    If you would like to skip a chain while modeling multi-chain complexes,
+    you must have the identical sequence in the ``.fasta`` file to the chains
+    in the template you would like to skip.
+
+    Clash-checking and will be done with skipped-chains in consideration.
 
 .. include:: ../example/cnot7_example/README.rst
     :start-after: .. start-description

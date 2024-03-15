@@ -265,7 +265,12 @@ libcli.add_argument_duser(ap)
 ap.add_argument(
     '-fld',
     '--folded-structure',
-    help="Input .PDB file for folded structure of interest.",
+    help=(
+        "Input .PDB file for folded structure of interest. "
+        "If you would like to skip chains in a multi-chain template "
+        "you must have its identical sequence .fasta submitted in the -seq "
+        "flag."
+        ),
     required=True,
     )
 
@@ -600,15 +605,29 @@ def main(
         else:
             fld_struc_data = fld_struc.data_array
         
-        fld_chainseq = process_multichain_pdb(fld_struc_data, input_seq)
+        fld_chainseq, skipped_chains = process_multichain_pdb(fld_struc_data, input_seq)  # noqa: E501
+        final_chainseq = {}
         for chain in fld_chainseq:
+            if type(fld_chainseq[chain]) is str:
+                # We skip this chain due to perfect matching of sequence
+                skipped_seq = list(input_seq.keys())[list(input_seq.values()).index(fld_chainseq[chain])]  # noqa: E501
+                del input_seq[skipped_seq]
+                continue
             match_index = fld_chainseq[chain][1]
             seq_id = list(input_seq)[match_index]
             log.info(S(f"sequence {seq_id} is matched with chain {chain}"))
+            final_chainseq[chain] = fld_chainseq[chain]
+        fld_chainseq = final_chainseq
+        if bool(input_seq) is False:
+            log.info("Your input sequence must have new IDRs residues you'd like to model.")  # noqa: E501
+            return
     else:
+        skipped_chains = []
         chain = list(unique_chains)[0]
         fld_chainseq = {chain: (fld_fasta, 0, fld_struc.data_array)}
-
+    
+    if len(skipped_chains) == 0:
+        skipped_chains = None
     DISORDER_BOUNDS = {}
     DISORDER_CASES = {}
     for chain in fld_chainseq:
@@ -1091,6 +1110,8 @@ def main(
             fld_struc=Path(folded_structure),
             case=DISORDER_CASES,
             ranges=DISORDER_BOUNDS,
+            membrane=membrane,
+            skipped_chains=skipped_chains,
             )
         execute = partial(
             report_on_crash,

@@ -15,6 +15,17 @@ Changelog
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 * Add a new property ``residues_splitted`` in ``libstructure.py`` to get the residue numbers in all chains
 
+v0.7.21 (2024-03-13)
+------------------------------------------------------------
+
+* When a given sequence overlaps with sequence from folded template in ``ldrs``, ignore building on that chain
+* Fixes issue #269
+
+v0.7.20 (2024-02-01)
+------------------------------------------------------------
+
+* Add a note for users in the ``README.rst`` regarding conformers generated with ``ldrs`` prior to version 0.7.17
+
 v0.7.19 (2024-01-29)
 ------------------------------------------------------------
 

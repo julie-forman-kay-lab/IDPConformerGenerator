@@ -7,7 +7,7 @@ import numpy as np
 from Bio.PDB import MMCIFParser, PDBParser
 from Bio.PDB.SASA import ShrakeRupley
 
-from idpconfgen import Path
+from idpconfgen import Path, log
 from idpconfgen.core.definitions import aa3to1, pk_aa_dict
 from idpconfgen.ldrs_helper import consecutive_grouper
 from idpconfgen.libs.libparse import split_consecutive_groups
@@ -21,6 +21,7 @@ from idpconfgen.libs.libstructure import (
     col_segid,
     cols_coords,
     )
+from idpconfgen.logger import S
 
 
 def process_multichain_pdb(fld_struc, input_seq):
@@ -62,6 +63,7 @@ def process_multichain_pdb(fld_struc, input_seq):
             break
         if next_res != res:
             fld_chainseq[fld_chain[i]].append(aa3to1[name])
+    skipped_chains = []
     for chain in fld_chainseq:
         fld_fasta = ''.join(fld_chainseq[chain]).upper()
         matches = []
@@ -75,11 +77,16 @@ def process_multichain_pdb(fld_struc, input_seq):
         for i, c in enumerate(fld_chain):
             if c == chain:
                 chain_lst.append(fld_lst[i])
+        if max_match == 1.0:
+            log.info(S(f"Identical sequence found, skipping chain {chain}."))
+            fld_chainseq[chain] = fld_fasta
+            skipped_chains += chain_lst
+            continue
         chain_arr = np.array(chain_lst)
         fld_chainseq[chain] = (fld_fasta, match_index, chain_arr)
-    
-    return fld_chainseq
 
+    return fld_chainseq, skipped_chains
+ 
 
 def group_chains(pdb_paths):
     """

@@ -904,7 +904,14 @@ def count_clashes(
     return int(num_clashes), fragment
 
 
-def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
+def psurgeon(
+        idp_lst,
+        fld_struc,
+        case,
+        ranges,
+        membrane=False,
+        skipped_chains=None
+        ):
     """
     Protein surgeon grafts disordered regions onto folded structures.
 
@@ -925,10 +932,15 @@ def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
         For Linker-IDR, what residue ranges for the chain break
         Keys are the chain ID
     
-    membrane: Bool
+    membrane : Bool
         Whether or not a membrane exists within the template structure.
         Carried over from user-input in `ldrs` sub-client.
         Defaults to False.
+    
+    skipped_chains : list
+        Any skipped chains we're building can be appended
+        at the end of our new structure.
+        Optional. Defaults to None.
 
     Returns
     -------
@@ -1129,7 +1141,8 @@ def psurgeon(idp_lst, fld_struc, case, ranges, membrane=False):
             new_struc_arr_complete = new_struc_arr
         else:
             new_struc_arr_complete = np.array(new_struc_arr_complete.tolist() + new_struc_arr.tolist())  # noqa: E501
-
+    if skipped_chains is not None:
+        new_struc_arr_complete = np.array(new_struc_arr_complete.tolist() + skipped_chains)  # noqa: E501
     new_serial = [str(i) for i in range(1, len(new_struc_arr_complete) + 1)]
     new_struc_arr_complete[:, col_serial] = new_serial
     
