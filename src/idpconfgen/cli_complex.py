@@ -405,15 +405,18 @@ def main(
         combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains
         if phos:
             combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
-    
     # NOTE: based on chain information, see if any of the residues in
     # custom contacts are in the ones with folded protein chains.
-    # If custom contacts not within surface residues, log it for the user
-    # If custom contacts are within surface resiudes, store the position
-    # For re-weighting with custom contacts, make the weight of custom
-    # contact 90% and the knowledge database as 10%.
+    # If custom contacts not within surface residues, log it for the user.
+    
+    # We do not change "combo_chains" since that's our anchor for alignment.
+    # If we do not have custom contacts for specific combo chains, store None.
+    
+    # We select later if we have custom contacts, then 90% of the time we will
+    # select a custom_res/custom_seq. If not, then 10% of the time we select
+    # from our knowledge driven database.
     if custom_contacts is not None:
-        custom_res, positions = process_custom_contacts(
+        custom_res, custom_seqs, custom_chains = process_custom_contacts(
             custom_contacts,
             combo_chains,
             combo_res,

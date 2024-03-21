@@ -807,7 +807,7 @@ def create_coordinate_combinations(data, modifier=0):
     return coordinates
 
 
-def process_custom_contacts(file, res_combos, chain_combos, ignore_sasa=False):
+def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     """
     Process text (.txt) file containing inter- and/or intra- contacts.
     
@@ -830,10 +830,10 @@ def process_custom_contacts(file, res_combos, chain_combos, ignore_sasa=False):
     file : string or Path
         Path to the custom contacts file of interest.
     
-    res_combos : list
-        List of combinations of residues for each of the respected chains
+    combo_chains : list
+        List of combinations of sequences or sequences and chains.
 
-    chain_combos : list
+    combo_res : list
         List of combinations of different chains and sequences by their
         name.
     
@@ -843,16 +843,20 @@ def process_custom_contacts(file, res_combos, chain_combos, ignore_sasa=False):
     
     Returns
     -------
-    custom_res_combo : list
-        New residue combinations now with certain resiudes
+    custom_res : list
+        Combinations of residues from custom contacts.
+        Aligned to combo_chains.
     
-    positions : list
-        List of positions/coordinates for each of the combinations
-        we know for sure to make a contact.
+    custom_seqs : list
+        Combinations of sequences from custom contacts.
+        Aligned to combo_chains.
+    
+    custom_chains : list
+        New combination of all the chains
     """
-    custom_res_combo = []
-    custom_chain_combo = []
-    positions = []
+    custom_res = []
+    custom_seqs = []
+    custom_chains = []
     
     with open(file) as cc_file:
         lines = cc_file.readlines()
@@ -884,56 +888,13 @@ def process_custom_contacts(file, res_combos, chain_combos, ignore_sasa=False):
                 if len(chain2ID) > 1:
                     chain2ID = f">{chain2ID}"
                 
-                custom_chain_combo.append((chain1ID, chain2ID))
-                custom_res_combo.append((chain1Seq, chain2Seq))
+                custom_chains.append((chain1ID, chain2ID))
+                custom_res.append((chain1Seq, chain2Seq))
             except Exception:
                 # We have to skip lines that don't follow the correct formatting
                 continue
     
-    for c, combo in enumerate(custom_chain_combo):
-        to_add = -1
-        c1, c2 = combo
-        if len(c1) == 1 and len(c2) == 1:
-            # Ignore improperly formatted files
-            # i.e. cannot have both folded domains
-            continue
-        elif len(c1) > 1 and len(c2) > 1:
-            # Get the positions straight up since they're both IDPs
-            temp_coordinates = create_coordinate_combinations(
-                data=custom_res_combo[c],
-                modifier=-1
-                )
-            positions.append(temp_coordinates)
-            # No need to update the residue combinations
-            continue
-        try:
-            combo_rev = combo[::-1]
-            if not ignore_sasa:
-                if combo in chain_combos:
-                    idx = chain_combos.index(combo)
-                elif combo_rev in chain_combos:
-                    custom_chain_combo[c] = combo_rev
-                    custom_res_combo[c] = custom_res_combo[c][::-1]
-                    idx = chain_combos.index(combo_rev)
-                else:
-                    # If the chains do not match input files tell the user
-                    log.info(S(f"Specified residues {combo} were not identified as surface residues."))  # noqa: E501
-                    log.info(S("Please use the flag --ignore-sasa if you would like to use these residues."))  # noqa: E501
-                    continue
-        except ValueError:
-            # Catches improper formatting
-            continue
-
-        # Make sure we're only considering the folded domain
-        if c1.isupper() and len(c1) == 1:
-            to_add = 0
-        elif c2.isupper() and len(c2) == 1:
-            to_add = 1
-        
-        custom_fld_res = custom_res_combo[c][to_add]  # noqa: F841
-        original_fld_res = res_combos[idx]  # noqa: F841
-        
-    return custom_res_combo, positions
+    return custom_res, custom_seqs, custom_chains
         
 
 def reverse_position_lookup(coords, location_mtx, database):
