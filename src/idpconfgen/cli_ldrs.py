@@ -70,6 +70,7 @@ from idpconfgen.ldrs_helper import (
     count_clashes,
     create_all_combinations,
     disorder_cases,
+    inter_chain_cc,
     next_seeker,
     psurgeon,
     tolerance_calculator,
@@ -1081,7 +1082,7 @@ def main(
     # - Generate a tuple database of which pairs have already been generated
     if not stitching_off:
         log.info("Creating combinations of IDRs for stitching process...")
-        log.info(S("Interchain clash-checking will be performed at this stage."))  # noqa: E501
+        log.info(S("Intra- and inter-chain clash-checking will be performed at this stage."))  # noqa: E501
         chains = list(fld_chainseq.keys())
         all_files = create_all_combinations(
             output_folder.joinpath(TEMP_DIRNAME),
@@ -1089,16 +1090,20 @@ def main(
             nconfs,
             ncores
             )
-        files = []
-        for i in range(len(list(all_files.values())[0])):
-            new_dict = {}
-            for key, value_list in all_files.items():
-                if type(value_list[i]) is list:
-                    new_dict[key] = value_list[i]
-                else:  # make sure we have a list of paths
-                    new_dict[key] = [value_list[i]]
+        
+        files_to_process = []
+        if MULTICHAIN:
+            files_to_process = inter_chain_cc(all_files, nconfs)
+        else:
+            for i in range(len(list(all_files.values())[0])):
+                new_dict = {}
+                for key, value_list in all_files.items():
+                    if type(value_list[i]) is list:
+                        new_dict[key] = value_list[i]
+                    else:  # make sure we have a list of paths
+                        new_dict[key] = [value_list[i]]
+                files_to_process.append(new_dict.copy())
 
-            files.append(new_dict.copy())
         log.info("Stitching conformers onto the folded domain...")
         if membrane:
             log.info(S(
@@ -1120,7 +1125,7 @@ def main(
             ROC_folder=output_folder,
             ROC_prefix=_name,
             )
-        execute_pool = pool_function(execute, files, ncores=ncores)
+        execute_pool = pool_function(execute, files_to_process, ncores=ncores)
         
         for i, conf in enumerate(execute_pool):
             struc = structure_to_pdb(conf)
