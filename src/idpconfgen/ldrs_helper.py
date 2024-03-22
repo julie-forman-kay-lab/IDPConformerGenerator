@@ -1129,3 +1129,63 @@ def psurgeon(
     new_struc_arr_complete[:, col_serial] = new_serial
     
     return new_struc_arr_complete
+
+
+def inter_chain_cc(all_files, nconfs):
+    """
+    Check for clashes between all chains of IDRs.
+
+    Parameters
+    ----------
+    all_files : dict
+        Keys are chains and values are lists of Paths
+        for IDRs selected that don't clash with each other.
+    
+    nconfs : int
+        Number of final conformers.
+    
+    Returns
+    -------
+    final_combos : list of dict
+        Each value is a dictionary where key is the chain and value
+        are the list containing IDRs.
+    """
+    final_combos = []
+    total_chains = len(all_files)
+    all_chains = all_files.keys()
+
+    while len(final_combos) < nconfs:
+        reset = False
+        random_combo = [random.randint(0, nconfs - 1) for _ in range(total_chains)]  # noqa: E501
+        candidate_combo = []
+        
+        for i, selections in enumerate(all_files.values()):
+            candidate_combo.append(selections[random_combo[i]])
+            
+        for i in range(len(candidate_combo)):
+            for j in range(i + 1, len(candidate_combo)):
+                idr_set1 = candidate_combo[i]
+                idr_set2 = candidate_combo[j]
+                idr_pairs = product(idr_set1, idr_set2)
+                for pair in idr_pairs:
+                    frag_s = Structure(pair[0])
+                    struc_s = Structure(pair[1])
+                    frag_s.build()
+                    struc_s.build()
+                    clashes, _ = count_clashes(frag_s.data_array, struc_s)
+                    if clashes:
+                        reset = True
+                        break
+                if reset:
+                    break
+            if reset:
+                break
+        if reset:
+            continue
+        else:
+            temp_dict = {}
+            for i, c in enumerate(all_chains):
+                temp_dict[c] = candidate_combo[i]
+            final_combos.append(temp_dict)
+
+    return final_combos
