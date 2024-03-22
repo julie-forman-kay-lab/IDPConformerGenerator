@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.22 (2024-03-22)
+------------------------------------------------------------
+
 * Fixes issue where clash-checking IDR combinations was not being performed between different chains
 
 v0.7.21 (2024-03-13)
