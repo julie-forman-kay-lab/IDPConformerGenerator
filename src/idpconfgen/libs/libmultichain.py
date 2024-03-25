@@ -811,6 +811,10 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     """
     Process text (.txt) file containing inter- and/or intra- contacts.
     
+    Lets the user know if a set of residues are not considered to be SASA
+    by comparing to `combo_res`. For unspecified contacts in `combo_chains`,
+    store as "none" in the final list of `custom_res`.
+    
     Follows the following format:
         Each new line is a new contact.
         Inter- and intra-contacts are denoted by a single slash (/).
@@ -843,19 +847,14 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     
     Returns
     -------
-    custom_res : list
-        Combinations of residues from custom contacts.
+    cus_inter_res : list
+        Combinations of interchain residues from custom contacts.
         Aligned to combo_chains.
     
-    custom_seqs : list
-        Combinations of sequences from custom contacts.
-        Aligned to combo_chains.
-    
-    custom_chains : list
-        New combination of all the chains
+    cus_intra_res : dict
+        Custom contacts for intraIDP residues
     """
     custom_res = []
-    custom_seqs = []
     custom_chains = []
     
     with open(file) as cc_file:
@@ -863,7 +862,7 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
         for line in lines:
             try:
                 splitted = line.split("/")
-                chain1 = splitted[0]
+                chain1 = splitted[0]  # Must be chain of folded domain
                 chain2 = splitted[1]
                 
                 chain1_split = chain1.split(":")
@@ -892,9 +891,30 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
                 custom_res.append((chain1Seq, chain2Seq))
             except Exception:
                 # We have to skip lines that don't follow the correct formatting
+                log.info(f"Incorrect formatting detected for line: {line}")
                 continue
     
-    return custom_res, custom_seqs, custom_chains
+    custom_combos = {}
+    ordered_combos = {}
+    cus_intra_res = {}
+    for i, ccombo in enumerate(custom_chains):
+        if ccombo not in combo_chains:
+            cus_intra_res[ccombo] = custom_res[i]
+        else:
+            custom_combos[ccombo] = custom_res[i]
+        
+    for all_ccombo in combo_chains:
+        ordered_combos[all_ccombo] = None
+        if all_ccombo not in custom_chains:
+            custom_combos[all_ccombo] = None
+    
+    sorted_chains = sorted(custom_combos, key=lambda x: list(ordered_combos.keys()).index(x))  # noqa: E501
+    custom_combos = {key: custom_combos[key] for key in sorted_chains}
+    
+    custom_chains = list(custom_combos.keys())
+    cus_inter_res = list(custom_combos.values())
+    
+    return cus_inter_res, cus_intra_res
         
 
 def reverse_position_lookup(coords, location_mtx, database):

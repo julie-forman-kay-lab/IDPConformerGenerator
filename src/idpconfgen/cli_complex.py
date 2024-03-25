@@ -416,13 +416,13 @@ def main(
     # select a custom_res/custom_seq. If not, then 10% of the time we select
     # from our knowledge driven database.
     if custom_contacts is not None:
-        custom_res, custom_seqs, custom_chains = process_custom_contacts(
+        cus_inter_res, cus_intra_res = process_custom_contacts(
             custom_contacts,
             combo_chains,
             combo_res,
             ignore_sasa=ignore_sasa,
             )
-    
+
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
         log.info("Only using electropotential contact frequencies.")
