@@ -891,8 +891,12 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
                 custom_res.append((chain1Seq, chain2Seq))
             except Exception:
                 # We have to skip lines that don't follow the correct formatting
-                log.info(f"Incorrect formatting detected for line: {line}")
+                log.info(f"Incorrect formatting detected for line: {line}. Skipping.")  # noqa: E501
                 continue
+
+    og_combos = {}
+    for i, chain in enumerate(combo_chains):
+        og_combos[chain] = combo_res[i]
     
     custom_combos = {}
     ordered_combos = {}
@@ -910,6 +914,34 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     
     sorted_chains = sorted(custom_combos, key=lambda x: list(ordered_combos.keys()).index(x))  # noqa: E501
     custom_combos = {key: custom_combos[key] for key in sorted_chains}
+    
+    for combo, res in og_combos.items():
+        chain = combo[0]
+        if len(chain) == 1:
+            if custom_combos[combo] is None:
+                continue
+            else:
+                custom_res = custom_combos[combo][0][0]
+                chain_res = res[0]
+                flat_res = [r for subr in chain_res for r in subr]
+                non_sasa = set(custom_res) - set(flat_res)
+                if not ignore_sasa:
+                    log.info(
+                        f"Please note that residue {non_sasa} in chain "
+                        f"{chain} is not identified to be surface accessible. "
+                        "Since --ignore-sasa has not been initialized, these "
+                        "residues will be removed from consideration."
+                        )
+                    custom_combos[combo][0][0] = [val for val in custom_res if val not in non_sasa]  # noqa: E501
+                else:
+                    log.info(
+                        f"Please note that residue {non_sasa} in chain "
+                        f"{chain} is not identified to be surface accessible. "
+                        "Since --ignore-sasa has been initialized, these "
+                        "residues will not be removed from consideration."
+                        )
+        else:
+            continue
     
     custom_chains = list(custom_combos.keys())
     cus_inter_res = list(custom_combos.values())
