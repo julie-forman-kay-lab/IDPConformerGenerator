@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Fixes bug in ``inter_chain_cc()`` for ``ldrs`` so single IDR cases will also be accounted for
+
 v0.7.22 (2024-03-22)
 ------------------------------------------------------------
 
