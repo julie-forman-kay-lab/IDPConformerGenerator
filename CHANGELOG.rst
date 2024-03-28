@@ -14,6 +14,11 @@ Changelog
 * Add ``BioPython`` as a dependency for calulation purposes (Shrake-Rupley SASA method)
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 * Add a new property ``residues_splitted`` in ``libstructure.py`` to get the residue numbers in all chains
+* Add new functions ``split_consecutive_groups()`` and ``update_chars_lower()`` in ``libparse.py``
+* New library ``libmultichain.py`` added to process multiple chains for building complexes
+* Added pKa, pKb, and pKx values to known residues in ``definitions.py``
+* Added plotting capability for generated contact heatmaps and automated font-size calculation in ``plotfuncs.py``
+* Catch unique KeyError when calculating torsion angles in ``cli_torsions.py``
 
 v0.7.23 (2024-03-27)
 ------------------------------------------------------------
