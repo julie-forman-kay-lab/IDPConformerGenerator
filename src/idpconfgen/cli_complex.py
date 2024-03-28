@@ -12,6 +12,7 @@ import argparse
 import re
 from functools import partial
 from itertools import combinations, product
+from random import random
 
 import numpy as np
 
@@ -39,6 +40,7 @@ from idpconfgen.libs.libmultichain import (
     extract_intrapairs_from_db,
     find_sa_residues,
     process_custom_contacts,
+    select_contacts,
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import update_chars_lower
@@ -92,6 +94,9 @@ ap.add_argument(
         "intermolecular contact between the IDP sequence >sic1 and chain B "
         "of the folded protein template."
         "Folded chains MUST be before IDP sequence as indicated above."
+        "If custom-contacts are given, these contacts will be selected with a "
+        "probability of 0.9 and knowledge-based + electrostatic potential "
+        "contacts will be selected with a probability of 0.1."
         ),
     default=None,
     )
@@ -127,7 +132,7 @@ ap.add_argument(
     )
 
 ap.add_argument(
-    '--blend-weight',
+    '--blended-contacts-weight',
     help=(
         'Integer weight from 0-100. Where 100 only uses the electrostatic '
         'potential contacts frequency and a value of 0 only uses the '
@@ -135,6 +140,18 @@ ap.add_argument(
         'Defaults to 60.'
         ),
     default=60,
+    type=int,
+    )
+
+ap.add_argument(
+    '--custom-contacts-weight',
+    help=(
+        'Integer weight from 0-100. Where 100 only uses the custom-contacts '
+        'given by the user and a value of 0 only uses the sequence-based '
+        'contacts frequency. '
+        'Defaults to 90.'
+        ),
+    default=90,
     type=int,
     )
 
@@ -247,7 +264,8 @@ def main(
         nconfs=1,
         ncores=1,
         ph=7,
-        blend_weight=60,
+        blended_contacts_weight=60,
+        custom_contacts_weight=90,
         max_contacts=10,
         random_seed=0,
         xmer_probs=None,
@@ -582,7 +600,8 @@ def main(
     log.info(S('done'))
 
     log.info(T('Blending contact map frequencies and plotting'))
-    blend_weight = np.clip(blend_weight, 0, 100)  # ensure it's between 0-100
+    # Ensure it's between 0-100
+    blend_weight = np.clip(blended_contacts_weight, 0, 100)
     minimized_blend_weight = blend_weight / 100.0
     if len(all_contacts_filtered) > 0:
         if len(inter_mtxs) >= 1:
@@ -609,19 +628,42 @@ def main(
                 title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
                 )
     log.info(S('done'))
-    '''
-    # Calculates the maximum number of contacts for each input sequence
-    # TODO modify this to accept multiple sequences
-    max_contacts = calculate_max_contacts(input_seq)
-    preselected_contacts = {}
-    # Pre-select contacts for each sequence based on maximum number and matrix
-    for chain in max_contacts:
-        chosen_contacts = []
-        max_num = max_contacts[chain]
+    
+    selected_contacts = {}  # Key value "B" for blended, "C" for custom
+    selected_contacts["Bx"] = []
+    selected_contacts["By"] = []
+    if custom_contacts:
+        custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
+        min_contacts_weight = custom_contacts_weight / 100.0
+        log.info(T(f'Choosing {max_contacts} contacts. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %.'))  # noqa: E501
+        selected_contacts["Cx"] = []
+        selected_contacts["Cy"] = []
         for _ in range(nconfs):
-            chosen_contacts.append(pick_point_from_heatmap(norm_blended_mtx, max_num))  # noqa: E501
-        preselected_contacts[chain] = chosen_contacts
-    '''
+            custom = random() < min_contacts_weight
+            if custom:
+                x_coords, y_coords = select_contacts(
+                    # TODO: change to custom_res matrix
+                    coords=norm_blended_mtx,
+                    max_num_points=max_contacts
+                    )
+                selected_contacts["Cx"].append(x_coords)
+                selected_contacts["Cy"].append(y_coords)
+            else:
+                x_coords, y_coords = select_contacts(
+                    coords=norm_blended_mtx,
+                    max_num_points=max_contacts
+                    )
+                selected_contacts["Bx"].append(x_coords)
+                selected_contacts["By"].append(y_coords)
+    else:
+        log.info(T(f'Choosing {max_contacts} contacts from the blended contact heatmap.'))  # noqa: E501
+        for _ in range(nconfs):
+            x_coords, y_coords = select_contacts(
+                coords=norm_blended_mtx,
+                max_num_points=max_contacts
+                )
+            selected_contacts["Bx"].append(x_coords)
+            selected_contacts["By"].append(y_coords)
 
 
 if __name__ == "__main__":

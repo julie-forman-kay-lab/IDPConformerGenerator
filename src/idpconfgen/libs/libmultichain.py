@@ -947,7 +947,71 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     cus_inter_res = list(custom_combos.values())
     
     return cus_inter_res, cus_intra_res
+
+
+def select_contacts(
+        coords,
+        min_x_spacing=3,
+        max_num_points=10,
+        ):
+    """
+    Select random number of contacts based on the contact heatmap.
+    
+    Parameters
+    ----------
+    coords : np.array
+        Contact heatmap of choice.
+    
+    min_x_spacing : int
+        Minimum number of residues to space out for in the X-axis.
+        Defaults to 3.
+    
+    max_num_points : int
+        Maximum number of points to select from contact heatmap.
+        Defaults to 10.
+    
+    Returns
+    -------
+    x_coordinates : tuple
+        Indices for the coordinates on the X-axis.
+    
+    y_coordinates : tuple
+        Indices for the coordinates on the Y-axis.
+    """
+    y_size, x_size = coords.shape
+    
+    num_points = min(max_num_points, x_size // min_x_spacing)
+
+    # Calculate probabilities for each point in the heatmap
+    flat_heatmap = coords.flatten()
+    probabilities = flat_heatmap / np.sum(flat_heatmap)
+    
+    # Choose random points based on probabilities
+    chosen_indices = np.random.choice(
+        np.arange(x_size * y_size),
+        size=num_points,
+        replace=False,
+        p=probabilities
+        )
+
+    x_coordinates, y_coordinates = np.unravel_index(chosen_indices, (y_size, x_size))  # noqa: E501
+
+    chosen_points = []
+    while len(chosen_points) < num_points:
+        index = np.random.choice(np.arange(x_size * y_size), p=probabilities)
+        x, y = np.unravel_index(index, (y_size, x_size))
         
+        if not chosen_points or abs(chosen_points[-1][0] - x) >= min_x_spacing:
+            chosen_points.append((x, y))
+            if len(chosen_points) == num_points:
+                break
+
+    # Sort the chosen points by x coordinate to ensure they are consecutive
+    chosen_points.sort(key=lambda point: point[0])
+    y_coordinates, x_coordinates = zip(*chosen_points)
+
+    return x_coordinates, y_coordinates
+
 
 def reverse_position_lookup(coords, location_mtx, database):
     """
