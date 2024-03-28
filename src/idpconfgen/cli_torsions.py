@@ -171,15 +171,14 @@ def main(
         }
 
     if source:
-
         pop_difference_with_log(database_dict, torsion_result)
-
         for key, value in torsion_result.items():
             # where value is a dictionary {'chi':, 'phi':, 'omega':}
-            database_dict[key].update(value)
-
+            try:
+                database_dict[key].update(value)
+            except KeyError:
+                continue
         save_dict_to_json(database_dict, output=output)
-
     else:
         save_dict_to_json(torsion_result, output=output)
 

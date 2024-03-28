@@ -197,6 +197,25 @@ class Structure:
         """
         return [int(i) for i in dict.fromkeys(self.data_array[:, col_resSeq])]
 
+    @property
+    def residues_splitted(self):
+        """
+        Residues of the structure while considering chain ID.
+        
+        With filtering, with chain separation.
+        Same output format as self.fasta
+        """
+        c, rs = col_chainID, col_resSeq
+
+        chains = defaultdict(set)
+        for row in self.filtered_atoms:
+            chains[row[c]].add(int(row[rs]))
+        
+        return {
+            chain: list(residues)
+            for chain, residues in chains.items()
+            }
+
     def pop_last_filter(self):
         """Pop last filter."""
         self._filters.pop()

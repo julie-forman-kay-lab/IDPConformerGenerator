@@ -133,6 +133,31 @@ vdW_radii_dict = {
     'crc82': vdW_radii_ionic_CRC82,
     }
 
+# pKa (COO), pKb (NH3), and pKx (side chain) of common amino-acids
+# Tuples organized like the following: (pKa, pKb, pKx)
+# D.R. Lide, Handbook of Chemistry and Physics, 72nd Edition, CRC Press, 1991
+pk_aa_dict = {
+    'A': (2.34, 9.69, None),
+    'R': (2.17, 9.04, 12.48),
+    'N': (2.02, 8.80, None),
+    'D': (1.88, 9.60, 3.65),
+    'C': (1.96, 10.28, 8.18),
+    'E': (2.19, 9.67, 4.25),
+    'Q': (2.17, 9.13, None),
+    'G': (2.34, 9.60, None),
+    'H': (1.82, 9.17, 6.00),
+    'I': (2.36, 9.60, None),
+    'L': (2.36, 9.60, None),
+    'K': (2.18, 8.95, 10.53),
+    'M': (2.28, 9.21, None),
+    'F': (1.83, 9.13, None),
+    'P': (1.99, 10.60, None),
+    'S': (2.21, 9.15, None),
+    'T': (2.09, 9.10, None),
+    'W': (2.83, 9.39, None),
+    'Y': (2.20, 9.11, 10.07),
+    'V': (2.32, 9.62, None),
+    }
 
 # JSON structure parameter keys
 JsonParameters = namedtuple('JsonParameters', 'ss fasta resids')

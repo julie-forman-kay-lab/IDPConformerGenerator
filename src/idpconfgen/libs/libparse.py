@@ -567,3 +567,86 @@ def split_by_ranges(seq, ranges):
     if start < len(seq):
         chunks.append(seq[start:])
     return chunks
+
+
+def split_consecutive_groups(query, minimum=2):
+    """
+    Process a list of numbers into list of consecutive integers.
+    
+    Fills in the blank for residues that are alone by 3.
+    
+    Example
+    -------
+    query = [1, 2, 3, 4, 6, 8, 11, 12]
+    output = [[1, 2, 3, 4, 5, 6, 7, 8], [11, 12]]
+
+    Parameters
+    ----------
+    query : list of int
+        List of integers we want to process.
+    
+    minimum : int
+        Minimum number of allowed consecutive residues.
+        Defaults to 2.
+
+    Return
+    ------
+    result : list of lists of int
+        Consecutive indexes
+    """
+    result = []
+    pre_result = []
+    current_group = []
+
+    for num in query:
+        if not current_group or num == current_group[-1] + 1:
+            current_group.append(num)
+        elif num - 1 == current_group[-1] + 1:
+            current_group.append(num - 1)
+            current_group.append(num)
+        else:
+            if len(current_group) >= minimum:
+                pre_result.append(current_group)
+            elif len(current_group) == 1:
+                pre_result.append([num - 1, num, num + 1])
+            current_group = [num]
+
+    if len(current_group) >= minimum:
+        pre_result.append(current_group)
+    
+    # Fix overlapping residues
+    pre_result.sort()
+    for sublist in pre_result:
+        if not result or sublist[0] > result[-1][-1] + 1:
+            result.append(sublist)
+        else:
+            result[-1] = [min(result[-1][0], sublist[0])] + list(range(min(result[-1][1], sublist[1]), max(result[-1][-1], sublist[-1]) + 1))  # noqa: E501
+
+    return result
+
+
+def update_chars_lower(string, indices):
+    """
+    Change specific characters of a string lowercase.
+
+    Parameters
+    ----------
+    string : str
+        String to modify
+    
+    indices : list
+        List of indices in the string to make lower case
+
+    Returns
+    -------
+    updated_string : str
+        Updated stirng with speicific characters made lowercase
+    """
+    char_list = list(string)
+    
+    for index in indices:
+        if 0 <= index < len(char_list):
+            char_list[index] = char_list[index].lower()
+
+    updated_string = ''.join(char_list)
+    return updated_string
