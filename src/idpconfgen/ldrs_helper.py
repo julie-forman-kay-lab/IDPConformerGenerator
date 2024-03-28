@@ -1178,7 +1178,11 @@ def inter_chain_cc(all_files, nconfs):
         candidate_combo = []
         
         for i, selections in enumerate(all_files.values()):
-            candidate_combo.append(selections[random_combo[i]])
+            sele = selections[random_combo[i]]
+            if type(sele) is list:
+                candidate_combo.append(sele)
+            else:
+                candidate_combo.append([sele])
             
         for i in range(len(candidate_combo)):
             for j in range(i + 1, len(candidate_combo)):

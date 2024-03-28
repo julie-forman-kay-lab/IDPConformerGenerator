@@ -15,6 +15,11 @@ Changelog
 * Optimize ``next_seeker`` protocol to identify Linker-IDR solutions
 * Add a new property ``residues_splitted`` in ``libstructure.py`` to get the residue numbers in all chains
 
+v0.7.23 (2024-03-27)
+------------------------------------------------------------
+
+* Fixes bug in ``inter_chain_cc()`` for ``ldrs`` so conformers generated with ``-scm mcsce`` also work
+
 v0.7.22 (2024-03-22)
 ------------------------------------------------------------
 
