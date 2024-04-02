@@ -601,6 +601,8 @@ def main(
 
     log.info(T('Blending contact map frequencies and plotting'))
     # Ensure it's between 0-100
+    blended_inter_mtxs = []
+    blended_intra_mtxs = []
     blend_weight = np.clip(blended_contacts_weight, 0, 100)
     minimized_blend_weight = blend_weight / 100.0
     if len(all_contacts_filtered) > 0:
@@ -610,6 +612,7 @@ def main(
                 plot_out = str(output_folder) + f'/blend_inter_{i}_' + plot_name
                 blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
                 norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+                blended_inter_mtxs.append(norm_blended_mtx)
                 plot_contacts_matrix(
                     norm_blended_mtx,
                     inter_seqs[i],
@@ -621,6 +624,7 @@ def main(
             plot_out = str(output_folder) + f'/blend_intra_{i}_' + plot_name
             blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
             norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+            blended_intra_mtxs.append(norm_blended_mtx)
             plot_contacts_matrix(
                 norm_blended_mtx,
                 in_seqs[i].upper(),
@@ -630,40 +634,107 @@ def main(
     log.info(S('done'))
     
     selected_contacts = {}  # Key value "B" for blended, "C" for custom
-    selected_contacts["Bx"] = []
-    selected_contacts["By"] = []
+    selected_contacts["Bx"] = {}
+    selected_contacts["By"] = {}
+    selected_contacts["Bx"]['inter'] = {}
+    selected_contacts["By"]['intra'] = {}
     if custom_contacts:
         custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
         min_contacts_weight = custom_contacts_weight / 100.0
         log.info(T(f'Choosing {max_contacts} contacts. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %.'))  # noqa: E501
-        selected_contacts["Cx"] = []
-        selected_contacts["Cy"] = []
+        selected_contacts["Cx"] = {}
+        selected_contacts["Cy"] = {}
+        selected_contacts["Cx"]['inter'] = {}
+        selected_contacts["Cy"]['intra'] = {}
         for _ in range(nconfs):
-            custom = random() < min_contacts_weight
-            if custom:
-                x_coords, y_coords = select_contacts(
-                    # TODO: change to custom_res matrix
-                    coords=norm_blended_mtx,
-                    max_num_points=max_contacts
-                    )
-                selected_contacts["Cx"].append(x_coords)
-                selected_contacts["Cy"].append(y_coords)
-            else:
-                x_coords, y_coords = select_contacts(
-                    coords=norm_blended_mtx,
-                    max_num_points=max_contacts
-                    )
-                selected_contacts["Bx"].append(x_coords)
-                selected_contacts["By"].append(y_coords)
+            for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
+                custom = random() < min_contacts_weight
+                if custom:
+                    x_coords, y_coords = select_contacts(
+                        # TODO: change to custom_res matrix
+                        coords=norm_blended_mtx,
+                        max_num_points=max_contacts
+                        )
+                    try:
+                        selected_contacts["Cx"]['inter'][i].append(x_coords)
+                        selected_contacts["Cy"]['inter'][i].append(y_coords)
+                    except KeyError:
+                        selected_contacts["Cx"]['inter'][i] = []
+                        selected_contacts["Cy"]['inter'][i] = []
+                        selected_contacts["Cx"]['inter'][i].append(x_coords)
+                        selected_contacts["Cy"]['inter'][i].append(y_coords)
+                else:
+                    x_coords, y_coords = select_contacts(
+                        coords=norm_inter_mtx,
+                        max_num_points=max_contacts
+                        )
+                    try:
+                        selected_contacts["Bx"]['inter'][i].append(x_coords)
+                        selected_contacts["By"]['inter'][i].append(y_coords)
+                    except KeyError:
+                        selected_contacts["Bx"]['inter'][i] = []
+                        selected_contacts["By"]['inter'][i] = []
+                        selected_contacts["Bx"]['inter'][i].append(x_coords)
+                        selected_contacts["By"]['inter'][i].append(y_coords)
+            
+            for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
+                custom = random() < min_contacts_weight
+                if custom:
+                    x_coords, y_coords = select_contacts(
+                        # TODO: change to custom_res matrix
+                        coords=norm_blended_mtx,
+                        max_num_points=max_contacts
+                        )
+                    try:
+                        selected_contacts["Cx"]['intra'][i].append(x_coords)
+                        selected_contacts["Cy"]['intra'][i].append(y_coords)
+                    except KeyError:
+                        selected_contacts["Cx"]['intra'][i] = []
+                        selected_contacts["Cy"]['intra'][i] = []
+                        selected_contacts["Cx"]['intra'][i].append(x_coords)
+                        selected_contacts["Cy"]['intra'][i].append(y_coords)
+                else:
+                    x_coords, y_coords = select_contacts(
+                        coords=norm_intra_mtx,
+                        max_num_points=max_contacts
+                        )
+                    try:
+                        selected_contacts["Bx"]['intra'][i].append(x_coords)
+                        selected_contacts["By"]['intra'][i].append(y_coords)
+                    except KeyError:
+                        selected_contacts["Bx"]['intra'][i] = []
+                        selected_contacts["By"]['intra'][i] = []
+                        selected_contacts["Bx"]['intra'][i].append(x_coords)
+                        selected_contacts["By"]['intra'][i].append(y_coords)
     else:
         log.info(T(f'Choosing {max_contacts} contacts from the blended contact heatmap.'))  # noqa: E501
         for _ in range(nconfs):
-            x_coords, y_coords = select_contacts(
-                coords=norm_blended_mtx,
-                max_num_points=max_contacts
-                )
-            selected_contacts["Bx"].append(x_coords)
-            selected_contacts["By"].append(y_coords)
+            for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
+                x_coords, y_coords = select_contacts(
+                    coords=norm_inter_mtx,
+                    max_num_points=max_contacts
+                    )
+                try:
+                    selected_contacts["Bx"]['inter'][i].append(x_coords)
+                    selected_contacts["By"]['inter'][i].append(y_coords)
+                except KeyError:
+                    selected_contacts["Bx"]['inter'][i] = []
+                    selected_contacts["By"]['inter'][i] = []
+                    selected_contacts["Bx"]['inter'][i].append(x_coords)
+                    selected_contacts["By"]['inter'][i].append(y_coords)
+            for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
+                x_coords, y_coords = select_contacts(
+                    coords=norm_intra_mtx,
+                    max_num_points=max_contacts
+                    )
+                try:
+                    selected_contacts["Bx"]['intra'][i].append(x_coords)
+                    selected_contacts["By"]['intra'][i].append(y_coords)
+                except KeyError:
+                    selected_contacts["Bx"]['intra'][i] = []
+                    selected_contacts["By"]['intra'][i] = []
+                    selected_contacts["Bx"]['intra'][i].append(x_coords)
+                    selected_contacts["By"]['intra'][i].append(y_coords)
 
 
 if __name__ == "__main__":
