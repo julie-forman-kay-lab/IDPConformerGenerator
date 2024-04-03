@@ -39,6 +39,7 @@ from idpconfgen.libs.libio import (
 from idpconfgen.libs.libmultichain import (
     calc_interchain_ca_contacts,
     calc_intrachain_ca_contacts,
+    contact_type,
     group_chains,
     )
 from idpconfgen.libs.libmulticore import pool_function
@@ -177,7 +178,7 @@ def main(
         count += result[2]
         contacts_results[pdbid] = contacts
         contacts_results[pdbid] = {}
-        contacts_results[pdbid]["intra"] = contacts
+        contacts_results[pdbid][contact_type[0]] = contacts
     log.info(f'Total intramolecular contacts: {count} found.')
     
     log.info(T(f'Finding intermolecular contacts of Cα within {inter_dist} Å'))
@@ -203,7 +204,7 @@ def main(
         for _, ids in enumerate(pdbids):
             if ids not in contacts_results:
                 contacts_results[ids] = {}
-            contacts_results[ids]["inter"] = result[1][ids]
+            contacts_results[ids][contact_type[1]] = result[1][ids]
     log.info(f'Total intermolecular contacts: {count} found.')
     log.info(S('done'))
 

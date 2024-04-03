@@ -24,6 +24,9 @@ from idpconfgen.libs.libstructure import (
 from idpconfgen.logger import S
 
 
+contact_type = ["intra", "inter"]
+
+
 def process_multichain_pdb(fld_struc, input_seq):
     """
     Search multiple chains in a PDB file.
@@ -565,9 +568,9 @@ def extract_intrapairs_from_db(intra_seg):
     seg_vals = list(intra_seg.values())[0]
     seq = seg_vals["fasta"]
     contact_pairs = {}
-    if "intra" in seg_vals:
+    if contact_type[0] in seg_vals:
         contact_pairs[seg_id] = []
-        intra = seg_vals["intra"]
+        intra = seg_vals[contact_type[0]]
         for contact in intra:
             s1 = next(iter(contact))
             s2 = contact[s1][0]
@@ -606,9 +609,9 @@ def extract_interpairs_from_db(inter_segs):
     for seg in inter_segs:
         seg_vals = inter_segs[seg]
         
-        if "inter" in seg_vals:
+        if contact_type[1] in seg_vals:
             contact_pairs[seg] = []
-            inter = seg_vals["inter"]
+            inter = seg_vals[contact_type[1]]
             s1_seq = seg_vals["fasta"]
             for contact in inter:
                 s1 = next(iter(contact))
@@ -807,7 +810,13 @@ def create_coordinate_combinations(data, modifier=0):
     return coordinates
 
 
-def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
+def process_custom_contacts(
+        file,
+        combo_chains,
+        combo_res,
+        input_seq,
+        ignore_sasa=False
+        ):
     """
     Process text (.txt) file containing inter- and/or intra- contacts.
     
@@ -840,6 +849,9 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     combo_res : list
         List of combinations of different chains and sequences by their
         name.
+    
+    input_seq : dict
+        Dictionary of input sequences for intramolecular contacts.
     
     ignore_sasa : Bool
         Whether or not to include custom sequences that are not found to be
@@ -901,11 +913,17 @@ def process_custom_contacts(file, combo_chains, combo_res, ignore_sasa=False):
     custom_combos = {}
     ordered_combos = {}
     cus_intra_res = {}
+        
     for i, ccombo in enumerate(custom_chains):
         if ccombo not in combo_chains:
             cus_intra_res[ccombo] = custom_res[i]
         else:
             custom_combos[ccombo] = custom_res[i]
+    
+    for key in list(input_seq.keys()):
+        intra_combo = (key, key)
+        if intra_combo not in list(cus_intra_res.keys()):
+            cus_intra_res[intra_combo] = None
         
     for all_ccombo in combo_chains:
         ordered_combos[all_ccombo] = None

@@ -35,6 +35,7 @@ from idpconfgen.libs import libcli
 from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
 from idpconfgen.libs.libmultichain import (
     contact_matrix,
+    contact_type,
     electropotential_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
@@ -288,10 +289,10 @@ def main(
     db_lst = [{k: v} for k, v in db.items()]
     db_inter_lst = []
     for seg, values in db.items():
-        if "inter" in values:
+        if contact_type[1] in values:
             inter_dict = {}
             inter_dict[seg] = values
-            for contact in values["inter"]:
+            for contact in values[contact_type[1]]:
                 s1 = next(iter(contact))
                 s2 = contact[s1][0]
                 inter_dict[s2] = db[s2]
@@ -438,6 +439,7 @@ def main(
             custom_contacts,
             combo_chains,
             combo_res,
+            input_seq,
             ignore_sasa=ignore_sasa,
             )
 
@@ -636,16 +638,16 @@ def main(
     selected_contacts = {}  # Key value "B" for blended, "C" for custom
     selected_contacts["Bx"] = {}
     selected_contacts["By"] = {}
-    selected_contacts["Bx"]['inter'] = {}
-    selected_contacts["By"]['intra'] = {}
+    selected_contacts["Bx"][contact_type[1]] = {}
+    selected_contacts["By"][contact_type[0]] = {}
     if custom_contacts:
         custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
         min_contacts_weight = custom_contacts_weight / 100.0
         log.info(T(f'Choosing {max_contacts} contacts. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %.'))  # noqa: E501
         selected_contacts["Cx"] = {}
         selected_contacts["Cy"] = {}
-        selected_contacts["Cx"]['inter'] = {}
-        selected_contacts["Cy"]['intra'] = {}
+        selected_contacts["Cx"][contact_type[1]] = {}
+        selected_contacts["Cy"][contact_type[0]] = {}
         for _ in range(nconfs):
             for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
                 custom = random() < min_contacts_weight
@@ -656,26 +658,26 @@ def main(
                         max_num_points=max_contacts
                         )
                     try:
-                        selected_contacts["Cx"]['inter'][i].append(x_coords)
-                        selected_contacts["Cy"]['inter'][i].append(y_coords)
+                        selected_contacts["Cx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["Cy"][contact_type[1]][i].append(y_coords)  # noqa: E501
                     except KeyError:
-                        selected_contacts["Cx"]['inter'][i] = []
-                        selected_contacts["Cy"]['inter'][i] = []
-                        selected_contacts["Cx"]['inter'][i].append(x_coords)
-                        selected_contacts["Cy"]['inter'][i].append(y_coords)
+                        selected_contacts["Cx"][contact_type[1]][i] = []
+                        selected_contacts["Cy"][contact_type[1]][i] = []
+                        selected_contacts["Cx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["Cy"][contact_type[1]][i].append(y_coords)  # noqa: E501
                 else:
                     x_coords, y_coords = select_contacts(
                         coords=norm_inter_mtx,
                         max_num_points=max_contacts
                         )
                     try:
-                        selected_contacts["Bx"]['inter'][i].append(x_coords)
-                        selected_contacts["By"]['inter'][i].append(y_coords)
+                        selected_contacts["Bx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["By"][contact_type[1]][i].append(y_coords)  # noqa: E501
                     except KeyError:
-                        selected_contacts["Bx"]['inter'][i] = []
-                        selected_contacts["By"]['inter'][i] = []
-                        selected_contacts["Bx"]['inter'][i].append(x_coords)
-                        selected_contacts["By"]['inter'][i].append(y_coords)
+                        selected_contacts["Bx"][contact_type[1]][i] = []
+                        selected_contacts["By"][contact_type[1]][i] = []
+                        selected_contacts["Bx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["By"][contact_type[1]][i].append(y_coords)  # noqa: E501
             
             for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
                 custom = random() < min_contacts_weight
@@ -686,26 +688,26 @@ def main(
                         max_num_points=max_contacts
                         )
                     try:
-                        selected_contacts["Cx"]['intra'][i].append(x_coords)
-                        selected_contacts["Cy"]['intra'][i].append(y_coords)
+                        selected_contacts["Cx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["Cy"][contact_type[0]][i].append(y_coords)  # noqa: E501
                     except KeyError:
-                        selected_contacts["Cx"]['intra'][i] = []
-                        selected_contacts["Cy"]['intra'][i] = []
-                        selected_contacts["Cx"]['intra'][i].append(x_coords)
-                        selected_contacts["Cy"]['intra'][i].append(y_coords)
+                        selected_contacts["Cx"][contact_type[0]][i] = []
+                        selected_contacts["Cy"][contact_type[0]][i] = []
+                        selected_contacts["Cx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["Cy"][contact_type[0]][i].append(y_coords)  # noqa: E501
                 else:
                     x_coords, y_coords = select_contacts(
                         coords=norm_intra_mtx,
                         max_num_points=max_contacts
                         )
                     try:
-                        selected_contacts["Bx"]['intra'][i].append(x_coords)
-                        selected_contacts["By"]['intra'][i].append(y_coords)
+                        selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
                     except KeyError:
-                        selected_contacts["Bx"]['intra'][i] = []
-                        selected_contacts["By"]['intra'][i] = []
-                        selected_contacts["Bx"]['intra'][i].append(x_coords)
-                        selected_contacts["By"]['intra'][i].append(y_coords)
+                        selected_contacts["Bx"][contact_type[0]][i] = []
+                        selected_contacts["By"][contact_type[0]][i] = []
+                        selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                        selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
     else:
         log.info(T(f'Choosing {max_contacts} contacts from the blended contact heatmap.'))  # noqa: E501
         for _ in range(nconfs):
@@ -715,26 +717,26 @@ def main(
                     max_num_points=max_contacts
                     )
                 try:
-                    selected_contacts["Bx"]['inter'][i].append(x_coords)
-                    selected_contacts["By"]['inter'][i].append(y_coords)
+                    selected_contacts["Bx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                    selected_contacts["By"][contact_type[1]][i].append(y_coords)  # noqa: E501
                 except KeyError:
-                    selected_contacts["Bx"]['inter'][i] = []
-                    selected_contacts["By"]['inter'][i] = []
-                    selected_contacts["Bx"]['inter'][i].append(x_coords)
-                    selected_contacts["By"]['inter'][i].append(y_coords)
+                    selected_contacts["Bx"][contact_type[1]][i] = []
+                    selected_contacts["By"][contact_type[1]][i] = []
+                    selected_contacts["Bx"][contact_type[1]][i].append(x_coords)  # noqa: E501
+                    selected_contacts["By"][contact_type[1]][i].append(y_coords)  # noqa: E501
             for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
                 x_coords, y_coords = select_contacts(
                     coords=norm_intra_mtx,
                     max_num_points=max_contacts
                     )
                 try:
-                    selected_contacts["Bx"]['intra'][i].append(x_coords)
-                    selected_contacts["By"]['intra'][i].append(y_coords)
+                    selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                    selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
                 except KeyError:
-                    selected_contacts["Bx"]['intra'][i] = []
-                    selected_contacts["By"]['intra'][i] = []
-                    selected_contacts["Bx"]['intra'][i].append(x_coords)
-                    selected_contacts["By"]['intra'][i].append(y_coords)
+                    selected_contacts["Bx"][contact_type[0]][i] = []
+                    selected_contacts["By"][contact_type[0]][i] = []
+                    selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
+                    selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
 
 
 if __name__ == "__main__":
