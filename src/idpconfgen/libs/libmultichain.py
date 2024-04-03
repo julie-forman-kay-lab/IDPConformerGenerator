@@ -2,6 +2,7 @@
 from difflib import SequenceMatcher
 from itertools import combinations
 from math import ceil, floor
+from random import randint
 
 import numpy as np
 from Bio.PDB import MMCIFParser, PDBParser
@@ -9,7 +10,6 @@ from Bio.PDB.SASA import ShrakeRupley
 
 from idpconfgen import Path, log
 from idpconfgen.core.definitions import aa3to1, pk_aa_dict
-from idpconfgen.ldrs_helper import consecutive_grouper
 from idpconfgen.libs.libparse import split_consecutive_groups
 from idpconfgen.libs.libpdb import get_fasta_from_PDB
 from idpconfgen.libs.libstructure import (
@@ -882,18 +882,9 @@ def process_custom_contacts(
                 
                 chain1ID = chain1_split[0]
                 chain2ID = chain2_split[0]
-                chain1Seq_grouped = \
-                    consecutive_grouper([int(s) for s in chain1_split[1].split(',')])  # noqa: E501
-                chain2Seq_grouped = \
-                    consecutive_grouper([int(s) for s in chain2_split[1].split(',')])  # noqa: E501
-                
-                chain1Seq = []
-                chain2Seq = []
-                for g1 in chain1Seq_grouped:
-                    chain1Seq.append([s for s in range(g1[0], g1[1])])
-                for g2 in chain2Seq_grouped:
-                    chain2Seq.append([s for s in range(g2[0], g2[1])])
-                
+                chain1Seq = [[int(s) for s in chain1_split[1].split(',')]]  # noqa: E501
+                chain2Seq = [[int(s) for s in chain2_split[1].split(',')]]  # noqa: E501
+
                 if len(chain1ID) > 1:
                     chain1ID = f">{chain1ID}"
                 if len(chain2ID) > 1:
@@ -916,9 +907,23 @@ def process_custom_contacts(
         
     for i, ccombo in enumerate(custom_chains):
         if ccombo not in combo_chains:
-            cus_intra_res[ccombo] = custom_res[i]
+            # Should be an intra-contact
+            if ccombo in list(cus_intra_res.keys()):
+                group = cus_intra_res[ccombo]
+                group[0].append(custom_res[i][0][0])
+                group[1].append(custom_res[i][1][0])
+                cus_intra_res[ccombo] = group
+            else:
+                cus_intra_res[ccombo] = custom_res[i]
         else:
-            custom_combos[ccombo] = custom_res[i]
+            # Should be an inter-contact
+            if ccombo in list(custom_combos.keys()):
+                group = custom_combos[ccombo]
+                group[0].append(custom_res[i][0][0])
+                group[1].append(custom_res[i][1][0])
+                custom_combos[ccombo] = group
+            else:
+                custom_combos[ccombo] = custom_res[i]
     
     for key in list(input_seq.keys()):
         intra_combo = (key, key)
@@ -961,7 +966,6 @@ def process_custom_contacts(
         else:
             continue
     
-    custom_chains = list(custom_combos.keys())
     cus_inter_res = list(custom_combos.values())
     
     return cus_inter_res, cus_intra_res
@@ -1029,6 +1033,63 @@ def select_contacts(
     y_coordinates, x_coordinates = zip(*chosen_points)
 
     return x_coordinates, y_coordinates
+
+
+def select_custom_contacts(contacts, idx, c_type, max_contacts):
+    """
+    Similar to select_contacts() but built for custom contacts.
+
+    Parameters
+    ----------
+    contacts : list or dict
+        Inter- and Intra-contacts respectively depending on the datatype.
+        For the list case, it should be aligned by indices to the combination
+        of chains determined from the main CLI.
+    
+    idx : int
+        Index aligned to the combination of chains determined from the main CLI.
+    
+    c_type : string
+        Type of inter- or intra-contact. Check against datatype of contacts.
+    
+    max_contacts : int
+        Maximum number of contacts to have.
+        Need to check we're not returning greater than the maximum.
+    
+    Returns
+    -------
+    list pair of residue contacts.
+    
+    False if no matches are found or invalid formatting.
+    """
+    if c_type is contact_type[0]:
+        assert type(contacts) is dict
+        custom_contacts = list(contacts.values())[idx]
+        if custom_contacts is None:
+            return False
+        selected = randint(0, len(custom_contacts[0]) - 1)
+        if max_contacts >= len(custom_contacts[0]):
+            # Return all the contacts because it's within the max
+            return custom_contacts[0], custom_contacts[1]
+        else:
+            # Return one contact
+            return custom_contacts[0][selected], custom_contacts[1][selected]
+    
+    elif c_type is contact_type[1]:
+        assert type(contacts) is list
+        custom_contacts = contacts[idx]
+        if custom_contacts is None:
+            return False
+        selected = randint(0, len(custom_contacts[0]) - 1)
+        if max_contacts >= len(custom_contacts[0]):
+            return custom_contacts[0], custom_contacts[1]
+        else:
+            # Return one contact
+            return custom_contacts[0][selected], custom_contacts[1][selected]
+    
+    else:
+        log.info("Incorrect contact-type. Must be inter or intra.")
+        return False
 
 
 def reverse_position_lookup(coords, location_mtx, database):
