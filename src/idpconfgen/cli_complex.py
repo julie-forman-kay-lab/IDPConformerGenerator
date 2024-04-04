@@ -10,6 +10,7 @@ USAGE:
 """
 import argparse
 import re
+from collections import defaultdict
 from functools import partial
 from itertools import combinations, product
 from random import randint, random
@@ -443,6 +444,7 @@ def main(
             input_seq,
             ignore_sasa=ignore_sasa,
             )
+    input_seq_keys = list(input_seq.keys())
 
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
@@ -520,6 +522,7 @@ def main(
         intra_mtxs = []
         # Don't need `intra_seqs` variable here because `in_seqs` is the same
         for seq in in_seqs:
+            log.info(S(f"calculating intramolecular contact probabilities of {seq}"))  # noqa: E501
             matrix_consume = partial(contact_matrix, sequence=seq)
             matrix_execute = partial(
                 report_on_crash,
@@ -636,134 +639,90 @@ def main(
                 )
     log.info(S('done'))
     
-    selected_contacts = {}
-    # Custom and knowledge based contacts are delineated by datatype
-    # Custom contacts are lists while knolwedge based ones are tuple
-    # TODO: test this out to see if it's giving the expected returns
-    # if so, then we can proceed with extracting distances from our
-    # database based on selected contacts.
-    # We might need a function to return a distribution of distances
-    # given residue pairs and the information we have in our database.
-    # TODO try to optimize the code below...
-    selected_contacts['X'] = {}
-    selected_contacts['Y'] = {}
-    selected_contacts['X'][contact_type[0]] = []
-    selected_contacts['Y'][contact_type[0]] = []
-    selected_contacts['X'][contact_type[1]] = []
-    selected_contacts['Y'][contact_type[1]] = []
+    # Custom and knowledge based contacts are delineated by datatype.
+    # Custom contacts are lists while knolwedge based ones are tuple.
+    # TODO function to return a distribution of distances given
+    # residue pairs and the information we have in our database.
+    selected_contacts = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))  # noqa: E501
     if custom_contacts:
         custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
         min_contacts_weight = custom_contacts_weight / 100.0
-        log.info(T(f'Choosing {max_contacts} contacts. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %.'))  # noqa: E501
+        log.info(T(f'Choosing at most {max_contacts} contacts for every conformer. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %'))  # noqa: E501
         for _ in range(nconfs):
             for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
+                case = combo_chains[i]
                 contacts_counter = randint(1, max_contacts)
-                while contacts_counter > 0:
+                while contacts_counter - 1 > 0:
                     custom = random() < min_contacts_weight
                     if not custom or cus_inter_res[i] is None:
                         x_coords, y_coords = select_contacts(
                             coords=norm_inter_mtx,
                             max_num_points=contacts_counter
                             )
-                        try:
-                            selected_contacts['X'][contact_type[1]][i].append(x_coords)  # noqa: E501
-                            selected_contacts['Y'][contact_type[1]][i].append(y_coords)  # noqa: E501
-                        except KeyError:
-                            selected_contacts['X'][contact_type[1]][i] = []
-                            selected_contacts['Y'][contact_type[1]][i] = []
-                            selected_contacts['X'][contact_type[1]][i].append(x_coords)  # noqa: E501
-                            selected_contacts['Y'][contact_type[1]][i].append(y_coords)  # noqa: E501
+                        selected_contacts['X'][contact_type[1]][case].append(x_coords)  # noqa: E501
+                        selected_contacts['Y'][contact_type[1]][case].append(y_coords)  # noqa: E501
                         contacts_counter -= len(x_coords)
-                    if custom and cus_inter_res[i] is not None:
+                    elif custom and cus_inter_res[i] is not None:
                         pair1, pair2 = select_custom_contacts(
                             contacts=cus_inter_res,
                             idx=i,
                             c_type=contact_type[1],
                             max_contacts=contacts_counter,
                             )
-                        try:
-                            selected_contacts['X'][contact_type[1]][i].append(pair1)  # noqa: E501
-                            selected_contacts['Y'][contact_type[1]][i].append(pair2)  # noqa: E501
-                        except KeyError:
-                            selected_contacts['X'][contact_type[1]][i] = []
-                            selected_contacts['Y'][contact_type[1]][i] = []
-                            selected_contacts['X'][contact_type[1]][i].append(pair1)  # noqa: E501
-                            selected_contacts['Y'][contact_type[1]][i].append(pair2)  # noqa: E501
-                        if type(pair1[0]) is list:
-                            contacts_counter -= len(pair1)
-                        else:
-                            contacts_counter -= 1
+                        selected_contacts['X'][contact_type[1]][case].append(pair1)  # noqa: E501
+                        selected_contacts['Y'][contact_type[1]][case].append(pair2)  # noqa: E501
+                        contacts_counter -= len(pair1)
             
             for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
                 contacts_counter = randint(1, max_contacts)
-                while contacts_counter > 0:
+                case = input_seq_keys[i]
+                while contacts_counter - 1 > 0:
                     custom = random() < min_contacts_weight
                     if not custom or list(cus_intra_res.values())[i] is None:
                         x_coords, y_coords = select_contacts(
                             coords=norm_intra_mtx,
                             max_num_points=contacts_counter
                             )
-                        try:
-                            selected_contacts['X'][contact_type[0]][i].append(x_coords)  # noqa: E501
-                            selected_contacts['Y'][contact_type[0]][i].append(y_coords)  # noqa: E501
-                        except KeyError:
-                            selected_contacts['X'][contact_type[0]][i] = []
-                            selected_contacts['Y'][contact_type[0]][i] = []
-                            selected_contacts['X'][contact_type[0]][i].append(x_coords)  # noqa: E501
-                            selected_contacts['Y'][contact_type[0]][i].append(y_coords)  # noqa: E501
+                        selected_contacts['X'][contact_type[0]][case].append(x_coords)  # noqa: E501
+                        selected_contacts['Y'][contact_type[0]][case].append(y_coords)  # noqa: E501
                         contacts_counter -= len(x_coords)
-                    if custom and list(cus_intra_res.values())[i] is not None:
+                    elif custom and list(cus_intra_res.values())[i] is not None:
                         pair1, pair2 = select_custom_contacts(
                             contacts=cus_intra_res,
                             idx=i,
                             c_type=contact_type[0],
                             max_contacts=contacts_counter,
                             )
-                        try:
-                            selected_contacts['X'][contact_type[0]][i].append(pair1)  # noqa: E501
-                            selected_contacts['Y'][contact_type[0]][i].append(pair2)  # noqa: E501
-                        except KeyError:
-                            selected_contacts['X'][contact_type[0]][i] = []
-                            selected_contacts['Y'][contact_type[0]][i] = []
-                            selected_contacts['X'][contact_type[0]][i].append(pair1)  # noqa: E501
-                            selected_contacts['Y'][contact_type[0]][i].append(pair2)  # noqa: E501
-                        if type(pair1[0]) is list:
-                            contacts_counter -= len(pair1)
-                        else:
-                            contacts_counter -= 1
+                        selected_contacts['X'][contact_type[0]][case].append(pair1)  # noqa: E501
+                        selected_contacts['Y'][contact_type[0]][case].append(pair2)  # noqa: E501
+                        contacts_counter -= len(pair1)
+        log.info(S('done'))
     else:
-        log.info(T(f'Choosing {max_contacts} contacts from the blended contact heatmap.'))  # noqa: E501
+        log.info(T(f'Choosing at most {max_contacts} contacts for every conformer from the blended contact heatmap.'))  # noqa: E501
         for _ in range(nconfs):
             for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
                 contacts_counter = randint(1, max_contacts)
+                case = combo_chains[i]
                 while contacts_counter > 0:
                     x_coords, y_coords = select_contacts(
                         coords=norm_inter_mtx,
                         max_num_points=contacts_counter
                         )
-                    try:
-                        selected_contacts['X'][contact_type[1]][i].append(x_coords)  # noqa: E501
-                        selected_contacts['Y'][contact_type[1]][i].append(y_coords)  # noqa: E501
-                    except KeyError:
-                        selected_contacts['X'][contact_type[1]][i] = []
-                        selected_contacts['Y'][contact_type[1]][i] = []
-                        selected_contacts['X'][contact_type[1]][i].append(x_coords)  # noqa: E501
-                        selected_contacts['Y'][contact_type[1]][i].append(y_coords)  # noqa: E501
+                    selected_contacts['X'][contact_type[1]][case].append(x_coords)  # noqa: E501
+                    selected_contacts['Y'][contact_type[1]][case].append(y_coords)  # noqa: E501
                     contacts_counter -= len(x_coords)
             for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
                 contacts_counter = randint(1, max_contacts)
-                x_coords, y_coords = select_contacts(
-                    coords=norm_intra_mtx,
-                    max_num_points=contacts_counter
-                    )
-                try:
-                    selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
-                    selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
-                except KeyError:
-                    selected_contacts["Bx"][contact_type[0]][i] = []
-                    selected_contacts["By"][contact_type[0]][i] = []
-                    selected_contacts["Bx"][contact_type[0]][i].append(x_coords)  # noqa: E501
-                    selected_contacts["By"][contact_type[0]][i].append(y_coords)  # noqa: E501
+                case = input_seq_keys[i]
+                while contacts_counter > 0:
+                    x_coords, y_coords = select_contacts(
+                        coords=norm_intra_mtx,
+                        max_num_points=contacts_counter
+                        )
+                    selected_contacts["X"][contact_type[0]][case].append(x_coords)  # noqa: E501
+                    selected_contacts["Y"][contact_type[0]][case].append(y_coords)  # noqa: E501
+                    contacts_counter -= len(x_coords)
+        log.info(S('done'))
 
 
 if __name__ == "__main__":
