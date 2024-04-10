@@ -339,18 +339,24 @@ def has_consecutive_match(s, q, consecutive_length=2):
     return False
 
 
-def contact_matrix(db, sequence):
+def contact_matrix(database, sequence):
     """
     Generate a matrix of the sequence against database of pairs of contacts.
     
     Parameters
     ----------
-    db : dict of list of tuple pairs
-        Minimized version of the database that only contains
-        information of the sequence pairs. There will also be
-        positional information so matches can be back-mapped
-        to the full database.
-        E.g. {"seg1": [("ABC", "DEF"),]}
+    database : tuple of the following
+        contact_db : dict of list of tuple pairs
+            Minimized version of the database that only contains
+            information of the sequence pairs. There will also be
+            positional information so matches can be back-mapped
+            to the full database.
+            E.g. {"seg1": [("ABC", "DEF"),]}
+
+        dist_db : dict of list of tuples
+            Aligned with contact_db but for the distances associated
+            with the pairs.
+            E.g. {"seg1": [(1, 2, 3),]}
     
     sequence : list or str
         Combination of input protein sequences.
@@ -359,16 +365,18 @@ def contact_matrix(db, sequence):
     
     Returns
     -------
-    segid : string
-        Segment ID from database
-    
     hit_matrix : np.ndarray
         Disitrubtion matrix of all the matches and weights
 
-    loc_matrix : np.ndarray
-        Matrix of positions corresponding to input database
+    dist_matrix : np.ndarray
+        Matrix of lists corresponding to distances from database
     """
-    segid = next(iter(db))
+    contact_db = database[0]
+    dist_db = database[1]
+    
+    segid = next(iter(contact_db))
+    # Make sure databases are aligned
+    assert segid == next(iter(dist_db))
     
     if type(sequence) is list:
         seq1 = sequence[0]
@@ -377,10 +385,10 @@ def contact_matrix(db, sequence):
         len2 = len(seq2)
         
         h_mtx = np.zeros((len1, len2))
-        l_mtx = np.empty((len1, len2), dtype=object)
-        l_mtx.fill([])
+        d_mtx = np.empty((len1, len2), dtype=object)
+        d_mtx.fill([])
         
-        for pairs in db.values():
+        for pairs in contact_db.values():
             for idx, pair in enumerate(pairs):
                 p1, p2 = pair
                 for i in range(len1):
@@ -399,17 +407,19 @@ def contact_matrix(db, sequence):
                         p2_c2 = has_consecutive_match(p2, c2)
                         if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)):
                             h_mtx[i, j] += 1
-                            l_mtx[i, j].append(idx)
+                            min_len = min(len(c1), len(c2))
+                            sub_distances = list(dist_db.values())[0][idx][:min_len]  # noqa: E501
+                            d_mtx[i, j].append(sub_distances)
         
         hit_matrix = np.flipud(h_mtx)
-        loc_matrix = np.flipud(l_mtx)
+        dist_matrix = np.flipud(d_mtx)
     else:
         seq_len = len(sequence)
-        hit_matrix = np.zeros((seq_len, seq_len))
-        loc_matrix = np.empty((seq_len, seq_len), dtype=object)
-        loc_matrix.fill([])
+        h_mtx = np.zeros((seq_len, seq_len))
+        d_mtx = np.empty((seq_len, seq_len), dtype=object)
+        d_mtx.fill([])
         
-        for pairs in db.values():
+        for pairs in contact_db.values():
             for idx, pair in enumerate(pairs):
                 p1, p2 = pair
                 for i in range(seq_len):
@@ -427,13 +437,16 @@ def contact_matrix(db, sequence):
                         p2_c1 = has_consecutive_match(p2, c1)
                         p2_c2 = has_consecutive_match(p2, c2)
                         if ((p1_c1 and p2_c2) or (p1_c2 and p2_c1)) and j > i + 4:  # noqa: E501
-                            hit_matrix[i, j] += 1
-                            hit_matrix[j, i] += 1
-                            loc_matrix[i, j].append(idx)
+                            h_mtx[i, j] += 1
+                            h_mtx[j, i] += 1
+                            min_len = min(len(c1), len(c2))
+                            sub_distances = list(dist_db.values())[0][idx][:min_len]  # noqa: E501
+                            d_mtx[i, j].append(sub_distances)
+                            d_mtx[j, i].append(sub_distances)
 
-        hit_matrix = np.flipud(hit_matrix)
-        loc_matrix = np.flipud(loc_matrix)
-    return segid, hit_matrix, loc_matrix
+        hit_matrix = np.flipud(h_mtx)
+        dist_matrix = np.flipud(d_mtx)
+    return hit_matrix, dist_matrix
 
 
 def find_sequence_net_charge(seq, pH):
@@ -626,6 +639,7 @@ def extract_interpairs_from_db(inter_segs):
         
         if contact_type[1] in seg_vals:
             contact_pairs[seg] = []
+            contact_dists[seg] = []
             inter = seg_vals[contact_type[1]]
             s1_seq = seg_vals["fasta"]
             for contact in inter:

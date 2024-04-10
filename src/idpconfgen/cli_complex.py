@@ -447,17 +447,22 @@ def main(
 
     if len(all_contacts_filtered) == 0:
         log.info("WARNING: No contacts found. Your database is invalid.")
-        log.info("Only using electropotential contact frequencies.")
+        log.info("Please use `idpconfgen contacts` to make the extended database.")  # noqa: E501
+        return
     else:
+        all_db_merged = [(c, d) for c, d in zip(all_contacts_filtered, all_dists_filtered)]  # noqa: E501
+        
         log.info(T("Calculating all-contacts probability matrix"))
-        inter_mtxs = []
+        inter_c_mtxs = []
+        inter_d_mtxs = []
         if len(combo_seqs) >= 1:
             inter_seqs = []
             for combo in combo_seqs:
                 c1 = combo[0]
                 c2 = combo[1]
                 if type(c1) is list:
-                    temp_mtxs = np.zeros(shape=(1, len(c2)))
+                    temp_c_mtxs = np.zeros(shape=(1, len(c2)))
+                    temp_d_mtxs = np.empty(shape=(1, len(c2)))
                     temp_seq = ""
                     for seq in c1:
                         log.info(S(f"calculating intermolecular probabilities between {c2} and {seq}"))  # noqa: E501
@@ -471,21 +476,30 @@ def main(
                             )
                         matrix_execute_pool = pool_function(
                             matrix_execute,
-                            all_contacts_filtered,
+                            all_db_merged,
                             ncores=ncores,
                             )
-                        mtx = np.zeros((len(seq), len(c2)))
-                        location_mtx = {}
-                        for id, hit, loc in matrix_execute_pool:
-                            mtx = np.add(mtx, hit)
-                            location_mtx[id] = loc
+                        c_mtx = np.zeros((len(seq), len(c2)))
+                        d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+                        d_mtx.fill([])
+                        for hit, dist in matrix_execute_pool:
+                            c_mtx = np.add(c_mtx, hit)
+                            try:
+                                d_mtx = np.concatenate(d_mtx, dist)
+                            except TypeError:
+                                # We have no hits, move onto the next
+                                # TODO see if it can concatenate empty lists
+                                continue
                         temp_seq += seq
-                        temp_mtxs = np.vstack((mtx, temp_mtxs))
+                        temp_c_mtxs = np.vstack((c_mtx, temp_c_mtxs))
+                        temp_d_mtxs = np.vstack((d_mtx, temp_d_mtxs))
                         log.info(S("done"))
                     # First row will be all zeroes, so remove them
-                    mtx = temp_mtxs[:-1]
-                    norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
-                    inter_mtxs.append(norm_mtx)
+                    c_mtx = temp_c_mtxs[:-1]
+                    d_mtx = temp_d_mtxs[:-1]
+                    norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
+                    inter_c_mtxs.append(norm_mtx)
+                    inter_d_mtxs.append(d_mtx)
                     inter_seqs.append([c2, temp_seq])
                 else:
                     log.info(S(f"calculating intermolecular probabilities between {c1} and {c2}"))  # noqa: E501
@@ -499,21 +513,29 @@ def main(
                         )
                     matrix_execute_pool = pool_function(
                         matrix_execute,
-                        all_contacts_filtered,
+                        all_db_merged,
                         ncores=ncores,
                         )
-                    mtx = np.zeros((len(c1), len(c2)))
-                    location_mtx = {}
-                    for id, hit, loc in matrix_execute_pool:
-                        mtx = np.add(mtx, hit)
-                        location_mtx[id] = loc
-                    norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
-                    inter_mtxs.append(norm_mtx)
+                    c_mtx = np.zeros((len(c1), len(c2)))
+                    d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+                    d_mtx.fill([])
+                    for hit, dist in matrix_execute_pool:
+                        c_mtx = np.add(c_mtx, hit)
+                        try:
+                            d_mtx = np.concatenate(d_mtx, dist)
+                        except TypeError:
+                            # We have no hits, move onto the next
+                            # TODO see if it can concatenate empty lists
+                            continue
+                    norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
+                    inter_c_mtxs.append(norm_mtx)
+                    inter_d_mtxs.append(d_mtx)
                     inter_seqs.append([c2, c1])
                     log.info(S("done"))
         
         log.info(T("Calculating intramolecular contacts probability matrix"))
-        intra_mtxs = []
+        intra_c_mtxs = []
+        intra_d_mtxs = []
         # Don't need `intra_seqs` variable here because `in_seqs` is the same
         for seq in in_seqs:
             log.info(S(f"calculating intramolecular contact probabilities of {seq}"))  # noqa: E501
@@ -527,16 +549,22 @@ def main(
                 )
             matrix_execute_pool = pool_function(
                 matrix_execute,
-                all_contacts_filtered,
+                all_db_merged,
                 ncores=ncores,
                 )
-            mtx = np.zeros((len(seq), len(seq)))
-            location_mtx = {}
-            for id, hit, loc in matrix_execute_pool:
-                mtx = np.add(mtx, hit)
-                location_mtx[id] = loc
-            norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
-            intra_mtxs.append(norm_mtx)
+            c_mtx = np.zeros((len(seq), len(seq)))
+            d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+            d_mtx.fill([])
+            for hit, dist in matrix_execute_pool:
+                c_mtx = np.add(c_mtx, hit)
+                try:
+                    d_mtx = np.concatenate(d_mtx, dist)
+                except TypeError:
+                    # TODO see if it can concatenate empty lists
+                    continue
+            norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
+            intra_c_mtxs.append(norm_mtx)
+            intra_d_mtxs.append(d_mtx)
     
     log.info(T("Calculating electropotential contact matrix"))
     if phos:
@@ -572,11 +600,11 @@ def main(
         plot_name = plot_path.with_suffix('.png')
 
     if len(all_contacts_filtered) > 0:
-        if len(inter_mtxs) >= 1:
-            for i, mtx in enumerate(inter_mtxs):
+        if len(inter_c_mtxs) >= 1:
+            for i, mtx in enumerate(inter_c_mtxs):
                 plot_out = str(output_folder) + f'/inter_{i}_' + plot_name
                 plot_contacts_matrix(mtx, inter_seqs[i], plot_out)
-        for i, mtx in enumerate(intra_mtxs):
+        for i, mtx in enumerate(intra_c_mtxs):
             plot_out = str(output_folder) + f'/intra_{i}_' + plot_name
             plot_contacts_matrix(mtx, in_seqs[i].upper(), plot_out)
 
@@ -606,8 +634,8 @@ def main(
     blend_weight = np.clip(blended_contacts_weight, 0, 100)
     minimized_blend_weight = blend_weight / 100.0
     if len(all_contacts_filtered) > 0:
-        if len(inter_mtxs) >= 1:
-            for i, mtx in enumerate(inter_mtxs):
+        if len(inter_c_mtxs) >= 1:
+            for i, mtx in enumerate(inter_c_mtxs):
                 e_mtx = inter_electro_mtx[i]
                 plot_out = str(output_folder) + f'/blend_inter_{i}_' + plot_name
                 blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
@@ -619,7 +647,7 @@ def main(
                     plot_out,
                     title=f"Inter Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
                     )
-        for i, mtx in enumerate(intra_mtxs):
+        for i, mtx in enumerate(intra_c_mtxs):
             e_mtx = intra_electro_mtx[i]
             plot_out = str(output_folder) + f'/blend_intra_{i}_' + plot_name
             blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
@@ -632,6 +660,17 @@ def main(
                 title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
                 )
     log.info(S('done'))
+    
+    # NOTE temporary for testing purposes
+    # print(len(inter_c_mtxs))
+    # print(len(inter_d_mtxs))
+    # print(inter_c_mtxs[0])
+    # print(inter_d_mtxs[0])
+    # print(len(intra_c_mtxs))
+    # print(len(intra_d_mtxs))
+    # print(intra_c_mtxs[0])
+    # print(intra_d_mtxs[0])
+    # return
     
     # Custom and knowledge based contacts are delineated by datatype.
     # Custom contacts are lists while knolwedge based ones are tuple.
@@ -716,6 +755,8 @@ def main(
                     contacts_counter -= len(x_coords)
         log.info(S('done'))
     
+    # TODO make a savepoint here (sub-database) for all
+    # the filtered contacts/distances
     # TODO extracting distance distributions from database
     # 1. Need a way to use the knowledge-based coordinates from
     #    `selected_contacts` and see where the exact sequence
