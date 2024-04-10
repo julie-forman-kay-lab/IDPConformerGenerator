@@ -359,11 +359,14 @@ def contact_matrix(db, sequence):
     
     Returns
     -------
-    matrix : np.ndarray
+    segid : string
+        Segment ID from database
+    
+    hit_matrix : np.ndarray
         Disitrubtion matrix of all the matches and weights
 
-    positions : list
-        List of positions corresponding to input database
+    loc_matrix : np.ndarray
+        Matrix of positions corresponding to input database
     """
     segid = next(iter(db))
     
@@ -563,17 +566,24 @@ def extract_intrapairs_from_db(intra_seg):
     contact_pairs : dict
         dict of list of tuple pairs of sequences in order
         Key value being the seg ID from database entry
+    
+    contact_dists : dict
+        Dictionary of list of tuples of distances for each residue
+        in the specfic pair. Key value being seg ID from database entry
     """
     seg_id = next(iter(intra_seg))
     seg_vals = list(intra_seg.values())[0]
     seq = seg_vals["fasta"]
     contact_pairs = {}
+    contact_dists = {}
     if contact_type[0] in seg_vals:
         contact_pairs[seg_id] = []
+        contact_dists[seg_id] = []
         intra = seg_vals[contact_type[0]]
         for contact in intra:
             s1 = next(iter(contact))
             s2 = contact[s1][0]
+            dist = tuple(contact[s1][1])
             f1 = s1.split(",")
             f1.pop(-1)
             f2 = s2.split(",")
@@ -585,10 +595,11 @@ def extract_intrapairs_from_db(intra_seg):
             for r in f2:
                 r2 += seq[int(r)]
             contact_pairs[seg_id].append((r1, r2))
+            contact_dists[seg_id].append(dist)
     else:
-        return False
+        return False, False
 
-    return contact_pairs
+    return contact_pairs, contact_dists
 
 
 def extract_interpairs_from_db(inter_segs):
@@ -604,8 +615,12 @@ def extract_interpairs_from_db(inter_segs):
     ------
     contact_pairs : dict
         dict of list of pairs of sequences in order for specific segment
+    
+    contact_dists : dict
+        Dictionary of list of distances between pairs of sequences
     """
     contact_pairs = {}
+    contact_dists = {}
     for seg in inter_segs:
         seg_vals = inter_segs[seg]
         
@@ -616,10 +631,11 @@ def extract_interpairs_from_db(inter_segs):
             for contact in inter:
                 s1 = next(iter(contact))
                 s2_seg = contact[s1][0]
+                dist = tuple(contact[s1][2])
                 try:
                     s2_seq = inter_segs[s2_seg]["fasta"]
                 except KeyError:
-                    return False
+                    return False, False
                 s2_seq_idx = contact[s1][1]
                 f1 = s1.split(",")
                 f1.pop(-1)
@@ -632,8 +648,9 @@ def extract_interpairs_from_db(inter_segs):
                 for r in f2:
                     r2 += s2_seq[int(r)]
                 contact_pairs[seg].append((r1, r2))
+                contact_dists[seg].append(dist)
     
-    return contact_pairs
+    return contact_pairs, contact_dists
 
 
 def pick_point_from_heatmap(prob_mtx, max_num=1):

@@ -349,10 +349,12 @@ def main(
         )
     intra_execute_pool = pool_function(intra_execute, db_lst, ncores=ncores)
     intra_contacts = []
-    for result in intra_execute_pool:
-        if result is False:
+    intra_dists = []
+    for contact, dist in intra_execute_pool:
+        if contact is False:
             continue
-        intra_contacts.append(result)
+        intra_contacts.append(contact)
+        intra_dists.append(dist)
     log.info(S("done"))
     
     log.info(T("analyzing intermolecular contacts from the database"))
@@ -370,15 +372,19 @@ def main(
         ncores=ncores,
         )
     inter_contacts = []
-    for result in inter_execute_pool:
-        if result is False:
+    inter_dists = []
+    for contact, dist in inter_execute_pool:
+        if contact is False:
             continue
-        inter_contacts.append(result)
+        inter_contacts.append(contact)
+        inter_dists.append(dist)
     log.info(S("done"))
     
     all_contacts = intra_contacts + inter_contacts
+    all_dists = intra_dists + inter_dists
     all_contacts_filtered = [c for c in all_contacts if c]
-    
+    all_dists_filtered = [d for d in all_dists if d]  # noqa: F841
+
     in_seqs = list(input_seq.values())
     in_res = []
     for seq in in_seqs:
@@ -426,16 +432,9 @@ def main(
         combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains
         if phos:
             combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
-    # NOTE: based on chain information, see if any of the residues in
-    # custom contacts are in the ones with folded protein chains.
-    # If custom contacts not within surface residues, log it for the user.
     
     # We do not change "combo_chains" since that's our anchor for alignment.
     # If we do not have custom contacts for specific combo chains, store None.
-    
-    # We select later if we have custom contacts, then 90% of the time we will
-    # select a custom_res/custom_seq. If not, then 10% of the time we select
-    # from our knowledge driven database.
     if custom_contacts is not None:
         cus_inter_res, cus_intra_res = process_custom_contacts(
             custom_contacts,
@@ -454,8 +453,6 @@ def main(
         inter_mtxs = []
         if len(combo_seqs) >= 1:
             inter_seqs = []
-            # TODO need a way to delineate the indices and chain IDs
-            # from folded template
             for combo in combo_seqs:
                 c1 = combo[0]
                 c2 = combo[1]
@@ -482,13 +479,10 @@ def main(
                         for id, hit, loc in matrix_execute_pool:
                             mtx = np.add(mtx, hit)
                             location_mtx[id] = loc
-                        # TODO figure out what to do with the relative
-                        # locations of data
-                        # temp_mtxs.append((mtx, location_mtx))
                         temp_seq += seq
                         temp_mtxs = np.vstack((mtx, temp_mtxs))
                         log.info(S("done"))
-                    # First row will be all zeroes
+                    # First row will be all zeroes, so remove them
                     mtx = temp_mtxs[:-1]
                     norm_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))
                     inter_mtxs.append(norm_mtx)
@@ -641,8 +635,6 @@ def main(
     
     # Custom and knowledge based contacts are delineated by datatype.
     # Custom contacts are lists while knolwedge based ones are tuple.
-    # TODO function to return a distribution of distances given
-    # residue pairs and the information we have in our database.
     selected_contacts = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))  # noqa: E501
     if custom_contacts:
         custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
@@ -723,6 +715,21 @@ def main(
                     selected_contacts["Y"][contact_type[0]][case].append(y_coords)  # noqa: E501
                     contacts_counter -= len(x_coords)
         log.info(S('done'))
+    
+    # TODO extracting distance distributions from database
+    # 1. Need a way to use the knowledge-based coordinates from
+    #    `selected_contacts` and see where the exact sequence
+    #    combinations lie (take as many as up to 2 residues on either side).
+    #    - Need to make sure they're within the same cluster of surface
+    #      accessible residues
+    #    - For IDP-IDP complexes, just have up to 2 on either side as well]
+    #      (most of the time it will be 5-mers)
+    # 2. For custom-contacts we would need to rescan the database for
+    #    residue pairs
+    #    - Allow for single residues to make contact here
+    #      (extend 1 residue on either side)
+    if folded_structure:
+        pass
 
 
 if __name__ == "__main__":
