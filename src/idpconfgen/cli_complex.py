@@ -247,6 +247,9 @@ libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
 
 
+append_np_arr_lsts = np.vectorize(lambda x, y: x + y, otypes=[object])
+
+
 def main(
         input_seq,
         database,
@@ -484,12 +487,7 @@ def main(
                         d_mtx.fill([])
                         for hit, dist in matrix_execute_pool:
                             c_mtx = np.add(c_mtx, hit)
-                            try:
-                                d_mtx = np.concatenate(d_mtx, dist)
-                            except TypeError:
-                                # We have no hits, move onto the next
-                                # TODO see if it can concatenate empty lists
-                                continue
+                            d_mtx = append_np_arr_lsts(d_mtx, dist)
                         temp_seq += seq
                         temp_c_mtxs = np.vstack((c_mtx, temp_c_mtxs))
                         temp_d_mtxs = np.vstack((d_mtx, temp_d_mtxs))
@@ -517,16 +515,11 @@ def main(
                         ncores=ncores,
                         )
                     c_mtx = np.zeros((len(c1), len(c2)))
-                    d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+                    d_mtx = np.empty((len(c1), len(c2)), dtype=object)
                     d_mtx.fill([])
                     for hit, dist in matrix_execute_pool:
                         c_mtx = np.add(c_mtx, hit)
-                        try:
-                            d_mtx = np.concatenate(d_mtx, dist)
-                        except TypeError:
-                            # We have no hits, move onto the next
-                            # TODO see if it can concatenate empty lists
-                            continue
+                        d_mtx = append_np_arr_lsts(d_mtx, dist)
                     norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
                     inter_c_mtxs.append(norm_mtx)
                     inter_d_mtxs.append(d_mtx)
@@ -553,15 +546,11 @@ def main(
                 ncores=ncores,
                 )
             c_mtx = np.zeros((len(seq), len(seq)))
-            d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+            d_mtx = np.empty((len(seq), len(seq)), dtype=object)
             d_mtx.fill([])
             for hit, dist in matrix_execute_pool:
                 c_mtx = np.add(c_mtx, hit)
-                try:
-                    d_mtx = np.concatenate(d_mtx, dist)
-                except TypeError:
-                    # TODO see if it can concatenate empty lists
-                    continue
+                d_mtx = append_np_arr_lsts(d_mtx, dist)
             norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
             intra_c_mtxs.append(norm_mtx)
             intra_d_mtxs.append(d_mtx)
