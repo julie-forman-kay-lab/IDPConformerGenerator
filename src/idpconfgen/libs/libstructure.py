@@ -12,8 +12,10 @@ from collections import defaultdict
 from functools import reduce
 
 import numpy as np
+from Bio.PDB import MMCIFParser, PDBParser
+from Bio.PDB.SASA import ShrakeRupley
 
-from idpconfgen import log
+from idpconfgen import Path, log
 from idpconfgen.core.definitions import aa3to1, blocked_ids, pdb_ligand_codes
 from idpconfgen.core.definitions import residue_elements as _allowed_elements
 from idpconfgen.core.exceptions import (
@@ -24,7 +26,12 @@ from idpconfgen.core.exceptions import (
     )
 from idpconfgen.libs import libpdb
 from idpconfgen.libs.libcif import CIFParser, is_cif
-from idpconfgen.libs.libparse import group_runs, sample_case, type2string
+from idpconfgen.libs.libparse import (
+    group_runs,
+    sample_case,
+    split_consecutive_groups,
+    type2string,
+    )
 from idpconfgen.libs.libpdb import RE_ENDMDL, RE_MODEL, delete_insertions
 from idpconfgen.logger import S
 
@@ -791,3 +798,71 @@ def save_structure_by_chains(
                 pdbdata.pop_last_filter()
         else:
             log.debug(f'Failed to download {chaincode}')
+
+
+def find_sa_residues(
+        structure_path,
+        min_area=31.65,
+        probe_radius=1.40,
+        n_points=500
+        ):
+    """
+    Use SASA module in BioPython to find surface accessible resiudes.
+    
+    Reference: https://biopython.org/docs/dev/api/Bio.PDB.SASA.html
+
+    Parameters
+    ----------
+    structure_path : string
+        Path to the .PDB structure of interest.
+    
+    min_area : float
+        Minimum SASA to consider to be on the surface.
+        Defaults to 31.65 Å^2, half the surface area of Glycine.
+    
+    probe_radius : float
+        Radius of rolling-ball, defaults to 1.4 Å,
+        radius of a water molecule.
+    
+    n_points : int
+        Resolution of the surface of each atom.
+        Defaults to 500.
+    
+    Returns
+    -------
+    residue_idx : dict
+        Indices for the consecutive residues that are
+        considered on the surface to make a contact.
+        Keys are the chain ID of interest.
+    """
+    if structure_path.endswith('.pdb'):
+        p = PDBParser(QUIET=1)
+    elif structure_path.endswith('.cif'):
+        p = MMCIFParser(QUIET=1)
+    
+    sr = ShrakeRupley(
+        probe_radius=probe_radius,
+        n_points=n_points,
+        )
+    struc = p.get_structure("structure", structure_path)
+    sr.compute(struc, level="R")
+    
+    residue_idx = {}
+    for chain in struc.get_chains():
+        temp_res_idx = []
+        for i, res in enumerate(list(chain.get_residues())):
+            area = res.sasa
+            if area > min_area:
+                temp_res_idx.append(i)
+        consecutive_idx = split_consecutive_groups(temp_res_idx)
+        residue_idx[chain.id] = consecutive_idx
+
+    # Check that the last set of indices does not go over
+    fld_struc = Structure(Path(structure_path))
+    fld_struc.build()
+    for chain, sequence in fld_struc.fasta.items():
+        last_idx = residue_idx[chain][-1][-1]
+        if last_idx == len(sequence):
+            residue_idx[chain][-1][-1] = residue_idx[chain][-1][-1][:-1]
+    
+    return residue_idx

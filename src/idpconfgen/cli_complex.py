@@ -33,21 +33,20 @@ from idpconfgen.components.sidechain_packing import (
 from idpconfgen.components.xmer_probs import add_xmer_arg
 from idpconfgen.core.build_definitions import forcefields
 from idpconfgen.libs import libcli
-from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
-from idpconfgen.libs.libmultichain import (
+from idpconfgen.libs.libcomplex import (
     contact_matrix,
     contact_type,
     electropotential_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
-    find_sa_residues,
     process_custom_contacts,
     select_contacts,
     select_custom_contacts,
     )
+from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import update_chars_lower
-from idpconfgen.libs.libstructure import Structure
+from idpconfgen.libs.libstructure import Structure, find_sa_residues
 from idpconfgen.logger import S, T, init_files, report_on_crash
 
 

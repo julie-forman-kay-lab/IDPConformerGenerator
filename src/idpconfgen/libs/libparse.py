@@ -650,3 +650,46 @@ def update_chars_lower(string, indices):
 
     updated_string = ''.join(char_list)
     return updated_string
+
+
+def has_consecutive_match(s, q, consecutive_length=2):
+    """Find matches of consecutive characters in s within q."""
+    for i in range(len(q) - 1):
+        consecutive_chars_q = q[i:i + consecutive_length]
+        if consecutive_chars_q in s:
+            return True
+        
+    return False
+
+
+def create_coordinate_combinations(data, modifier=0):
+    """
+    Create coordinates based on a tuple of two sets of residues of interest.
+    
+    Parameters
+    ----------
+    data : tuple, N = 2
+        Tuple of lists ([[]], [[]])
+    
+    modifier : int
+        Change the values of coordinates for indexing purposes
+    
+    Returns
+    -------
+    coordinates : list of tuple
+        Combination of coordinates between each of the lists of lists
+        within the tuple [(,)]
+    """
+    if len(data) != 2:
+        raise ValueError("Input must be a tuple of two elements.")
+
+    list1, list2 = data
+
+    coordinates = []
+    for sublist1 in list1:
+        for item1 in sublist1:
+            for sublist2 in list2:
+                for item2 in sublist2:
+                    coordinates.append((item1 + modifier, item2 + modifier))
+
+    return coordinates

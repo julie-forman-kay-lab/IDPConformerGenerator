@@ -30,6 +30,7 @@ from functools import partial
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libcomplex import contact_type
 from idpconfgen.libs.libio import (
     extract_from_tar,
     read_dictionary_from_disk,
@@ -39,7 +40,6 @@ from idpconfgen.libs.libio import (
 from idpconfgen.libs.libmultichain import (
     calc_interchain_ca_contacts,
     calc_intrachain_ca_contacts,
-    contact_type,
     group_chains,
     )
 from idpconfgen.libs.libmulticore import pool_function
