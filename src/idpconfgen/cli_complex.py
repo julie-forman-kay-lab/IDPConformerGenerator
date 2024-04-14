@@ -42,6 +42,7 @@ from idpconfgen.libs.libcomplex import (
     process_custom_contacts,
     select_contacts,
     select_custom_contacts,
+    update_distance_distribution_matrix,
     )
 from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
 from idpconfgen.libs.libmulticore import pool_function
@@ -244,9 +245,6 @@ ap.add_argument(
     )
 libcli.add_argument_random_seed(ap)
 libcli.add_argument_ncores(ap)
-
-
-append_np_arr_lsts = np.vectorize(lambda x, y: x + y, otypes=[object])
 
 
 def main(
@@ -483,10 +481,10 @@ def main(
                             )
                         c_mtx = np.zeros((len(seq), len(c2)))
                         d_mtx = np.empty((len(seq), len(c2)), dtype=object)
-                        d_mtx.fill([])
+                        d_mtx.fill({})
                         for hit, dist in matrix_execute_pool:
                             c_mtx = np.add(c_mtx, hit)
-                            d_mtx = append_np_arr_lsts(d_mtx, dist)
+                            d_mtx = update_distance_distribution_matrix(dist, d_mtx)  # noqa: E501
                         temp_seq += seq
                         temp_c_mtxs = np.vstack((c_mtx, temp_c_mtxs))
                         temp_d_mtxs = np.vstack((d_mtx, temp_d_mtxs))
@@ -515,10 +513,10 @@ def main(
                         )
                     c_mtx = np.zeros((len(c1), len(c2)))
                     d_mtx = np.empty((len(c1), len(c2)), dtype=object)
-                    d_mtx.fill([])
+                    d_mtx.fill({})
                     for hit, dist in matrix_execute_pool:
                         c_mtx = np.add(c_mtx, hit)
-                        d_mtx = append_np_arr_lsts(d_mtx, dist)
+                        d_mtx = update_distance_distribution_matrix(dist, d_mtx)  # noqa: E501
                     norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
                     inter_c_mtxs.append(norm_mtx)
                     inter_d_mtxs.append(d_mtx)
@@ -546,10 +544,10 @@ def main(
                 )
             c_mtx = np.zeros((len(seq), len(seq)))
             d_mtx = np.empty((len(seq), len(seq)), dtype=object)
-            d_mtx.fill([])
+            d_mtx.fill({})
             for hit, dist in matrix_execute_pool:
                 c_mtx = np.add(c_mtx, hit)
-                d_mtx = append_np_arr_lsts(d_mtx, dist)
+                d_mtx = update_distance_distribution_matrix(dist, d_mtx)
             norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
             intra_c_mtxs.append(norm_mtx)
             intra_d_mtxs.append(d_mtx)
@@ -648,17 +646,6 @@ def main(
                 title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
                 )
     log.info(S('done'))
-    
-    # NOTE temporary for testing purposes
-    # print(len(inter_c_mtxs))
-    # print(len(inter_d_mtxs))
-    # print(inter_c_mtxs[0])
-    # print(inter_d_mtxs[0])
-    # print(len(intra_c_mtxs))
-    # print(len(intra_d_mtxs))
-    # print(intra_c_mtxs[0])
-    # print(intra_d_mtxs[0])
-    # return
     
     # Custom and knowledge based contacts are delineated by datatype.
     # Custom contacts are lists while knolwedge based ones are tuple.

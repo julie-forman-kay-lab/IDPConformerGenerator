@@ -1,4 +1,5 @@
 """Functions that are useful for generating dynamic complexes."""
+from collections import Counter
 from random import randint
 
 import numpy as np
@@ -694,9 +695,45 @@ def select_custom_contacts(contacts, idx, c_type, max_contacts):
         return False
 
 
+def update_distance_distribution_matrix(dist, d_mtx):
+    """
+    Update the distance and distribution matrices.
+
+    Parameters
+    ----------
+    dist : np.ndarray of list
+        Array of list of all possible contacts for given database entry.
+    
+    d_mtx : np.ndarray of dict
+        Array of dict of number of counts for each distance tuple in the array.
+
+    Returns
+    -------
+    d_mtx : np.ndarray of dict
+        Updated distance_mtx from information in d_mtx.
+    """
+    # They should have the same shape
+    assert np.shape(dist) == np.shape(d_mtx)
+
+    dist = dist.astype(list)
+    for x, row in enumerate(dist):
+        for y, item in enumerate(row):
+            db_entry = item
+            existing = d_mtx[x, y]
+            db_count = Counter(db_entry)
+            for dist, count in db_count.items():
+                existing[dist] = count
+            d_mtx[x, y] = existing    
+    return d_mtx
+
+
 def reverse_position_lookup(coords, location_mtx, database):
     """
     Return database entry based on a point in the contacts frequency heatmap.
+
+    NOTE this will be heavily remodified given the updated way of database
+    processing. Essentially this will take in all 3 aligned matrices and
+    return the distance that we want.
 
     Parameters
     ----------
