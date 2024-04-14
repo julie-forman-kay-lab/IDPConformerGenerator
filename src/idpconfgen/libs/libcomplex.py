@@ -723,7 +723,7 @@ def update_distance_distribution_matrix(dist, d_mtx):
             db_count = Counter(db_entry)
             for dist, count in db_count.items():
                 existing[dist] = count
-            d_mtx[x, y] = existing    
+            d_mtx[x, y] = existing
     return d_mtx
 
 
