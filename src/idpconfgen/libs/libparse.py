@@ -693,3 +693,79 @@ def create_coordinate_combinations(data, modifier=0):
                     coordinates.append((item1 + modifier, item2 + modifier))
 
     return coordinates
+
+
+def get_string_element(strings, index):
+    """
+    Get the whole string in the list of strings using an index.
+
+    Parameters
+    ----------
+    strings :  list of str
+        List of strings
+    
+    index : int
+        Global index relative to the list of strings
+    
+    Returns
+    -------
+    string : str
+        String of interest
+    
+    position : int
+        Relative index in the string that was chosen
+    
+    Nonetype if no matches were found
+    """
+    flattened_index = 0
+    
+    for string in strings:
+        string_length = len(string)
+        flattened_index += string_length
+        if index < flattened_index:
+            position = index - (flattened_index - string_length)
+            return string, position
+    
+    return None, None
+
+
+def get_substring_characters(string, char_position, max_chars):
+    """
+    Get a substring where the middle character is the target.
+    
+    Parameters
+    ----------
+    string : str
+        String of interest, typically expecting a sequence.
+    
+    char_position : int
+        Integer position of the AA of interest.
+    
+    max_chars : int
+        Maximum number of AA to return surrounding the target.
+    
+    Returns
+    -------
+    substring : str
+        Substring from string of target that has the char
+        position and maxes out the number of characters.
+    """
+    half_max_chars = max_chars // 2
+
+    start_pos = max(char_position - half_max_chars, 0)
+    end_pos = min(char_position + half_max_chars + 1, len(string))
+    
+    if end_pos - start_pos < max_chars:
+        if start_pos == 0:
+            end_pos = min(end_pos + (max_chars - (end_pos - start_pos)), len(string))  # noqa: E501
+        else:
+            start_pos = max(start_pos - (max_chars - (end_pos - start_pos)), 0)
+    
+    substring = string[start_pos:end_pos]
+    
+    # If the string is over maximum allowed characters
+    # it will only be 1 over so remove the first character
+    if len(substring) > max_chars:
+        substring = substring[1:]
+
+    return substring

@@ -733,19 +733,10 @@ def main(
     # TODO make a savepoint here (sub-database) for all
     # the filtered contacts/distances
     # TODO extracting distance distributions from database
-    # 1. Need a way to use the knowledge-based coordinates from
-    #    `selected_contacts` and see where the exact sequence
-    #    combinations lie (take as many as up to 2 residues on either side).
-    #    - Need to make sure they're within the same cluster of surface
-    #      accessible residues
-    #    - For IDP-IDP complexes, just have up to 2 on either side as well]
-    #      (most of the time it will be 5-mers)
-    # 2. For custom-contacts we would need to rescan the database for
-    #    residue pairs
-    #    - Allow for single residues to make contact here
-    #      (extend 1 residue on either side)
-    if folded_structure:
-        pass
+    # For custom-contacts we would need to rescan the database for
+    # residue pairs
+    # - Make a d_mtx for every custom contact and align it with
+    #   `cus_inter_res` and `cus_intra_res`
 
 
 if __name__ == "__main__":

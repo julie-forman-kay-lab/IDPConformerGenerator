@@ -1,12 +1,16 @@
 """Functions that are useful for generating dynamic complexes."""
 from collections import Counter
-from random import randint
+from random import choices, randint
 
 import numpy as np
 
 from idpconfgen import log
 from idpconfgen.core.definitions import pk_aa_dict
-from idpconfgen.libs.libparse import has_consecutive_match
+from idpconfgen.libs.libparse import (
+    get_string_element,
+    get_substring_characters,
+    has_consecutive_match,
+    )
 
 
 contact_type = ["intra", "inter"]
@@ -727,31 +731,87 @@ def update_distance_distribution_matrix(dist, d_mtx):
     return d_mtx
 
 
-def reverse_position_lookup(coords, location_mtx, database):
+def get_contact_distances(
+        coords,
+        res_combo,
+        d_mtx,
+        custom=False,
+        folded=None
+        ):
     """
-    Return database entry based on a point in the contacts frequency heatmap.
-
-    NOTE this will be heavily remodified given the updated way of database
-    processing. Essentially this will take in all 3 aligned matrices and
-    return the distance that we want.
+    Return the set of Cα distances based on selected coordinates.
 
     Parameters
     ----------
     coords : tuple of int
         The location of the contact per the contacts frequency heatmap.
     
-    location_mtx : dict of np.ndarray
-        Keys are the segid as seen in the database. Values are an array
-        of list of indicies of where the contact is.
+    res_combo : tuple of int
+        Residue number combination where the first sequence is
+        aligned to the Y-axis and second to the X-axis.
     
-    database : dict
-        IDPConformerGenerator database
+    d_mtx : np.ndarray of dict
+        Array of distance distributions where each value is a dictionary
+        of tuple distances and number of counts.
+    
+    custom : Bool
+        Custom contact or not?
+        Defaults to False.
+    
+    folded : tuple of tuple
+        First tuple element is the combination of chain and sequence.
+        Second tuple element is the combination of residues.
     
     Returns
     -------
-    entry : dict
-        Key-value pairs of the entry for a specific segid in the database.
-        TODO: this return can be changed to only the torsion angle? or remain
-        as we need information on the secondary structure as well
+    distances : tuple of float
+        Cα distances for selected residues in question
+    
+    residues : tuple of tuple of int
+        Residue numbers of the selected distances
     """
-    return
+    # Coords should be a tuple of (y, x)
+    # Coords will be (0, 0) if given a custom contact.
+    if custom:
+        x = 0
+        y = 0
+    else:
+        x = coords[1]
+        y = coords[0]
+    
+    dist_distribution = d_mtx[x, y]
+    total_distances = list(dist_distribution.keys())
+    total_counts = list(dist_distribution.values())
+    selected_idx = choices(
+        range(len(total_counts)),
+        weights=total_counts,
+        k=1)[0]
+
+    distances = total_distances[selected_idx]
+    nres = len(distances)
+
+    if custom:
+        residues = (coords[0], coords[1])
+        return distances, residues
+    
+    if folded:
+        # For the IDP-Folded contact case
+        folded_res = res_combo[0]
+        idp_res = res_combo[1]
+        
+        fld_sub_seq, _ = get_string_element(folded_res, y, nres)
+        idp_sub_seq = get_substring_characters(idp_res, x, nres)
+        # TODO fix what if fld_sub_seq is less than idp_sub_seq?
+        
+        residues = (fld_sub_seq, idp_sub_seq)
+    else:
+        # For the IDP-IDP contact case
+        seq1 = res_combo[0]
+        seq2 = res_combo[1]
+        sub_seq1 = get_substring_characters(seq1, x, nres)
+        sub_seq2 = get_substring_characters(seq2, y, nres)
+        assert len(sub_seq1) == len(sub_seq2) == nres
+        
+        residues = (sub_seq1, sub_seq2)
+
+    return distances, residues
