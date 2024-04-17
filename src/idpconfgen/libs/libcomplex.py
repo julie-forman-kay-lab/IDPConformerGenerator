@@ -7,6 +7,7 @@ import numpy as np
 from idpconfgen import log
 from idpconfgen.core.definitions import pk_aa_dict
 from idpconfgen.libs.libparse import (
+    adjust_iterable_length,
     get_string_element,
     get_substring_characters,
     has_consecutive_match,
@@ -736,7 +737,7 @@ def get_contact_distances(
         res_combo,
         d_mtx,
         custom=False,
-        folded=None
+        folded=False
         ):
     """
     Return the set of Cα distances based on selected coordinates.
@@ -758,9 +759,9 @@ def get_contact_distances(
         Custom contact or not?
         Defaults to False.
     
-    folded : tuple of tuple
-        First tuple element is the combination of chain and sequence.
-        Second tuple element is the combination of residues.
+    folded : Bool
+        Whether we're working with a folded protein or not.
+        Defaults to False.
     
     Returns
     -------
@@ -770,16 +771,17 @@ def get_contact_distances(
     residues : tuple of tuple of int
         Residue numbers of the selected distances
     """
-    # Coords should be a tuple of (y, x)
     # Coords will be (0, 0) if given a custom contact.
     if custom:
         x = 0
         y = 0
     else:
-        x = coords[1]
-        y = coords[0]
+        x = coords[0]
+        y = coords[1]
     
-    dist_distribution = d_mtx[x, y]
+    # Note [y, x] because y is the number of rows (y-axis)
+    # x is the number of columns (x-axis)
+    dist_distribution = d_mtx[y, x]
     total_distances = list(dist_distribution.keys())
     total_counts = list(dist_distribution.values())
     selected_idx = choices(
@@ -799,9 +801,22 @@ def get_contact_distances(
         folded_res = res_combo[0]
         idp_res = res_combo[1]
         
-        fld_sub_seq, _ = get_string_element(folded_res, y, nres)
+        fld_sub_seq, fld_pos = get_string_element(folded_res, y)
+        fld_sub_seq = get_substring_characters(fld_sub_seq, fld_pos, nres)
         idp_sub_seq = get_substring_characters(idp_res, x, nres)
-        # TODO fix what if fld_sub_seq is less than idp_sub_seq?
+        try:
+            assert len(fld_sub_seq) == len(idp_sub_seq) == nres
+        except AssertionError:
+            # Case where the lengths don't match up
+            # Shorten everything else accordingly
+            if len(fld_sub_seq) < len(idp_sub_seq):
+                des_l = len(fld_sub_seq)
+                idp_sub_seq = adjust_iterable_length(idp_sub_seq, des_l)
+                distances = adjust_iterable_length(distances, des_l)
+            elif len(idp_sub_seq) < len(fld_sub_seq):
+                des_l = len(idp_sub_seq)
+                fld_sub_seq = adjust_iterable_length(fld_sub_seq, des_l)
+                distances = adjust_iterable_length(distances, des_l)
         
         residues = (fld_sub_seq, idp_sub_seq)
     else:

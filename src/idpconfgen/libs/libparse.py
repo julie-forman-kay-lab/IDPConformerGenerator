@@ -722,10 +722,13 @@ def get_string_element(strings, index):
     for string in strings:
         string_length = len(string)
         flattened_index += string_length
-        if index < flattened_index:
+        if index <= flattened_index:
             position = index - (flattened_index - string_length)
+            if index == flattened_index:
+                # Last index
+                position -= 1
             return string, position
-    
+
     return None, None
 
 
@@ -769,3 +772,44 @@ def get_substring_characters(string, char_position, max_chars):
         substring = substring[1:]
 
     return substring
+
+
+def adjust_iterable_length(lst, desired_length):
+    """
+    Remove last then first element until desired length is reached.
+
+    Parameters
+    ----------
+    lst : list or string or tuple
+        Iterable datatype of elements we want to correct.
+    
+    desired_length : int
+        Integer length that is desired.
+    
+    Returns
+    -------
+    lst : list or string or tuple
+        Updated data with the desired length.
+    """
+    istuple = False
+    isstring = False
+    try:
+        assert type(lst) is list
+    except AssertionError:
+        if type(lst) is tuple:
+            lst = list(lst)
+        elif type(lst) is str:
+            lst = [*lst]
+
+    while len(lst) > desired_length:
+        lst.pop()
+        if len(lst) > desired_length:
+            lst.pop(0)
+    
+    if istuple:
+        return tuple(lst)
+    if isstring:
+        newlst = ""
+        return newlst.join(lst)
+            
+    return lst
