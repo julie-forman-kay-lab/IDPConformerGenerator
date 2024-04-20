@@ -11,6 +11,7 @@ Contents
 .. toctree::
    :maxdepth: 2
 
+   first_steps
    installation
    usage
    faq
