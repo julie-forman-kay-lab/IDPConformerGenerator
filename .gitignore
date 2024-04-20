@@ -115,3 +115,5 @@ venv.bak/
 .mypy_cache/
 idpconfgen.version
 .vscode/settings.json
+
+miniconda3/
