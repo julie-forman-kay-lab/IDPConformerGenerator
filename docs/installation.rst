@@ -24,55 +24,55 @@ And navigate to the new ``IDPConformerGenerator`` folder::
 
     cd IDPConformerGenerator
 
-Run the following commands to install ``idpconfgen`` dependencies if you use
-Anaconda as your Python package manager::
-
-    conda env create -f requirements.yml
-    conda activate idpconfgen
-
 .. note::
-    If you don't use Anaconda to manage your Python installations, you can use
-    ``virtualenv`` and the ``requirements.txt`` file following the commands:
 
-    | ``virtualenv idpcgenv --python=3.9``
-    | ``source venv/bin/activate``
-    | ``pip install -r requirements.txt``
+    The ``requirements.yml`` describe the Python dependencies of
+    IDPConformerGenerator. If you are skilled managing python environments you
+    can go on your own. Otherwise, you can calmly follow our install
+    instructions.
 
-    If you have difficulties installing ``idpconfgen``, raise an Issue in the
-    main GitHub repository, and we will help you.
+At the end of the installation process, you will have a ``miniconda3``
+directory inside the ``IDPConformerGenerator`` main directory where the whole
+installation is placed. If your ever want to delete ``IDPCG`` from your computer,
+simply delete the ``IDPConformerGenerator`` directory.
 
-Install ``idpconfgen`` in development mode in order for your installation to be
-always up-to-date with the repository::
+**To install IDPConfGen**, run the following three commands. Wait until one
+finishes before running the second one::
 
-    python setup.py develop --no-deps
+    ./install_miniconda3.sh
+    source activate.sh
+    ./install_deps.sh
 
-.. note::
-    The above applies also if you used ``virtualenv`` instead of ``conda``.
+Once this finishes, ``IDPConfGen`` is ready to be used.
 
 **Remember** to active the ``idpconfgen`` environment every time you open a new
-terminal window, from within the repository folder, choose yours::
+terminal window. For that, navigate to the ``IDPConformerGenerator`` repository folder
+and ``source`` the ``activate.sh`` file::
 
-    # Installation with Anaconda
-    conda activate idpconfgen
+    source activate.sh
 
-    # Installation with virtualenv
-    source idpcgenv/bin/activate
+Update
+------
 
+To update to the latest version, open a new terminal window, and navigate to the
+``IDPConformerGenerator`` source folder. Remove the ``miniconda3`` environment::
 
-To update to the latest version, navigate to the repository folder, activate the
-``idpconfgen`` python environment as described above, and run the commands::
+    rm -rf miniconda3
+
+Update the source to the latest version::
 
     git pull
 
-    # if you used anaconda to create the python environment, run:
-    conda env update -f requirements.yml
+Reinstall the project and it's dependencies. Run the following commands, one
+after the other, wait for them to finish before running the next one::
 
-    # if you used venv to create the python environment, run:
-    pip install -r requirements.txt  --upgrade
-
-    python setup.py develop --no-deps
+    ./install_miniconda3.sh
+    source activate.sh
+    ./install_deps.sh
 
 Your installation will become up to date with the latest developments.
+If you had installed MC-SCE and Int2Cart, you may need to update those
+separately.
 
 From source on the Graham Cluster (DRAC)
 ----------------------------------------
