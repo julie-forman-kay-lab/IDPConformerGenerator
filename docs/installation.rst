@@ -43,12 +43,14 @@ finishes before running the second one::
     source activate.sh
     ./install_deps.sh
 
-Once this finishes, ``IDPConfGen`` is ready to be used.
+Once this finishes, ``idpconfgen`` is ready to be used. Go to the :ref:`usage
+<Usage>` and continue from there.
 
-**Remember** to active the ``idpconfgen`` environment every time you open a new
-terminal window. For that, navigate to the ``IDPConformerGenerator`` repository folder
-and ``source`` the ``activate.sh`` file::
+**Remember** to active the ``idpconfgen`` environment every time you open a
+new terminal window. For that, navigate to the ``IDPConformerGenerator``
+repository folder and ``source`` the ``activate.sh`` file::
 
+    cd path/to/my/IDPConformerGenerator
     source activate.sh
 
 Update
