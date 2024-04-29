@@ -2,7 +2,7 @@ First steps
 ===========
 
 
-IDPConformerGenerator (aka IDPConfGen and IDPCG), is available for free on GitHub at:
+IDPConformerGenerator (AKA IDPConfGen and IDPCG), is available for free on GitHub at:
 
     https://github.com/julie-forman-kay-lab/IDPConformerGenerator
 
@@ -23,15 +23,15 @@ you can skip the first instruction in the documentation page regarding the “gi
 clone”.
 
 To run IDPConfGen, you also need to install third party software: DSSP, and
-MC-SCE. If you have access to CUDA compatible GPU, installing Int2Cart provides
-significant improvements. Instructions to install these libraries are written
+MC-SCE. If you have access to CUDA compatible GPU, installing Int2Cart may provide improvements
+on covalent bond geometry during the building process. Instructions to install these libraries are written
 in the :ref:`respective section of the install instructions <installing-third-party-software>`:
 
 Now that you have installed IDPConfGen, you can used it from the command line.
 Remember to activate the ``idpconfgen`` python environment every time you open a
 new terminal window. For example, with ``conda activate idpconfgen``.
 
-You now have available the ``idpconfgen`` command which opens the doors to all
+You will now have access to the ``idpconfgen`` command which opens the door to all
 the tools inside IDPConfGen. IDPCG is composed of several sub-clients
 (sub-commands). Some tasks are completed with a single command (for example,
 generating conformers), others require several commands (for example,
@@ -41,12 +41,12 @@ In order to introduce our users to IDPConfGen we have prepared a series of
 examples that users can navigate and reproduce to get used to the software. We
 highly encourage your to run over those examples first. You can find the
 examples inside the ``example/`` `directory <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/tree/main/example>`_
-and detailed descriptions also on the :ref:`usage documentation page <Usage>`.
+and detailed tutorials can be found on the :ref:`usage documentation page <Usage>`.
 
-But, before you start, we want to briefly clarify the two main processes that
+Before you start, we want to briefly clarify the two main processes that
 you will do with IDPConfGen:
 
-*Step 1)* **Create your structural data base.** You will need this database to
+*Step 1)* **Create your structural database.** You will need this database to
 generate conformers. We provide all the commands and facilities required to
 compile the initial database. This database is fully customizable, and can
 serve several projects or be project specific. You can also reutilize it as much
@@ -66,15 +66,13 @@ download link above, for example the following file which contains 24857 chains:
 conformers: ``idpconfgen build`` to build IDP conformers and ``idpconfgen
 ldrs`` to build IDR regions within folded domains.
 
-Now that these two concepts were clarified, we invite you to run over the
+Now that these two concepts were clarified, we invite you to go over the
 examples.
 
 Enjoy IDPConfGen, and keep in contact with us. For feedback or any doubts
 please raise an issue on our repository if you are skilled with GitHub or
-directly write us an email to: Zi Hao Liu (nemo.liu@mail.utoronto.ca) or João
+directly write us via E-mail to: Zi Hao Liu (nemo.liu@mail.utoronto.ca) or João
 Teixeira (joaomcteixeira@gmail.com).
 
 Refer to :ref:`our publications <How to cite>` for technical details on IDPCG and
 please cite the project if you use it.
-
-
