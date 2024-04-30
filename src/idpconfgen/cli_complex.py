@@ -9,7 +9,7 @@ USAGE:
     $ idpconfgen complex -db contacts.json -seq sequence.fasta --plot
 """
 import argparse
-import json
+import pickle
 import re
 from collections import defaultdict
 from functools import partial
@@ -46,7 +46,12 @@ from idpconfgen.libs.libcomplex import (
     select_custom_contacts,
     update_distance_distribution_matrix,
     )
-from idpconfgen.libs.libio import make_folder_or_cwd, read_dictionary_from_disk
+from idpconfgen.libs.libio import (
+    change_extension,
+    file_exists,
+    make_folder_or_cwd,
+    read_dictionary_from_disk,
+    )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import update_chars_lower
 from idpconfgen.libs.libstructure import Structure, find_sa_residues
@@ -71,14 +76,14 @@ ap = libcli.CustomParser(
 libcli.add_argument_idb(ap)
 
 ap.add_argument(
-    '-cp',
     '--contacts-checkpoint',
     help=(
-        'Intermediate database of selected contacts and distances. '
-        'Dictionary format storing distances and residue numbers. '
-        'For use with the same input sequence/folded protein.'
+        'Path to the intermediate binary .PKL database of chain & residue '
+        'combinations, intra- & inter- contact frequencies, and respective '
+        'intra- & inter- contact distances. For use with the same input '
+        'sequence/folded protein. Defaults to contacts_checkpoint.pkl'
         ),
-    default=None,
+    default="contacts_checkpoint.pkl",
     )
 
 libcli.add_argument_seq(ap)
@@ -274,7 +279,7 @@ libcli.add_argument_ncores(ap)
 def main(
         input_seq,
         database,
-        contacts_checkpoint=None,
+        contacts_checkpoint="contacts_checkpoint.pkl",
         phos=None,
         folded_structure=None,
         custom_contacts=None,
@@ -328,6 +333,19 @@ def main(
         continue
     log.info(S('done'))
     
+    log.info(T('Checking validity of --contacts-checkpoint'))
+    process_extended_db = True
+    if not contacts_checkpoint.endswith(".pkl"):
+        log.info(S(f"Incorrect formatting for contacts checkpoint: {contacts_checkpoint}"))  # noqa: E501
+    else:
+        contacts_checkpoint = change_extension(contacts_checkpoint, "pkl")
+        if file_exists(contacts_checkpoint):
+            log.info(S(f"Found a checkpoint for contacts information: {contacts_checkpoint}"))  # noqa: E501
+            process_extended_db = False
+        else:
+            log.info(S("No checkpoint for contacts information found, will save a checkpoint after processing"))  # noqa: E501
+    log.info(S('done'))
+    
     if type(input_seq) is dict:
         if len(input_seq) > 1:
             log.info(T('multiple sequences detected. assuming they are in a multi-chain complex'))  # noqa: E501
@@ -340,159 +358,180 @@ def main(
         log.info(S(f'input sequence: {input_seq}'))
         input_seq = {1: input_seq}
     
-    if phos:
-        REGEX_PATTERN = re.compile(r"(.*:([0-9,])*[/])+")
-        phos_ptm = {}
-        if REGEX_PATTERN.match(phos):
-            phos_residues = phos.split('/')
-            phos_residues.pop()  # last element should be empty
-            for c in phos_residues:
-                chain = c.split(':')
-                residues = chain[1].split(',')
-                residues.pop()
-                if len([input_seq.values()]) == 1:
-                    phos_ptm[1] = [int(r) for r in residues]
-                else:
-                    phos_ptm[f">{chain[0]}"] = [int(r) for r in residues]
-        else:
-            log.info(S('Incorrect pattern input for --phos.'))
-            log.info(S('Pattern is as follows: A:1,3,4,/B:3,9,5,/'))
-         
-        mod_in_seqs = []
-        for key, sequence in input_seq.items():
-            phos_idx = [x - 1 for x in phos_ptm[key]]
-            mod_in_seqs.append(update_chars_lower(sequence, phos_idx))
-        combo_mod_seqs = [c for c in combinations(mod_in_seqs, 2)]
-    
-    log.info(T("analyzing intramolecular contacts from the database"))
-    intra_consume = partial(extract_intrapairs_from_db)
-    intra_execute = partial(
-        report_on_crash,
-        intra_consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
-    intra_execute_pool = pool_function(intra_execute, db_lst, ncores=ncores)
-    intra_contacts = []
-    intra_dists = []
-    for contact, dist in intra_execute_pool:
-        if contact is False:
-            continue
-        intra_contacts.append(contact)
-        intra_dists.append(dist)
-    log.info(S("done"))
-    
-    log.info(T("analyzing intermolecular contacts from the database"))
-    inter_consume = partial(extract_interpairs_from_db)
-    inter_execute = partial(
-        report_on_crash,
-        inter_consume,
-        ROC_exception=Exception,
-        ROC_folder=output_folder,
-        ROC_prefix=_name,
-        )
-    inter_execute_pool = pool_function(
-        inter_execute,
-        db_inter_lst,
-        ncores=ncores,
-        )
-    inter_contacts = []
-    inter_dists = []
-    for contact, dist in inter_execute_pool:
-        if contact is False:
-            continue
-        inter_contacts.append(contact)
-        inter_dists.append(dist)
-    log.info(S("done"))
-    
-    all_contacts = intra_contacts + inter_contacts
-    all_dists = intra_dists + inter_dists
-    all_contacts_filtered = [c for c in all_contacts if c]
-    all_dists_filtered = [d for d in all_dists if d]  # noqa: F841
-
-    in_seqs = list(input_seq.values())
-    in_res = []
-    for seq in in_seqs:
-        in_res.append([i for i in range(1, len(seq))])
-    in_chains = list(input_seq.keys())
-    combo_res = [c for c in combinations(in_res, 2)]
-    combo_seqs = [c for c in combinations(in_seqs, 2)]
-    combo_chains = [c for c in combinations(in_chains, 2)]
-    if folded_structure:
-        log.info(T("Folded structure found, identifying surface accessible resiudes"))  # noqa: E501
-        assert folded_structure.endswith('.pdb') or \
-            folded_structure.endswith('.cif')
-
-        fld_struc = Structure(Path(folded_structure))
-        fld_struc.build()
-        fld_res = fld_struc.residues_splitted
-        fld_seqs = fld_struc.fasta
-        sa_idx = find_sa_residues(folded_structure)
-        
-        sa_seqs = {}
-        sa_res = {}
-        for chain, combos in sa_idx.items():
-            temp_seq = []
-            temp_res = []
-            for c in combos:
-                res = ""
-                real_res = []
-                for i in c:
-                    res += fld_seqs[chain][i]
-                    real_res.append(fld_res[chain][i])
-                temp_seq.append(res)
-                temp_res.append(real_res)
-            sa_seqs[chain] = temp_seq
-            sa_res[chain] = temp_res
-        fld_sa_res = list(sa_res.values())
-        fld_sa_seqs = list(sa_seqs.values())
-        fld_sa_chains = list(sa_seqs.keys())
-        log.info("Found the folowing sequences to be surface accessible:")
-        for chain in sa_seqs:
-            log.info(f"Chain {chain}: {sa_seqs[chain]}")
-        log.info(S("done"))
-        # Combo seqs and combo chains are aligned to give locations
-        combo_res = list(product(fld_sa_res, in_res)) + combo_res
-        combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
-        combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains
+    if process_extended_db:
         if phos:
-            combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
-    
-    # We do not change "combo_chains" since that's our anchor for alignment.
-    # If we do not have custom contacts for specific combo chains, store None.
-    if custom_contacts is not None:
-        cus_inter_res, cus_intra_res = process_custom_contacts(
-            custom_contacts,
-            combo_chains,
-            combo_res,
-            input_seq,
-            ignore_sasa=ignore_sasa,
-            )
-    input_seq_keys = list(input_seq.keys())
+            REGEX_PATTERN = re.compile(r"(.*:([0-9,])*[/])+")
+            phos_ptm = {}
+            if REGEX_PATTERN.match(phos):
+                phos_residues = phos.split('/')
+                phos_residues.pop()  # last element should be empty
+                for c in phos_residues:
+                    chain = c.split(':')
+                    residues = chain[1].split(',')
+                    residues.pop()
+                    if len([input_seq.values()]) == 1:
+                        phos_ptm[1] = [int(r) for r in residues]
+                    else:
+                        phos_ptm[f">{chain[0]}"] = [int(r) for r in residues]
+            else:
+                log.info(S('Incorrect pattern input for --phos.'))
+                log.info(S('Pattern is as follows: A:1,3,4,/B:3,9,5,/'))
 
-    if len(all_contacts_filtered) == 0:
-        log.info("WARNING: No contacts found. Your database is invalid.")
-        log.info("Please use `idpconfgen contacts` to make the extended database.")  # noqa: E501
-        return
-    else:
-        all_db_merged = [(c, d) for c, d in zip(all_contacts_filtered, all_dists_filtered)]  # noqa: E501
-        
-        log.info(T("Calculating all-contacts probability matrix"))
-        inter_c_mtxs = []
-        inter_d_mtxs = []
-        if len(combo_seqs) >= 1:
-            inter_seqs = []
-            for combo in combo_seqs:
-                c1 = combo[0]
-                c2 = combo[1]
-                if type(c1) is list:
-                    temp_c_mtxs = np.zeros(shape=(1, len(c2)))
-                    temp_d_mtxs = np.empty(shape=(1, len(c2)))
-                    temp_seq = ""
-                    for seq in c1:
-                        log.info(S(f"calculating intermolecular probabilities between {c2} and {seq}"))  # noqa: E501
-                        matrix_consume = partial(contact_matrix, sequence=[seq, c2])  # noqa: E501
+            mod_in_seqs = []
+            for key, sequence in input_seq.items():
+                phos_idx = [x - 1 for x in phos_ptm[key]]
+                mod_in_seqs.append(update_chars_lower(sequence, phos_idx))
+            combo_mod_seqs = [c for c in combinations(mod_in_seqs, 2)]
+
+        log.info(T("analyzing intramolecular contacts from the database"))
+        intra_consume = partial(extract_intrapairs_from_db)
+        intra_execute = partial(
+            report_on_crash,
+            intra_consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+        intra_execute_pool = pool_function(intra_execute, db_lst, ncores=ncores)
+        intra_contacts = []
+        intra_dists = []
+        for contact, dist in intra_execute_pool:
+            if contact is False:
+                continue
+            intra_contacts.append(contact)
+            intra_dists.append(dist)
+        log.info(S("done"))
+
+        log.info(T("analyzing intermolecular contacts from the database"))
+        inter_consume = partial(extract_interpairs_from_db)
+        inter_execute = partial(
+            report_on_crash,
+            inter_consume,
+            ROC_exception=Exception,
+            ROC_folder=output_folder,
+            ROC_prefix=_name,
+            )
+        inter_execute_pool = pool_function(
+            inter_execute,
+            db_inter_lst,
+            ncores=ncores,
+            )
+        inter_contacts = []
+        inter_dists = []
+        for contact, dist in inter_execute_pool:
+            if contact is False:
+                continue
+            inter_contacts.append(contact)
+            inter_dists.append(dist)
+        log.info(S("done"))
+
+        all_contacts = intra_contacts + inter_contacts
+        all_dists = intra_dists + inter_dists
+        all_contacts_filtered = [c for c in all_contacts if c]
+        all_dists_filtered = [d for d in all_dists if d]  # noqa: F841
+
+        in_seqs = list(input_seq.values())
+        in_res = []
+        for seq in in_seqs:
+            in_res.append([i for i in range(1, len(seq))])
+        in_chains = list(input_seq.keys())
+        combo_res = [c for c in combinations(in_res, 2)]
+        combo_seqs = [c for c in combinations(in_seqs, 2)]
+        combo_chains = [c for c in combinations(in_chains, 2)]
+        if folded_structure:
+            log.info(T("Folded structure found, identifying surface accessible resiudes"))  # noqa: E501
+            assert folded_structure.endswith('.pdb') or \
+                folded_structure.endswith('.cif')
+
+            fld_struc = Structure(Path(folded_structure))
+            fld_struc.build()
+            fld_res = fld_struc.residues_splitted
+            fld_seqs = fld_struc.fasta
+            sa_idx = find_sa_residues(folded_structure)
+
+            sa_seqs = {}
+            sa_res = {}
+            for chain, combos in sa_idx.items():
+                temp_seq = []
+                temp_res = []
+                for c in combos:
+                    res = ""
+                    real_res = []
+                    for i in c:
+                        res += fld_seqs[chain][i]
+                        real_res.append(fld_res[chain][i])
+                    temp_seq.append(res)
+                    temp_res.append(real_res)
+                sa_seqs[chain] = temp_seq
+                sa_res[chain] = temp_res
+            fld_sa_res = list(sa_res.values())
+            fld_sa_seqs = list(sa_seqs.values())
+            fld_sa_chains = list(sa_seqs.keys())
+            log.info("Found the folowing sequences to be surface accessible:")
+            for chain in sa_seqs:
+                log.info(f"Chain {chain}: {sa_seqs[chain]}")
+            log.info(S("done"))
+            # Combo seqs and combo chains are aligned to give locations
+            combo_res = list(product(fld_sa_res, in_res)) + combo_res
+            combo_seqs = list(product(fld_sa_seqs, in_seqs)) + combo_seqs
+            combo_chains = list(product(fld_sa_chains, in_chains)) + combo_chains  # noqa: E501
+            if phos:
+                combo_mod_seqs = list(product(fld_sa_seqs, mod_in_seqs)) + combo_mod_seqs  # noqa: E501
+
+        if len(all_contacts_filtered) == 0:
+            log.info("WARNING: No contacts found. Your database is invalid.")
+            log.info("Please use `idpconfgen contacts` to make the extended database.")  # noqa: E501
+            return
+        else:
+            all_db_merged = [(c, d) for c, d in zip(all_contacts_filtered, all_dists_filtered)]  # noqa: E501
+
+            log.info(T("Calculating all-contacts probability matrix"))
+            inter_c_mtxs = []
+            inter_d_mtxs = []
+            if len(combo_seqs) >= 1:
+                inter_seqs = []
+                for combo in combo_seqs:
+                    c1 = combo[0]
+                    c2 = combo[1]
+                    if type(c1) is list:
+                        temp_c_mtxs = np.zeros(shape=(1, len(c2)))
+                        temp_d_mtxs = np.empty(shape=(1, len(c2)))
+                        temp_seq = ""
+                        for seq in c1:
+                            log.info(S(f"calculating intermolecular probabilities between {c2} and {seq}"))  # noqa: E501
+                            matrix_consume = partial(contact_matrix, sequence=[seq, c2])  # noqa: E501
+                            matrix_execute = partial(
+                                report_on_crash,
+                                matrix_consume,
+                                ROC_exception=Exception,
+                                ROC_folder=output_folder,
+                                ROC_prefix=_name,
+                                )
+                            matrix_execute_pool = pool_function(
+                                matrix_execute,
+                                all_db_merged,
+                                ncores=ncores,
+                                )
+                            c_mtx = np.zeros((len(seq), len(c2)))
+                            d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+                            d_mtx.fill({})
+                            for hit, dist in matrix_execute_pool:
+                                c_mtx = np.add(c_mtx, hit)
+                                d_mtx = update_distance_distribution_matrix(dist, d_mtx)  # noqa: E501
+                            temp_seq += seq
+                            temp_c_mtxs = np.vstack((c_mtx, temp_c_mtxs))
+                            temp_d_mtxs = np.vstack((d_mtx, temp_d_mtxs))
+                            log.info(S("done"))
+                        # First row will be all zeroes, so remove them
+                        c_mtx = temp_c_mtxs[:-1]
+                        d_mtx = temp_d_mtxs[:-1]
+                        norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
+                        inter_c_mtxs.append(norm_mtx)
+                        inter_d_mtxs.append(d_mtx)
+                        inter_seqs.append([c2, temp_seq])
+                    else:
+                        log.info(S(f"calculating intermolecular probabilities between {c1} and {c2}"))  # noqa: E501
+                        matrix_consume = partial(contact_matrix, sequence=[c1, c2])  # noqa: E501
                         matrix_execute = partial(
                             report_on_crash,
                             matrix_consume,
@@ -505,26 +544,28 @@ def main(
                             all_db_merged,
                             ncores=ncores,
                             )
-                        c_mtx = np.zeros((len(seq), len(c2)))
-                        d_mtx = np.empty((len(seq), len(c2)), dtype=object)
+                        c_mtx = np.zeros((len(c1), len(c2)))
+                        d_mtx = np.empty((len(c1), len(c2)), dtype=object)
                         d_mtx.fill({})
                         for hit, dist in matrix_execute_pool:
                             c_mtx = np.add(c_mtx, hit)
                             d_mtx = update_distance_distribution_matrix(dist, d_mtx)  # noqa: E501
-                        temp_seq += seq
-                        temp_c_mtxs = np.vstack((c_mtx, temp_c_mtxs))
-                        temp_d_mtxs = np.vstack((d_mtx, temp_d_mtxs))
+                        norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
+                        inter_c_mtxs.append(norm_mtx)
+                        inter_d_mtxs.append(d_mtx)
+                        inter_seqs.append([c2, c1])
                         log.info(S("done"))
-                    # First row will be all zeroes, so remove them
-                    c_mtx = temp_c_mtxs[:-1]
-                    d_mtx = temp_d_mtxs[:-1]
-                    norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
-                    inter_c_mtxs.append(norm_mtx)
-                    inter_d_mtxs.append(d_mtx)
-                    inter_seqs.append([c2, temp_seq])
-                else:
-                    log.info(S(f"calculating intermolecular probabilities between {c1} and {c2}"))  # noqa: E501
-                    matrix_consume = partial(contact_matrix, sequence=[c1, c2])
+
+            if ignore_intra:
+                log.info("Since --ignore-intra has been turned on. We will not build intramolecular complexes.")  # noqa: E501
+            else:
+                log.info(T("Calculating intramolecular contacts probability matrix"))  # noqa: E501
+                intra_c_mtxs = []
+                intra_d_mtxs = []
+                # Don't need `intra_seqs` here because `in_seqs` is the same
+                for seq in in_seqs:
+                    log.info(S(f"calculating intramolecular contact probabilities of {seq}"))  # noqa: E501
+                    matrix_consume = partial(contact_matrix, sequence=seq)
                     matrix_execute = partial(
                         report_on_crash,
                         matrix_consume,
@@ -537,148 +578,147 @@ def main(
                         all_db_merged,
                         ncores=ncores,
                         )
-                    c_mtx = np.zeros((len(c1), len(c2)))
-                    d_mtx = np.empty((len(c1), len(c2)), dtype=object)
+                    c_mtx = np.zeros((len(seq), len(seq)))
+                    d_mtx = np.empty((len(seq), len(seq)), dtype=object)
                     d_mtx.fill({})
                     for hit, dist in matrix_execute_pool:
                         c_mtx = np.add(c_mtx, hit)
-                        d_mtx = update_distance_distribution_matrix(dist, d_mtx)  # noqa: E501
+                        d_mtx = update_distance_distribution_matrix(dist, d_mtx)
                     norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
-                    inter_c_mtxs.append(norm_mtx)
-                    inter_d_mtxs.append(d_mtx)
-                    inter_seqs.append([c2, c1])
-                    log.info(S("done"))
-        
-        if ignore_intra:
-            log.info("Since --ignore-intra has been turned on. We will not build intramolecular complexes.")  # noqa: E501
-        else:
-            log.info(T("Calculating intramolecular contacts probability matrix"))  # noqa: E501
-            intra_c_mtxs = []
-            intra_d_mtxs = []
-            # Don't need `intra_seqs` here because `in_seqs` is the same
+                    intra_c_mtxs.append(norm_mtx)
+                    intra_d_mtxs.append(d_mtx)
+
+        log.info(T("Calculating electropotential contact matrix"))
+        if phos:
+            combo_seqs = combo_mod_seqs
+            in_seqs = mod_in_seqs
+        inter_electro_mtx = []
+        if len(combo_seqs) >= 1:
+            for combo in combo_seqs:
+                c1 = combo[0]
+                c2 = combo[1]
+                if type(c1) is list:
+                    tmp_electro_mtx = np.zeros(shape=(1, len(c2)))
+                    for seq in c1:
+                        mtx = electropotential_matrix([seq, c2], ph)
+                        tmp_electro_mtx = np.vstack((mtx, tmp_electro_mtx))
+                    mtx = tmp_electro_mtx[:-1]
+                    norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
+                    inter_electro_mtx.append(norm_electro_mtx)
+                else:
+                    mtx = electropotential_matrix([c1, c2], ph)
+                    norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
+                    inter_electro_mtx.append(norm_electro_mtx)
+        if ignore_intra is False:
+            intra_electro_mtx = []
             for seq in in_seqs:
-                log.info(S(f"calculating intramolecular contact probabilities of {seq}"))  # noqa: E501
-                matrix_consume = partial(contact_matrix, sequence=seq)
-                matrix_execute = partial(
-                    report_on_crash,
-                    matrix_consume,
-                    ROC_exception=Exception,
-                    ROC_folder=output_folder,
-                    ROC_prefix=_name,
+                mtx = electropotential_matrix(seq, ph)
+                norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
+                intra_electro_mtx.append(norm_electro_mtx)
+        log.info(S('done'))
+
+        log.info(T('saving heatmap distribution plots to output directory'))
+        output_plots = make_folder_or_cwd(str(output_folder) + "/plots")
+        if not (plot_name.endswith(".png") or plot_name.endswith(".jpg")):
+            plot_path = Path(plot_name)
+            plot_name = plot_path.with_suffix('.png')
+
+        if len(all_contacts_filtered) > 0:
+            if len(inter_c_mtxs) >= 1:
+                for i, mtx in enumerate(inter_c_mtxs):
+                    plot_out = str(output_plots) + f'/inter_{i}_' + plot_name
+                    plot_contacts_matrix(mtx, inter_seqs[i], plot_out)
+            if ignore_intra is False:
+                for i, mtx in enumerate(intra_c_mtxs):
+                    plot_out = str(output_plots) + f'/intra_{i}_' + plot_name
+                    plot_contacts_matrix(mtx, in_seqs[i].upper(), plot_out)
+
+        if len(inter_electro_mtx) >= 1:
+            for e, mtx in enumerate(inter_electro_mtx):
+                plot_electro_out = str(output_plots) + f'/electro_inter_{e}_' + plot_name  # noqa: E501
+                plot_contacts_matrix(
+                    mtx,
+                    inter_seqs[e],
+                    plot_electro_out,
+                    title="Contacts Frequency Heatmap (Electrostatic)"
                     )
-                matrix_execute_pool = pool_function(
-                    matrix_execute,
-                    all_db_merged,
-                    ncores=ncores,
+        if ignore_intra is False:
+            for e, mtx in enumerate(intra_electro_mtx):
+                plot_electro_out = str(output_plots) + f'/electro_intra_{e}_' + plot_name  # noqa: E501
+                plot_contacts_matrix(
+                    mtx,
+                    in_seqs[e].upper(),
+                    plot_electro_out,
+                    title="Contacts Frequency Heatmap (Electrostatic)"
                     )
-                c_mtx = np.zeros((len(seq), len(seq)))
-                d_mtx = np.empty((len(seq), len(seq)), dtype=object)
-                d_mtx.fill({})
-                for hit, dist in matrix_execute_pool:
-                    c_mtx = np.add(c_mtx, hit)
-                    d_mtx = update_distance_distribution_matrix(dist, d_mtx)
-                norm_mtx = (c_mtx - np.min(c_mtx)) / (np.max(c_mtx) - np.min(c_mtx))  # noqa: E501
-                intra_c_mtxs.append(norm_mtx)
-                intra_d_mtxs.append(d_mtx)
+        log.info(S('done'))
+
+        log.info(T('Blending contact map frequencies and plotting'))
+        # Ensure it's between 0-100
+        blended_inter_mtxs = []
+        blended_intra_mtxs = []
+        blend_weight = np.clip(blended_contacts_weight, 0, 100)
+        minimized_blend_weight = blend_weight / 100.0
+        if len(all_contacts_filtered) > 0:
+            if len(inter_c_mtxs) >= 1:
+                for i, mtx in enumerate(inter_c_mtxs):
+                    e_mtx = inter_electro_mtx[i]
+                    plot_out = str(output_plots) + f'/blend_inter_{i}_' + plot_name  # noqa: E501
+                    blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
+                    norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+                    blended_inter_mtxs.append(norm_blended_mtx)
+                    plot_contacts_matrix(
+                        norm_blended_mtx,
+                        inter_seqs[i],
+                        plot_out,
+                        title=f"Inter Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
+                        )
+            if ignore_intra is False:
+                for i, mtx in enumerate(intra_c_mtxs):
+                    e_mtx = intra_electro_mtx[i]
+                    plot_out = str(output_plots) + f'/blend_intra_{i}_' + plot_name  # noqa: E501
+                    blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
+                    norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
+                    blended_intra_mtxs.append(norm_blended_mtx)
+                    plot_contacts_matrix(
+                        norm_blended_mtx,
+                        in_seqs[i].upper(),
+                        plot_out,
+                        title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
+                        )
+        log.info(S('done'))
     
-    log.info(T("Calculating electropotential contact matrix"))
-    if phos:
-        combo_seqs = combo_mod_seqs
-        in_seqs = mod_in_seqs
-    inter_electro_mtx = []
-    if len(combo_seqs) >= 1:
-        for combo in combo_seqs:
-            c1 = combo[0]
-            c2 = combo[1]
-            if type(c1) is list:
-                tmp_electro_mtx = np.zeros(shape=(1, len(c2)))
-                for seq in c1:
-                    mtx = electropotential_matrix([seq, c2], ph)
-                    tmp_electro_mtx = np.vstack((mtx, tmp_electro_mtx))
-                mtx = tmp_electro_mtx[:-1]
-                norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
-                inter_electro_mtx.append(norm_electro_mtx)
-            else:
-                mtx = electropotential_matrix([c1, c2], ph)
-                norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
-                inter_electro_mtx.append(norm_electro_mtx)
-    if ignore_intra is False:
-        intra_electro_mtx = []
-        for seq in in_seqs:
-            mtx = electropotential_matrix(seq, ph)
-            norm_electro_mtx = (mtx - np.min(mtx)) / (np.max(mtx) - np.min(mtx))  # noqa: E501
-            intra_electro_mtx.append(norm_electro_mtx)
-    log.info(S('done'))
-
-    log.info(T('saving heatmap distribution plots to output directory'))
-    if not (plot_name.endswith(".png") or plot_name.endswith(".jpg")):
-        plot_path = Path(plot_name)
-        plot_name = plot_path.with_suffix('.png')
-
-    if len(all_contacts_filtered) > 0:
-        if len(inter_c_mtxs) >= 1:
-            for i, mtx in enumerate(inter_c_mtxs):
-                plot_out = str(output_folder) + f'/inter_{i}_' + plot_name
-                plot_contacts_matrix(mtx, inter_seqs[i], plot_out)
-        if ignore_intra is False:
-            for i, mtx in enumerate(intra_c_mtxs):
-                plot_out = str(output_folder) + f'/intra_{i}_' + plot_name
-                plot_contacts_matrix(mtx, in_seqs[i].upper(), plot_out)
-
-    if len(inter_electro_mtx) >= 1:
-        for e, mtx in enumerate(inter_electro_mtx):
-            plot_electro_out = str(output_folder) + f'/electro_inter_{e}_' + plot_name  # noqa: E501
-            plot_contacts_matrix(
-                mtx,
-                inter_seqs[e],
-                plot_electro_out,
-                title="Contacts Frequency Heatmap (Electrostatic)"
-                )
-    if ignore_intra is False:
-        for e, mtx in enumerate(intra_electro_mtx):
-            plot_electro_out = str(output_folder) + f'/electro_intra_{e}_' + plot_name  # noqa: E501
-            plot_contacts_matrix(
-                mtx,
-                in_seqs[e].upper(),
-                plot_electro_out,
-                title="Contacts Frequency Heatmap (Electrostatic)"
-                )
-    log.info(S('done'))
-
-    log.info(T('Blending contact map frequencies and plotting'))
-    # Ensure it's between 0-100
-    blended_inter_mtxs = []
-    blended_intra_mtxs = []
-    blend_weight = np.clip(blended_contacts_weight, 0, 100)
-    minimized_blend_weight = blend_weight / 100.0
-    if len(all_contacts_filtered) > 0:
-        if len(inter_c_mtxs) >= 1:
-            for i, mtx in enumerate(inter_c_mtxs):
-                e_mtx = inter_electro_mtx[i]
-                plot_out = str(output_folder) + f'/blend_inter_{i}_' + plot_name
-                blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
-                norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
-                blended_inter_mtxs.append(norm_blended_mtx)
-                plot_contacts_matrix(
-                    norm_blended_mtx,
-                    inter_seqs[i],
-                    plot_out,
-                    title=f"Inter Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
-                    )
-        if ignore_intra is False:
-            for i, mtx in enumerate(intra_c_mtxs):
-                e_mtx = intra_electro_mtx[i]
-                plot_out = str(output_folder) + f'/blend_intra_{i}_' + plot_name
-                blended_mtx = (1 - minimized_blend_weight) * mtx + minimized_blend_weight * e_mtx  # noqa: E501
-                norm_blended_mtx = (blended_mtx - np.min(blended_mtx)) / (np.max(blended_mtx) - np.min(blended_mtx))  # noqa: E501
-                blended_intra_mtxs.append(norm_blended_mtx)
-                plot_contacts_matrix(
-                    norm_blended_mtx,
-                    in_seqs[i].upper(),
-                    plot_out,
-                    title=f"Intra Contacts Frequency Heatmap (Blended {100 - blend_weight}:{blend_weight})"  # noqa: #501
-                    )
-    log.info(S('done'))
+        # Make a savepoint here (--contacts-checkpoint)
+        # Contains all information about chain combinations,
+        # residue numbers, contact frequencies, and CA distances
+        with open(contacts_checkpoint, 'wb') as f:
+            pickle.dump(combo_chains, f)
+            pickle.dump(combo_res, f)
+            pickle.dump(blended_inter_mtxs, f)
+            pickle.dump(blended_intra_mtxs, f)
+            pickle.dump(inter_d_mtxs, f)
+            pickle.dump(intra_d_mtxs, f)
+    else:
+        # Extract all necessary information from checkpoint
+        with open(contacts_checkpoint, 'rb') as f:
+            combo_chains = pickle.load(f)
+            combo_res = pickle.load(f)
+            blended_inter_mtxs = pickle.load(f)
+            blended_intra_mtxs = pickle.load(f)
+            inter_d_mtxs = pickle.load(f)
+            intra_d_mtxs = pickle.load(f)
+    
+    # We do not change "combo_chains" since that's our anchor for alignment.
+    # If we do not have custom contacts for specific combo chains, store None.
+    if custom_contacts is not None:
+        cus_inter_res, cus_intra_res = process_custom_contacts(
+            custom_contacts,
+            combo_chains,
+            combo_res,
+            input_seq,
+            ignore_sasa=ignore_sasa,
+            )
+    input_seq_keys = list(input_seq.keys())
     
     # Custom and knowledge based contacts are delineated by datatype.
     # Custom contacts are lists while knolwedge based ones are tuple.
@@ -776,7 +816,6 @@ def main(
     res = combo_res[0]
     inter_x_coords = selected_contacts["X"][contact_type[1]][chain]
     inter_y_coords = selected_contacts["Y"][contact_type[1]][chain]
-    checkpoint_subdb = {str(chain): []}
     
     for i, x_coords in enumerate(inter_x_coords):
         xy = []
@@ -794,13 +833,6 @@ def main(
                 )
             residues.append(r)
             distances.append(d)
-        checkpoint_subdb[str(chain)].append([residues, distances])
-    # Make a savepoint here (--contacts-checkpoint)
-    # where the key value is the chain combination and the
-    # tuples for each conformer containing the residue
-    # combinations and distances
-    with open(str(output_folder) + '/complex_checkpoint.json', 'w', encoding='utf-8') as out:  # noqa: E501
-        out.write(json.dumps(checkpoint_subdb, ensure_ascii=False, indent=4))
 
 
 if __name__ == "__main__":

@@ -715,6 +715,31 @@ def save_pairs_to_files(pairs, destination=None):
             Path(dest, k).write_bytes(v)
 
 
+def change_extension(path, ext):
+    """
+    Change the file extension to a new desired one.
+
+    Parameters
+    ----------
+    path : str
+        String path including file name and extension.
+    
+    ext : str
+        Desired extension.
+
+    Returns
+    -------
+    new_path : str
+        New filepath with the updated file extension.
+    """
+    directory, filename = os.path.split(path)
+    name, _ = os.path.splitext(filename)
+    
+    new_filename = name + "." + ext
+    
+    return os.path.join(directory, new_filename)
+
+
 class FileReaderIterator:
     """
     Dispaches file read iteractor.
