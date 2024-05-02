@@ -810,30 +810,51 @@ def main(
     # - Make a d_mtx for every custom contact and align it with
     #   `cus_inter_res` and `cus_intra_res`
     
-    # For temporary testing of extracting distances from heatmap
-    inter_mtx = inter_d_mtxs[0]
-    chain = combo_chains[0]
-    res = combo_res[0]
-    inter_x_coords = selected_contacts["X"][contact_type[1]][chain]
-    inter_y_coords = selected_contacts["Y"][contact_type[1]][chain]
-    
-    for i, x_coords in enumerate(inter_x_coords):
-        xy = []
-        y_coords = inter_y_coords[i]
-        for j, x in enumerate(x_coords):
-            xy.append((x, y_coords[j]))
-        residues = []
-        distances = []
-        for coords in xy:
-            d, r = get_contact_distances(
-                coords,
-                res,
-                inter_mtx,
-                folded=True,
-                )
-            residues.append(r)
-            distances.append(d)
+    # NOTE work with generalizable inter- for IDP-Folded and IDP-IDP before
+    # algorithm for intramolecular contacts
+    for conf in range(nconfs):
+        log.info(T(f"Generating fragments for conformer {conf + 1}"))
+        conf_out = make_folder_or_cwd(str(output_folder) + f"/conformer_{conf + 1}")  # noqa: E501, F841
+        
+        for idx, chains in enumerate(combo_chains):
+            res = combo_res[idx]
+            inter_mtx = inter_d_mtxs[idx]
+            inter_x_coords = selected_contacts["X"][contact_type[1]][chains]
+            inter_y_coords = selected_contacts["Y"][contact_type[1]][chains]
 
+            for i, x_coords in enumerate(inter_x_coords):
+                xy = []
+                y_coords = inter_y_coords[i]
+                for j, x in enumerate(x_coords):
+                    xy.append((x, y_coords[j]))
+                res_combos = []
+                distances = []
+                for coords in xy:
+                    d, r = get_contact_distances(
+                        coords,
+                        res,
+                        inter_mtx,
+                        folded=True,
+                        )
+                    res_combos.append(r)
+                    distances.append(d)
+
+            # We want to only build fragments of IDP
+            seq1_id = chains[0]
+            seq2_id = chains[1]
+            # We have two IDPs
+            if seq1_id[0] == ">" and seq2_id[0] == ">":
+                pass
+            # IDP-fld case
+            elif seq1_id[0] != ">" and seq2_id[0] == ">":
+                idp_sequences = []
+                for res_pair in res_combos:
+                    idp_seq = ""
+                    idp_res = res_pair[1]
+                    for r in idp_res:
+                        idp_seq += input_seq[seq2_id][r]
+                    idp_sequences.append(idp_seq)
+        
 
 if __name__ == "__main__":
     libcli.maincli(ap, main)
