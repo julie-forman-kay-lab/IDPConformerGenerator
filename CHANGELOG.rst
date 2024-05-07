@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Added first steps page to documentation.
+
 v0.7.23 (2024-03-27)
 ------------------------------------------------------------
 

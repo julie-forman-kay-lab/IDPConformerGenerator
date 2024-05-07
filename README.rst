@@ -38,6 +38,12 @@ your understanding and we apologize for any inconvenience this has caused.
 
 .. end-description
 
+First Steps
+-----------
+
+To get a first glance on IDPConformerGenerator, read through our `first steps <https://idpconformergenerator.readthedocs.io/en/latest/first_steps.html>`_
+documentation page.
+
 How to Install
 --------------
 
