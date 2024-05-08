@@ -14,7 +14,7 @@ import re
 from collections import defaultdict
 from functools import partial
 from itertools import combinations, cycle, product
-from multiprocessing import Pool, Queue
+from multiprocessing import Pool
 from random import randint, random
 
 import numpy as np
@@ -47,9 +47,8 @@ from idpconfgen.components.sidechain_packing import (
     sidechain_packing_methods,
     )
 from idpconfgen.components.xmer_probs import (
-    add_xmer_arg,
     compress_xmer_to_key,
-    prepare_xmer_probs,
+    make_xmerprobs,
     )
 from idpconfgen.core.build_definitions import (
     backbone_atoms,
@@ -133,9 +132,6 @@ XMERPROBS = None
 GET_ADJ = None
 
 MULTICHAIN = False
-
-CONF_NUMBER = Queue()
-RANDOMSEEDS = Queue()
 
 ALL_ATOM_LABELS = None
 ALL_ATOM_MASKS = None
@@ -330,14 +326,6 @@ ap.add_argument(
     action='store_true',
     )
 
-#########################################
-libcli.add_argument_dloopoff(ap)
-libcli.add_argument_dhelix(ap)
-libcli.add_argument_dstrand(ap)
-libcli.add_argument_dany(ap)
-libcli.add_argument_duser(ap)
-#########################################
-
 _ffchoice = list(forcefields.keys())
 FFDEFAULT = _ffchoice[0]
 ap.add_argument(
@@ -377,7 +365,6 @@ ap.add_argument(
     )
 
 add_et_type_arg(ap)
-add_xmer_arg(ap)
 add_res_tolerance_groups(ap)
 
 ap.add_argument(
@@ -388,6 +375,12 @@ ap.add_argument(
     default='energies.log',
     )
 
+ap.add_argument(
+    '-dsd',
+    '--disable-sidechains',
+    help='Whether or not to compute sidechains. Defaults to True.',
+    action='store_true',
+    )
 
 add_sidechain_method(ap)
 add_mcsce_subparser(ap)
@@ -414,11 +407,6 @@ def main(
         custom_contacts=None,
         ignore_sasa=False,
         ignore_intra=False,
-        dloop_off=False,
-        dstrand=False,
-        dhelix=False,
-        duser=False,
-        dany=False,
         func=None,
         forcefield=FFDEFAULT,
         bgeo_strategy=bgeo_strategies_default,
@@ -431,7 +419,6 @@ def main(
         custom_contacts_weight=90,
         max_contacts=10,
         random_seed=0,
-        xmer_probs=None,
         output_folder=None,
         energy_log='energies.log',
         sidechain_method=DEFAULT_SDM,
@@ -444,50 +431,13 @@ def main(
     Distributes over processors.
     """
     global ANGLES, BEND_ANGS, BOND_LENS, SLICEDICT_XMERS, XMERPROBS, GET_ADJ
-    
+      
     if residue_tolerance is not None:
         _restol = str(residue_tolerance)[1:-1]
         log.info(S(f"Building with residue tolerances: {_restol}"))
     
-    all_valid_ss_codes = ''.join(dssp_ss_keys.valid)
-    # ensuring some parameters do not overlap
-    dloop = not dloop_off
-    any_def_loops = any((dloop, dhelix, dstrand))
-    non_overlapping_parameters = (any_def_loops, dany, duser)
-    _sum = sum(map(bool, non_overlapping_parameters))
-
-    if _sum > 1:
-        emsg = (
-            'Note (dloop, dstrand, dhelix), dany, and duser '
-            'are mutually exclusive.'
-            )
-        raise ValueError(emsg)
-    elif _sum < 1:
-        raise ValueError("Give at least one sampling option.")
-
-    del _sum
-    del non_overlapping_parameters
-    # done
-    if dany:
-        # will sample the database disregarding the SS annotation
-        dssp_regexes = [all_valid_ss_codes]
-
-    elif any((dloop, dhelix, dstrand)):
-        dssp_regexes = []
-        if dloop:
-            dssp_regexes.append("L")
-        if dhelix:
-            dssp_regexes.append("H")
-        if dstrand:
-            dssp_regexes.append("E")
-
-    elif duser:
-        # this is a very advanced option,
-        # users should know what they are doing :-)
-        dssp_regexes = duser
-
-    else:
-        raise AssertionError("One option is missing. Code shouldn't be here.")
+    # Defaults to --dany since we're building short fragments
+    dssp_regexes = [''.join(dssp_ss_keys.valid)]
 
     assert isinstance(dssp_regexes, list), \
         f"`dssp_regexes` should be a list at this point: {type(dssp_regexes)}"
@@ -524,11 +474,9 @@ def main(
             return
     else:
         _, ANGLES, secondary, primary = aligndb(db)
-        
+    
     del db
-    
-    xmer_probs_tmp = prepare_xmer_probs(xmer_probs)
-    
+
     log.info(S('done'))
     
     log.info(T('Checking validity of --contacts-checkpoint'))
@@ -1013,7 +961,7 @@ def main(
     for conf in range(nconfs):
         log.info(T(f"Generating fragments for conformer {conf + 1}"))
         conf_out = make_folder_or_cwd(str(output_folder) + f"/conformer_{conf + 1}")  # noqa: E501
-        
+        rs = random_seed + conf
         for idx, chains in enumerate(combo_chains):
             res = combo_res[idx]
             inter_mtx = inter_d_mtxs[idx]
@@ -1056,25 +1004,27 @@ def main(
             SLICEDICT_XMERS = []
             XMERPROBS = []
             GET_ADJ = []
-            
             for i, seq in enumerate(idp_sequences):
-                log.info(S(f"Preparing database for fragment #{i + 1}: {seq}"))
-                
+                log.info(S(f"Preparing database for conformer {conf + 1} fragment #{i + 1}: {seq}"))  # noqa: E501
+                xmer_sizes = list(range(1, len(seq) + 1))
+                xmer_probs = [1 for _ in range(len(seq))]
+                xmer_probs_tmp = make_xmerprobs(xmer_sizes, xmer_probs)
+
                 SLICEDICT_XMERS.append(prepare_slice_dict(
                     primary,
                     seq,
                     dssp_regexes=dssp_regexes,
                     secondary=secondary,
-                    mers_size=xmer_probs_tmp.size,
+                    mers_size=xmer_probs_tmp.sizes,
                     res_tolerance=residue_tolerance,
                     ncores=ncores,
                     ))
-                
+
                 remove_empty_keys(SLICEDICT_XMERS[i])
                 # updates user defined fragment sizes and probabilities to the
                 # ones actually observed
-                _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
-                XMERPROBS.append(_.probs)
+                x = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
+                XMERPROBS.append(x.probs)
 
                 GET_ADJ.append(get_adjacent_angles(
                     sorted(SLICEDICT_XMERS[i].keys()),
@@ -1093,12 +1043,24 @@ def main(
             
             sidechain_parameters = \
                 get_sidechain_packing_parameters(kwargs, sidechain_method)
+                
             for i, seq in enumerate(idp_sequences):
+                log.info(T(f"Building fragment {i + 1} for conformer {conf + 1}"))  # noqa: E501
+                
+                populate_globals(
+                    input_seq=seq,
+                    bgeo_strategy=bgeo_strategy,
+                    bgeo_path=bgeo_path,
+                    forcefield=forcefields[forcefield],
+                    **kwargs)
+                
                 consume = partial(
                     _build_conformers,
+                    rs=rs,
                     index=i,
                     input_seq=seq,
                     output_folder=conf_out,
+                    conf_num=conf + 1,
                     sidechain_parameters=sidechain_parameters,
                     sidechain_method=sidechain_method,
                     bgeo_strategy=bgeo_strategy,
@@ -1113,8 +1075,8 @@ def main(
                     ROC_prefix=_name,
                     )
                 
-                with Pool(ncores) as pool:
-                    imap = pool.imap(execute, range(ncores))
+                with Pool(1) as pool:
+                    imap = pool.imap(execute, range(1))
                     for _ in imap:
                         pass
 
@@ -1205,9 +1167,11 @@ def populate_globals(
 # which is assembled in `main()`
 def _build_conformers(
         *args,
+        rs=0,
         index=None,
         input_seq=None,
         conformer_name='fragment',
+        conf_num=1,
         output_folder=None,
         sidechain_parameters=None,
         bgeo_strategy=bgeo_strategies_default,
@@ -1222,7 +1186,7 @@ def _build_conformers(
     builder = conformer_generator(
         index=index,
         input_seq=input_seq,
-        random_seed=RANDOMSEEDS.get(),
+        random_seed=rs,
         sidechain_parameters=sidechain_parameters,
         bgeo_strategy=bgeo_strategy,
         **kwargs)
@@ -1238,7 +1202,7 @@ def _build_conformers(
         ROUND(coords, decimals=3),
         )
     
-    fname = f'{conformer_name}_{index + 1}.pdb'
+    fname = f'conf_{conf_num}_{conformer_name}_{index + 1}.pdb'
     
     with open(Path(output_folder, fname), 'w') as fout:
         fout.write(pdb_string)
