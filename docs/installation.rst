@@ -5,6 +5,10 @@ IDPConformerGenerator uses only Python-based APIs for which we expect it to run
 native on any system Python can run, as long as the third-party installation
 requirements are met.
 
+Please note that `SPyCi-PDB <https://github.com/julie-forman-kay-lab/SPyCi-PDB>`_ and
+`X-EISDv2 <https://github.com/THGLab/X-EISDv2>`_ can be installed on top of the ``idpconfgen``
+Python environment. It is actually recommended since they both have IDPConfGen as a dependency.
+
 We tested IDPConfGen on Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and
 the Graham cluster, an HPC resource of the Digital Research Alliance of Canada
 (DRAC).
@@ -245,3 +249,60 @@ refer to https://github.com/protein-nmr/CheSPI to install CheSPI.
 
 The use δ2D via the ``idpconfgen csssconv`` command you need δ2D.
 Please refer to https://github.com/carlocamilloni/d2D.
+
+Installing back-calculators and reweighting protocols
+-----------------------------------------------------
+
+Both SPyCi-PDB and X-EISDv2 have been developed in-house with considerations
+for protein structural ensembles in mind. We recommend to install both of
+these packages on-top of the ``idpconfgen`` environment for streamlined usage.
+
+Install SPyCi-PDB
+`````````````````
+
+Clone the SPyCi-PDB repository to the parent directory of where IDPConformerGenerator was cloned::
+    
+    git clone https://github.com/julie-forman-kay-lab/SPyCi-PDB
+
+Activate the ``idpconfgen`` environment and install the missing dependencies::
+
+    pip install pandas
+    pip install natsort
+
+Move into the SPyCi-PDB directory and install on top of IDPConfGen::
+
+    cd SPyCi-PDB
+    python setup.py develop --no-deps
+
+.. note::
+
+    For the usage of all the back-calculators, please refer to the installation
+    directions documented for SPyCi-PDB that can be found `here <https://spyci-pdb.readthedocs.io/en/stable/installation.html>`_.
+
+    The publication for SPyCi-PDB can be found `here <https://joss.theoj.org/papers/10.21105/joss.04861>`_.
+
+Install X-EISDv2
+````````````````
+
+Clone the X-EISDv2 repository to the parent directory of where IDPConformerGenerator was cloned::
+    
+    git clone https://github.com/THGLab/X-EISDv2
+
+Activate the ``idpconfgen`` environment and install the missing dependencies.
+You can skip this step if you've already installed SPyCi-PDB::
+
+    pip install pandas
+    pip install natsort
+
+Move into the X-EISDv2 directory and install on top of IDPConfGen::
+
+    cd X-EISDv2
+    python setup.py develop --no-deps
+
+.. note::
+
+    Usage directions for X-EISDv2 can be found within the command-line interface
+    by using the ``-h`` command. For example: ``xeisd -h``, ``xeisd score -h``.
+
+    The publication for X-EISD can be found `here <https://pubs.acs.org/doi/10.1021/jacs.6b00351>`_.
+    The original X-EISD repository can be found `here <https://github.com/THGLab/X-EISD>`_.
