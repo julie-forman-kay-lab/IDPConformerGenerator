@@ -11,6 +11,11 @@ Changelog
 
 * Update user install instructions to use only ``miniconda3``.
 
+v0.7.24 (2024-05-07)
+------------------------------------------------------------
+
+* Added first steps page to documentation.
+
 v0.7.23 (2024-03-27)
 ------------------------------------------------------------
 
