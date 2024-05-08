@@ -20,6 +20,11 @@ Changelog
 * Added plotting capability for generated contact heatmaps and automated font-size calculation in ``plotfuncs.py``
 * Catch unique KeyError when calculating torsion angles in ``cli_torsions.py``
 
+v0.7.24 (2024-05-07)
+------------------------------------------------------------
+
+* Added first steps page to documentation.
+
 v0.7.23 (2024-03-27)
 ------------------------------------------------------------
 

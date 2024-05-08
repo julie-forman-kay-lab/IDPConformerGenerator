@@ -67,4 +67,4 @@ def assert_subclass(objs, subclass):
 
 source_folder = Path(__file__).absparent
 
-__version__ = '0.7.23'
+__version__ = '0.7.24'

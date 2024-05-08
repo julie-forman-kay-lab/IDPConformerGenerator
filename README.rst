@@ -38,6 +38,12 @@ your understanding and we apologize for any inconvenience this has caused.
 
 .. end-description
 
+First Steps
+-----------
+
+To get a first glance on IDPConformerGenerator, read through our `first steps <https://idpconformergenerator.readthedocs.io/en/latest/first_steps.html>`_
+documentation page.
+
 How to Install
 --------------
 
@@ -72,4 +78,4 @@ If you use the Local Disordered Region Sampling (LDRS) module, please also cite:
 
 Version
 -------
-v0.7.23
+v0.7.24
