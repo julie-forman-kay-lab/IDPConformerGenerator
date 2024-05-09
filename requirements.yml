@@ -1,13 +1,11 @@
-name: idpconfgen
 channels:
     - conda-forge
     - defaults
 dependencies:
-    - python>=3.8,<4
     - numpy>=1.22.4,<2
     - numba>=0.53.0,<1
     - pybind11>=2.9.2,<3
     - scipy>=1.8.1,<2
     - matplotlib>=3.5.2,<4
     - pip
-    - tox>=3.25.0,<4
+    - tox=4

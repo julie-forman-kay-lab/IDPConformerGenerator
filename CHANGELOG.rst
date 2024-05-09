@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update user install instructions to use only ``miniconda3``.
+
 v0.7.24 (2024-05-07)
 ------------------------------------------------------------
 
