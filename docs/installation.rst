@@ -76,9 +76,9 @@ after the other, wait for them to finish before running the next one::
     source activate.sh
     ./install_deps.sh
 
-Your installation will become up to date with the latest developments.
-If you had installed MC-SCE and Int2Cart, you may need to update those
-separately.
+Your installation will become up to date with the latest developments.  If you
+had installed MC-SCE, Int2Cart, SPyCi-PDB, or X-EISDv2,  you need to reinstall
+them again in the ``idpconfgen`` environment.
 
 From source on the Graham Cluster (DRAC)
 ----------------------------------------
