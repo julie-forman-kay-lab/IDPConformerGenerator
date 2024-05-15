@@ -3,5 +3,5 @@ numba>=0.53.0, <1
 pybind11>=2.9.2, <3
 scipy>=1.8.1, <2
 matplotlib>=3.5.2, <4
-tox>=3.25.0, <4
 biopython>=1.81, <2
+tox==4

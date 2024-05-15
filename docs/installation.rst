@@ -5,6 +5,10 @@ IDPConformerGenerator uses only Python-based APIs for which we expect it to run
 native on any system Python can run, as long as the third-party installation
 requirements are met.
 
+Please note that `SPyCi-PDB <https://github.com/julie-forman-kay-lab/SPyCi-PDB>`_ and
+`X-EISDv2 <https://github.com/THGLab/X-EISDv2>`_ can be installed on top of the ``idpconfgen``
+Python environment. It is actually recommended since they both have IDPConfGen as a dependency.
+
 We tested IDPConfGen on Ubuntu 18.04 LTS and 20.04 LTS as well as on WSL2.0 and
 the Graham cluster, an HPC resource of the Digital Research Alliance of Canada
 (DRAC).
@@ -24,55 +28,57 @@ And navigate to the new ``IDPConformerGenerator`` folder::
 
     cd IDPConformerGenerator
 
-Run the following commands to install ``idpconfgen`` dependencies if you use
-Anaconda as your Python package manager::
-
-    conda env create -f requirements.yml
-    conda activate idpconfgen
-
 .. note::
-    If you don't use Anaconda to manage your Python installations, you can use
-    ``virtualenv`` and the ``requirements.txt`` file following the commands:
 
-    | ``virtualenv idpcgenv --python=3.9``
-    | ``source venv/bin/activate``
-    | ``pip install -r requirements.txt``
+    The ``requirements.yml`` describe the Python dependencies of
+    IDPConformerGenerator. If you are skilled managing python environments you
+    can go on your own. Otherwise, you can calmly follow our install
+    instructions.
 
-    If you have difficulties installing ``idpconfgen``, raise an Issue in the
-    main GitHub repository, and we will help you.
+At the end of the installation process, you will have a ``miniconda3``
+directory inside the ``IDPConformerGenerator`` main directory where the whole
+installation is placed. If your ever want to delete ``IDPCG`` from your computer,
+simply delete the ``IDPConformerGenerator`` directory.
 
-Install ``idpconfgen`` in development mode in order for your installation to be
-always up-to-date with the repository::
+**To install IDPConfGen**, run the following three commands. Wait until one
+finishes before running the second one::
 
-    python setup.py develop --no-deps
+    ./install_miniconda3.sh
+    source activate.sh
+    ./install_deps.sh
 
-.. note::
-    The above applies also if you used ``virtualenv`` instead of ``conda``.
+Once this finishes, ``idpconfgen`` is ready to be used. Go to the :ref:`usage
+<Usage>` and continue from there.
 
-**Remember** to active the ``idpconfgen`` environment every time you open a new
-terminal window, from within the repository folder, choose yours::
+**Remember** to active the ``idpconfgen`` environment every time you open a
+new terminal window. For that, navigate to the ``IDPConformerGenerator``
+repository folder and ``source`` the ``activate.sh`` file::
 
-    # Installation with Anaconda
-    conda activate idpconfgen
+    cd path/to/my/IDPConformerGenerator
+    source activate.sh
 
-    # Installation with virtualenv
-    source idpcgenv/bin/activate
+Update
+------
 
+To update to the latest version, open a new terminal window, and navigate to the
+``IDPConformerGenerator`` source folder. Remove the ``miniconda3`` environment::
 
-To update to the latest version, navigate to the repository folder, activate the
-``idpconfgen`` python environment as described above, and run the commands::
+    rm -rf miniconda3
+
+Update the source to the latest version::
 
     git pull
 
-    # if you used anaconda to create the python environment, run:
-    conda env update -f requirements.yml
+Reinstall the project and it's dependencies. Run the following commands, one
+after the other, wait for them to finish before running the next one::
 
-    # if you used venv to create the python environment, run:
-    pip install -r requirements.txt  --upgrade
+    ./install_miniconda3.sh
+    source activate.sh
+    ./install_deps.sh
 
-    python setup.py develop --no-deps
-
-Your installation will become up to date with the latest developments.
+Your installation will become up to date with the latest developments.  If you
+had installed MC-SCE, Int2Cart, SPyCi-PDB, or X-EISDv2,  you need to reinstall
+them again in the ``idpconfgen`` environment.
 
 From source on the Graham Cluster (DRAC)
 ----------------------------------------
@@ -243,3 +249,60 @@ refer to https://github.com/protein-nmr/CheSPI to install CheSPI.
 
 The use δ2D via the ``idpconfgen csssconv`` command you need δ2D.
 Please refer to https://github.com/carlocamilloni/d2D.
+
+Installing back-calculators and reweighting protocols
+-----------------------------------------------------
+
+Both SPyCi-PDB and X-EISDv2 have been developed in-house with considerations
+for protein structural ensembles in mind. We recommend to install both of
+these packages on-top of the ``idpconfgen`` environment for streamlined usage.
+
+Install SPyCi-PDB
+`````````````````
+
+Clone the SPyCi-PDB repository to the parent directory of where IDPConformerGenerator was cloned::
+    
+    git clone https://github.com/julie-forman-kay-lab/SPyCi-PDB
+
+Activate the ``idpconfgen`` environment and install the missing dependencies::
+
+    pip install pandas
+    pip install natsort
+
+Move into the SPyCi-PDB directory and install on top of IDPConfGen::
+
+    cd SPyCi-PDB
+    python setup.py develop --no-deps
+
+.. note::
+
+    For the usage of all the back-calculators, please refer to the installation
+    directions documented for SPyCi-PDB that can be found `here <https://spyci-pdb.readthedocs.io/en/stable/installation.html>`_.
+
+    The publication for SPyCi-PDB can be found `here <https://joss.theoj.org/papers/10.21105/joss.04861>`_.
+
+Install X-EISDv2
+````````````````
+
+Clone the X-EISDv2 repository to the parent directory of where IDPConformerGenerator was cloned::
+    
+    git clone https://github.com/THGLab/X-EISDv2
+
+Activate the ``idpconfgen`` environment and install the missing dependencies.
+You can skip this step if you've already installed SPyCi-PDB::
+
+    pip install pandas
+    pip install natsort
+
+Move into the X-EISDv2 directory and install on top of IDPConfGen::
+
+    cd X-EISDv2
+    python setup.py develop --no-deps
+
+.. note::
+
+    Usage directions for X-EISDv2 can be found within the command-line interface
+    by using the ``-h`` command. For example: ``xeisd -h``, ``xeisd score -h``.
+
+    The publication for X-EISD can be found `here <https://pubs.acs.org/doi/10.1021/jacs.6b00351>`_.
+    The original X-EISD repository can be found `here <https://github.com/THGLab/X-EISD>`_.
