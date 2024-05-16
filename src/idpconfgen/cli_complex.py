@@ -89,6 +89,7 @@ from idpconfgen.libs.libcomplex import (
     electropotential_matrix,
     extract_interpairs_from_db,
     extract_intrapairs_from_db,
+    find_ca_coords_fld,
     get_contact_distances,
     process_custom_contacts,
     select_contacts,
@@ -949,13 +950,7 @@ def main(
                         selected_contacts["Y"][contact_type[0]][case].append(y_coords)  # noqa: E501
                         contacts_counter -= len(x_coords)
         log.info(S('done'))
-    
-    # TODO extracting distance distributions from database
-    # For custom-contacts we would need to rescan the database for
-    # residue pairs
-    # - Make a d_mtx for every custom contact and align it with
-    #   `cus_inter_res` and `cus_intra_res`
-    
+     
     # NOTE work with generalizable inter- for IDP-Folded and IDP-IDP before
     # algorithm for intramolecular contacts
     for conf in range(nconfs):
@@ -1079,6 +1074,17 @@ def main(
                     imap = pool.imap(execute, range(1))
                     for _ in imap:
                         pass
+            log.info(S("done"))
+            
+            # Move IDP fragments to the desired distance and location
+            fld_contact_coords = []
+            fld_struc = Structure(Path(folded_structure))
+            fld_struc.build()
+            fld_data = fld_struc.data_array
+            for res in res_combos:
+                # First element in res contains our residues of interest
+                coords = find_ca_coords_fld(fld_data, res[0])
+                fld_contact_coords.append(coords)
 
 
 def populate_globals(

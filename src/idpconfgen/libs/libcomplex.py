@@ -12,6 +12,7 @@ from idpconfgen.libs.libparse import (
     get_substring_characters,
     has_consecutive_match,
     )
+from idpconfgen.libs.libstructure import col_name, col_resSeq, cols_coords
 
 
 contact_type = ["intra", "inter"]
@@ -830,3 +831,33 @@ def get_contact_distances(
         residues = (sub_seq1, sub_seq2)
 
     return distances, residues
+
+
+def find_ca_coords_fld(fld_struc, residues):
+    """
+    Locates CA coordinates in a structure based on residues.
+
+    Parameters
+    ----------
+    fld_struc : np.ndarray
+        data_array property of libstructure.Structure.
+    
+    residues : list or tuple
+        Series of residue numbers for the CA residues of interest.
+    
+    Returns
+    -------
+    coords : list of array
+        [x, y, z] coordinates for each residue's CA.
+    """
+    fld_res = fld_struc[:, col_resSeq].astype(int)
+    fld_coords = fld_struc[:, cols_coords]
+    fld_atom_names = fld_struc[:, col_name]
+    coords = []
+    for r in residues:
+        for i, fr in enumerate(fld_res):
+            atom = fld_atom_names[i]
+            if r == fr and atom == "CA":
+                coords.append(fld_coords[i])
+    
+    return coords
