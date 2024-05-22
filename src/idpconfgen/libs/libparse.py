@@ -6,6 +6,7 @@ parse the information inside and return/yield the parsed information.
 """
 import ast
 import subprocess
+from collections import Counter
 from functools import partial
 from itertools import product, repeat
 from operator import setitem
@@ -813,3 +814,28 @@ def adjust_iterable_length(lst, desired_length):
         return newlst.join(lst)
             
     return lst
+
+
+def count_occurrences(main_str, substrings):
+    """
+    Count occurrences of substrings in the main string.
+
+    Parameters
+    ----------
+    main_str : str
+        Main string, usually an amino acid sequence
+    
+    substrings : list of str
+        List of substrings
+    
+    Returns
+    -------
+    counts : int
+        Number of occurences in main string
+    """
+    counts = Counter()
+    for s in substrings:
+        count = main_str.count(s)
+        counts[s] = count
+        
+    return counts

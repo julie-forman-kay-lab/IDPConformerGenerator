@@ -10,12 +10,12 @@ USAGE:
 """
 import argparse
 import pickle
+import random
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from functools import partial
 from itertools import combinations, cycle, product
 from multiprocessing import Pool
-from random import randint, random
 
 import numpy as np
 
@@ -106,6 +106,7 @@ from idpconfgen.libs.libio import (
     )
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import (
+    count_occurrences,
     get_trimer_seq_njit,
     remap_sequence,
     remove_empty_keys,
@@ -874,12 +875,13 @@ def main(
         custom_contacts_weight = np.clip(custom_contacts_weight, 0, 100)
         min_contacts_weight = custom_contacts_weight / 100.0
         log.info(T(f'Choosing at most {max_contacts} contacts for every conformer. Custom-contacts will be chosen with a probability of {custom_contacts_weight} %'))  # noqa: E501
-        for _ in range(nconfs):
+        for n in range(nconfs):
             for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
                 case = combo_chains[i]
-                contacts_counter = randint(1, max_contacts)
+                random.seed(random_seed + n)
+                contacts_counter = random.randint(1, max_contacts)
                 while contacts_counter - 1 > 0:
-                    custom = random() < min_contacts_weight
+                    custom = random.random() < min_contacts_weight
                     if not custom or cus_inter_res[i] is None:
                         x_coords, y_coords = select_contacts(
                             coords=norm_inter_mtx,
@@ -900,10 +902,11 @@ def main(
                         contacts_counter -= len(pair1)
             if ignore_intra is False:
                 for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
-                    contacts_counter = randint(1, max_contacts)
+                    random.seed(random_seed + n)
+                    contacts_counter = random.randint(1, max_contacts)
                     case = input_seq_keys[i]
                     while contacts_counter - 1 > 0:
-                        custom = random() < min_contacts_weight
+                        custom = random.random() < min_contacts_weight
                         if not custom or list(cus_intra_res.values())[i] is None:  # noqa: E501
                             x_coords, y_coords = select_contacts(
                                 coords=norm_intra_mtx,
@@ -925,9 +928,10 @@ def main(
         log.info(S('done'))
     else:
         log.info(T(f'Choosing at most {max_contacts} contacts for every conformer from the blended contact heatmap.'))  # noqa: E501
-        for _ in range(nconfs):
+        for n in range(nconfs):
             for i, norm_inter_mtx in enumerate(blended_inter_mtxs):
-                contacts_counter = randint(1, max_contacts)
+                random.seed(random_seed + n)
+                contacts_counter = random.randint(1, max_contacts)
                 case = combo_chains[i]
                 while contacts_counter > 0:
                     x_coords, y_coords = select_contacts(
@@ -939,7 +943,8 @@ def main(
                     contacts_counter -= len(x_coords)
             if ignore_intra is False:
                 for i, norm_intra_mtx in enumerate(blended_intra_mtxs):
-                    contacts_counter = randint(1, max_contacts)
+                    random.seed(random_seed + n)
+                    contacts_counter = random.randint(1, max_contacts)
                     case = input_seq_keys[i]
                     while contacts_counter > 0:
                         x_coords, y_coords = select_contacts(
@@ -950,7 +955,7 @@ def main(
                         selected_contacts["Y"][contact_type[0]][case].append(y_coords)  # noqa: E501
                         contacts_counter -= len(x_coords)
         log.info(S('done'))
-     
+    
     # NOTE work with generalizable inter- for IDP-Folded and IDP-IDP before
     # algorithm for intramolecular contacts
     for conf in range(nconfs):
@@ -963,39 +968,57 @@ def main(
             inter_x_coords = selected_contacts["X"][contact_type[1]][chains]
             inter_y_coords = selected_contacts["Y"][contact_type[1]][chains]
 
-            for i, x_coords in enumerate(inter_x_coords):
-                xy = []
-                y_coords = inter_y_coords[i]
-                for j, x in enumerate(x_coords):
-                    xy.append((x, y_coords[j]))
-                res_combos = []
-                distances = []
-                for coords in xy:
-                    d, r = get_contact_distances(
-                        coords,
-                        res,
-                        inter_mtx,
-                        folded=True,
-                        )
-                    res_combos.append(r)
-                    distances.append(d)
+            xy = []
+            x_coords = inter_x_coords[conf]
+            y_coords = inter_y_coords[conf]
+            for j, x in enumerate(x_coords):
+                xy.append((x, y_coords[j]))
+            
+            res_combos = []
+            distances = []
+            for coords in xy:
+                d, r = get_contact_distances(
+                    coords,
+                    res,
+                    inter_mtx,
+                    folded=True,
+                    )
+                res_combos.append(r)
+                distances.append(d)
 
             # We want to only build fragments of IDP
             seq1_id = chains[0]
             seq2_id = chains[1]
+            # If we have repeats of residues where there shouldn't be repeats
+            removed_idxs = []
             # We have two IDPs
             if seq1_id[0] == ">" and seq2_id[0] == ">":
                 pass
             # IDP-fld case
             elif seq1_id[0] != ">" and seq2_id[0] == ">":
                 idp_sequences = []
+                in_seq = input_seq[seq2_id]
                 for res_pair in res_combos:
                     idp_seq = ""
                     idp_res = res_pair[1]
                     for r in idp_res:
-                        idp_seq += input_seq[seq2_id][r]
+                        idp_seq += in_seq[r]
                     idp_sequences.append(idp_seq)
-            
+                
+                seq_counts = count_occurrences(in_seq, set(idp_sequences))
+                
+                valid_idps = []
+                used_counts = Counter()
+                
+                for index, substring in enumerate(idp_sequences):
+                    if used_counts[substring] < seq_counts[substring]:
+                        valid_idps.append(substring)
+                        used_counts[substring] += 1
+                    else:
+                        removed_idxs.append(index)
+                
+                idp_sequences = valid_idps
+
             SLICEDICT_XMERS = []
             XMERPROBS = []
             GET_ADJ = []
@@ -1085,6 +1108,20 @@ def main(
                 # First element in res contains our residues of interest
                 coords = find_ca_coords_fld(fld_data, res[0])
                 fld_contact_coords.append(coords)
+            
+            # Remove information that was related to repeat sequences
+            if len(removed_idxs) > 0:
+                for i in removed_idxs:
+                    distances.pop(i)
+                    fld_contact_coords.pop(i)
+            
+            # If the number of coords do not match the number of CA distances
+            # remove the last CA coordinate
+            for i, d in enumerate(distances):
+                coords = fld_contact_coords[i]
+                while len(coords) > len(d):
+                    coords.pop(-1)
+                    fld_contact_coords[i] = coords
 
 
 def populate_globals(
@@ -1276,7 +1313,7 @@ def conformer_generator(
     PLACE_SIDECHAIN_TEMPLATE = place_sidechain_template
     RAD_60 = np.radians(60)
     RC = np.random.choice
-    RINT = randint
+    RINT = random.randint
     ROT_COORDINATES = rotate_coordinates_Q_njit
     RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
