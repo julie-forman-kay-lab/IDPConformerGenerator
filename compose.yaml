@@ -1,0 +1,8 @@
+services:
+    idpconfgen:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        command: tail -F anything
+        volumes:
+            - /home/jteixeira/shared/idpconfgen:/shared
