@@ -23,7 +23,7 @@ you can skip the first instruction in the documentation page regarding the “gi
 clone”.
 
 To run IDPConfGen, you also need to install third party software: DSSP, and
-MC-SCE. If you have access to CUDA compatible GPU, installing Int2Cart may provide improvements
+MCSCE. If you have access to CUDA compatible GPU, installing Int2Cart may provide improvements
 on covalent bond geometry during the building process. Instructions to install these libraries are written
 in the :ref:`respective section of the install instructions <installing-third-party-software>`:
 

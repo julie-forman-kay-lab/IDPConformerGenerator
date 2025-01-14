@@ -51,9 +51,9 @@ and download the archive named ``cnot7_ldrs_example.zip``.
     Sidechain clashes may appear if you use the FASPR method for packing on sidechains
     above. To guarantee no sidechain clashes, we recommended either lowering the steric-clash
     tolerance using the ``-tol`` flag above or generating backbone-only conformers first
-    then packing sidechains later with MC-SCE as described below.
+    then packing sidechains later with MCSCE as described below.
 
-To generate backbone-only IDR tails on CNOT7 then pack sidechains on the IDRs with MC-SCE.
+To generate backbone-only IDR tails on CNOT7 then pack sidechains on the IDRs with MCSCE.
 We will be using agnostic secondary structure sampling here with ``--dany``.::
 
     idpconfgen ldrs \
@@ -87,7 +87,7 @@ We will be using agnostic secondary structure sampling here with ``--dany``.::
         -f 12-262
 
 .. note::
-    You can access the MC-SCE software `here <https://github.com/THGLab/MCSCE>`_
+    You can access the MCSCE software `here <https://github.com/THGLab/MCSCE>`_
     to ignore folded regions and add post-translational modifications during the
     sidechain packing process.
     

@@ -60,8 +60,8 @@ be 100 kJ and 250 kJ respectively, using default fragment sizes, no substitution
 :code:`idpconfgen` is deterministic. Therefore, the random seed defines the sampling progression - 
 read :ref:`here <F.A.Q.s>` for more information.
 
-To switch the side chain building algorithm to MC-SCE (recommended), you would first have to install MC-SCE.
-Please re-visit the :ref:`installation <Installation>` page to get MC-SCE set up. Here's the following example::
+To switch the side chain building algorithm to MCSCE (recommended), you would first have to install MCSCE.
+Please re-visit the :ref:`installation <Installation>` page to get MCSCE set up. Here's the following example::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -72,15 +72,15 @@ Please re-visit the :ref:`installation <Installation>` page to get MC-SCE set up
         -n
 
 .. note::
-    Running MC-SCE within IDPConformerGenerator can be memory (RAM) intensive.
+    Running MCSCE within IDPConformerGenerator can be memory (RAM) intensive.
     Consider running with a lower number of CPU threads using the `-n` flag if
     necessary.
 
 The defaults for :code:`--mcsce-n_trials` is 16 while using the :code:`--mcsce-mode exhaustive`, however
 we recommend trials larger or equal to 100 for smaller conformer pools. In this exercise, we will be using the
-default MC-SCE side chain building mode :code:`simple`.
+default MCSCE side chain building mode :code:`simple`.
 
-If you're encountering an error with MC-SCE running interally through IDPConformerGenerator,
+If you're encountering an error with MCSCE running interally through IDPConformerGenerator,
 we recommend you to generate backbones first, then pack sidechains after. For example, these would be the commands,
 required to generate backbones first and then sidechains.::
 
@@ -92,10 +92,10 @@ required to generate backbones first and then sidechains.::
         -of ./drk_L+_nosub_bb \
         -n
     
-    # Make the output folder for MC-SCE
+    # Make the output folder for MCSCE
     mkdir ./drk_L+_nosub_mcsce
 
-    # Run MC-SCE in the idpconfgen environment because it's already installed
+    # Run MCSCE in the idpconfgen environment because it's already installed
     mcsce ./drk_L+_nosub_bb 100 \
         -w \
         -o ./drk_L+_nosub_mcsce \
@@ -146,7 +146,7 @@ To convert output from CheSPI to CSSS, use the :code:`csssconv` subclient with f
 
 The outputted :code:`csss_*.json` files will be used for the :code:`-csss` flag in the :code:`build` subclient.
 For example, constructing 100 conformers for the unfolded state of the drkN SH3 domain using the δ2D predictions and the same settings for
-energy and MC-SCE as above::
+energy and MCSCE as above::
 
     idpconfgen build \
         -db idpconfgen_database.json \

@@ -11,7 +11,7 @@ FASPR
 .. automodule:: idpconfgen.components.sidechain_packing.faspr
     :members:
 
-MC-SCE
+MCSCE
 ------
 
 .. automodule:: idpconfgen.components.sidechain_packing.mcsce
