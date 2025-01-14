@@ -77,7 +77,7 @@ after the other, wait for them to finish before running the next one::
     ./install_deps.sh
 
 Your installation will become up to date with the latest developments.  If you
-had installed MC-SCE, Int2Cart, SPyCi-PDB, or X-EISDv2,  you need to reinstall
+had installed MCSCE, Int2Cart, SPyCi-PDB, or X-EISDv2,  you need to reinstall
 them again in the ``idpconfgen`` environment.
 
 From source on the Graham Cluster (DRAC)
@@ -135,23 +135,31 @@ DSSP
 IDPConfGen uses `DSSP <https://github.com/cmbi/dssp>`_ to calculate secondary
 structures. However, you only need DSSP if you are generated the database from
 scratch. If you use a prepared database JSON file you don't need to install
-DSSP.
+DSSP. We have prepared a database based on ``cullpdb_pc90.0_res0.0-2.0_len40-10000_R0.25_Xray_d2024_09_28_chains27425``
+from the Dunbrack PISCES database that can be downloaded on DropBox
+`here <https://www.dropbox.com/scl/fi/sfmxgdgw3h3ram79fq41d/idpconfgen_database_2024.tar.xz?rlkey=tm02sea1pcqykoer2cw06nstj&st=vlwcmedd&dl=0>`_.
+Please extract the JSON file before using.
 
 Please note we are only compatible with DSSP versions 2 and 3. If you have
 installed DSSP version 4 (check by using the command ``mkdssp --version``) please
 refer `to this issue <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48>`_
 for a proper re-installation after removing DSSP version 4.
 
-Install MC-SCE
+For newer versions of Linux (e.g. Ubuntu 24.04 LTS) you will have to install DSSP v3 manually
+by installing the requirements using ``sudo dpkg -i <DEB_FILENAME>`` and then finally installing
+``dssp_3.0.0-3build1_AXX64.deb``. AXX can be ``arm64`` or ``amd64`` depending on your CPU architecture.
+The required packages and DSSP v3 for Ubuntu can be found `here <https://ubuntu.pkgs.org/20.04/ubuntu-universe-amd64/dssp_3.0.0-3build1_amd64.deb.html>`_.
+
+Install MCSCE
 ``````````````
 
-IDPConformerGenerator can integrate MC-SCE to generate sidechains on top of the
+IDPConformerGenerator can integrate MCSCE to generate sidechains on top of the
 backbone conformers it generates, on the fly. For that you need to install
-MC-SCE on top of the `idpconfgen` Python environment. First, install IDPConfGen
+MCSCE on top of the `idpconfgen` Python environment. First, install IDPConfGen
 as described above. Next, follow these steps::
 
     # ensure you are in the parent IDPConformerGenerator GitHub folder
-    # clone and enter the MC-SCE GitHub repository
+    # clone and enter the MCSCE GitHub repository
     git clone https://github.com/THGLab/MCSCE
     cd MCSCE
 
@@ -161,7 +169,7 @@ as described above. Next, follow these steps::
     pip install tqdm
     pip install pathos
 
-    # Install MC-SCE on top of IDPConformerGenerator
+    # Install MCSCE on top of IDPConformerGenerator
     python setup.py develop --no-deps
 
     # Navigate back to the IDPConformerGenerator GitHub folder and install
@@ -170,27 +178,27 @@ as described above. Next, follow these steps::
     python setup.py develop --no-deps
 
 Now, if you choose the flag :code:`-scm mcsce` in ``idpconfgen build`` command,
-IDPConfGen will use MC-SCE to build sidechains as backbone conformers are
+IDPConfGen will use MCSCE to build sidechains as backbone conformers are
 generated. You will see :code:`idpconfgen build -h` has a specific group of
-parameters dedicated to MC-SCE, you can explore those as well.
+parameters dedicated to MCSCE, you can explore those as well.
 
 For installation on a cluster via virtualenv, dependencies need to be manually installed
-as the following for MC-SCE::
+as the following for MCSCE::
 
     # ensure you're in the idpcgenv and the IDPConformerGenerator GitHub folder
     git clone https://github.com/THGLab/MCSCE
 
-    # MC-SCE also requires numba and tox but that's already handled in previous steps
+    # MCSCE also requires numba and tox but that's already handled in previous steps
     pip install tensorflow --no-index
     pip install keras --no-index
     pip install tqdm --no-index
     pip install pathos --no-index
 
-    # cd into the MCSCE GitHub folder and install MC-SCE
+    # cd into the MCSCE GitHub folder and install MCSCE
     cd MCSCE
     python setup.py develop --no-deps
 
-    # cd back into the IDPConformerGenerator GitHub folder and install idpconfgen on top of MC-SCE
+    # cd back into the IDPConformerGenerator GitHub folder and install idpconfgen on top of MCSCE
     cd ..
     python setup.py develop --no-deps
 

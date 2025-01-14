@@ -44,34 +44,34 @@ we recommend running on the maximum number of physical cores for hyperthreadded 
 For example, a Threadripper 2990wx has 32 cores and 64 threads, it's best to use :code:`-n 32` to avoid overloading
 the system.
 
-What's the difference between MC-SCE and FASPR?
+What's the difference between MCSCE and FASPR?
 -----------------------------------------------
 
 IDPConfGen incorporates `FASPR <https://github.com/tommyhuangthu/FASPR>`_
 to natively build sidechains on the conformer's backbone.
 
-A part from the algorithmic differences between FASPR and MC-SCE (please refer
+A part from the algorithmic differences between FASPR and MCSCE (please refer
 to their publications for details), FASPR does not add hydrogens to the
 sidechains, so other tools are required to add hydrogens if they are desired.
-MC-SCE does add hydrogens to the sidechains it generates.
+MCSCE does add hydrogens to the sidechains it generates.
 
-Although MC-SCE is slower, it produces structures with no steric clashes, as it
+Although MCSCE is slower, it produces structures with no steric clashes, as it
 uses the same clash quality controls as IDPConfGen. Furthermore, it also has
 many settings that can be tweaked for flexible in silico experiments as opposed
 to the default settings of FASPR.
 
-How can I optimize the MC-SCE settings for large proteins?
+How can I optimize the MCSCE settings for large proteins?
 ----------------------------------------------------------
 
 For larger proteins such as the Tau fragment (441 residues), we recommend
-generating backbone-only conformers and use MC-SCE as a stand-alone program
+generating backbone-only conformers and use MCSCE as a stand-alone program
 afterwards.
 
 During the backbone generation stage (i.e. :code:`idpconfgen build ... -dsd`), speed could be
 improved by setting a higher backbone energy threshold (:code:`-etbb`). We recommend 250 as a minimum.
 
-For the MC-SCE sidechain step, we recommend doing a small benchmark with 128 trials to see what the median
-number of trials MC-SCE requires for a successful sidechain addition.
+For the MCSCE sidechain step, we recommend doing a small benchmark with 128 trials to see what the median
+number of trials MCSCE requires for a successful sidechain addition.
 
 
 What does it mean that IDPConformerGenerator is deterministic?
@@ -103,3 +103,11 @@ If you are scripting the ``count_clashes`` function or using an exceptionally la
 
 To avoid this, try reducing the number of cores/multiple processes with the ``--ncores`` flag. Or
 Decrease the size of your template structure, or request more RAM when submitting a job to a cluster.
+
+``ldrs`` is incorrectly recognizing my IDR boundaries
+-----------------------------------------------------
+
+As seen in issue `#283 <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/283#issuecomment-2585933667>`_
+your template ``.pdb`` file may have residues that have alternative residue conformations. Please
+remove a conformation and re-save the ``.pdb`` file using PyMOL so every residue only have one single
+conformation per residue.

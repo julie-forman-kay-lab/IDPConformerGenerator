@@ -49,7 +49,7 @@ position to the folded domain.
 
 To guarantee no sidechain clashes, we recommend either lowering the steric-clash
 tolerance using the ``-tol`` flag above or generating backbone-only conformers first
-then packing sidechains later with MC-SCE as described below in the Advanced LDRS
+then packing sidechains later with MCSCE as described below in the Advanced LDRS
 Usage section.
 
 To check your outputs against what is to be expected for this tutorial section. Please click
@@ -133,7 +133,7 @@ IDR models to the folded domain. The output for this will be in ``slc26a9_result
             -n
 
 6. Model the sidechains onto the backbone-only L-IDRs stitched onto the folded region
-   generated previously in the ``results`` folder using the `MC-SCE software <https://github.com/THGLab/MCSCE>`_:
+   generated previously in the ``results`` folder using the `MCSCE software <https://github.com/THGLab/MCSCE>`_:
 
     .. code-block:: bash
         mcsce \

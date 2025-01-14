@@ -1,7 +1,7 @@
 """
-Implement MC-SCE sidechain packing algorithm logic.
+Implement MCSCE sidechain packing algorithm logic.
 
-MC-SCE repository at: https://github.com/THGLab/MCSCE
+MCSCE repository at: https://github.com/THGLab/MCSCE
 """
 from functools import partial
 
@@ -22,11 +22,11 @@ only_H_mask = None
 
 
 def add_mcsce_subparser(ap):
-    """Add MC-SCE related parameters to client."""
+    """Add MCSCE related parameters to client."""
     group = ap.add_argument_group(
-        title="MC-SCE related parameters",
+        title="MCSCE related parameters",
         description=(
-            "Parameters configuring MC-SCE sidechain sampling. "
+            "Parameters configuring MCSCE sidechain sampling. "
             "Used only if `-scm mcsce` is selected."
             ),
         )
@@ -44,7 +44,7 @@ def add_mcsce_subparser(ap):
         )
     group.add_argument(
         '--mcsce-batch_size',
-        help=f'The MC-SCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',  # noqa: E501
+        help=f'The MCSCE batch size. Defaults to {mcsce_defaults["batch_size"]}.',  # noqa: E501
         type=int,
         default=mcsce_defaults['batch_size'],
         )
@@ -65,7 +65,7 @@ def init_mcsce_sidechains(
         **ignore,
         ):
     """
-    Instantiate dedicated function environment for MC-SCE sidechain building.
+    Instantiate dedicated function environment for MCSCE sidechain building.
 
     Examples
     --------
@@ -87,7 +87,7 @@ def init_mcsce_sidechains(
         Related to the all atoom coordinate system in `cli_build`.
 
     user_parameters : dict
-        Dictionary with additional parameters for the MC-SCE package.
+        Dictionary with additional parameters for the MCSCE package.
 
     Returns
     -------

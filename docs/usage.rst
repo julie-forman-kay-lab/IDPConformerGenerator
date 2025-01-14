@@ -175,13 +175,13 @@ To see which plotting parameters can be modified, please refer to :code:`src/idp
 
     --plot title=<TITLE> title_fs=<TITLE FONT SIZE> xlabel=<X-AXIS LABEL> xlabel_fs=<X-AXIS LABEL FONT SIZE> colors=<LIST_OF_COLORS>
 
-Exploring MC-SCE and Int2Cart Integrations
+Exploring MCSCE and Int2Cart Integrations
 ------------------------------------------
 
 Integrating the functions from our collaborators at the `Head-Gordon Lab <https://thglab.berkeley.edu/>`_,
 IDPConformerGenerator has the ability to build with bond geometries derived from a recurrent neural network
 machine learning model `Int2Cart <https://github.com/THGLab/int2cart>`_. Furthermore, as we introduced
-the `MC-SCE <https://github.com/THGLab/MCSCE>`_ method for building sidechains in the previous modules,
+the `MCSCE <https://github.com/THGLab/MCSCE>`_ method for building sidechains in the previous modules,
 we would like to provide some examples on changing the default sidechain settings.
 
 To use the Int2Cart method for bond geometries, the :code:`--bgeo-strategy` flag needs to be defined with
@@ -201,7 +201,7 @@ To use the Int2Cart method for bond geometries, the :code:`--bgeo-strategy` flag
         -of ./drk_CSSSd2D_nosub_int2cart_mcsce \
         -n
 
-To change the number of trials for MC-SCE to optimize success rate and overall speed::
+To change the number of trials for MCSCE to optimize success rate and overall speed::
 
     idpconfgen build \
         -db idpconfgen_database.json \
@@ -216,6 +216,26 @@ To change the number of trials for MC-SCE to optimize success rate and overall s
         --mcsce-n_trials 64 \
         -of ./drk_CSSSd2D_nosub_32_trials_mcsce \
         -n
+
+
+Using MCSCE to Add Post-Translational Modifications (PTMs)
+-----------------------------------------------------------
+
+MCSCE can be used stand-alone if installed correctly. As described in the Bioinformatics
+`publication <https://doi.org/10.1093/bioinformatics/btae444>`_, MCSCE has the ability to add
+all-atom PTMs (phosphroylation, methylation, N6-carboxylysine, and hydroxylation) on select residues.
+
+The residue names will have to be changed manually or by using a script. Please refer to the MCSCE
+`readme.rst <https://github.com/THGLab/MCSCE/blob/56da7cf597aa96546818e364a22fa9b7128a603b/README.rst>`_
+for the alternative residue names that will be recognized to be PTM'd.
+
+It is important to generate conformers with backbone-only by using the ``-dsd`` flag in either
+``build`` or ``ldrs`` modules, followed by independent sidechain packing with MCSCE.
+
+If you generated your conformers using ``ldrs`` where a folded domain is fixed, you can fix
+the sidechains of the template residues so only the IDR backbones will have sidechain packing by providing
+the folded domain boundaries using the ``--fix`` flag in MCSCE. The energy of the entire structure will
+be taken into consideration within MCSCE however, to ensure no steric clashes.
 
 
 How to Efficiently Set Jobs up for HPC Clusters
