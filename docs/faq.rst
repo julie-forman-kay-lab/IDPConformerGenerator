@@ -103,3 +103,11 @@ If you are scripting the ``count_clashes`` function or using an exceptionally la
 
 To avoid this, try reducing the number of cores/multiple processes with the ``--ncores`` flag. Or
 Decrease the size of your template structure, or request more RAM when submitting a job to a cluster.
+
+``ldrs`` is incorrectly recognizing my IDR boundaries
+-----------------------------------------------------
+
+As seen in issue `#283 <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/283#issuecomment-2585933667>`_
+your template ``.pdb`` file may have residues that have alternative residue conformations. Please
+remove a conformation and re-save the ``.pdb`` file using PyMOL so every residue only have one single
+conformation per residue.
