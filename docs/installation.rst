@@ -135,12 +135,20 @@ DSSP
 IDPConfGen uses `DSSP <https://github.com/cmbi/dssp>`_ to calculate secondary
 structures. However, you only need DSSP if you are generated the database from
 scratch. If you use a prepared database JSON file you don't need to install
-DSSP.
+DSSP. We have prepared a database based on ``cullpdb_pc90.0_res0.0-2.0_len40-10000_R0.25_Xray_d2024_09_28_chains27425``
+from the Dunbrack PISCES database that can be downloaded on DropBox
+`here <https://www.dropbox.com/scl/fi/sfmxgdgw3h3ram79fq41d/idpconfgen_database_2024.tar.xz?rlkey=tm02sea1pcqykoer2cw06nstj&st=vlwcmedd&dl=0>`_.
+Please extract the JSON file before using.
 
 Please note we are only compatible with DSSP versions 2 and 3. If you have
 installed DSSP version 4 (check by using the command ``mkdssp --version``) please
 refer `to this issue <https://github.com/julie-forman-kay-lab/IDPConformerGenerator/issues/48>`_
 for a proper re-installation after removing DSSP version 4.
+
+For newer versions of Linux (e.g. Ubuntu 24.04 LTS) you will have to install DSSP v3 manually
+by installing the requirements using ``sudo dpkg -i <DEB_FILENAME>`` and then finally installing
+``dssp_3.0.0-3build1_AXX64.deb``. AXX can be ``arm64`` or ``amd64`` depending on your CPU architecture.
+The required packages and DSSP v3 for Ubuntu can be found `here <https://ubuntu.pkgs.org/20.04/ubuntu-universe-amd64/dssp_3.0.0-3build1_amd64.deb.html>`_.
 
 Install MC-SCE
 ``````````````
