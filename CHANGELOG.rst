@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.26 (2025-01-14)
+------------------------------------------------------------
+
 * Update documentation to clarify DSSPv3 installation
 * Update usage documentation for recognition of PDB files for ``ldrs``
 * Addresses issue #283
