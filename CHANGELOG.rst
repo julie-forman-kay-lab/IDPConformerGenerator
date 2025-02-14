@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Adds ``--force-long`` flag into ``build`` client to force long-method for sequences longer than 100 AA
+
 v0.7.26 (2025-01-14)
 ------------------------------------------------------------
 
