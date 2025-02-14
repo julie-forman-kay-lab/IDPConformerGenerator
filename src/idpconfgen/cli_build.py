@@ -270,6 +270,16 @@ ap.add_argument(
     )
 
 
+ap.add_argument(
+    '--force-long',
+    help=(
+        'Use this flag if you want to use the long-method on sequence lengths '
+        'longer than 100 AA. Switches the fragments to 50 AA at a time.'
+        ),
+    action="store_true",
+    )
+
+
 #########################################
 libcli.add_argument_dloopoff(ap)
 libcli.add_argument_dhelix(ap)
@@ -428,6 +438,7 @@ def main(
         input_seq,
         database,
         custom_sampling,
+        force_long=False,
         long=False,
         long_ranges=None,
         dloop_off=False,
@@ -481,7 +492,11 @@ def main(
         input_seq = list(input_seq.values())[0]
     log.info(S(f'input sequence: {input_seq}'))
     
-    if len(input_seq) > 300:
+    long_seq_num = 300
+    if force_long:
+        long_seq_num = 100
+    
+    if len(input_seq) > long_seq_num:
         if long is False:
             log.info(
                 "TIP: if your IDP is longer than ~300 residues, consider "
@@ -504,7 +519,10 @@ def main(
                     log.info(S('Incorrect pattern input. Resorting to default.'))  # noqa: E501
                     log.info(S('Sample pattern is as follows: 1-89,90-191,'))
             else:
-                long_fragments = split_into_chunks(input_seq)
+                if force_long:
+                    long_fragments = split_into_chunks(input_seq, size=50)
+                else:
+                    long_fragments = split_into_chunks(input_seq)
             
             for i in range(len(long_fragments) - 1):
                 j = i + 1
