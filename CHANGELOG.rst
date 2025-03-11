@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Corrected a bug in issue #287 regarding building with ``ldrs`` for 3 or more chains
+
 v0.7.27 (2025-02-14)
 ------------------------------------------------------------
 
