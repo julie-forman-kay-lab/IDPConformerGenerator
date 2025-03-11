@@ -611,8 +611,6 @@ def main(
         for chain in fld_chainseq:
             if type(fld_chainseq[chain]) is str:
                 # We skip this chain due to perfect matching of sequence
-                skipped_seq = list(input_seq.keys())[list(input_seq.values()).index(fld_chainseq[chain])]  # noqa: E501
-                del input_seq[skipped_seq]
                 continue
             match_index = fld_chainseq[chain][1]
             seq_id = list(input_seq)[match_index]
