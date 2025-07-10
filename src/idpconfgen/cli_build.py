@@ -877,7 +877,7 @@ def populate_globals(
         if bgeo_path is None:
             bgeo_path = bgeo_sampling_path
 
-        global BGEO_full, BGEO_trimer, BGEO_res
+        global BGEO_full, BGEO_trimer, BGEO_res  # noqa: F824
         BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
         _1, _2 = bgeo_reduce(BGEO_full)
         BGEO_trimer.update(_1)
@@ -1218,19 +1218,19 @@ def conformer_generator(
     RRD10 = rrd10_njit
     SIDECHAIN_TEMPLATES = sidechain_templates
     SUM = np.nansum
-    global BGEO_full
-    global BGEO_trimer
-    global BGEO_res
-    global ALL_ATOM_LABELS
-    global ALL_ATOM_MASKS
-    global ALL_ATOM_EFUNC
-    global TEMPLATE_LABELS
-    global TEMPLATE_MASKS
-    global TEMPLATE_EFUNC
-    global XMERPROBS
-    global SLICEDICT_MONOMERS
-    global SLICEDICT_XMERS
-    global GET_ADJ
+    global BGEO_full  # noqa: F824
+    global BGEO_trimer  # noqa: F824
+    global BGEO_res  # noqa: F824
+    global ALL_ATOM_LABELS  # noqa: F824
+    global ALL_ATOM_MASKS  # noqa: F824
+    global ALL_ATOM_EFUNC  # noqa: F824
+    global TEMPLATE_LABELS  # noqa: F824
+    global TEMPLATE_MASKS  # noqa: F824
+    global TEMPLATE_EFUNC  # noqa: F824
+    global XMERPROBS  # noqa: F824
+    global SLICEDICT_MONOMERS  # noqa: F824
+    global SLICEDICT_XMERS  # noqa: F824
+    global GET_ADJ  # noqa: F824
 
     del input_seq
 
