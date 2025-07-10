@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.29 (2025-07-10)
+------------------------------------------------------------
+
 * Minor update the environment requirements specifying Python version to be between 3.8 and 3.12.
 
 v0.7.28 (2025-03-11)
