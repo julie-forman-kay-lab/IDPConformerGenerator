@@ -5,8 +5,9 @@ dependencies:
     - python>=3.8,<3.12
     - numpy>=1.22.4,<2
     - numba>=0.53.0,<1
-    - pybind11>=2.9.2,<3
+    - pybind11>=2.9.2,<2.13.6
     - scipy>=1.8.1,<2
     - matplotlib>=3.5.2,<4
+    - setuptools>=70.0.0,<80
     - pip
     - tox=4
