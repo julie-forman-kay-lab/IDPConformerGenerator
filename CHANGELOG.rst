@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.30 (2025-07-11)
+------------------------------------------------------------
+
 * Emergency fix for required packaged since setuptools 80.0.0 is not supported
 
 v0.7.29 (2025-07-10)
