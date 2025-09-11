@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.7.31 (2025-09-11)
+------------------------------------------------------------
+
 * Add new sublcient ``contacts`` to build and evaluate extended idpconfgen database
 * Add new subclient ``complex`` to analyze sequences against the database and build dynamic complexes
 * Add ``BioPython`` as a dependency for calulation purposes (Shrake-Rupley SASA method)
