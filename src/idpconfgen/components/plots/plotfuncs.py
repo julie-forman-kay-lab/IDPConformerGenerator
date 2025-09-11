@@ -17,6 +17,33 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
+def calculate_fontsize(len_ticks, lw):
+    """
+    Calculate the fontsize depending on length of ticks and size of plot.
+
+    Parameters
+    ----------
+    len_ticks : int
+        Length of sequence or numbers to plot
+    
+    lw : int
+        Length and width of figure
+    
+    Returns
+    -------
+    fs : int
+        Fontsize
+    """
+    if len_ticks >= 200:
+        fs = len_ticks / (lw * 8)
+    elif len_ticks >= 100:
+        fs = len_ticks / (lw * 4)
+    else:
+        fs = len_ticks / (lw * 2)
+    
+    return fs
+
+
 def get_xtick_lbl(xticks):
     """# noqa: D205, D400
     Mainly for residues, reworks the first x-tick label to
@@ -302,3 +329,55 @@ def plot_bend_angles(
     plt.close("all")
 
     return errmsg
+
+
+def plot_contacts_matrix(
+        matrix,
+        sequence,
+        output,
+        dpi=300,
+        title="Contacts Frequency Heatmap (Sequence)"
+        ):
+    """
+    Plot matrix heatmap from `contact_matrix` function.
+
+    Parameters
+    ----------
+    matrix : np.ndarray
+        Probability matrix of contacts
+    
+    sequence : str or list
+        Single sequence for intra- or two sequences for inter-
+    
+    output : str
+        Path/filename to output the plot
+    
+    dpi : int
+        dpi of plot to save
+    """
+    lw = 10
+    plt.figure(figsize=(lw, lw))
+    im = plt.imshow(matrix, cmap='plasma', interpolation='nearest')
+    plt.title(title, fontsize=18)
+    plt.colorbar().set_label(label="Frequency", size=16)
+    im.figure.axes[1].tick_params(axis="y", labelsize=16)
+    
+    if type(sequence) is list:
+        seq1 = sequence[0]
+        seq2 = sequence[1]
+        
+        len_s1 = len(seq1)
+        len_s2 = len(seq2)
+        fs1 = calculate_fontsize(len_s1, lw)
+        fs2 = calculate_fontsize(len_s2, lw)
+        plt.yticks(np.arange(len_s2), seq2[::-1], fontsize=fs2)
+        plt.xticks(np.arange(len_s1), seq1, fontsize=fs1)
+    else:
+        len_seq = len(sequence)
+        fs = calculate_fontsize(len_seq, lw)
+        plt.xticks(np.arange(len_seq), sequence, fontsize=fs)
+        plt.yticks(np.arange(len_seq), sequence[::-1], fontsize=fs)
+    
+    plt.tight_layout(h_pad=0.01, w_pad=0.04)
+    plt.savefig(output, dpi=dpi)
+    plt.close()

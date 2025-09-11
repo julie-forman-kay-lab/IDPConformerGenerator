@@ -20,6 +20,8 @@ from idpconfgen import (
     cli_bgeo,
     cli_bgeodb,
     cli_build,
+    cli_complex,
+    cli_contacts,
     cli_csssconv,
     cli_dssppii,
     cli_fastaext,
@@ -55,8 +57,10 @@ Individual routines for DB creation:
     * {cli_pdbdl._name}
     * {cli_sscalc._name}
     * {cli_torsions._name}
+    * {cli_contacts._name}
     * {cli_build._name}
     * {cli_ldrs._name}
+    * {cli_complex._name}
 
 Other useful routines:
 
@@ -96,9 +100,11 @@ subparsers = ap.add_subparsers(
 libcli.add_subparser(subparsers, cli_pdbdl)
 libcli.add_subparser(subparsers, cli_sscalc)
 libcli.add_subparser(subparsers, cli_torsions)
+libcli.add_subparser(subparsers, cli_contacts)
 libcli.add_subparser(subparsers, cli_torsionsJ)
 libcli.add_subparser(subparsers, cli_build)
 libcli.add_subparser(subparsers, cli_ldrs)
+libcli.add_subparser(subparsers, cli_complex)
 
 # argument parsers for secondary routines
 libcli.add_subparser(subparsers, cli_bgeo)

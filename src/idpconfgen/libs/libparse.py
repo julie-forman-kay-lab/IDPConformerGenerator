@@ -6,6 +6,7 @@ parse the information inside and return/yield the parsed information.
 """
 import ast
 import subprocess
+from collections import Counter
 from functools import partial
 from itertools import product, repeat
 from operator import setitem
@@ -567,3 +568,274 @@ def split_by_ranges(seq, ranges):
     if start < len(seq):
         chunks.append(seq[start:])
     return chunks
+
+
+def split_consecutive_groups(query, minimum=2):
+    """
+    Process a list of numbers into list of consecutive integers.
+    
+    Fills in the blank for residues that are alone by 3.
+    
+    Example
+    -------
+    query = [1, 2, 3, 4, 6, 8, 11, 12]
+    output = [[1, 2, 3, 4, 5, 6, 7, 8], [11, 12]]
+
+    Parameters
+    ----------
+    query : list of int
+        List of integers we want to process.
+    
+    minimum : int
+        Minimum number of allowed consecutive residues.
+        Defaults to 2.
+
+    Return
+    ------
+    result : list of lists of int
+        Consecutive indexes
+    """
+    result = []
+    pre_result = []
+    current_group = []
+
+    for num in query:
+        if not current_group or num == current_group[-1] + 1:
+            current_group.append(num)
+        elif num - 1 == current_group[-1] + 1:
+            current_group.append(num - 1)
+            current_group.append(num)
+        else:
+            if len(current_group) >= minimum:
+                pre_result.append(current_group)
+            elif len(current_group) == 1:
+                pre_result.append([num - 1, num, num + 1])
+            current_group = [num]
+
+    if len(current_group) >= minimum:
+        pre_result.append(current_group)
+    
+    # Fix overlapping residues
+    pre_result.sort()
+    for sublist in pre_result:
+        if not result or sublist[0] > result[-1][-1] + 1:
+            result.append(sublist)
+        else:
+            result[-1] = [min(result[-1][0], sublist[0])] + list(range(min(result[-1][1], sublist[1]), max(result[-1][-1], sublist[-1]) + 1))  # noqa: E501
+
+    return result
+
+
+def update_chars_lower(string, indices):
+    """
+    Change specific characters of a string lowercase.
+
+    Parameters
+    ----------
+    string : str
+        String to modify
+    
+    indices : list
+        List of indices in the string to make lower case
+
+    Returns
+    -------
+    updated_string : str
+        Updated stirng with speicific characters made lowercase
+    """
+    char_list = list(string)
+    
+    for index in indices:
+        if 0 <= index < len(char_list):
+            char_list[index] = char_list[index].lower()
+
+    updated_string = ''.join(char_list)
+    return updated_string
+
+
+def has_consecutive_match(s, q, consecutive_length=2):
+    """Find matches of consecutive characters in s within q."""
+    for i in range(len(q) - 1):
+        consecutive_chars_q = q[i:i + consecutive_length]
+        if consecutive_chars_q in s:
+            return True
+        
+    return False
+
+
+def create_coordinate_combinations(data, modifier=0):
+    """
+    Create coordinates based on a tuple of two sets of residues of interest.
+    
+    Parameters
+    ----------
+    data : tuple, N = 2
+        Tuple of lists ([[]], [[]])
+    
+    modifier : int
+        Change the values of coordinates for indexing purposes
+    
+    Returns
+    -------
+    coordinates : list of tuple
+        Combination of coordinates between each of the lists of lists
+        within the tuple [(,)]
+    """
+    if len(data) != 2:
+        raise ValueError("Input must be a tuple of two elements.")
+
+    list1, list2 = data
+
+    coordinates = []
+    for sublist1 in list1:
+        for item1 in sublist1:
+            for sublist2 in list2:
+                for item2 in sublist2:
+                    coordinates.append((item1 + modifier, item2 + modifier))
+
+    return coordinates
+
+
+def get_string_element(strings, index):
+    """
+    Get the whole string in the list of strings using an index.
+
+    Parameters
+    ----------
+    strings :  list of str
+        List of strings
+    
+    index : int
+        Global index relative to the list of strings
+    
+    Returns
+    -------
+    string : str
+        String of interest
+    
+    position : int
+        Relative index in the string that was chosen
+    
+    Nonetype if no matches were found
+    """
+    flattened_index = 0
+    
+    for string in strings:
+        string_length = len(string)
+        flattened_index += string_length
+        if index <= flattened_index:
+            position = index - (flattened_index - string_length)
+            if index == flattened_index:
+                # Last index
+                position -= 1
+            return string, position
+
+    return None, None
+
+
+def get_substring_characters(string, char_position, max_chars):
+    """
+    Get a substring where the middle character is the target.
+    
+    Parameters
+    ----------
+    string : str
+        String of interest, typically expecting a sequence.
+    
+    char_position : int
+        Integer position of the AA of interest.
+    
+    max_chars : int
+        Maximum number of AA to return surrounding the target.
+    
+    Returns
+    -------
+    substring : str
+        Substring from string of target that has the char
+        position and maxes out the number of characters.
+    """
+    half_max_chars = max_chars // 2
+
+    start_pos = max(char_position - half_max_chars, 0)
+    end_pos = min(char_position + half_max_chars + 1, len(string))
+    
+    if end_pos - start_pos < max_chars:
+        if start_pos == 0:
+            end_pos = min(end_pos + (max_chars - (end_pos - start_pos)), len(string))  # noqa: E501
+        else:
+            start_pos = max(start_pos - (max_chars - (end_pos - start_pos)), 0)
+    
+    substring = string[start_pos:end_pos]
+    
+    # If the string is over maximum allowed characters
+    # it will only be 1 over so remove the first character
+    if len(substring) > max_chars:
+        substring = substring[1:]
+
+    return substring
+
+
+def adjust_iterable_length(lst, desired_length):
+    """
+    Remove last then first element until desired length is reached.
+
+    Parameters
+    ----------
+    lst : list or string or tuple
+        Iterable datatype of elements we want to correct.
+    
+    desired_length : int
+        Integer length that is desired.
+    
+    Returns
+    -------
+    lst : list or string or tuple
+        Updated data with the desired length.
+    """
+    istuple = False
+    isstring = False
+    try:
+        assert type(lst) is list
+    except AssertionError:
+        if type(lst) is tuple:
+            lst = list(lst)
+        elif type(lst) is str:
+            lst = [*lst]
+
+    while len(lst) > desired_length:
+        lst.pop()
+        if len(lst) > desired_length:
+            lst.pop(0)
+    
+    if istuple:
+        return tuple(lst)
+    if isstring:
+        newlst = ""
+        return newlst.join(lst)
+            
+    return lst
+
+
+def count_occurrences(main_str, substrings):
+    """
+    Count occurrences of substrings in the main string.
+
+    Parameters
+    ----------
+    main_str : str
+        Main string, usually an amino acid sequence
+    
+    substrings : list of str
+        List of substrings
+    
+    Returns
+    -------
+    counts : int
+        Number of occurences in main string
+    """
+    counts = Counter()
+    for s in substrings:
+        count = main_str.count(s)
+        counts[s] = count
+        
+    return counts
