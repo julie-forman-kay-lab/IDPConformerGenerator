@@ -19,6 +19,10 @@ IDPConformerGenerator
     :target: https://doi.org/10.1093/bioinformatics/btad739
     :alt: LDRS Publication
 
+.. image:: https://img.shields.io/badge/AlphaFlex-10.1101%2F2025.11.24.690279-blue
+    :target: https://doi.org/10.1101/2025.11.24.690279
+    :alt: AlphaFlex Pre-print
+
 IDPConformerGenerator is a flexible, modular platform for generating ensembles
 of disordered protein states that builds conformers by sampling backbone torsion
 angles of relevant sequence fragments extracted from protein structures in the
