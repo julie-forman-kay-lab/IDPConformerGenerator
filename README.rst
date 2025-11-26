@@ -94,4 +94,4 @@ If you use the AlphaFlex protocol, please also cite::
 
 Version
 -------
-v0.7.30
+v0.8.0
