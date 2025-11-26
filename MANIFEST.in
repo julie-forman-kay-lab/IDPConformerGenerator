@@ -32,3 +32,7 @@ global-exclude *.vim
 include install_miniconda3.sh
 include install_deps.sh
 include activate.sh
+
+recursive-include alphaflex *.json
+recursive-include alphaflex *.rst
+recursive-include alphaflex *.zip

@@ -19,6 +19,10 @@ IDPConformerGenerator
     :target: https://doi.org/10.1093/bioinformatics/btad739
     :alt: LDRS Publication
 
+.. image:: https://img.shields.io/badge/AlphaFlex-10.1101%2F2025.11.24.690279-blue
+    :target: https://doi.org/10.1101/2025.11.24.690279
+    :alt: AlphaFlex Pre-print
+
 IDPConformerGenerator is a flexible, modular platform for generating ensembles
 of disordered protein states that builds conformers by sampling backbone torsion
 angles of relevant sequence fragments extracted from protein structures in the
@@ -55,6 +59,11 @@ How to Use
 Usage instructions are described in the `usage page <https://idpconformergenerator.readthedocs.io/en/latest/usage.html>`_. See also
 tutorial examples in the ``example/`` folder or by following different sections on the usage page.
 
+AlphaFlex Update
+----------------
+IDPConformerGenerator version 0.8.X+ includes methodologies for AFX-IDPCG ensembles described in the AlphaFlex manuscript. Please refer to the
+``alphaflex/`` folder for more details.
+
 How to cite
 -----------
 
@@ -73,6 +82,13 @@ If you use the Local Disordered Region Sampling (LDRS) module, please also cite:
     Julie D Forman-Kay, Local Disordered Region Sampling (LDRS) for ensemble modeling of proteins with experimentally undetermined
     or low confidence prediction segments, Bioinformatics, Volume 39, Issue 12, December 2023, btad739,
     https://doi.org/10.1093/bioinformatics/btad739
+
+If you use the AlphaFlex protocol, please also cite::
+
+    Zi Hao Liu, Oufan Zhang, Stefano De Castro, Kunyang Sun, Hamidreza Ghafouri, Omar Abdelghani Attafi, Nicolas L Fawzi,
+    Silvio C E Tosatto, Alexander M Monzon, Alan M Moses, Teresa Head-Gordon, Julie D Forman-Kay,
+    AlphaFlex: Ensembles of the human proteome representing disordered regions, bioRxiv, November 2025,
+    https://doi.org/10.1101/2025.11.24.690279
 
 .. end-citing
 
