@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update documentation
+
 v0.8.0 (2025-11-26)
 ------------------------------------------------------------
 
