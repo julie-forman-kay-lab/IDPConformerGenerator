@@ -6,6 +6,7 @@ interference with the main IDPConformerGenerator package.
 AFX-IDPCG Python scripts must be run within the ``idpconfgen`` Python environment created during the installation of IDPConformerGenerator.
 
 The ``idpconfgen`` conda environment will need to be updated with the following packages::
+
     conda install -c conda-forge pdbfixer
     pip install pdb-tools
     pip install chardet==5.2.0
@@ -13,7 +14,7 @@ The ``idpconfgen`` conda environment will need to be updated with the following 
     pip install biopython==1.85
     pip install mdtraj==1.11.0
 
-The AlphaFlex database is a standard JSON dictionary database where each key is a UniProt ID and the values correspond
+The AlphaFlex database (``AlphaFlex_database_Jul2024.json``) is a standard JSON dictionary database where each key is a UniProt ID and the values correspond
 to IDR boundaries (``idrs``), mean PAEs between folded (F) and disordered (D) regions (``mean_pae``), and any interactions
 between folded domains where the mean PAE is less than 15 Angstroms is documented in ``interactions``.
 

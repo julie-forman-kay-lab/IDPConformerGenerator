@@ -31,23 +31,28 @@ And navigate to the new ``IDPConformerGenerator`` folder::
 .. note::
 
     The ``requirements.yml`` describe the Python dependencies of
-    IDPConformerGenerator. If you are skilled managing python environments you
-    can go on your own. Otherwise, you can calmly follow our install
-    instructions.
+    IDPConformerGenerator. If you are skilled managing custom Python environments
+    (recommended) please create a new ``idpconfgen`` conda environment using that file
+    and install the dependencies yourself. Otherwise, please follow our express installation
+    instructions below.
 
-At the end of the installation process, you will have a ``miniconda3``
+    Creating a new Python environment using ``requirements.yml`` can take between 2-4 minutes;
+    however, the express installation process can take approximately 10 minutes since it will
+    install the ``miniconda3`` package manager as well as all dependencies.
+
+At the end of the express installation process, you will have a ``miniconda3``
 directory inside the ``IDPConformerGenerator`` main directory where the whole
 installation is placed. If your ever want to delete ``IDPCG`` from your computer,
 simply delete the ``IDPConformerGenerator`` directory.
 
-**To install IDPConfGen**, run the following three commands. Wait until one
+**Express Installation for IDPConfGen**, run the following three commands. Wait until one
 finishes before running the second one::
 
     ./install_miniconda3.sh
     source activate.sh
     ./install_deps.sh
 
-Once this finishes, ``idpconfgen`` is ready to be used. Go to the :ref:`usage
+Once this finishes , ``idpconfgen`` is ready to be used. Go to the :ref:`usage
 <Usage>` and continue from there.
 
 **Remember** to active the ``idpconfgen`` environment every time you open a
