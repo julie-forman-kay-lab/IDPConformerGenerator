@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Update IDPConformerGenerator to recognize DSSP v4.X versions as well as retain backwards compatibility
+
 v0.8.2 (2026-06-22)
 ------------------------------------------------------------
 
