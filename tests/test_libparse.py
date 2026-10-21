@@ -109,6 +109,18 @@ def test_parse_dssp_IndexError():
                 pass
 
 
+def test_parse_dssp_mmcif():
+    """
+    Test mmCIF is not parsed as classic DSSP.
+
+    DSSP v4 writes mmCIF by default, which has lines starting with `#`.
+    """
+    data = b'data_nohd\n# \n_entry.id   nohd\n# \n'
+    with pytest.raises(DSSPParserError):
+        for _ in libparse.parse_dssp(data):
+            pass
+
+
 @pytest.mark.parametrize(
     'in1, expected',
     [
@@ -145,11 +157,18 @@ def BTE_A_results():
     return results
 
 
-def test_split_pdb_by_dssp(BTE_A_results):
+@pytest.mark.parametrize(
+    'dssp_file',
+    [
+        '1BTE_A.dssp',  # DSSP v3
+        '1BTE_A_dssp4.dssp',  # DSSP v4
+        ]
+    )
+def test_split_pdb_by_dssp(BTE_A_results, dssp_file):
     """Test mkdssp with split."""
     sgen = libparse.split_pdb_by_dssp(
         Path(tcommons.data_folder, '1BTE_A.pdb'),
-        Path(tcommons.data_folder, '1BTE_A.dssp').read_bytes(),
+        Path(tcommons.data_folder, dssp_file).read_bytes(),
         reduced=True,
         )
 

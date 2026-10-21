@@ -134,6 +134,12 @@ class DSSPInputMissingError(IDPConfGenException):
     errmsg = 'One of the two required positional arguments is missing.'
 
 
+class DSSPExecutionError(IDPConfGenException):
+    """Raise when the external DSSP program cannot run or fails."""
+
+    errmsg = 'Error while running DSSP: {}'
+
+
 class ParserNotFoundError(IDPConfGenException):
     """Raise when parser for PDB/CIF file is not found."""
 

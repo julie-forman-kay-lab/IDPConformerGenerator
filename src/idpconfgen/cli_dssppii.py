@@ -1,5 +1,5 @@
 """
-Adds polyproline type-2 helix assignment to DSSP. For DSSP v2-v3.
+Adds polyproline type-2 helix assignment to DSSP. For DSSP v2, v3 and v4.
 
 USAGE:
     $ idpconfgen dssppii [--pdb-file]
@@ -58,6 +58,13 @@ import re
 
 from idpconfgen import Path, log
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libdssp import (
+    dssp_version_str,
+    get_dssp_version,
+    is_dssp4,
+    remove_native_ppii,
+    run_dssp,
+    )
 from idpconfgen.logger import S, T, init_files
 
 
@@ -84,8 +91,11 @@ ap.add_argument(
 ap.add_argument(
     '-cmd',
     '--dssp_cmd',
-    help="Path the do DSSP executable. Defaults to `dssp`.",
-    default="dssp",
+    help=(
+        "Command or path to the DSSP executable. "
+        "DSSP v2, v3 and v4 are supported. Defaults to `mkdssp`."
+        ),
+    default="mkdssp",
     )
 
 ap.add_argument(
@@ -106,9 +116,14 @@ ap.add_argument(
 libcli.add_argument_ncores(ap)
 
 
-def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
+def dssp_ppii_assignment(
+        pdb_file,
+        dssp_cmd="mkdssp",
+        dssp_version=None,
+        native_ppii=False,
+        ):
     """
-    Parse DSSP output to include PPII as secondary structure.
+    Run DSSP and include PPII as secondary structure in its output.
 
     Parameters
     ----------
@@ -116,7 +131,47 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
         Path to the PDB file to operate on as indicated by the user
 
     dssp_cmd : string
-        Any custom dssp commands the user may want. Defaults to `dssp`
+        The DSSP executable, or a command that runs it.
+        Defaults to `mkdssp`.
+
+    dssp_version : tuple of int, optional
+        The DSSP version, as returned by
+        :func:`idpconfgen.libs.libdssp.get_dssp_version`. If not given,
+        it is read by running ``<dssp_cmd> --version``.
+
+    native_ppii : bool, optional
+        Only for DSSP v4, which assigns PPII helices itself. If ``True``,
+        return the output of DSSP v4 as it is, without DSSP-PPII. If
+        ``False`` (default), reset the PPII helices of DSSP v4 to loops
+        and assign PPII with DSSP-PPII, as for DSSP v2 and v3.
+
+    Returns
+    -------
+    tab_new_dssp : list
+        List of every line of DSSP output, now with PPII identification
+    """
+    if dssp_version is None:
+        dssp_version = get_dssp_version(dssp_cmd)
+
+    dssp_output = run_dssp(pdb_file, dssp_cmd, dssp_version)
+    tab_output = dssp_output.decode('utf-8', errors='replace').splitlines()
+
+    if is_dssp4(dssp_version):
+        if native_ppii:
+            return tab_output
+        tab_output = remove_native_ppii(tab_output)
+
+    return assign_ppii(tab_output)
+
+
+def assign_ppii(tab_output):
+    """
+    Parse DSSP output to include PPII as secondary structure.
+
+    Parameters
+    ----------
+    tab_output : list of str
+        List of every line of DSSP output, in the classic DSSP format.
 
     Returns
     -------
@@ -143,11 +198,6 @@ def dssp_ppii_assignment(pdb_file, dssp_cmd="dssp"):
     inf_psi = cannonical_psi - epsilon
 
     tab_new_dssp = []
-
-    # Launch DSSP
-    run_dssp = os.popen(dssp_cmd + " -i " + pdb_file).read()
-    tab_output = list(run_dssp.split("\n"))
-    tab_output.pop()
 
     # Parsing DSSP to detect Polyproline II Helix
     for line in tab_output:
@@ -298,7 +348,7 @@ def parsing_dssp(ref_tab_out_dssp):
 def main(
         pdb_file,
         output,
-        dssp_cmd="dssp",
+        dssp_cmd="mkdssp",
         horizontal=False,
         ncores=1,
         **kwargs,
@@ -317,7 +367,7 @@ def main(
 
     dssp_cmd : string, optional
         If given runs dssp as per user specification, else runs dssp as
-        default.  Defaults to `dssp`.
+        default.  Defaults to `mkdssp`.
 
     horizontal : bool, optional
         If given the output will be a 1D line of DSSP-PPII codes, else
@@ -326,7 +376,10 @@ def main(
     init_files(log, LOGFILESNAME)
     log.info(T('reading and processing DSSP information...'))
 
-    ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd)
+    dssp_version = get_dssp_version(dssp_cmd)
+    log.info(S(f'DSSP version: {dssp_version_str(dssp_version)}'))
+
+    ref_tab_out_dssp = dssp_ppii_assignment(pdb_file, dssp_cmd, dssp_version)
 
     if horizontal:
         ref_tab_out_dssp_horiz = parsing_dssp(ref_tab_out_dssp)

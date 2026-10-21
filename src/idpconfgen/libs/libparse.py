@@ -5,7 +5,6 @@ All functions in this module receive a certain Python native datastructure,
 parse the information inside and return/yield the parsed information.
 """
 import ast
-import subprocess
 from functools import partial
 from itertools import product, repeat
 from operator import setitem
@@ -21,6 +20,7 @@ from idpconfgen.core.definitions import (
     jsonparameters,
     )
 from idpconfgen.core.exceptions import DSSPParserError
+from idpconfgen.libs.libdssp import DSSP_RESIDUE_HEADER, run_dssp
 from idpconfgen.libs.libfunc import chainfs, consume
 from idpconfgen.libs.libpdb import PDBIDFactory, atom_resSeq
 from idpconfgen.logger import S
@@ -129,7 +129,8 @@ def mkdssp_w_split(pdb, cmd, **kwargs):
     as identified by `mkdssp`. Splits the input PDB into bb continuity
     segments.
 
-    https://github.com/cmbi/dssp
+    Supports DSSP v2 and v3 (https://github.com/cmbi/dssp) and
+    DSSP v4 (https://github.com/PDB-REDO/dssp).
 
     Parameters
     ----------
@@ -144,11 +145,8 @@ def mkdssp_w_split(pdb, cmd, **kwargs):
     from `split_pdb_by_dssp`
     """
     pdbfile = pdb.resolve()
-    _cmd = [cmd, '-i', str(pdbfile)]
-    result = subprocess.run(_cmd, capture_output=True)
-    # if subpress.run fails, the parser will raise an error,
-    # no need to assert result.returncode
-    yield from split_pdb_by_dssp(pdbfile, result.stdout, **kwargs)
+    dssp_output = run_dssp(pdbfile, dssp_cmd=cmd)
+    yield from split_pdb_by_dssp(pdbfile, dssp_output, **kwargs)
 
 
 def split_pdb_by_dssp(pdbfile, dssp_text, minimum=2, reduced=False):
@@ -240,13 +238,18 @@ def parse_dssp(data, reduced=False):
     # RM means removed empty
     RM1 = (i for i in data_ if i)
 
-    # exausts generator until
+    # exausts generator until the header of the residue table
+    # mmCIF files (the default output of DSSP v4) also have lines
+    # starting with '#', those must not be taken as the header
+    header = DSSP_RESIDUE_HEADER.strip().encode()
     for line in RM1:
-        if line.strip().startswith(b'#'):
+        if line.strip().startswith(header):
             break
     else:
         # if the whole generator is exhausted
-        raise DSSPParserError("File exhausted without finding '#'")
+        raise DSSPParserError(
+            f"File exhausted without finding '{header.decode()}'"
+            )
 
     dssp = []
     fasta = []

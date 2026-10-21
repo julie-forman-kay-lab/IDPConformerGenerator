@@ -9,7 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
-* Update IDPConformerGenerator to recognize DSSP v4.X versions as well as retain backwards compatibility
+* Added support DSSP v4 in ``sscalc`` and ``dssppii``, with backward compatibility for DSSP v2 and v3.
+* By default, the PPII helices assigned by DSSP v4 are replaced with DSSP-PPII, as used with DSSP v2 and v3. ``sscalc --native-ppii`` keeps them.
 
 v0.8.2 (2026-06-22)
 ------------------------------------------------------------

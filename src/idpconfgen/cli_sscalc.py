@@ -7,7 +7,7 @@ This client is upgraded to DSSP-PPII according to:
    PolyProline II conformation and analysis od sequence-structure
    relationship. PLoS One 6(3): e18401. doi:10.1371/journal.pone.0018401
 
-Uses an external third party software.
+Uses an external third party software: DSSP v2, v3 or v4.
 
 USAGE:
     $ idpconfgen sscalc [PDBS]
@@ -25,6 +25,7 @@ from idpconfgen import Path, log
 from idpconfgen.cli_dssppii import dssp_ppii_assignment
 from idpconfgen.components.plots.plotfuncs import plot_fracSS
 from idpconfgen.libs import libcli
+from idpconfgen.libs.libdssp import dssp_version_str, get_dssp_version, is_dssp4
 from idpconfgen.libs.libio import (
     extract_from_tar,
     read_dictionary_from_disk,
@@ -60,8 +61,21 @@ libcli.add_argument_pdb_files(ap)
 ap.add_argument(
     '-cmd',
     '--dssp_cmd',
-    help="Shell command for the DSSP executable. Defaults to `mkdssp`.",
+    help=(
+        "Command or path to the DSSP executable. "
+        "DSSP v2, v3, and v4 are supported. Defaults to `mkdssp`."
+        ),
     default="mkdssp",
+    )
+
+ap.add_argument(
+    '--native-ppii',
+    help=(
+        "DSSP v4 only. Keep the polyproline II (P) helices assigned by "
+        "DSSP v4. By default, they are reset and PPII is assigned with "
+        "DSSP-PPII, as for DSSP v2 and v3."
+        ),
+    action='store_true',
     )
 
 ap.add_argument(
@@ -116,20 +130,33 @@ libcli.add_argument_ncores(ap)
 libcli.add_argument_plot(ap)
 
 
-def dssppi_helper(pdb_file, dssp_cmd, **kwargs):
+def dssppi_helper(
+        pdb_file,
+        dssp_cmd,
+        dssp_version=None,
+        native_ppii=False,
+        **kwargs,
+        ):
     """."""
     pf = pdb_file.resolve()
-    result = str.encode(os.linesep.join(dssp_ppii_assignment(str(pf), dssp_cmd)))  # noqa: E501
+    dssp_lines = dssp_ppii_assignment(
+        str(pf),
+        dssp_cmd,
+        dssp_version=dssp_version,
+        native_ppii=native_ppii,
+        )
+    result = str.encode(os.linesep.join(dssp_lines))
     yield from split_pdb_by_dssp(pf, result, **kwargs)
 
 
 def main(
         pdb_files,
-        dssp_cmd="dssp",
+        dssp_cmd="mkdssp",
         chunks=1000,
         destination='sscalc_splitted.tar',
         func=None,  # here just to receive from main cli.py
         minimum=3,
+        native_ppii=False,
         ncores=1,
         output='sscalc_output.json',
         reduced=False,
@@ -143,8 +170,8 @@ def main(
 
     Parameters
     ----------
-    ss_cmd : str or Path
-        The command to run with subprocess module.
+    dssp_cmd : str or Path
+        The DSSP executable (DSSP v2, v3 or v4), or a command that runs it.
 
     pdb_files : str or Path, required
         Location for PDB files to operate on, can be within a folder or inside .TAR file
@@ -159,6 +186,10 @@ def main(
 
     reduced : Bool, optional
         Whether to reduce secondary structure information to L/H/E
+
+    native_ppii : Bool, optional
+        DSSP v4 only. Whether to keep the PPII helices assigned by DSSP v4
+        instead of assigning PPII with DSSP-PPII. Defaults to False.
 
     ncores : int
         The numbers of cores to use.
@@ -177,6 +208,19 @@ def main(
     if update:
         previous = read_dictionary_from_disk(update)
 
+    # the same applies to the DSSP executable
+    dssp_version = get_dssp_version(dssp_cmd)
+    log.info(S(f'DSSP version: {dssp_version_str(dssp_version)}'))
+    if dssp_version is None:
+        log.info(S('could not read the DSSP version, assuming DSSP v2/v3'))
+
+    if is_dssp4(dssp_version) and native_ppii:
+        log.info(S('using the PPII helices assigned by DSSP v4'))
+    elif is_dssp4(dssp_version):
+        log.info(S('replacing the PPII helices of DSSP v4 with DSSP-PPII'))
+    elif native_ppii:
+        log.info(S('--native-ppii is only for DSSP v4, ignoring it'))
+
     # TODO: REFACTOR THIS BLOCK
     log.info(T('reading input paths'))
     try:
@@ -194,6 +238,8 @@ def main(
             consume_iterable_in_list,
             dssppi_helper,
             dssp_cmd=dssp_cmd,
+            dssp_version=dssp_version,
+            native_ppii=native_ppii,
             reduced=reduced,
             minimum=minimum,
             )
