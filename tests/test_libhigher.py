@@ -25,12 +25,15 @@ def test_bgeo_database():
 
     assert set(results.keys()) == set(expected.keys())
 
+    # angles are calculated from float32 coordinates, so they can differ
+    # from the expected values by about 1e-7 depending on the CPU and the
+    # BLAS library
     for key in results.keys():
         for k2 in results[key].keys():
             r = results[key][k2]
             e = expected[key][k2]
 
-            assert all(r[i] - e[i] < 0.00000000001 for i in range(len(r)))
+            np.testing.assert_allclose(r, e, rtol=0, atol=1e-6)
 
     return
 
