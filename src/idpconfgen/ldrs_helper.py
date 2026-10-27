@@ -8,11 +8,10 @@ Name: FLDR/S (Folded disordered region/structure sampling)
 import math
 import os
 import random
-from functools import partial
 from itertools import combinations, islice, product
-from types import SimpleNamespace
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 from idpconfgen import Path, log
 from idpconfgen.core.build_definitions import (
@@ -28,8 +27,6 @@ from idpconfgen.core.definitions import (
     )
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs.libcalc import calc_torsion_angles, make_coord_Q_planar
-from idpconfgen.libs.libmulticore import pool_function
-from idpconfgen.libs.libparse import convert_tuples_to_lists
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
@@ -220,6 +217,72 @@ def _idr_rows(rows, case=None):
     return rows[np.isin(resseq, keep)]
 
 
+class _AtomSet:
+    """
+    Coordinates and vdW radii of atoms, as :func:`count_clashes` sees them.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Data array rows of the atoms.
+    """
+
+    def __init__(self, rows):
+        self.coords = rows[:, cols_coords].astype(np.float64)
+        self.radii = atom_vdw_radii(rows[:, col_element], rows[:, col_name])
+        if len(self.coords):
+            self.low = self.coords.min(axis=0)
+            self.high = self.coords.max(axis=0)
+        self._tree = None
+
+    @property
+    def tree(self):
+        """KD-tree of the coordinates, built on first use."""
+        if self._tree is None:
+            self._tree = cKDTree(self.coords)
+        return self._tree
+
+
+def _count_contacts(first, second, tolerance):
+    """
+    Count atom pairs closer than their vdW radii sum plus `tolerance`.
+
+    Parameters
+    ----------
+    first, second : :class:`_AtomSet`
+
+    tolerance : float
+        Added to every vdW radii sum (Angstrom), as in
+        :func:`count_clashes`.
+
+    Returns
+    -------
+    int
+    """
+    if not len(first.coords) or not len(second.coords):
+        return 0
+    reach = first.radii.max() + second.radii.max() + tolerance
+    if np.any(first.low - reach > second.high) \
+            or np.any(second.low - reach > first.high):
+        return 0
+    pairs = first.tree.sparse_distance_matrix(
+        second.tree,
+        reach,
+        output_type='ndarray',
+        )
+    if not len(pairs):
+        return 0
+    limit = first.radii[pairs['i']] + second.radii[pairs['j']] + tolerance
+    return int(np.count_nonzero(pairs['v'] < limit))
+
+
+def _fragment_rows(path):
+    """Return the data array of a fragment file."""
+    structure = Structure(Path(path))
+    structure.build()
+    return structure.data_array
+
+
 def combinations_clash_check(selected, cases=None):
     """
     Clash-check IDRs within a combination against each other.
@@ -252,19 +315,10 @@ def combinations_clash_check(selected, cases=None):
     idrs = []
     for item, case in zip(selected, cases):
         for path in _combination_fragments(item):
-            structure = Structure(path)
-            structure.build()
-            rows = _idr_rows(structure.data_array, case)
-            if len(rows):
-                idrs.append(rows)
+            idrs.append(_AtomSet(_idr_rows(_fragment_rows(path), case)))
 
     for first, second in combinations(idrs, 2):
-        num_clashes, _ = count_clashes(
-            first,
-            SimpleNamespace(data_array=second),
-            tolerance=1.0,
-            )
-        if type(num_clashes) is bool:
+        if _count_contacts(first, second, 1.0) > 40:
             return False
 
     return selected
@@ -303,6 +357,226 @@ def _random_combinations(lst):
         yield tuple(items[i] for items, i in zip(lst, indexes))
 
 
+def _assemble_combinations(sizes, num, passes, max_trials, attempts=4):
+    """
+    Choose up to `num` distinct combinations of one item per list.
+
+    Parameters
+    ----------
+    sizes : list of int
+        Number of items of each list.
+
+    num : int
+        Number of combinations wanted.
+
+    passes : callable
+        Takes a tuple with one item index per list and returns whether
+        the combination is acceptable.
+
+    max_trials : int
+        Maximum number of distinct combinations checked with `passes`.
+
+    attempts : int, optional
+        Maximum number of assemblies.
+
+    Returns
+    -------
+    list of tuple
+        The accepted index tuples.
+
+    int
+        Number of distinct combinations checked.
+    """
+    results = {}
+
+    def checked(indexes):
+        if indexes not in results:
+            results[indexes] = bool(passes(indexes))
+        return results[indexes]
+
+    def spread(chosen):
+        """Count the combinations and the distinct items they use."""
+        distinct = [len({indexes[k] for indexes in chosen}) for k in range(len(sizes))]  # noqa: E501
+        return len(chosen), sum(distinct), distinct
+
+    best = None
+    for _ in range(max(1, attempts)):
+        budget = max_trials - len(results)
+        if best is not None and budget <= 0:
+            break
+        chosen = _assemble_once(sizes, num, checked, max(0, budget), results)
+        score = spread(chosen)
+        if best is None or score[:2] > best[0][:2]:
+            best = (score, chosen)
+        count, _total, distinct = best[0]
+        if count == num and all(
+                d == min(size, count) for d, size in zip(distinct, sizes)
+                ):
+            # no item is reused that could have been avoided
+            break
+    return best[1], len(results)
+
+
+def _assemble_once(sizes, num, passes, max_trials, known=None):
+    """
+    Assemble up to `num` distinct combinations of one item per list.
+
+    Parameters
+    ----------
+    sizes, num, passes
+        As in :func:`_assemble_combinations`.
+
+    max_trials : int
+        Maximum number of combinations checked that are not in `known`.
+
+    known : dict, optional
+        Results of `passes` known already, by index tuple.
+
+    Returns
+    -------
+    list of tuple
+        The accepted index tuples.
+    """
+    chosen = []
+    used = set()
+    results = dict(known or {})
+    tried = 0
+    usage = [[0] * size for size in sizes]
+    # how many combinations each item of a list may take part in
+    quota = [max(1, -(-num // max(1, size))) for size in sizes]
+
+    def test(indexes):
+        nonlocal tried
+        if indexes not in results:
+            if tried >= max_trials:
+                return False
+            tried += 1
+            results[indexes] = bool(passes(indexes))
+        return results[indexes]
+
+    def count(indexes, step=1):
+        for counts, i in zip(usage, indexes):
+            counts[i] += step
+
+    def free_items():
+        """Return the items of each list below their quota, least used first."""
+        pools = []
+        for counts, limit in zip(usage, quota):
+            pool = [i for i, c in enumerate(counts) if c < limit]
+            random.shuffle(pool)
+            # least used first; the sort keeps the shuffled order of ties
+            pool.sort(key=counts.__getitem__)
+            pools.append(pool)
+        return pools
+
+    # zip the free items of every list
+    idle = 0
+    while len(chosen) < num and tried < max_trials and idle < 3:
+        pools = free_items()
+        if not all(pools):
+            break
+        accepted = 0
+        for indexes in zip(*pools):
+            if len(chosen) == num:
+                break
+            if indexes not in used and test(indexes):
+                chosen.append(indexes)
+                used.add(indexes)
+                count(indexes)
+                accepted += 1
+        idle = 0 if accepted else idle + 1
+
+    # place the free items left over by exchanging one item with an
+    # accepted combination
+    limit = tried + (max_trials - tried) // 2
+    placed = True
+    while placed and chosen and len(chosen) < num and tried < limit:
+        placed = False
+        pools = free_items()
+        if not all(pools):
+            break
+        partners = random.sample(range(len(chosen)), min(len(chosen), 32))
+        for left in zip(*pools):
+            for a in partners:
+                accepted = chosen[a]
+                for k in range(len(sizes)):
+                    swapped = accepted[:k] + (left[k],) + accepted[k + 1:]
+                    other = left[:k] + (accepted[k],) + left[k + 1:]
+                    if swapped in used or other in used or swapped == other:
+                        continue
+                    if test(swapped) and test(other):
+                        used.discard(accepted)
+                        chosen[a] = swapped
+                        chosen.append(other)
+                        used.update((swapped, other))
+                        # left[k] joins `swapped`; accepted[k] moves on to
+                        # `other` with the other items of `left`
+                        count(left)
+                        placed = True
+                        break
+                    if tried >= limit:
+                        break
+                if placed or tried >= limit:
+                    break
+            if placed or tried >= limit:
+                break
+
+    # complete with distinct combinations, reusing the least used items
+    def load(indexes):
+        counts = [c[i] for c, i in zip(usage, indexes)]
+        return max(counts), sum(counts)
+
+    width = 2
+    while len(chosen) < num and tried < max_trials:
+        tops = []
+        for counts in usage:
+            order = list(range(len(counts)))
+            random.shuffle(order)
+            order.sort(key=counts.__getitem__)
+            tops.append(order[:width])
+        if math.prod(len(top) for top in tops) > 50_000:
+            break
+        candidates = [
+            indexes for indexes in product(*tops)
+            if indexes not in used and results.get(indexes, True)
+            ]
+        candidates.sort(key=load)
+        for indexes in candidates:
+            if tried >= max_trials:
+                break
+            if test(indexes):
+                chosen.append(indexes)
+                used.add(indexes)
+                count(indexes)
+                break
+        else:
+            if all(width >= size for size in sizes):
+                break
+            width *= 2
+
+    # many long lists: draw the combinations at random instead
+    candidates = _random_combinations([range(size) for size in sizes])
+    while len(chosen) < num and tried < max_trials:
+        batch = list(islice(candidates, 256))
+        if not batch:
+            break
+        # skip the chosen combinations and those that failed already
+        batch = [
+            indexes for indexes in batch
+            if indexes not in used and results.get(indexes, True)
+            ]
+        # the combination of the least used items first, as usage changes
+        while batch and len(chosen) < num and tried < max_trials:
+            indexes = min(batch, key=load)
+            batch.remove(indexes)
+            if test(indexes):
+                chosen.append(indexes)
+                used.add(indexes)
+                count(indexes)
+
+    return chosen
+
+
 def create_combinations(
         lst,
         num_combinations,
@@ -314,12 +588,16 @@ def create_combinations(
     Create unique combinations between list of lists.
     
     Made for N-IDR and C-IDR combinations. Where list1 = N-IDR paths,
-    and list2 = C-IDR paths. Itertools product is used here because
-    order matters.
+    and list2 = C-IDR paths. One item is taken from each list, in order.
 
-    Combinations are drawn at random without repetition and clash-checked
-    with :func:`combinations_clash_check` until ``num_combinations`` pass,
-    every combination was tried, or ``max_trials`` were tried.
+    Each item takes part in at most one combination while that is
+    possible (items of lists shorter than ``num_combinations`` about
+    equally often), and items are reused only to complete
+    ``num_combinations``, the least used first (see
+    :func:`_assemble_combinations`). No combination is repeated.
+    Every pair of IDR fragments of a combination must pass the clash
+    check of :func:`combinations_clash_check`. Each fragment is read once
+    and each pair of fragments checked once.
     
     Parameters
     ----------
@@ -331,16 +609,16 @@ def create_combinations(
         Number of combinations to create.
     
     ncores : int
-        Number of cores to use for clash-checking against multiple IDR
-        combinations.
+        Not used, kept for compatibility: the clash checks run in this
+        process.
 
     max_trials : int, optional
         Maximum number of combinations to clash-check.
-        Defaults to ``max(100, 20 * num_combinations)``.
+        Defaults to ``max(1000, 100 * num_combinations)``.
 
     cases : list of str, optional
-        Disorder case of each list in ``lst``, given to
-        :func:`combinations_clash_check`.
+        Disorder case of each list in ``lst`` (see
+        :func:`combinations_clash_check`).
     
     Return
     ------
@@ -355,32 +633,50 @@ def create_combinations(
     IDPConfGenException
         If no combination passed the clash check.
     """
-    candidates = _random_combinations(lst)
-
     if len(lst) == 1:
-        return convert_tuples_to_lists(islice(candidates, num_combinations))
+        items = list(lst[0])
+        random.shuffle(items)
+        return [[item] for item in items[:num_combinations]]
 
     if max_trials is None:
-        max_trials = max(100, 20 * num_combinations)
+        max_trials = max(1000, 100 * num_combinations)
+    if cases is None:
+        cases = [None] * len(lst)
 
-    check = partial(combinations_clash_check, cases=cases)
-    passed = []
-    tried = 0
-    while len(passed) < num_combinations and tried < max_trials:
-        batch_size = min(
-            max(num_combinations - len(passed), ncores),
-            max_trials - tried,
-            )
-        batch = list(islice(candidates, batch_size))
-        if not batch:
-            break
-        tried += len(batch)
-        execute_clash = pool_function(check, batch, ncores=ncores)
-        for result in execute_clash:
-            if result is not False:
-                passed.append(result)
+    atoms = {}
 
-    if not passed:
+    def fragments(k, i):
+        if (k, i) not in atoms:
+            atoms[k, i] = [
+                _AtomSet(_idr_rows(_fragment_rows(path), cases[k]))
+                for path in _combination_fragments(lst[k][i])
+                ]
+        return atoms[k, i]
+
+    pair_ok = {}
+
+    def passes(indexes):
+        sets = [
+            ((k, i, f), atom_set)
+            for k, i in enumerate(indexes)
+            for f, atom_set in enumerate(fragments(k, i))
+            ]
+        for (key1, first), (key2, second) in combinations(sets, 2):
+            key = (key1, key2)
+            if key not in pair_ok:
+                pair_ok[key] = _count_contacts(first, second, 1.0) <= 40
+            if not pair_ok[key]:
+                return False
+        return True
+
+    chosen, tried = _assemble_combinations(
+        [len(items) for items in lst],
+        num_combinations,
+        passes,
+        max_trials,
+        )
+
+    if not chosen:
         raise IDPConfGenException(errmsg=(
             f"None of the {tried} combinations of IDR conformers tried "
             "passed the clash check between IDRs (more than 40 contacts "
@@ -388,19 +684,24 @@ def create_combinations(
             "for each IDR."
             ))
 
-    if len(passed) < num_combinations:
+    if len(chosen) < num_combinations:
         log.warning(
-            f"Only {len(passed)} of the {num_combinations} requested "
+            f"Only {len(chosen)} of the {num_combinations} requested "
             f"combinations of IDR conformers passed the clash check "
             f"between IDRs ({tried} tried)."
             )
 
-    return convert_tuples_to_lists(passed[:num_combinations])
+    return [[lst[k][i] for k, i in enumerate(indexes)] for indexes in chosen]
 
 
 def create_all_combinations(folder, chains, nconfs, ncores=1):
     """
     Generate combinations of all cases.
+
+    The IDRs of a chain are combined at once (see
+    :func:`create_combinations`), so that each conformer of each IDR is
+    used in at most one combination while that is possible, and the
+    conformers of an IDR with fewer than `nconfs` about equally often.
 
     Parameters
     ----------
@@ -414,8 +715,7 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
         Desired number of list elements based on number of conformers.
     
     ncores : int
-        Number of cores to perform multiprocessing with.
-        Exists for clash-checking step for all combinations.
+        Passed to :func:`create_combinations`.
     
     Returns
     -------
@@ -432,7 +732,7 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
         lidr_path = chain_path.joinpath(disorder_cases[1])
         cidr_path = chain_path.joinpath(disorder_cases[2])
         nidr_files = []
-        lidr_combinations = []
+        lidr_confs_lst = []
         cidr_files = []
 
         if os.path.isdir(nidr_path):
@@ -444,39 +744,109 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
                 os.listdir(lidr_path),
                 key=lambda name: int(name.rsplit('_', 1)[-1]),
                 )
-            lidr_confs_lst = []
             for cpath in lidr_cases_dir:
                 num = cpath.rsplit('_', 1)[-1]
                 lidr_matches = lidr_path.joinpath(cpath, f"{num}_match")
                 lidr_confs = os.listdir(lidr_matches)
                 lidr_files = [Path(lidr_matches.joinpath(fpath)) for fpath in lidr_confs]  # noqa: E501
                 lidr_confs_lst.append(lidr_files)
-            lidr_combinations = create_combinations(
-                lidr_confs_lst,
-                nconfs,
-                ncores,
-                cases=[lidr] * len(lidr_confs_lst),
-                )
         if os.path.isdir(cidr_path):
             cidr_confs = os.listdir(cidr_path)
             cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]  # noqa: E501
 
-        if len(nidr_files) and len(cidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs, ncores, cases=[nidr, lidr, cidr])  # noqa: E501
-        elif len(nidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([nidr_files, lidr_combinations], nconfs, ncores, cases=[nidr, lidr])  # noqa: E501
-        elif len(cidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([lidr_combinations, cidr_files], nconfs, ncores, cases=[lidr, cidr])  # noqa: E501
-        elif len(nidr_files) and len(cidr_files) > 0:
-            combinations[c] = create_combinations([nidr_files, cidr_files], nconfs, ncores, cases=[nidr, cidr])  # noqa: E501
-        elif len(nidr_files) > 0:
-            combinations[c] = nidr_files[0:nconfs]
-        elif len(lidr_combinations) > 0:
-            combinations[c] = lidr_combinations
-        elif len(cidr_files) > 0:
-            combinations[c] = cidr_files[0:nconfs]
+        if not lidr_confs_lst and not (len(nidr_files) and len(cidr_files)):
+            # a single N-IDR or C-IDR
+            if len(nidr_files) > 0:
+                combinations[c] = nidr_files[0:nconfs]
+            elif len(cidr_files) > 0:
+                combinations[c] = cidr_files[0:nconfs]
+            continue
+
+        lists = []
+        cases = []
+        if nidr_files:
+            lists.append(nidr_files)
+            cases.append(nidr)
+        lists.extend(lidr_confs_lst)
+        cases.extend([lidr] * len(lidr_confs_lst))
+        if cidr_files:
+            lists.append(cidr_files)
+            cases.append(cidr)
+
+        first = 1 if nidr_files else 0
+        nlinkers = len(lidr_confs_lst)
+        chain_combinations = []
+        for combo in create_combinations(lists, nconfs, ncores, cases=cases):
+            linkers = combo[first:first + nlinkers]
+            if not nidr_files and not cidr_files:
+                # Linker-IDRs only: a flat list
+                chain_combinations.append(linkers)
+                continue
+            entry = []
+            if nidr_files:
+                entry.append(combo[0])
+            if nlinkers:
+                entry.append(linkers)
+            if cidr_files:
+                entry.append(combo[-1])
+            chain_combinations.append(entry)
+        combinations[c] = chain_combinations
     
     return combinations
+
+
+def _loop_ca(path):
+    """Return the C-alpha coordinates of the IDR residues of a loop file."""
+    ca = {}
+    with open(path) as fin:
+        for line in fin:
+            if line.startswith(('ATOM', 'HETATM')) \
+                    and line[12:16].strip() == 'CA':
+                ca[int(line[22:26])] = (
+                    float(line[30:38]),
+                    float(line[38:46]),
+                    float(line[46:54]),
+                    )
+    residues = sorted(ca)[2:-2]
+    return np.array([ca[r] for r in residues], dtype=np.float64).reshape(-1, 3)
+
+
+def prune_duplicate_loops(folder, min_rmsd=0.5):
+    """
+    Delete Linker-IDR loops that repeat another loop of `folder`.
+
+    Parameters
+    ----------
+    folder : str or Path
+        Folder with the loops (``*.pdb``) of one Linker-IDR.
+
+    min_rmsd : float
+        Smallest C-alpha RMSD (Angstrom) between two distinct loops.
+
+    Returns
+    -------
+    int
+        Number of loops left in `folder`.
+    """
+    kept = {}
+    count = 0
+    paths = [
+        os.path.join(str(folder), name)
+        for name in os.listdir(folder)
+        if name.endswith('.pdb')
+        ]
+    paths.sort(key=lambda path: (os.stat(path).st_mtime_ns, path))
+    for path in paths:
+        ca = _loop_ca(path)
+        same = kept.setdefault(ca.shape, [])
+        if same and len(ca):
+            rmsd = np.sqrt(((np.array(same) - ca) ** 2).sum(axis=2).mean(axis=1))  # noqa: E501
+            if rmsd.min() < min_rmsd:
+                os.remove(path)
+                continue
+        same.append(ca)
+        count += 1
+    return count
 
 
 def break_check(fdata, membrane=False):
@@ -1205,11 +1575,12 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
     """
     Check for clashes between all chains of IDRs.
 
-    Combinations of one entry per chain are drawn at random without
-    repetition until ``nconfs`` pass, every combination was tried, or
-    ``max_trials`` were tried. A combination passes when no IDR of a
-    chain has a contact (within the vdW radii sum + 0.4 A) with an IDR
-    of another chain.
+    Combinations of one entry per chain are assembled as in
+    :func:`create_combinations`: each entry of a chain is used in at most
+    one combination while that is possible, and entries are reused only
+    to complete ``nconfs``, the least used first. No combination is
+    repeated. A combination     passes when no IDR of a chain has a
+    contact (within the vdW radii sum + 0.4 A) with an IDR of another chain.
 
     Parameters
     ----------
@@ -1247,57 +1618,56 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
             for sele in all_files[chain]
             ])
 
-    structures = {}
+    atoms = {}
 
-    def _built(path):
-        if path not in structures:
-            structure = Structure(path)
-            structure.build()
-            structures[path] = structure
-        return structures[path]
+    def fragments(k, i):
+        if (k, i) not in atoms:
+            atoms[k, i] = [
+                _AtomSet(_fragment_rows(path))
+                for path in _combination_fragments(selections[k][i])
+                ]
+        return atoms[k, i]
 
-    final_combos = []
-    tried = 0
-    for candidate_combo in _random_combinations(selections):
-        if len(final_combos) == nconfs or tried == max_trials:
-            break
-        tried += 1
+    pair_ok = {}
 
-        clash = False
-        for idr_set1, idr_set2 in combinations(candidate_combo, 2):
-            idr_pairs = product(
-                _combination_fragments(idr_set1),
-                _combination_fragments(idr_set2),
-                )
-            for path1, path2 in idr_pairs:
-                clashes, _ = count_clashes(
-                    _built(path1).data_array,
-                    _built(path2),
+    def passes(indexes):
+        for (k1, i1), (k2, i2) in combinations(enumerate(indexes), 2):
+            key = (k1, i1, k2, i2)
+            if key not in pair_ok:
+                pair_ok[key] = all(
+                    _count_contacts(first, second, 0.4) == 0
+                    for first in fragments(k1, i1)
+                    for second in fragments(k2, i2)
                     )
-                if clashes:
-                    clash = True
-                    break
-            if clash:
-                break
+            if not pair_ok[key]:
+                return False
+        return True
 
-        if not clash:
-            final_combos.append(dict(zip(chains, candidate_combo)))
+    chosen, tried = _assemble_combinations(
+        [len(entries) for entries in selections],
+        nconfs,
+        passes,
+        max_trials,
+        )
 
-    if not final_combos:
+    if not chosen:
         raise IDPConfGenException(errmsg=(
             f"None of the {tried} combinations of IDR conformers across "
             "chains tried passed the clash check between chains. Build "
             "more conformers for each IDR."
             ))
 
-    if len(final_combos) < nconfs:
+    if len(chosen) < nconfs:
         log.warning(
-            f"Only {len(final_combos)} of the {nconfs} requested "
+            f"Only {len(chosen)} of the {nconfs} requested "
             "combinations of IDR conformers passed the clash check "
             f"between chains ({tried} tried)."
             )
 
-    return final_combos
+    return [
+        {chain: selections[k][i] for k, (chain, i) in enumerate(zip(chains, indexes))}  # noqa: E501
+        for indexes in chosen
+        ]
 
 
 def atom_vdw_radii(elements, names=None, default=1.7):

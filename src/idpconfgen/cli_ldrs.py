@@ -87,6 +87,7 @@ from idpconfgen.ldrs_helper import (
     inter_chain_cc,
     next_seeker,
     prepare_ccd_context,
+    prune_duplicate_loops,
     psurgeon,
     splice_folded_rows,
     tolerance_calculator,
@@ -248,6 +249,9 @@ def are_globals(bgeo_strategy):
 # Methods to close Linker-IDRs between two folded regions; the first one
 # is the default.
 LOOP_CLOSURE_METHODS = ('next_seeker', 'ccd')
+# rounds in a row without a new distinct Linker-IDR loop before ldrs goes on
+# with the loops it has
+LOOP_STALL_ROUNDS = 5
 
 # CLI argument parser parameters
 _name = 'ldrs'
@@ -346,8 +350,11 @@ ap.add_argument(
     '--ccd-max-trials',
     help=(
         "With `--loop-closure ccd`: number of backbone conformers each "
-        "core may try per Linker-IDR conformer it must deliver before "
-        "giving up. Defaults to 100."
+        "core may try per Linker-IDR conformer it must deliver in a round. "
+        "ldrs stops if the first round closes no loop; otherwise it keeps "
+        "closing loops until all conformers are built, or until "
+        f"{LOOP_STALL_ROUNDS} rounds in a row add no new distinct loop. "
+        "Defaults to 100."
         ),
     type=int,
     default=100,
@@ -961,8 +968,10 @@ def main(
                     linker_of.joinpath(f"{linkeridr_num}_match")
                     )
 
-                match_of_files = next(os.walk(match_of))[2]
-                num_files = len(match_of_files)
+                # distinct joined loops (see `prune_duplicate_loops`)
+                num_files = prune_duplicate_loops(match_of)
+                # rounds in a row whose new loops all repeat earlier ones
+                repeats = 0
                 # conformers already checked against each other
                 checked_C = []
                 checked_N = []
@@ -1099,10 +1108,18 @@ def main(
                     checked_C = C_files
                     checked_N = N_files
                     
-                    match_of_files = next(os.walk(match_of))[2]
-                    num_files = len(match_of_files)
-                    log.info(f"Generated {num_files} L-IDR models this run.")
+                    previous = num_files
+                    written = len(glob(str(match_of) + "/*.pdb")) - previous
+                    num_files = prune_duplicate_loops(match_of)
+                    log.info(f"{num_files} distinct L-IDR models so far.")
                     lidr_set += 1
+                    if num_files > previous:
+                        repeats = 0
+                    elif written:
+                        repeats += 1
+                        if repeats == LOOP_STALL_ROUNDS:
+                            log.info(S(_stalled_loops_warning(num_files, nconfs)))  # noqa: E501
+                            break
 
                 linkeridr_num += 1
 
@@ -1302,10 +1319,10 @@ def _close_linker_ccd(
     """
     Write `nconfs` Linker-IDR conformers closed in torsion space.
 
-    Backbone generation and closure are distributed over `ncores`. New
-    rounds run while the previous one closed at least one loop; a round
-    that closes none raises :class:`IDPConfGenException` with a summary of
-    the rejections.
+    Backbone generation and closure are distributed over `ncores`, in
+    rounds that run until the desired number of distinct loops are
+    written (repeats are deleted), or until `LOOP_STALL_ROUNDS`
+    rounds in a row add no distinct loop (a warning is logged).
 
     Parameters
     ----------
@@ -1326,7 +1343,7 @@ def _close_linker_ccd(
         Where closed loops are written (the `next_seeker` match folder).
 
     max_trials : int
-        Backbones each core may try per loop it must deliver.
+        Backbones each core may try per loop it must deliver in a round.
 
     max_clash, tolerance : int, float
         Clash budget and distance tolerance against the folded structure.
@@ -1335,7 +1352,8 @@ def _close_linker_ccd(
         Passed to :func:`_build_ccd_loops`.
     """
     def n_done():
-        return len(glob(os.path.join(str(output_folder), '*.pdb')))
+        # distinct loops only: repeats are deleted
+        return prune_duplicate_loops(output_folder)
 
     consume = partial(
         _build_ccd_loops,
@@ -1366,13 +1384,25 @@ def _close_linker_ccd(
     reasons = {}
     trials = 0
     round_ = 0
-    while n_done() < nconfs:
-        needed = nconfs - n_done()
-        workers = max(1, min(ncores, needed))
+    # rounds in a row that added no distinct loop
+    stalled = 0
+    done = n_done()
+    while done < nconfs:
+        needed = nconfs - done
+        if round_ == 0:
+            workers = max(1, min(ncores, needed))
+            quotas = [
+                needed // workers + int(worker < needed % workers)
+                for worker in range(workers)
+                ]
+        else:
+            # every core works on the loops left
+            workers = max(1, ncores)
+            quotas = [-(-needed // workers)] * workers
         tasks = [
             (
                 worker,
-                needed // workers + int(worker < needed % workers),
+                quotas[worker],
                 random_seed + 104729 * index + 7919 * round_ + worker,
                 round_,
                 )
@@ -1394,18 +1424,27 @@ def _close_linker_ccd(
             f'{reason}={count}'
             for reason, count in sorted(reasons.items(), key=lambda x: -x[1])
             )
+        previous = done
+        done = n_done()
         log.info(S(
             f'Loop closure round {round_ + 1}: {built} closed; '
-            f'{n_done()}/{nconfs} from {trials} backbones '
+            f'{min(done, nconfs)}/{nconfs} distinct from {trials} backbones '
             f'(rejected: {summary or "none"}).'
             ))
-        if built == 0:
+        if built == 0 and round_ == 0:
             raise IDPConfGenException(errmsg=(
                 f'Could not close the Linker-IDR {input_seq} in '
                 f'{trials} backbones (rejected: {summary}). Consider '
                 'raising --ccd-max-trials or -tol, or check the folded '
                 'residues next to the IDR.'
                 ))
+        if done > previous:
+            stalled = 0
+        else:
+            stalled += 1
+            if stalled == LOOP_STALL_ROUNDS:
+                log.info(S(_stalled_loops_warning(done, nconfs)))
+                break
         round_ += 1
 
 
@@ -1894,6 +1933,17 @@ def populate_globals(
 
     del topobj
     return
+
+
+def _stalled_loops_warning(found, nconfs):
+    """Return the warning for a Linker-IDR with fewer distinct loops."""
+    return (
+        f'WARNING: the last {LOOP_STALL_ROUNDS} rounds added no new distinct '
+        f'loops; going on with the {found} distinct loops of this Linker-IDR '
+        f'for {nconfs} conformers. Combined with other IDRs, some '
+        f'conformers will share a loop. A chain without other IDRs gets '
+        f'{found} conformers.'
+        )
 
 
 def _unchecked_pairs(C_files, N_files, checked_C, checked_N):
