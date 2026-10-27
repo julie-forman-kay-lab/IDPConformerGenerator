@@ -115,8 +115,8 @@ def test_next_seeker_writes_every_junction(expl_rows, tmp_path):
         term = int(name[:-4].rsplit('_j', 1)[1])
 
         def xyz(residue, atom):
-            row = (numbers == residue) & (rows[:, col_name] == atom)
-            return rows[row][0, cols_coords].astype(float)
+            row = (numbers == residue) & (rows[:, col_name] == atom)  # noqa: B023, E501
+            return rows[row][0, cols_coords].astype(float)  # noqa: B023
 
         c, o = xyz(term, 'C'), xyz(term, 'O')
         ca, n = xyz(term, 'CA'), xyz(term + 1, 'N')
