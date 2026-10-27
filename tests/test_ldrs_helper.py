@@ -1,4 +1,5 @@
 """Test LDRS helpers."""
+import os
 from itertools import islice, product
 
 import numpy as np
@@ -8,6 +9,7 @@ from idpconfgen.core.build_definitions import build_bend_CA_C_O, distance_C_O
 from idpconfgen.core.definitions import vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.ldrs_helper import (
+    _assemble_combinations,
     _random_combinations,
     atom_vdw_radii,
     backbone_anchor,
@@ -19,6 +21,7 @@ from idpconfgen.ldrs_helper import (
     next_seeker,
     packing_context,
     prepare_ccd_context,
+    prune_duplicate_loops,
     psurgeon,
     splice_folded_rows,
     )
@@ -298,6 +301,92 @@ def test_create_combinations(fragments):
         create_combinations([[fragments['X']], [fragments['a']]], 2)
 
 
+def test_assemble_combinations_one_to_one():
+    """Test every item is used once when all combinations pass."""
+    chosen, tried = _assemble_combinations([6, 6, 6], 6, lambda idx: True, 100)
+    assert len(chosen) == 6 and tried == 6
+    for position in range(3):
+        assert sorted(idx[position] for idx in chosen) == list(range(6))
+
+
+def test_assemble_combinations_short_list():
+    """Test a short list is used evenly and the others once each."""
+    chosen, tried = _assemble_combinations([2, 6, 6], 6, lambda idx: True, 100)  # noqa: E501
+    assert len(chosen) == len(set(chosen)) == 6 and tried == 6
+    first = [idx[0] for idx in chosen]
+    assert first.count(0) == first.count(1) == 3
+    for position in (1, 2):
+        assert sorted(idx[position] for idx in chosen) == list(range(6))
+
+
+def test_assemble_combinations_swaps(monkeypatch):
+    """Test items left over are placed by an exchange, not reused."""
+    # without shuffling, (0, 0) is tried first and fails
+    monkeypatch.setattr(
+        'idpconfgen.ldrs_helper.random.shuffle',
+        lambda items: None,
+        )
+    chosen, _ = _assemble_combinations([3, 3], 3, lambda idx: idx != (0, 0), 100)  # noqa: E501
+    assert len(chosen) == 3 and (0, 0) not in chosen
+    for position in range(2):
+        assert sorted(idx[position] for idx in chosen) == [0, 1, 2]
+
+
+def test_assemble_combinations_reuse():
+    """Test rejected items are paired again and reuse is a last resort."""
+    # item 0 of the first list never passes
+    chosen, _ = _assemble_combinations([4, 4], 4, lambda idx: idx[0] != 0, 100)  # noqa: E501
+    assert len(chosen) == len(set(chosen)) == 4
+    assert all(idx[0] != 0 for idx in chosen)
+    # the second list is used once each; one item of the first is reused
+    assert sorted(idx[1] for idx in chosen) == [0, 1, 2, 3]
+    first = [idx[0] for idx in chosen]
+    assert max(first.count(i) for i in (1, 2, 3)) == 2
+    # all four distinct combinations of two lists of two
+    chosen, tried = _assemble_combinations([2, 2], 10, lambda idx: True, 100)
+    assert sorted(chosen) == [(0, 0), (0, 1), (1, 0), (1, 1)] and tried == 4
+    chosen, tried = _assemble_combinations([2, 2], 10, lambda idx: False, 100)
+    assert chosen == [] and tried == 4
+    chosen, tried = _assemble_combinations([5, 5], 10, lambda idx: False, 3)
+    assert chosen == [] and tried == 3
+
+
+def test_create_all_combinations_uses_each_conformer_once(expl_rows, tmp_path):  # noqa: E501
+    """Test a chain with N-IDR, two Linker-IDRs and C-IDR."""
+    chain = tmp_path / 'chainA'
+    folders = {
+        'N': chain / 'N-IDR',
+        'L0': chain / 'Linker-IDR' / 'linker_0' / '0_match',
+        'L1': chain / 'Linker-IDR' / 'linker_1' / '1_match',
+        'C': chain / 'C-IDR',
+        }
+    files = {}
+    for k, (name, folder) in enumerate(folders.items()):
+        folder.mkdir(parents=True)
+        files[name] = [
+            _write_residues(
+                expl_rows,
+                folder / f'{name}_{i}.pdb',
+                4,
+                11,
+                shift=100.0 * (3 * k + i),
+                )
+            for i in range(3)
+            ]
+    combos = create_all_combinations(tmp_path, ['A'], nconfs=3)['A']
+    assert len(combos) == 3
+    for combo in combos:
+        assert len(combo) == 3 and len(combo[1]) == 2
+    used = {
+        'N': [combo[0] for combo in combos],
+        'L0': [combo[1][0] for combo in combos],
+        'L1': [combo[1][1] for combo in combos],
+        'C': [combo[2] for combo in combos],
+        }
+    for name, paths in used.items():
+        assert sorted(p.name for p in paths) == sorted(f.name for f in files[name])  # noqa: E501
+
+
 def test_inter_chain_cc(fragments):
     """Test chains with nested Linker-IDRs and fewer entries than nconfs."""
     nested = [fragments['a'], [fragments['b']]]
@@ -358,3 +447,35 @@ def test_psurgeon_n_linker_c(expl_rows, tmp_path):
         {'A': [(0, 3), (8, 10), (14, 16)]},
         )
     _assert_same_residues(out, expl_rows)
+
+
+def test_prune_duplicate_loops(expl_rows, tmp_path):
+    """Test loops repeating another loop of the folder are deleted."""
+    loops = tmp_path / 'matches'
+    loops.mkdir()
+    # 8-residue fragments: residues 3 to 6 are the IDR
+    _write_residues(expl_rows, loops / 'a.pdb', 4, 11)
+    _write_residues(expl_rows, loops / 'b.pdb', 4, 11, shift=0.3)
+    _write_residues(expl_rows, loops / 'c.pdb', 4, 11, shift=3.0)
+    # different folded residues only: still a repeat of 'a'
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    rows = np.array(expl_rows, copy=True)
+    moved = (resseq == 4) | (resseq == 11)
+    x = rows[moved, cols_coords[0]].astype(float) + 5.0
+    rows[moved, cols_coords[0]] = [f'{value:.3f}' for value in x]
+    _write_residues(rows, loops / 'd.pdb', 4, 11)
+    assert prune_duplicate_loops(loops) == 2
+    assert sorted(p.name for p in loops.iterdir()) == ['a.pdb', 'c.pdb']
+    assert prune_duplicate_loops(loops, min_rmsd=5.0) == 1
+
+
+def test_prune_duplicate_loops_keeps_earlier(expl_rows, tmp_path):
+    """Test a new loop is deleted, not the earlier one it repeats."""
+    loops = tmp_path / 'matches'
+    loops.mkdir()
+    old = _write_residues(expl_rows, loops / 'z.pdb', 4, 11)
+    new = _write_residues(expl_rows, loops / 'a.pdb', 4, 11, shift=0.3)
+    os.utime(old, (1000, 1000))
+    os.utime(new, (2000, 2000))
+    assert prune_duplicate_loops(loops) == 1
+    assert sorted(p.name for p in loops.iterdir()) == ['z.pdb']

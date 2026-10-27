@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from idpconfgen import cli_ldrs
+from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.libs import libccd
 
 
@@ -146,3 +147,80 @@ def test_faspr_in_context():
     far = dict(packing, tree=cKDTree(packing['atoms'] + 1000.0))
     alone = cli_ldrs._faspr_in_context(loop, loop_seq, far, 2, 3, n_heavy)
     assert alone.shape == (n_heavy, 3)
+
+
+def _write_loop(path, offset):
+    """Write an 8-residue C-alpha trace whose IDR residues move by `offset`."""
+    lines = []
+    for r in range(1, 9):
+        x = 3.8 * r + (offset if 3 <= r <= 6 else 0.0)
+        lines.append(
+            f'ATOM  {r:5d}  CA  ALA A{r:4d}    '
+            f'{x:8.3f}{0.0:8.3f}{0.0:8.3f}  1.00  0.00           C'
+            )
+    path.write_text('\n'.join(lines) + '\n')
+
+
+def _close_with(plan, tmp_path, monkeypatch, nconfs=3):
+    """Run `_close_linker_ccd` with loops given by `plan(round)`."""
+    rounds = []
+
+    def build(task, *, output_folder, conformer_name, **kwargs):
+        worker, quota, _seed, round_ = task
+        offsets = plan(round_)[:quota]
+        for n, offset in enumerate(offsets):
+            name = f'{conformer_name}_{round_}_{worker}_{n}.pdb'
+            _write_loop(output_folder / name, offset)
+        rounds.append(round_)
+        return {'built': len(offsets), 'trials': 1, 'reasons': {}}
+
+    monkeypatch.setattr(cli_ldrs, '_build_ccd_loops', build)
+    cli_ldrs._close_linker_ccd(
+        'GGAAAAGG',
+        index=0,
+        ccd_context={},
+        ccd_params=libccd.CCDParameters(),
+        rama=None,
+        output_folder=tmp_path,
+        conformer_name='loop',
+        nconfs=nconfs,
+        ncores=1,
+        random_seed=0,
+        max_trials=1,
+        max_clash=40,
+        tolerance=0.4,
+        report_folder=tmp_path,
+        )
+    return rounds, sorted(path.name for path in tmp_path.glob('*.pdb'))
+
+
+def test_close_linker_ccd_keeps_closing(tmp_path, monkeypatch):
+    """Test rounds go on after one closes nothing, until all are built."""
+    plan = {0: [0.0], 1: [], 2: [5.0, 10.0]}
+    rounds, files = _close_with(plan.get, tmp_path, monkeypatch)
+    assert rounds == [0, 1, 2]
+    assert len(files) == 3
+
+
+def test_close_linker_ccd_repeats(tmp_path, monkeypatch):
+    """Test repeated loops are deleted, and ldrs stops if only repeats come."""
+    rounds, files = _close_with(lambda r: [0.0, 0.1, 0.2], tmp_path, monkeypatch)  # noqa: E501
+    assert rounds == list(range(cli_ldrs.LOOP_STALL_ROUNDS + 1))
+    assert files == ['loop_0_0_0.pdb']
+
+
+def test_close_linker_ccd_stalls(tmp_path, monkeypatch):
+    """Test rounds that close nothing new end the search with a warning."""
+    rounds, files = _close_with(
+        lambda r: [0.0] if r == 0 else [],
+        tmp_path,
+        monkeypatch,
+        )
+    assert rounds == list(range(cli_ldrs.LOOP_STALL_ROUNDS + 1))
+    assert files == ['loop_0_0_0.pdb']
+
+
+def test_close_linker_ccd_first_round(tmp_path, monkeypatch):
+    """Test a first round without any closed loop stops ldrs."""
+    with pytest.raises(IDPConfGenException):
+        _close_with(lambda r: [], tmp_path, monkeypatch)
