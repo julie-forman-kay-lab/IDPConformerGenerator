@@ -5,20 +5,29 @@ Methodology deviates from traditional IDP or beads-on-a-string FLDR/S approach.
 
 Name: FLDR/S (Folded disordered region/structure sampling)
 """
+import math
 import os
 import random
-from itertools import combinations, product
+from functools import partial
+from itertools import combinations, islice, product
+from types import SimpleNamespace
 
 import numpy as np
 
-from idpconfgen import Path
+from idpconfgen import Path, log
+from idpconfgen.core.build_definitions import (
+    build_bend_CA_C_O,
+    build_bend_H_N_C,
+    distance_C_O,
+    distance_H_N,
+    )
 from idpconfgen.core.definitions import (
     aa3to1,
     vdW_radii_ionic_CRC82,
     vdW_radii_tsai_1999,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libcalc import calc_torsion_angles
+from idpconfgen.libs.libcalc import calc_torsion_angles, make_coord_Q_planar
 from idpconfgen.libs.libmulticore import pool_function
 from idpconfgen.libs.libparse import convert_tuples_to_lists
 from idpconfgen.libs.libstructure import (
@@ -158,142 +167,159 @@ def consecutive_grouper(seq):
     return bounds
 
 
-def combinations_clash_check(selected):
+def _combination_fragments(selected):
     """
-    Clash-check IDRs within a combination against each other.
+    Return the IDR fragment paths of a combination as a flat list.
+
+    Combinations nest the Linker-IDRs of a chain in their own list,
+    for example ``[N-IDR, [Linker-IDR 0, Linker-IDR 1], C-IDR]``.
 
     Parameters
     ----------
-    selected : list
-        List of lists of different combinations as follows:
-        [[item from list 1, item from list 2], ...]
+    selected : Path, list or tuple
+        A fragment path or a (nested) list or tuple of them.
+
+    Returns
+    -------
+    list of Path
     """
-    if len(selected) == 2:
-        first = selected[0]
-        second = selected[1]
-        # [L-IDR, C-IDR] case
-        if type(first) is tuple:
-            second_struc = Structure(second)
-            second_struc.build()
-            if len(first) > 1:
-                # Check all L-IDR against C-IDR
-                for l in first:    # noqa: E741
-                    l_struc = Structure(l)
-                    l_struc.build()
-                    l_arr = l_struc.data_array
-                    l_c, _ = count_clashes(l_arr, second_struc, tolerance=1.0)
-                    if type(l_c) is bool:
-                        return False
-                l_combos = list(combinations(first, 2))
-                # Check all L-IDR against each other
-                for combo in l_combos:
-                    l1 = Structure(combo[0])
-                    l1.build()
-                    l2 = Structure(combo[1])
-                    l2.build()
-                    lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
-                    if type(lx2) is bool:
-                        return False
-            else:
-                lidr = first[0]
-                lidr_struc = Structure(lidr)
-                lidr_arr = lidr_struc.data_array
-                l_c, _ = count_clashes(lidr_arr, second_struc, tolerance=1.0)
-                if type(l_c) is bool:
-                    return False
-        # [N-IDR, L-IDR] case
-        elif type(second) is tuple:
-            first_struc = Structure(second)
-            first_struc.build()
-            if len(second) > 1:
-                # Check all L-IDR against N-IDR
-                for l in second:    # noqa: E741
-                    l_struc = Structure(l)
-                    l_struc.build()
-                    l_arr = l_struc.data_array
-                    n_l, _ = count_clashes(l_arr, first_struc, tolerance=1.0)
-                    if type(n_l) is bool:
-                        return False
-                l_combos = list(combinations(second, 2))
-                # Check all L-IDR against each other
-                for combo in l_combos:
-                    l1 = Structure(combo[0])
-                    l1.build()
-                    l2 = Structure(combo[1])
-                    l2.build()
-                    lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
-                    if type(lx2) is bool:
-                        return False
-            else:
-                lidr = second[0]
-                lidr_struc = Structure(lidr)
-                lidr_arr = lidr_struc.data_array
-                n_l, _ = count_clashes(lidr_arr, first_struc, tolerance=1.0)
-                if type(n_l) is bool:
-                    return False
-        # [N-IDR, C-IDR] case
-        elif type(first) is Path and type(second) is Path:
-            first_struc = Structure(first)
-            first_struc.build()
-            first_arr = first_struc.data_array
-            second_struc = Structure(second)
-            second_struc.build()
-            n_c, _ = count_clashes(first_arr, second_struc, tolerance=1.0)
-            if type(n_c) is bool:
-                return False
-    # [N-IDR, L-IDR, C-IDR] case
-    elif len(selected) == 3:
-        nidr = selected[0]
-        nidr_struc = Structure(nidr)
-        nidr_struc.build()
-        cidr = selected[2]
-        cidr_struc = Structure(cidr)
-        cidr_struc.build()
-        
-        lidr = selected[1]
-        if len(lidr) > 1:
-            # Check all L-IDR against N-IDR and C-IDR
-            for l in lidr:    # noqa: E741
-                l_struc = Structure(l)
-                l_struc.build()
-                l_arr = l_struc.data_array
-                n_l, _ = count_clashes(l_arr, nidr_struc, tolerance=1.0)
-                l_c, _ = count_clashes(l_arr, cidr_struc, tolerance=1.0)
-                if type(n_l) is bool or type(l_c) is bool:
-                    return False
-            l_combos = list(combinations(lidr, 2))
-            # Check all L-IDR against each other
-            for combo in l_combos:
-                l1 = Structure(combo[0])
-                l1.build()
-                l2 = Structure(combo[1])
-                l2.build()
-                lx2, _ = count_clashes(l1.data_array, l2, tolerance=1.0)
-                if type(lx2) is bool:
-                    return False
-        # We just have 1 L-IDR
-        else:
-            lidr_struc = Structure(lidr[0])
-            lidr_struc.build()
-            lidr_arr = lidr_struc.data_array
-            nidr_arr = nidr_struc.data_array
-            n_i, _ = count_clashes(nidr_arr, lidr_struc, tolerance=1.0)
-            i_c, _ = count_clashes(lidr_arr, cidr_struc, tolerance=1.0)
-            n_c, _ = count_clashes(nidr_arr, cidr_struc, tolerance=1.0)
-            
-            if type(n_i) is bool or type(i_c) is bool or type(n_c) is bool:
-                return False
-    
+    if isinstance(selected, (list, tuple)):
+        fragments = []
+        for item in selected:
+            fragments.extend(_combination_fragments(item))
+        return fragments
+    return [selected]
+
+
+def _idr_rows(rows, case=None):
+    """
+    Return the rows of the IDR residues of an LDRS fragment.
+
+    LDRS fragments carry two folded residues bonded to the folded
+    domain: after an N-IDR, before a C-IDR, and on both sides of a
+    Linker-IDR. Those are removed.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Data array of the fragment.
+
+    case : str, optional
+        Disorder case of the fragment. None keeps every residue.
+
+    Returns
+    -------
+    np.ndarray
+    """
+    resseq = rows[:, col_resSeq].astype(int)
+    keep = np.unique(resseq)
+    if case in (disorder_cases[1], disorder_cases[2]):
+        keep = keep[2:]
+    if case in (disorder_cases[0], disorder_cases[1]):
+        keep = keep[:-2]
+    return rows[np.isin(resseq, keep)]
+
+
+def combinations_clash_check(selected, cases=None):
+    """
+    Clash-check IDRs within a combination against each other.
+
+    Every IDR fragment of the combination is checked against every
+    other one, whatever the mix of N-IDR, Linker-IDRs and C-IDR.
+
+    Parameters
+    ----------
+    selected : list or tuple
+        One combination: one item from each list given to
+        :func:`create_combinations`, for example
+        ``(N-IDR, [Linker-IDR 0, Linker-IDR 1], C-IDR)``.
+
+    cases : list of str, optional
+        Disorder case of each item of ``selected``, for example
+        ``['N-IDR', 'Linker-IDR', 'C-IDR']``. When given, the folded
+        residues carried by the fragments are not checked: IDRs a few
+        folded residues apart carry the same folded residues.
+
+    Returns
+    -------
+    list or tuple, or False
+        ``selected`` when no pair of IDRs has more than 40 contacts
+        (within the vdW radii sum + 1.0 A), False otherwise.
+    """
+    if cases is None:
+        cases = [None] * len(selected)
+
+    idrs = []
+    for item, case in zip(selected, cases):
+        for path in _combination_fragments(item):
+            structure = Structure(path)
+            structure.build()
+            rows = _idr_rows(structure.data_array, case)
+            if len(rows):
+                idrs.append(rows)
+
+    for first, second in combinations(idrs, 2):
+        num_clashes, _ = count_clashes(
+            first,
+            SimpleNamespace(data_array=second),
+            tolerance=1.0,
+            )
+        if type(num_clashes) is bool:
+            return False
+
     return selected
 
 
-def create_combinations(lst, num_combinations, ncores=1):
+def _random_combinations(lst):
+    """
+    Yield the combinations of one item from each list in random order.
+
+    Each combination is yielded once. Large products are sampled
+    index by index instead of being built in memory.
+
+    Parameters
+    ----------
+    lst : list of lists
+
+    Yields
+    ------
+    tuple
+        One item from each list, in the order of ``lst``.
+    """
+    sizes = [len(items) for items in lst]
+    total = math.prod(sizes)
+    if total <= 100_000:
+        all_combinations = list(product(*lst))
+        random.shuffle(all_combinations)
+        yield from all_combinations
+        return
+
+    seen = set()
+    while len(seen) < total:
+        indexes = tuple(random.randrange(size) for size in sizes)
+        if indexes in seen:
+            continue
+        seen.add(indexes)
+        yield tuple(items[i] for items, i in zip(lst, indexes))
+
+
+def create_combinations(
+        lst,
+        num_combinations,
+        ncores=1,
+        max_trials=None,
+        cases=None,
+        ):
     """
     Create unique combinations between list of lists.
     
     Made for N-IDR and C-IDR combinations. Where list1 = N-IDR paths,
     and list2 = C-IDR paths. Itertools product is used here because
     order matters.
+
+    Combinations are drawn at random without repetition and clash-checked
+    with :func:`combinations_clash_check` until ``num_combinations`` pass,
+    every combination was tried, or ``max_trials`` were tried.
     
     Parameters
     ----------
@@ -307,44 +333,69 @@ def create_combinations(lst, num_combinations, ncores=1):
     ncores : int
         Number of cores to use for clash-checking against multiple IDR
         combinations.
+
+    max_trials : int, optional
+        Maximum number of combinations to clash-check.
+        Defaults to ``max(100, 20 * num_combinations)``.
+
+    cases : list of str, optional
+        Disorder case of each list in ``lst``, given to
+        :func:`combinations_clash_check`.
     
     Return
     ------
     selected_combinations : list
         List of lists of different combinations as follows:
         [[item from list 1, item from list 2], ...]
-    """
-    all_combinations = list(product(*lst))
-    max_combinations = len(all_combinations)
+        Fewer than ``num_combinations`` if fewer passed (a warning
+        is logged).
 
-    selected_combinations = \
-        random.sample(all_combinations, min(num_combinations, max_combinations))  # noqa: E501
-    
+    Raises
+    ------
+    IDPConfGenException
+        If no combination passed the clash check.
+    """
+    candidates = _random_combinations(lst)
+
     if len(lst) == 1:
-        return convert_tuples_to_lists(selected_combinations)
-    else:
-        execute_clash = pool_function(combinations_clash_check, selected_combinations, ncores=ncores)  # noqa: E501
-        passed = []
+        return convert_tuples_to_lists(islice(candidates, num_combinations))
+
+    if max_trials is None:
+        max_trials = max(100, 20 * num_combinations)
+
+    check = partial(combinations_clash_check, cases=cases)
+    passed = []
+    tried = 0
+    while len(passed) < num_combinations and tried < max_trials:
+        batch_size = min(
+            max(num_combinations - len(passed), ncores),
+            max_trials - tried,
+            )
+        batch = list(islice(candidates, batch_size))
+        if not batch:
+            break
+        tried += len(batch)
+        execute_clash = pool_function(check, batch, ncores=ncores)
         for result in execute_clash:
             if result is not False:
                 passed.append(result)
-        
-        while len(passed) < num_combinations:
-            selected_combinations = \
-                random.sample(all_combinations, min(num_combinations, max_combinations))  # noqa: E501
-            execute_clash = pool_function(combinations_clash_check, selected_combinations, ncores=ncores)  # noqa: E501
-            for result in execute_clash:
-                if result is not False:
-                    passed.append(result)
-            try:
-                passed = list(set(passed))
-            except TypeError:
-                continue
-        
-        if len(passed) > num_combinations:
-            passed = passed[0:num_combinations]
 
-        return convert_tuples_to_lists(passed)
+    if not passed:
+        raise IDPConfGenException(errmsg=(
+            f"None of the {tried} combinations of IDR conformers tried "
+            "passed the clash check between IDRs (more than 40 contacts "
+            "within the vdW radii sum + 1.0 A). Build more conformers "
+            "for each IDR."
+            ))
+
+    if len(passed) < num_combinations:
+        log.warning(
+            f"Only {len(passed)} of the {num_combinations} requested "
+            f"combinations of IDR conformers passed the clash check "
+            f"between IDRs ({tried} tried)."
+            )
+
+    return convert_tuples_to_lists(passed[:num_combinations])
 
 
 def create_all_combinations(folder, chains, nconfs, ncores=1):
@@ -373,6 +424,7 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
         values as lists of combinations with first element being path for
         N-IDR, then Linker-IDR, and last element C-IDR if necessary.
     """
+    nidr, lidr, cidr = disorder_cases[0], disorder_cases[1], disorder_cases[2]  # noqa: E501
     combinations = {}
     for c in chains:
         chain_path = folder.joinpath(f"chain{c}")
@@ -387,26 +439,36 @@ def create_all_combinations(folder, chains, nconfs, ncores=1):
             nidr_confs = os.listdir(nidr_path)
             nidr_files = [Path(nidr_path.joinpath(cpath)) for cpath in nidr_confs]  # noqa: E501
         if os.path.isdir(lidr_path):
-            lidr_cases_dir = os.listdir(lidr_path)
+            # keep Linker-IDRs in sequence order: linker_0, linker_1, ...
+            lidr_cases_dir = sorted(
+                os.listdir(lidr_path),
+                key=lambda name: int(name.rsplit('_', 1)[-1]),
+                )
             lidr_confs_lst = []
-            for i, cpath in enumerate(lidr_cases_dir):
-                lidr_matches = lidr_path.joinpath(cpath + f"/{i}_match")
+            for cpath in lidr_cases_dir:
+                num = cpath.rsplit('_', 1)[-1]
+                lidr_matches = lidr_path.joinpath(cpath, f"{num}_match")
                 lidr_confs = os.listdir(lidr_matches)
                 lidr_files = [Path(lidr_matches.joinpath(fpath)) for fpath in lidr_confs]  # noqa: E501
                 lidr_confs_lst.append(lidr_files)
-            lidr_combinations = create_combinations(lidr_confs_lst, nconfs)
+            lidr_combinations = create_combinations(
+                lidr_confs_lst,
+                nconfs,
+                ncores,
+                cases=[lidr] * len(lidr_confs_lst),
+                )
         if os.path.isdir(cidr_path):
             cidr_confs = os.listdir(cidr_path)
             cidr_files = [Path(cidr_path.joinpath(cpath)) for cpath in cidr_confs]  # noqa: E501
 
         if len(nidr_files) and len(cidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs, ncores)  # noqa: E501
+            combinations[c] = create_combinations([nidr_files, lidr_combinations, cidr_files], nconfs, ncores, cases=[nidr, lidr, cidr])  # noqa: E501
         elif len(nidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([nidr_files, lidr_combinations], nconfs, ncores)  # noqa: E501
+            combinations[c] = create_combinations([nidr_files, lidr_combinations], nconfs, ncores, cases=[nidr, lidr])  # noqa: E501
         elif len(cidr_files) and len(lidr_combinations) > 0:
-            combinations[c] = create_combinations([lidr_combinations, cidr_files], nconfs, ncores)  # noqa: E501
+            combinations[c] = create_combinations([lidr_combinations, cidr_files], nconfs, ncores, cases=[lidr, cidr])  # noqa: E501
         elif len(nidr_files) and len(cidr_files) > 0:
-            combinations[c] = create_combinations([nidr_files, cidr_files], nconfs, ncores)  # noqa: E501
+            combinations[c] = create_combinations([nidr_files, cidr_files], nconfs, ncores, cases=[nidr, cidr])  # noqa: E501
         elif len(nidr_files) > 0:
             combinations[c] = nidr_files[0:nconfs]
         elif len(lidr_combinations) > 0:
@@ -627,6 +689,15 @@ def next_seeker(
     """
     Next-seeker protocol to find possible matches that will close the break.
 
+    The C-side conformer (from the folded region before the break)
+    and each N-side conformer (from the folded region after it)
+    cover the same residues. Wherever the C of a residue of the first and
+    the N and CA of the next residue of the second form a peptide bond,
+    the two are joined there: residues up to the junction come from the
+    C-side conformer and the others from the N-side one. A pair of
+    conformers can meet at several residues; every junction that passes
+    the clash check is written, as ``<C-side>+<N-side>_j<residue>.pdb``.
+
     Parameters
     ----------
     cterm_idr : str or Path
@@ -646,8 +717,8 @@ def next_seeker(
     
     Returns
     -------
-    False
-        If no matches have been found. Otherwise write them to output folder.
+    int
+        Number of joined conformers written to the output folder.
     """
     matches = 0
     idr_struc = Structure(Path(cterm_idr))
@@ -656,10 +727,10 @@ def next_seeker(
     idr_name = idr_arr[:, col_name]
     idr_coords = idr_arr[:, cols_coords].astype(float)
     idr_resseq = idr_arr[:, col_resSeq].astype(int)
+    cterm_idr_stem = Path(cterm_idr).stem
     
     idr_C = []
     idr_CA = []
-    idr_O = []
     idr_res = []
     for n, name in enumerate(idr_name):
         if name == 'C':
@@ -667,15 +738,14 @@ def next_seeker(
             idr_res.append(idr_resseq[n])
         elif name == 'CA':
             idr_CA.append(idr_coords[n])
-        elif name == 'O':
-            idr_O.append(idr_coords[n])
     
     for nterm_idr in nterm_idr_lib:
         nterm_idr_struc = Structure(Path(nterm_idr))
         nterm_idr_struc.build()
-        nterm_idr_arr = nterm_idr_struc.data_array
-        nterm_idr_name = nterm_idr_arr[:, col_name]
-        nterm_idr_coords = nterm_idr_arr[:, cols_coords].astype(float)
+        nterm_idr_full = nterm_idr_struc.data_array
+        nterm_idr_name = nterm_idr_full[:, col_name]
+        nterm_idr_coords = nterm_idr_full[:, cols_coords].astype(float)
+        nterm_idr_stem = Path(nterm_idr).stem
         
         nterm_idr_N = []
         nterm_idr_CA = []
@@ -685,6 +755,7 @@ def next_seeker(
             elif name == 'CA':
                 nterm_idr_CA.append(nterm_idr_coords[n])
         
+        # every residue where the pair meets gives a joined conformer
         for i, curr_c in enumerate(idr_C):
             try:
                 next_n = nterm_idr_N[i + 1]
@@ -702,19 +773,18 @@ def next_seeker(
             if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7 and np.abs(omega) >= 2.61:  # noqa: E501
                 term_residue = idr_res[i]
                 
-                idr_list = []
-                for p, _ in enumerate(idr_resseq):
-                    next = idr_resseq[p + 1]
-                    idr_list.append(idr_arr[p])
-                    nterm_idr_arr = nterm_idr_arr[1:]
-                    if next == term_residue + 1:
-                        break
-                idr_arr = np.array(idr_list)
-                    
+                # Both conformers share one atom layout: join the C-side
+                # conformer up to `term_residue` with the N-side one after
+                # it. Slice the full arrays at every junction; they serve
+                # the other junctions and the other N-side conformers.
+                cut = int(np.argmax(idr_resseq > term_residue))
+                idr_list = list(idr_arr[:cut])
+                nterm_idr_arr = nterm_idr_full[cut:]
+
                 nterm_idr_struc._data_array = nterm_idr_arr
                 
                 clashes, _ = count_clashes(
-                    idr_arr,
+                    np.array(idr_list),
                     nterm_idr_struc,
                     disorder_cases[1],
                     max_clash,
@@ -737,37 +807,32 @@ def next_seeker(
                         elif final_struc_res[idx] == term_residue + 2:
                             break
                     
-                    # Fix the position of the Carbonyl O and Nitrogen H
-                    CO_length = calculate_distance(curr_c, idr_O[i])
-                    CAC_O_vec = idr_CA[i] - curr_c
-                    NC_O_vec = next_n - curr_c
-                    O_angle = np.arccos(np.dot(CAC_O_vec, NC_O_vec) / (np.linalg.norm(CAC_O_vec) * np.linalg.norm(NC_O_vec)))  # noqa: E501
-                    O_vector = CO_length * np.sin(O_angle / 2) * (CAC_O_vec / np.linalg.norm(CAC_O_vec)) + CO_length * np.sin(O_angle / 2) * (NC_O_vec / np.linalg.norm(NC_O_vec))  # noqa: E501
-                    new_O_xyz = curr_c - O_vector
-  
-                    final_struc_arr[:, col_x][O_idx] = str(new_O_xyz[0])
-                    final_struc_arr[:, col_y][O_idx] = str(new_O_xyz[1])
-                    final_struc_arr[:, col_z][O_idx] = str(new_O_xyz[2])
+                    # Place the carbonyl O and the amide H of the new
+                    # peptide bond in its plane
+                    new_O_xyz = make_coord_Q_planar(
+                        idr_CA[i],
+                        curr_c,
+                        next_n,
+                        distance=distance_C_O,
+                        bend=build_bend_CA_C_O,
+                        )
+                    for col, value in zip(cols_coords, new_O_xyz):
+                        final_struc_arr[O_idx, col] = f'{value:.3f}'
                     
                     if H_idx >= 0:
-                        # Bond length also taken from
-                        # `core/build_definitions.py`
-                        NH_length = 1.0
-                        CN_H_vec = curr_c - next_n
-                        CAN_H_vec = next_ca - next_n
-                        H_angle = np.arccos(np.dot(CN_H_vec, CAN_H_vec) / (np.linalg.norm(CN_H_vec) * np.linalg.norm(CAN_H_vec)))  # noqa: E501
-                        H_vector = NH_length * np.sin(H_angle / 2) * (CN_H_vec / np.linalg.norm(CN_H_vec)) + NH_length * np.sin(H_angle / 2) * (CAN_H_vec / np.linalg.norm(CAN_H_vec))  # noqa: E501
-                        new_H_xyz = next_n - H_vector
-                        
-                        final_struc_arr[:, col_x][H_idx] = str(new_H_xyz[0])
-                        final_struc_arr[:, col_y][H_idx] = str(new_H_xyz[1])
-                        final_struc_arr[:, col_z][H_idx] = str(new_H_xyz[2])
+                        new_H_xyz = make_coord_Q_planar(
+                            next_ca,
+                            next_n,
+                            curr_c,
+                            distance=distance_H_N,
+                            bend=build_bend_H_N_C,
+                            )
+                        for col, value in zip(cols_coords, new_H_xyz):
+                            final_struc_arr[H_idx, col] = f'{value:.3f}'
                     
                     final_struc = structure_to_pdb(final_struc_arr)
-                    cterm_idr_stem = Path(cterm_idr).stem
-                    nterm_idr_stem = Path(nterm_idr).stem
                     matches += 1
-                    write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}.pdb")  # noqa: E501
+                    write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}_j{term_residue}.pdb")  # noqa: E501
 
     return matches
 
@@ -1002,6 +1067,10 @@ def psurgeon(
                 if prev != curr:
                     break
 
+            nidr_resseq = nidr_data_array[:, col_resSeq].astype(int)
+            offset = int(fld_seq_seg[0]) - nidr_resseq[-1]
+            nidr_data_array[:, col_resSeq] = (nidr_resseq + offset).astype(str)  # noqa: E501
+
             for i, seq in enumerate(fld_seq_seg):
                 next = fld_seq_seg[i + 1]
                 fld_data_seg = fld_data_seg[1:]
@@ -1056,22 +1125,25 @@ def psurgeon(
             r.pop(-1)
 
         if disorder_cases[1] in c:
-            if len(c) == 1:
+            if disorder_cases[0] not in c and disorder_cases[2] not in c:
+                # Linker-IDRs only
                 new_struc_arr = fld_data_seg
 
             new_struc_seq = new_struc_arr[:, col_resSeq].astype(int)
             first_struc_seq = new_struc_seq[0]
+
+            # The Linker-IDRs come nested, ``[[L0, L1, ...]]``, or,
+            # for chains with Linker-IDRs only, flat, ``[L0, L1, ...]``
+            linker_files = idp_lst[chain][0]
+            if not isinstance(linker_files, (list, tuple)):
+                linker_files = idp_lst[chain]
 
             for idx, minmax in enumerate(r):
                 lower = minmax[0]
                 upper = minmax[1]
                 new_struc_lst = new_struc_arr.tolist()
 
-                try:
-                    idr = Structure(idp_lst[chain][0][idx])
-                except TypeError:
-                    # For cases where there's only 1 L-IDR
-                    idr = Structure(idp_lst[chain][0])
+                idr = Structure(linker_files[idx])
                 idr.build()
 
                 idr_seq = idr.data_array[:, col_resSeq].astype(int)
@@ -1093,12 +1165,10 @@ def psurgeon(
                     
                 idr_data_lst = idr_data_array.tolist()
                 surrounding_data_list = []
-                if disorder_cases[0] not in c:
-                    actual_lower = lower + first_struc_seq - 1
-                    actual_upper = upper + first_struc_seq
-                else:
-                    actual_lower = lower
-                    actual_upper = upper + 1
+                # residues on either side of the chain break; the first
+                # residue of the chain is position 0 of the sequence
+                actual_lower = lower + first_struc_seq - 1
+                actual_upper = upper + first_struc_seq
                 found = False
                 for s, seq in enumerate(new_struc_seq):
                     if seq == actual_lower or seq == actual_upper:
@@ -1131,9 +1201,15 @@ def psurgeon(
     return new_struc_arr_complete
 
 
-def inter_chain_cc(all_files, nconfs):
+def inter_chain_cc(all_files, nconfs, max_trials=None):
     """
     Check for clashes between all chains of IDRs.
+
+    Combinations of one entry per chain are drawn at random without
+    repetition until ``nconfs`` pass, every combination was tried, or
+    ``max_trials`` were tried. A combination passes when no IDR of a
+    chain has a contact (within the vdW radii sum + 0.4 A) with an IDR
+    of another chain.
 
     Parameters
     ----------
@@ -1143,53 +1219,348 @@ def inter_chain_cc(all_files, nconfs):
     
     nconfs : int
         Number of final conformers.
+
+    max_trials : int, optional
+        Maximum number of combinations across chains to check.
+        Defaults to ``max(1000, 100 * nconfs)``.
     
     Returns
     -------
     final_combos : list of dict
         Each value is a dictionary where key is the chain and value
         are the list containing IDRs.
-    """
-    final_combos = []
-    total_chains = len(all_files)
-    all_chains = all_files.keys()
+        Fewer than ``nconfs`` if fewer passed (a warning is logged).
 
-    while len(final_combos) < nconfs:
-        reset = False
-        random_combo = [random.randint(0, nconfs - 1) for _ in range(total_chains)]  # noqa: E501
-        candidate_combo = []
-        
-        for i, selections in enumerate(all_files.values()):
-            sele = selections[random_combo[i]]
-            if type(sele) is list:
-                candidate_combo.append(sele)
-            else:
-                candidate_combo.append([sele])
-            
-        for i in range(len(candidate_combo)):
-            for j in range(i + 1, len(candidate_combo)):
-                idr_set1 = candidate_combo[i]
-                idr_set2 = candidate_combo[j]
-                idr_pairs = product(idr_set1, idr_set2)
-                for pair in idr_pairs:
-                    frag_s = Structure(pair[0])
-                    struc_s = Structure(pair[1])
-                    frag_s.build()
-                    struc_s.build()
-                    clashes, _ = count_clashes(frag_s.data_array, struc_s)
-                    if clashes:
-                        reset = True
-                        break
-                if reset:
+    Raises
+    ------
+    IDPConfGenException
+        If no combination passed the clash check.
+    """
+    if max_trials is None:
+        max_trials = max(1000, 100 * nconfs)
+
+    chains = list(all_files)
+    selections = []
+    for chain in chains:
+        selections.append([
+            sele if type(sele) is list else [sele]
+            for sele in all_files[chain]
+            ])
+
+    structures = {}
+
+    def _built(path):
+        if path not in structures:
+            structure = Structure(path)
+            structure.build()
+            structures[path] = structure
+        return structures[path]
+
+    final_combos = []
+    tried = 0
+    for candidate_combo in _random_combinations(selections):
+        if len(final_combos) == nconfs or tried == max_trials:
+            break
+        tried += 1
+
+        clash = False
+        for idr_set1, idr_set2 in combinations(candidate_combo, 2):
+            idr_pairs = product(
+                _combination_fragments(idr_set1),
+                _combination_fragments(idr_set2),
+                )
+            for path1, path2 in idr_pairs:
+                clashes, _ = count_clashes(
+                    _built(path1).data_array,
+                    _built(path2),
+                    )
+                if clashes:
+                    clash = True
                     break
-            if reset:
+            if clash:
                 break
-        if reset:
-            continue
-        else:
-            temp_dict = {}
-            for i, c in enumerate(all_chains):
-                temp_dict[c] = candidate_combo[i]
-            final_combos.append(temp_dict)
+
+        if not clash:
+            final_combos.append(dict(zip(chains, candidate_combo)))
+
+    if not final_combos:
+        raise IDPConfGenException(errmsg=(
+            f"None of the {tried} combinations of IDR conformers across "
+            "chains tried passed the clash check between chains. Build "
+            "more conformers for each IDR."
+            ))
+
+    if len(final_combos) < nconfs:
+        log.warning(
+            f"Only {len(final_combos)} of the {nconfs} requested "
+            "combinations of IDR conformers passed the clash check "
+            f"between chains ({tried} tried)."
+            )
 
     return final_combos
+
+
+def atom_vdw_radii(elements, names=None, default=1.7):
+    """
+    Return the van der Waals radius of each atom as in `count_clashes`.
+
+    Parameters
+    ----------
+    elements : array-like of str
+        Element symbols. Missing or unknown symbols are inferred from the
+        first letter of `names`.
+
+    names : array-like of str, optional
+        Atom names.
+
+    default : float
+        Radius used when the element cannot be resolved.
+
+    Returns
+    -------
+    np.ndarray of float
+    """
+    all_vdw_radii = {**vdW_radii_tsai_1999, **vdW_radii_ionic_CRC82}
+    elements = [str(e).strip().upper() for e in elements]
+    if names is None:
+        names = [''] * len(elements)
+    radii = np.empty(len(elements), dtype=np.float64)
+    for i, (element, name) in enumerate(zip(elements, names)):
+        if element not in all_vdw_radii:
+            element = str(name).strip().lstrip('0123456789')[:1].upper()
+        radii[i] = all_vdw_radii.get(element, default)
+    return radii
+
+
+def is_hydrogen(elements, names):
+    """Return a boolean mask of hydrogen atoms."""
+    out = []
+    for element, name in zip(elements, names):
+        element = str(element).strip().upper()
+        if not element:
+            element = str(name).strip().lstrip('0123456789')[:1].upper()
+        out.append(element in ('H', 'D'))
+    return np.array(out, dtype=bool)
+
+
+def backbone_anchor(rows):
+    """
+    Return N, CA, C, O coordinates of a residue.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Structure data array rows of one residue.
+
+    Returns
+    -------
+    np.ndarray, shape (4, 3)
+        NaN for missing atoms.
+    """
+    anchor = np.full((4, 3), np.nan)
+    names = list(rows[:, col_name])
+    for k, atom in enumerate(('N', 'CA', 'C', 'O')):
+        if atom in names:
+            anchor[k] = rows[names.index(atom), cols_coords].astype(float)
+    return anchor
+
+
+PACKING_CODES = {
+    **{key: value for key, value in aa3to1.items() if value.isupper()},
+    'HIP': 'H',
+    'HIE': 'H',
+    'HID': 'H',
+    'HSD': 'H',
+    'HSE': 'H',
+    'HSP': 'H',
+    'SEP': 'S',
+    'TPO': 'T',
+    'CYX': 'C',
+    'MSE': 'M',
+    }
+
+
+def packing_context(rows, exclude=None):
+    """
+    Collect template residues to pack side chains next to.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Structure data array; residues are consecutive rows with the same
+        chain, segment, number and name.
+
+    exclude : np.ndarray of bool, optional
+        Rows of residues to leave out.
+
+    Returns
+    -------
+    dict
+        ``sequence`` (one-letter codes of the protein residues with
+        complete N, CA, C and O), ``backbone`` (their N, CA, C, O,
+        shape (R, 4, 3)), ``atoms`` (their heavy atoms) and ``owner``
+        (the residue of each atom).
+    """
+    exclude = (
+        np.zeros(len(rows), dtype=bool) if exclude is None
+        else np.asarray(exclude, dtype=bool)
+        )
+    keys = [
+        (c, s, r, n) for c, s, r, n in zip(
+            rows[:, col_chainID],
+            rows[:, col_segid],
+            rows[:, col_resSeq],
+            rows[:, col_resName],
+            )
+        ]
+    hydrogen = is_hydrogen(rows[:, col_element], rows[:, col_name])
+    sequence, backbone, atoms, owner = [], [], [], []
+    start = 0
+    for stop in range(1, len(rows) + 1):
+        if stop < len(rows) and keys[stop] == keys[start]:
+            continue
+        code = PACKING_CODES.get(str(keys[start][3]).strip())
+        part = slice(start, stop)
+        start = stop
+        if code is None or exclude[part].any():
+            continue
+        anchor = backbone_anchor(rows[part])
+        if not np.all(np.isfinite(anchor)):
+            continue
+        heavy = ~hydrogen[part]
+        sequence.append(code)
+        backbone.append(anchor)
+        atoms.append(rows[part][heavy][:, cols_coords].astype(np.float64))
+        owner.append(np.full(int(heavy.sum()), len(owner)))
+    return {
+        'sequence': ''.join(sequence),
+        'backbone': np.array(backbone).reshape(-1, 4, 3),
+        'atoms': np.concatenate(atoms) if atoms else np.zeros((0, 3)),
+        'owner': np.concatenate(owner) if owner else np.zeros(0, dtype=int),
+        }
+
+
+def prepare_ccd_context(chain_rows, environment_rows, lower, upper):
+    """
+    Collect what CCD needs to close a Linker-IDR onto its folded anchors.
+
+    Parameters
+    ----------
+    chain_rows : np.ndarray
+        Structure data array of the protein atoms of the modeled chain.
+
+    environment_rows : np.ndarray
+        Structure data array of everything the loop must not clash with:
+        all chains, cofactors and membrane of the template.
+
+    lower, upper : int
+        Residue numbers of the last folded residue before the IDR and of
+        the first folded residue after it.
+
+    Returns
+    -------
+    dict
+        ``lower_anchor`` and ``upper_anchor`` (N, CA, C, O coordinates),
+        ``lower_outer`` and ``upper_outer`` (the same for the residues
+        before `lower` and after `upper`, NaN if missing), ``lower_rows``
+        and ``upper_rows`` (template rows of the residues bonded to the
+        IDR), the environment arrays ``env_coords``, ``env_radii``,
+        ``env_hydrogen``, ``env_lower`` and ``env_upper`` (the last two
+        mark the atoms of the residues bonded to the IDR), and
+        ``packing`` (:func:`packing_context` of the environment without
+        the four overlap residues).
+    """
+    resseq = chain_rows[:, col_resSeq].astype(int)
+    lower_rows = chain_rows[resseq == int(lower)]
+    upper_rows = chain_rows[resseq == int(upper)]
+    lower_anchor = backbone_anchor(lower_rows)
+    upper_anchor = backbone_anchor(upper_rows)
+    if not (
+            np.all(np.isfinite(lower_anchor[:3]))
+            and np.all(np.isfinite(upper_anchor[:3]))
+            ):
+        raise IDPConfGenException(errmsg=(
+            'Loop closure needs N, CA and C of residues '
+            f'{lower} and {upper} in the folded structure.'
+            ))
+    overlap_rows = chain_rows[np.isin(
+        resseq,
+        (int(lower) - 1, int(lower), int(upper), int(upper) + 1),
+        )]
+
+    env_names = environment_rows[:, col_name]
+    env_elements = environment_rows[:, col_element]
+    keys = [
+        (str(n).strip(), str(x).strip(), str(y).strip(), str(z).strip())
+        for n, x, y, z in zip(
+            env_names,
+            environment_rows[:, col_x],
+            environment_rows[:, col_y],
+            environment_rows[:, col_z],
+            )
+        ]
+
+    def _mask(rows):
+        wanted = {
+            (str(n).strip(), str(x).strip(), str(y).strip(), str(z).strip())
+            for n, x, y, z in zip(
+                rows[:, col_name],
+                rows[:, col_x],
+                rows[:, col_y],
+                rows[:, col_z],
+                )
+            }
+        return np.array([k in wanted for k in keys], dtype=bool)
+
+    return {
+        'lower_anchor': lower_anchor,
+        'upper_anchor': upper_anchor,
+        'lower_outer': backbone_anchor(chain_rows[resseq == int(lower) - 1]),
+        'upper_outer': backbone_anchor(chain_rows[resseq == int(upper) + 1]),
+        'lower_rows': np.array(lower_rows, copy=True),
+        'upper_rows': np.array(upper_rows, copy=True),
+        'env_coords': environment_rows[:, cols_coords].astype(np.float64),
+        'env_radii': atom_vdw_radii(env_elements, env_names),
+        'env_hydrogen': is_hydrogen(env_elements, env_names),
+        'env_lower': _mask(lower_rows),
+        'env_upper': _mask(upper_rows),
+        'packing': packing_context(environment_rows, _mask(overlap_rows)),
+        }
+
+
+def splice_folded_rows(fragment_rows, lower_rows, upper_rows):
+    """
+    Replace the junction residues of a closed loop with the folded ones.
+
+    Parameters
+    ----------
+    fragment_rows : np.ndarray
+        Structure data array of the closed loop, residues numbered 1 to L.
+
+    lower_rows, upper_rows : np.ndarray
+        Template rows of the folded residues before and after the IDR.
+
+    Returns
+    -------
+    np.ndarray
+    """
+    resseq = fragment_rows[:, col_resSeq].astype(int)
+    last = int(resseq.max())
+
+    def _renumbered(rows, number):
+        rows = np.array(rows, copy=True)
+        rows[:, col_resSeq] = str(number)
+        rows[:, col_chainID] = fragment_rows[0, col_chainID]
+        rows[:, col_segid] = ''
+        return rows
+
+    parts = [
+        fragment_rows[resseq == 1],
+        _renumbered(lower_rows, 2),
+        fragment_rows[(resseq > 2) & (resseq < last - 1)],
+        _renumbered(upper_rows, last - 1),
+        fragment_rows[resseq == last],
+        ]
+    out = np.concatenate(parts, axis=0)
+    out[:, col_serial] = [str(i) for i in range(1, len(out) + 1)]
+    return out

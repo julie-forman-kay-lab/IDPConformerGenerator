@@ -4,24 +4,34 @@ Client for filling in the tails of folded proteins with IDRs.
 Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
+IDRs between two folded regions (Linker-IDRs) are closed with
+`--loop-closure next_seeker` (default) or `--loop-closure ccd`. The ccd
+method attaches every backbone to the first folded region and closes it
+onto the second by small phi/psi changes (torsion-space loop closure).
+It is recommended for Linker-IDRs longer than 40 residues.
+
 Future Ideas
 ------------
 - Implement CSSS on IDR tails/fragments.
 
 USAGE:
     $ idpconfgen ldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
+    $ idpconfgen ldrs -db db.json -seq seq.fasta -fld fld.pdb --loop-closure ccd
 """
 import argparse
 import os
 import shutil
+import sys
+from contextlib import contextmanager
 from functools import partial
 from glob import glob
-from itertools import cycle, product
+from itertools import cycle
 from multiprocessing import Pool, Queue
 from random import randint
 from time import time
 
 import numpy as np
+from scipy.spatial import cKDTree
 
 from idpconfgen import Path, log
 from idpconfgen.cli_build import gen_PDB_from_conformer, get_adjacent_angles
@@ -45,6 +55,9 @@ from idpconfgen.components.sidechain_packing import (
     get_sidechain_packing_parameters,
     sidechain_packing_methods,
     )
+from idpconfgen.components.sidechain_packing.faspr import (
+    faspr_dun2010bbdep_path,
+    )
 from idpconfgen.components.xmer_probs import (
     add_xmer_arg,
     compress_xmer_to_key,
@@ -65,6 +78,7 @@ from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.ldrs_helper import (
     align_coords,
+    atom_vdw_radii,
     break_check,
     consecutive_grouper,
     count_clashes,
@@ -72,10 +86,12 @@ from idpconfgen.ldrs_helper import (
     disorder_cases,
     inter_chain_cc,
     next_seeker,
+    prepare_ccd_context,
     psurgeon,
+    splice_folded_rows,
     tolerance_calculator,
     )
-from idpconfgen.libs import libcli
+from idpconfgen.libs import libccd, libcli
 from idpconfgen.libs.libbuild import (
     create_sidechains_masks_per_residue,
     get_cycle_bond_type,
@@ -229,6 +245,10 @@ def are_globals(bgeo_strategy):
         raise AssertionError(bgeo_error_msg.format(bgeo_strategy))
 
 
+# Methods to close Linker-IDRs between two folded regions; the first one
+# is the default.
+LOOP_CLOSURE_METHODS = ('next_seeker', 'ccd')
+
 # CLI argument parser parameters
 _name = 'ldrs'
 _help = 'Building IDRs within a given folded protein.'
@@ -291,6 +311,46 @@ ap.add_argument(
         "and clash-checking. Also enables keep-temporary parameter."
         ),
     action='store_true',
+    )
+
+ap.add_argument(
+    '--loop-closure',
+    help=(
+        "Method to connect IDRs between two folded regions (Linker-IDRs). "
+        "'next_seeker' grows conformers from each folded end and keeps "
+        "pairs that meet with peptide-bond geometry. 'ccd' attaches each "
+        "backbone conformer to the first folded end and closes it onto the "
+        "second by small phi/psi changes (torsion-space loop closure), "
+        "avoiding the folded regions; it is much faster for Linker-IDRs "
+        "longer than about 40 residues and practical for loops of "
+        "hundreds of residues. Defaults to 'next_seeker'."
+        ),
+    choices=LOOP_CLOSURE_METHODS,
+    default=LOOP_CLOSURE_METHODS[0],
+    )
+
+ap.add_argument(
+    '--ccd-solver',
+    help=(
+        "With `--loop-closure ccd`: 'dls' changes all IDR torsions together "
+        "by clash-aware damped least squares, steering the loop around "
+        "the folded regions; 'ccd' uses cyclic coordinate descent sweeps "
+        "(Canutescu & Dunbrack 2003) and only screens contacts afterwards. "
+        "Defaults to 'dls'."
+        ),
+    choices=libccd.SOLVERS,
+    default=libccd.SOLVERS[0],
+    )
+
+ap.add_argument(
+    '--ccd-max-trials',
+    help=(
+        "With `--loop-closure ccd`: number of backbone conformers each "
+        "core may try per Linker-IDR conformer it must deliver before "
+        "giving up. Defaults to 100."
+        ),
+    type=int,
+    default=100,
     )
 
 ap.add_argument(
@@ -432,6 +492,9 @@ def main(
         output_folder=None,
         energy_log='energies.log',
         sidechain_method=DEFAULT_SDM,
+        loop_closure=LOOP_CLOSURE_METHODS[0],
+        ccd_solver=libccd.SOLVERS[0],
+        ccd_max_trials=100,
         **kwargs,  # other kwargs target energy function, for example.
         ):
     """
@@ -448,6 +511,17 @@ def main(
             )
         return
     
+    if loop_closure not in LOOP_CLOSURE_METHODS:
+        raise ValueError(
+            f'`loop_closure` must be one of {LOOP_CLOSURE_METHODS}, '
+            f'got {loop_closure!r}.'
+            )
+    if ccd_solver not in libccd.SOLVERS:
+        raise ValueError(
+            f'`ccd_solver` must be one of {libccd.SOLVERS}, '
+            f'got {ccd_solver!r}.'
+            )
+
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
     
     if keep_temporary or stitching_off:
@@ -629,6 +703,7 @@ def main(
         skipped_chains = None
     DISORDER_BOUNDS = {}
     DISORDER_CASES = {}
+    rama_reference = None
     for chain in fld_chainseq:
         log.info(f"Building IDRs onto chain {chain}")
         fld_fasta = fld_chainseq[chain][0]
@@ -638,7 +713,13 @@ def main(
         
         # Find out what our disordered sequences are
         # Can be C-term, N-term, in the middle, or all the above
-        linkers = break_check(pdb_raw, membrane)
+        # Folded regions of this chain only: those of other chains with
+        # the same sequence but other IDRs would hide this chain's IDRs
+        if len(unique_chains) > 1:
+            chain_pdb = '\n'.join(structure_to_pdb(chain_arr))
+        else:
+            chain_pdb = pdb_raw
+        linkers = break_check(chain_pdb, membrane)
         mod_input_seq = in_seq
         if linkers:
             for seq in linkers:
@@ -773,18 +854,72 @@ def main(
             get_sidechain_packing_parameters(kwargs, sidechain_method)
 
         # Generate library of conformers for each case
+        # Linker-IDRs of a chain are numbered in sequence order
+        linkeridr_num = 0
         for index, seq in enumerate(DISORDER_SEQS):
             fld_term_idx = {}
             case = DISORDER_CASES[chain][index]
-            if disorder_cases[0] not in DISORDER_CASES[chain]:
-                lower = DISORDER_BOUNDS[chain][index][0] + first_seq - 1
-                upper = DISORDER_BOUNDS[chain][index][1] + first_seq
-            else:
-                lower = DISORDER_BOUNDS[chain][index][0]
-                upper = DISORDER_BOUNDS[chain][index][1] + 1
-            linkeridr_num = 0
+            # template residue number of the first sequence position,
+            # before the N-IDR if there is one
+            first_position = first_seq
+            if disorder_cases[0] in DISORDER_CASES[chain]:
+                first_position -= DISORDER_BOUNDS[chain][0][1]
+            # residues on either side of the chain break
+            lower = DISORDER_BOUNDS[chain][index][0] + first_position - 1
+            upper = DISORDER_BOUNDS[chain][index][1] + first_position
             library_nconfs = 640
-            if case == disorder_cases[1]:
+            if case == disorder_cases[1] and loop_closure == 'ccd':
+                start = time()
+                linker_parent_of = make_folder_or_cwd(
+                    output_folder.joinpath(temp_dir + case)
+                    )
+                linker_of = make_folder_or_cwd(
+                    linker_parent_of.joinpath(f"linker_{linkeridr_num}")
+                    )
+                match_of = make_folder_or_cwd(
+                    linker_of.joinpath(f"{linkeridr_num}_match")
+                    )
+                if rama_reference is None:
+                    rama_reference = libccd.RamachandranReference(
+                        ANGLES,
+                        primary,
+                        )
+
+                populate_globals(
+                    input_seq=seq,
+                    bgeo_strategy=bgeo_strategy,
+                    bgeo_path=bgeo_path,
+                    forcefield=forcefields[forcefield],
+                    **kwargs)
+
+                _close_linker_ccd(
+                    seq,
+                    index=index,
+                    ccd_context=prepare_ccd_context(
+                        fld_pro if membrane else chain_arr,
+                        fld_struc.data_array,
+                        lower,
+                        upper,
+                        ),
+                    ccd_params=libccd.CCDParameters(solver=ccd_solver),
+                    rama=rama_reference,
+                    output_folder=match_of,
+                    conformer_name=f"{linkeridr_num}_ccd",
+                    nconfs=nconfs,
+                    ncores=ncores,
+                    random_seed=random_seed,
+                    max_trials=ccd_max_trials,
+                    max_clash=max_clash * 2,  # 2 fixed ends, as for linkers
+                    tolerance=dist_tolerance,
+                    report_folder=output_folder,
+                    sidechain_parameters=sidechain_parameters,
+                    sidechain_method=sidechain_method,
+                    bgeo_strategy=bgeo_strategy,
+                    **kwargs,
+                    )
+                linkeridr_num += 1
+
+            elif case == disorder_cases[1]:
                 for s, aa in enumerate(fld_seq):
                     if aa == lower - 1 and fld_name[s] == 'C':
                         fld_term_idx["CC"] = s
@@ -828,7 +963,9 @@ def main(
 
                 match_of_files = next(os.walk(match_of))[2]
                 num_files = len(match_of_files)
-                prev_combinations = []
+                # conformers already checked against each other
+                checked_C = []
+                checked_N = []
                 lidr_set = 0
                 start = time()
                 while num_files < nconfs:
@@ -937,27 +1074,30 @@ def main(
                     log.info("Commencing next-seeker protocol for Linker-IDR...")  # noqa: E501
 
                     # We need to make only new comparisons of files
-                    # we haven't seen before
-                    C_files = glob(str(linker_of) + "/*_C/*.pdb")
-                    N_files = glob(str(linker_of) + "/*_N/*.pdb")
-
-                    all_combinations = list(product(C_files, N_files))
-                    new_combinations = list(set(all_combinations) - set(prev_combinations))  # noqa: E501
-                    prev_combinations = all_combinations
-
-                    tocheck_C = list(set([item[0] for item in new_combinations]))  # noqa: E501
-                    tocheck_N = list(set([item[1] for item in new_combinations]))  # noqa: E501
-
-                    execute = partial(
-                        next_seeker,
-                        nterm_idr_lib=tocheck_N,
-                        max_clash=max_clash,
-                        tolerance=dist_tolerance,
-                        output_folder=match_of,
+                    # we haven't seen before: the new C-side conformers
+                    # against every N-side one, and the earlier C-side
+                    # conformers against the new N-side ones
+                    C_files = sorted(glob(str(linker_of) + "/*_C/*.pdb"))
+                    N_files = sorted(glob(str(linker_of) + "/*_N/*.pdb"))
+                    unchecked = _unchecked_pairs(
+                        C_files,
+                        N_files,
+                        checked_C,
+                        checked_N,
                         )
-                    execute_pool = pool_function(execute, tocheck_C, ncores=ncores)  # noqa: E501
-                    for _ in execute_pool:
-                        pass
+                    for tocheck_C, tocheck_N in unchecked:
+                        execute = partial(
+                            next_seeker,
+                            nterm_idr_lib=tocheck_N,
+                            max_clash=max_clash,
+                            tolerance=dist_tolerance,
+                            output_folder=match_of,
+                            )
+                        execute_pool = pool_function(execute, tocheck_C, ncores=ncores)  # noqa: E501
+                        for _ in execute_pool:
+                            pass
+                    checked_C = C_files
+                    checked_N = N_files
                     
                     match_of_files = next(os.walk(match_of))[2]
                     num_files = len(match_of_files)
@@ -1141,6 +1281,539 @@ def main(
     ENERGYLOGSAVER.close()
 
 
+def _close_linker_ccd(
+        input_seq,
+        *,
+        index,
+        ccd_context,
+        ccd_params,
+        rama,
+        output_folder,
+        conformer_name,
+        nconfs,
+        ncores,
+        random_seed,
+        max_trials,
+        max_clash,
+        tolerance,
+        report_folder,
+        **kwargs,
+        ):
+    """
+    Write `nconfs` Linker-IDR conformers closed in torsion space.
+
+    Backbone generation and closure are distributed over `ncores`. New
+    rounds run while the previous one closed at least one loop; a round
+    that closes none raises :class:`IDPConfGenException` with a summary of
+    the rejections.
+
+    Parameters
+    ----------
+    input_seq : str
+        Linker-IDR sequence with two folded residues on each side.
+
+    index : int
+        Index of the disordered region (selects the torsion sampler).
+
+    ccd_context : dict
+        Output of :func:`idpconfgen.ldrs_helper.prepare_ccd_context`.
+
+    ccd_params : :class:`idpconfgen.libs.libccd.CCDParameters`
+
+    rama : :class:`idpconfgen.libs.libccd.RamachandranReference` or None
+
+    output_folder : Path
+        Where closed loops are written (the `next_seeker` match folder).
+
+    max_trials : int
+        Backbones each core may try per loop it must deliver.
+
+    max_clash, tolerance : int, float
+        Clash budget and distance tolerance against the folded structure.
+
+    **kwargs
+        Passed to :func:`_build_ccd_loops`.
+    """
+    def n_done():
+        return len(glob(os.path.join(str(output_folder), '*.pdb')))
+
+    consume = partial(
+        _build_ccd_loops,
+        ccd_context=ccd_context,
+        ccd_params=ccd_params,
+        rama=rama,
+        index=index,
+        input_seq=input_seq,
+        conformer_name=conformer_name,
+        output_folder=output_folder,
+        max_trials=max_trials,
+        max_clash=max_clash,
+        tolerance=tolerance,
+        **kwargs,
+        )
+    execute = partial(
+        report_on_crash,
+        consume,
+        ROC_exception=Exception,
+        ROC_folder=report_folder,
+        ROC_prefix=_name,
+        )
+
+    log.info(S(
+        f'Closing Linker-IDR of {len(input_seq) - 4} residues in torsion '
+        f'space ({ccd_params.solver} solver).'
+        ))
+    reasons = {}
+    trials = 0
+    round_ = 0
+    while n_done() < nconfs:
+        needed = nconfs - n_done()
+        workers = max(1, min(ncores, needed))
+        tasks = [
+            (
+                worker,
+                needed // workers + int(worker < needed % workers),
+                random_seed + 104729 * index + 7919 * round_ + worker,
+                round_,
+                )
+            for worker in range(workers)
+            ]
+        if workers == 1:
+            results = [execute(tasks[0])]
+        else:
+            with Pool(workers) as pool:
+                results = list(pool.imap_unordered(execute, tasks))
+
+        built = 0
+        for result in results:
+            built += result['built']
+            trials += result['trials']
+            for reason, count in result['reasons'].items():
+                reasons[reason] = reasons.get(reason, 0) + count
+        summary = ', '.join(
+            f'{reason}={count}'
+            for reason, count in sorted(reasons.items(), key=lambda x: -x[1])
+            )
+        log.info(S(
+            f'Loop closure round {round_ + 1}: {built} closed; '
+            f'{n_done()}/{nconfs} from {trials} backbones '
+            f'(rejected: {summary or "none"}).'
+            ))
+        if built == 0:
+            raise IDPConfGenException(errmsg=(
+                f'Could not close the Linker-IDR {input_seq} in '
+                f'{trials} backbones (rejected: {summary}). Consider '
+                'raising --ccd-max-trials or -tol, or check the folded '
+                'residues next to the IDR.'
+                ))
+        round_ += 1
+
+
+@contextmanager
+def _quiet_stdout():
+    """Silence writes to the stdout file descriptor (FASPR warnings)."""
+    try:
+        if sys.stdout is not None:
+            sys.stdout.flush()
+        saved = os.dup(1)
+    except (OSError, ValueError):
+        yield
+        return
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    try:
+        os.dup2(devnull, 1)
+        yield
+    finally:
+        os.dup2(saved, 1)
+        os.close(saved)
+        os.close(devnull)
+
+
+def _faspr_in_context(backbone, input_seq, packing, first, last, n_heavy, radius=8.0):  # noqa: E501
+    """
+    Pack the side chains of a closed loop with FASPR next to its neighbours.
+
+    The template residues with a heavy atom within `radius` of the IDR
+    backbone are packed together with the loop, as extra (discontinuous)
+    residues, so FASPR places the loop side chains around them. FASPR
+    chooses the side chains of these neighbours too, from their backbone;
+    only the loop atoms are returned and the template keeps its own side
+    chains.
+
+    Parameters
+    ----------
+    backbone : np.ndarray, shape (L, 4, 3)
+        Closed loop with its folded overlap residues.
+
+    input_seq : str
+        Loop sequence.
+
+    packing : dict
+        :func:`idpconfgen.ldrs_helper.packing_context` output with a
+        ``tree`` (cKDTree of ``atoms``).
+
+    first, last : int
+        Zero-based IDR residue range.
+
+    n_heavy : int
+        Number of loop heavy atoms FASPR returns (without OXT).
+
+    Returns
+    -------
+    np.ndarray, shape (n_heavy, 3), or None if FASPR failed.
+    """
+    # we import idpcpp here to avoid problems with tox, as in faspr.py
+    import idpcpp
+    hits = packing['tree'].query_ball_point(
+        backbone[first:last + 1].reshape(-1, 3),
+        radius,
+        )
+    found = sorted({int(packing['owner'][i]) for hit in hits for i in hit})
+    sequence = input_seq + ''.join(packing['sequence'][r] for r in found)
+    coords = np.concatenate((
+        backbone.reshape(-1, 3),
+        packing['backbone'][found].reshape(-1, 3),
+        ))
+    try:
+        with _quiet_stdout():
+            packed = idpcpp.faspr_sidechains(
+                coords,
+                sequence,
+                str(faspr_dun2010bbdep_path),
+                )
+    except Exception:
+        return None
+    if packed is None or len(packed) < n_heavy:
+        return None
+    return np.asarray(packed[:n_heavy], dtype=np.float64)
+
+
+# private function because it depends on the globals populated by
+# `populate_globals`, as `_build_conformers`
+def _build_ccd_loops(
+        task,
+        *,
+        ccd_context,
+        ccd_params,
+        rama,
+        index,
+        input_seq,
+        conformer_name,
+        output_folder,
+        max_trials,
+        max_clash,
+        tolerance,
+        sidechain_parameters=None,
+        sidechain_method=DEFAULT_SDM,
+        disable_sidechains=False,
+        energy_threshold_backbone=100.0,
+        energy_threshold_sidechains=250.0,
+        bgeo_strategy=bgeo_strategies_default,
+        **kwargs,
+        ):
+    """
+    Build backbones and close them onto both ends of a Linker-IDR.
+
+    Each backbone is generated with the same sampler as other IDRs and
+    closed with :func:`idpconfgen.libs.libccd.close_loop`. Its four overlap
+    residues take their folded positions, and side chains are added with
+    `sidechain_method` (unless `disable_sidechains`); FASPR packs the IDR
+    together with the template residues around it
+    (:func:`_faspr_in_context`), and the overlaps left are relieved by chi
+    rotations (:func:`idpconfgen.libs.libccd.relax_side_chains`). The loop
+    is then checked for internal energy (`energy_threshold_sidechains`, or
+    `energy_threshold_backbone` without side chains), for clashes with the
+    folded structure (`max_clash`, `tolerance`) and for IDR atoms closer
+    than half their vdW radii sum to a folded atom. Accepted loops are saved
+    in the `next_seeker` match format, with the folded residues bonded to
+    the IDR copied from the template, so `psurgeon` inserts only the IDR.
+
+    Parameters
+    ----------
+    task : tuple
+        ``(worker, quota, random_seed, round)``.
+
+    Returns
+    -------
+    dict
+        Number of loops built, backbones tried and rejection counts.
+    """
+    worker, quota, seed, round_ = task
+    out = {'built': 0, 'trials': 0, 'reasons': {}}
+    if quota < 1:
+        return out
+
+    ROUND = np.round
+    NAN = np.nan
+    nres = len(input_seq)
+    first, last = 2, nres - 3
+    input_seq_3_letters = translate_seq_to_3l(input_seq)
+
+    heavy = ~ccd_context['env_hydrogen']
+    bb_env = libccd.ClashEnvironment(
+        ccd_context['env_coords'][heavy],
+        ccd_context['env_radii'][heavy],
+        ccd_context['env_lower'][heavy],
+        ccd_context['env_upper'][heavy],
+        )
+    all_env = libccd.ClashEnvironment(
+        ccd_context['env_coords'],
+        ccd_context['env_radii'],
+        ccd_context['env_lower'],
+        ccd_context['env_upper'],
+        )
+    lower_anchor = ccd_context['lower_anchor']
+    upper_anchor = ccd_context['upper_anchor']
+    # for overlaps, only the two peptide bonds to the IDR are covalent
+    env_heavy = ccd_context['env_coords'][heavy]
+    peptide_env = libccd.ClashEnvironment(
+        env_heavy,
+        ccd_context['env_radii'][heavy],
+        np.all(np.isclose(env_heavy, lower_anchor[2]), axis=1),
+        np.all(np.isclose(env_heavy, upper_anchor[0]), axis=1),
+        )
+
+    builder = conformer_generator(
+        index=index,
+        input_seq=input_seq,
+        random_seed=seed,
+        sidechain_parameters=sidechain_parameters,
+        sidechain_method=sidechain_method,
+        disable_sidechains=True,
+        energy_threshold_backbone=energy_threshold_backbone,
+        energy_threshold_sidechains=energy_threshold_sidechains,
+        bgeo_strategy=bgeo_strategy,
+        **kwargs)
+    atom_labels, residue_numbers, _residue_labels = next(builder)
+
+    with_sidechains = not disable_sidechains
+    packing = ccd_context['packing']
+    in_context = (
+        with_sidechains
+        and sidechain_method == 'faspr'
+        and len(packing['atoms']) > 0
+        )
+    if with_sidechains:
+        build_sidechains = sidechain_packing_methods[sidechain_method](
+            input_seq=input_seq,
+            template_masks=TEMPLATE_MASKS,
+            all_atom_masks=ALL_ATOM_MASKS,
+            user_parameters=sidechain_parameters,
+            )
+        energy_threshold = energy_threshold_sidechains
+    else:
+        energy_threshold = energy_threshold_backbone
+    if in_context:
+        packing = dict(packing, tree=cKDTree(packing['atoms']))
+
+    bb4_mask = ALL_ATOM_MASKS.bb4
+    oxt_index = ALL_ATOM_MASKS.cterm[0]
+    nh_index = ALL_ATOM_MASKS.NHs
+    nh_residue = residue_numbers[nh_index] - 1
+    is_bb = np.isin(atom_labels, ('N', 'CA', 'C', 'O'))
+    junction = (residue_numbers == 2) | (residue_numbers == nres - 1)
+    idr_atoms = (residue_numbers > 2) & (residue_numbers < nres - 1)
+    energy_atoms = idr_atoms | (junction & is_bb)
+    idr_residue = residue_numbers[idr_atoms] - 1
+    idr_radii = atom_vdw_radii([a.lstrip('123')[:1] for a in atom_labels[idr_atoms]])  # noqa: E501
+    idr_heavy = ~np.char.startswith(atom_labels[idr_atoms].astype(str), 'H')
+    # all four overlap residues take their folded positions
+    folded_bb = {
+        0: ccd_context['lower_outer'],
+        1: lower_anchor,
+        nres - 2: upper_anchor,
+        nres - 1: ccd_context['upper_outer'],
+        }
+    # side-chain relaxation acts on the IDR and the junction backbones
+    relax_atoms = np.flatnonzero(
+        (idr_atoms | (junction & np.isin(atom_labels, ('N', 'CA', 'C', 'O', 'H'))))  # noqa: E501
+        & (atom_labels != 'OXT')
+        )
+    idr_numbers = range(first + 1, last + 2)
+
+    def reject(reason):
+        out['reasons'][reason] = out['reasons'].get(reason, 0) + 1
+
+    def evaluate(all_atom):
+        """
+        Score a loop: energies, folded clash count and folded overlaps.
+
+        Overlaps are IDR heavy atoms closer than half the vdW radii sum to
+        a folded heavy atom, also of the residues bonded to the IDR; the
+        clash count alone weighs them as any contact.
+        """
+        energy = 0.0
+        if ALL_ATOM_EFUNC is not None:
+            energy = ALL_ATOM_EFUNC(np.where(
+                energy_atoms[:, None],
+                all_atom,
+                NAN,
+                ))
+        idr_coords = all_atom[idr_atoms]
+        present = np.isfinite(idr_coords[:, 0])
+        n_clash = all_env.count_overlaps(
+            idr_coords[present],
+            idr_radii[present],
+            idr_residue[present],
+            first,
+            last,
+            1.0,
+            offset=tolerance,
+            )
+        heavy = present & idr_heavy
+        n_hard = peptide_env.count_overlaps(
+            idr_coords[heavy],
+            idr_radii[heavy],
+            idr_residue[heavy],
+            first,
+            last,
+            0.5,
+            )
+        return energy, n_clash, n_hard
+
+    def passes(energy, n_clash, n_hard):
+        return (
+            not np.any(energy > energy_threshold)
+            and n_clash <= max_clash
+            and n_hard == 0
+            )
+
+    while out['built'] < quota and out['trials'] < max_trials * quota:
+        try:
+            _energy, coords = next(builder)
+        except StopIteration:
+            reject('builder_exhausted')
+            break
+        out['trials'] += 1
+
+        result = libccd.close_loop(
+            coords[bb4_mask].reshape(nres, 4, 3),
+            input_seq,
+            lower_anchor,
+            upper_anchor,
+            environment=bb_env,
+            params=ccd_params,
+            rama=rama,
+            extra=coords[[oxt_index]],
+            )
+        if not result.accepted:
+            reject(result.reason)
+            continue
+
+        # the overlap residues are the folded ones; the N-terminal H
+        # follow the first, and OXT completes the carboxylate of the last
+        closed = result.backbone
+        bb = closed.copy()
+        for residue, anchor in folded_bb.items():
+            if np.all(np.isfinite(anchor)):
+                bb[residue] = anchor
+        hterm = (
+            coords[ALL_ATOM_MASKS.Hterm] @ result.rotation.T
+            + result.translation
+            )
+        oxt = result.extra[0]
+        if not np.allclose(bb[0], closed[0]):
+            rot, tra, _ = libccd.kabsch(closed[0, :3], bb[0, :3])
+            hterm = hterm @ rot.T + tra
+        if not np.allclose(bb[-1], closed[-1]):
+            # OXT mirrors the folded O across the CA-C axis
+            axis = bb[-1, 2] - bb[-1, 1]
+            axis /= np.linalg.norm(axis)
+            arm = bb[-1, 3] - bb[-1, 2]
+            oxt = bb[-1, 2] + 2.0 * (arm @ axis) * axis - arm
+
+        all_atom = np.full(coords.shape, NAN, dtype=np.float64)
+        all_atom[bb4_mask] = bb.reshape(-1, 3)
+        all_atom[oxt_index] = oxt
+        all_atom[ALL_ATOM_MASKS.Hterm] = hterm
+        for atom, residue in zip(nh_index, nh_residue):
+            all_atom[atom] = make_coord_Q_planar(
+                bb[residue, 1],
+                bb[residue, 0],
+                bb[residue - 1, 2],
+                distance=distance_H_N,
+                bend=build_bend_H_N_C,
+                )
+
+        if with_sidechains:
+            sidechains = None
+            if in_context:
+                sidechains = _faspr_in_context(
+                    bb,
+                    input_seq,
+                    packing,
+                    first,
+                    last,
+                    len(ALL_ATOM_MASKS.non_Hs_non_OXT),
+                    )
+                mask = ALL_ATOM_MASKS.non_Hs_non_OXT
+            if sidechains is None:
+                template = np.full(
+                    (len(TEMPLATE_LABELS.atom_labels), 3),
+                    NAN,
+                    dtype=np.float64,
+                    )
+                template[TEMPLATE_MASKS.bb4] = all_atom[bb4_mask]
+                template[TEMPLATE_MASKS.NHs] = all_atom[nh_index]
+                template[TEMPLATE_MASKS.Hterm] = all_atom[ALL_ATOM_MASKS.Hterm]  # noqa: E501
+                template[TEMPLATE_MASKS.cterm[0]] = all_atom[oxt_index]
+                mask, sidechains = build_sidechains(template)
+            if sidechains is None:
+                reject('sidechains')
+                continue
+            all_atom[mask] = sidechains
+            # the packed backbone is the closed one
+            all_atom[bb4_mask] = bb.reshape(-1, 3)
+
+        energy, n_clash, n_hard = evaluate(all_atom)
+        if with_sidechains:
+            # chi rotations relieve the overlaps the packer left; kept
+            # unless they turn a loop that passed into one that fails
+            relaxed = all_atom.copy()
+            relaxed[relax_atoms], _stats = libccd.relax_side_chains(
+                all_atom[relax_atoms],
+                atom_labels[relax_atoms],
+                residue_numbers[relax_atoms],
+                input_seq,
+                idr_numbers,
+                environment=bb_env,
+                )
+            scores = evaluate(relaxed)
+            if passes(*scores) or not passes(energy, n_clash, n_hard):
+                all_atom = relaxed
+                energy, n_clash, n_hard = scores
+        if np.any(energy > energy_threshold):
+            reject('energy')
+            continue
+        if n_clash > max_clash:
+            reject('folded_clash')
+            continue
+        if n_hard:
+            reject('folded_overlap')
+            continue
+
+        pdb_string = gen_PDB_from_conformer(
+            input_seq_3_letters,
+            atom_labels,
+            residue_numbers,
+            ROUND(all_atom, decimals=3),
+            )
+        fragment = splice_folded_rows(
+            parse_pdb_to_array(pdb_string),
+            ccd_context['lower_rows'],
+            ccd_context['upper_rows'],
+            )
+        out['built'] += 1
+        fname = f'{conformer_name}_{round_}_{worker}_{out["built"]}.pdb'
+        with open(Path(output_folder, fname), 'w') as fout:
+            for line in structure_to_pdb(fragment):
+                fout.write(line + "\n")
+        ENERGYLOGSAVER.save(fname, np.nansum(energy))
+
+    del builder
+    return out
+
+
 def populate_globals(
         *,
         input_seq=None,
@@ -1221,6 +1894,34 @@ def populate_globals(
 
     del topobj
     return
+
+
+def _unchecked_pairs(C_files, N_files, checked_C, checked_N):
+    """
+    Group the C-/N-side conformer pairs `next_seeker` has not checked yet.
+
+    Parameters
+    ----------
+    C_files, N_files : list
+        All C-side and N-side conformers of a Linker-IDR so far.
+
+    checked_C, checked_N : list
+        The conformers of the previous rounds, checked against each other.
+
+    Returns
+    -------
+    list of tuple
+        (C-side conformers, N-side conformers to check them with): the new
+        C-side conformers with every N-side one, and the C-side conformers
+        of the previous rounds with the new N-side ones.
+    """
+    seen_C = set(checked_C)
+    seen_N = set(checked_N)
+    new_C = [f for f in C_files if f not in seen_C]
+    new_N = [f for f in N_files if f not in seen_N]
+    old_C = [f for f in C_files if f in seen_C]
+    groups = ((new_C, list(N_files)), (old_C, new_N))
+    return [(c, n) for c, n in groups if c and n]
 
 
 # private function because it depends on the global `CONF_NUMBER`
