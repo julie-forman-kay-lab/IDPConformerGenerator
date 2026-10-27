@@ -38,7 +38,7 @@ class IDPConfGenException(Exception):
 
     errmsg = 'An unknnown error as occurred. ' + CONTACTUS.contact_message
 
-    def __init__(self, *args, errmsg=None):
+    def __init__(self, *args, errmsg=None):  # noqa: B042
 
         # IDPConfGenException(errmsg='Custom error msg')
         if errmsg is not None:
