@@ -97,9 +97,9 @@ Rules of thumb:
 * Use ``--loop-closure ccd`` for Linker-IDRs longer than 40
   residues; beyond about 100 residues it is the only practical choice.
   ``next_seeker`` remains the default.
-* ``--ccd-max-trials`` (default 100) is the number of backbones each core may
-  try per conformer it must deliver. Every round logs why the loops were
-  rejected, and if a round closes nothing, ``ldrs`` stops. ``final_endpoint``
+* ``--ccd-max-trials`` (default 100) is the number of backbones each worker may
+  try per conformer it must deliver in a round. Every round logs why the loops
+  were rejected. If the first round closes nothing, ``ldrs`` stops. ``final_endpoint``
   means the L-IDR could not be closed within the torsion and contact limits,
   ``omega`` means that the sampled backbone had a twisted or non-proline cis
   peptide bond, and ``energy``, ``folded_clash`` and ``folded_overlap`` errors
