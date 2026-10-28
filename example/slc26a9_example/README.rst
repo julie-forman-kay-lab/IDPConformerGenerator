@@ -63,7 +63,12 @@ The ``next_seeker`` protocol compares conformer pairs from each side
 of the interacting folded domains and keeps the pairs that satisfies specific
 backbone peptide-bond geometry. The chance that two independently built IDRs
 meet drops steeply with the length of the IDR, which is why long Linker-IDRs
-need very large libraries. With ``--loop-closure ccd`` (the default),
+need very large libraries. Each round builds 640 backbone conformers
+from each side (halves), keeping only the residues that can still reach the
+other side. Every new half is compared with all halves of the other side at
+once, one loop is joined per run of consecutive matching residues. Successful
+loops get sidechains and the same energy and clash checks as with ``ccd``.
+With ``--loop-closure ccd`` (the default),
 ``ldrs`` instead attempts to close every backbone it builds onto both folded
 ends::
 

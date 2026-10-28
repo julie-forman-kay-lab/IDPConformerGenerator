@@ -7,7 +7,13 @@ import pytest
 
 from idpconfgen import cli_ldrs
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.ldrs_helper import split_long_idr
+from idpconfgen.ldrs_helper import (
+    find_junctions,
+    half_backbone,
+    junction_runs,
+    prepare_ccd_context,
+    split_long_idr,
+    )
 from idpconfgen.libs import libccd
 from idpconfgen.libs.libstructure import (
     Structure,
@@ -55,27 +61,142 @@ def test_main_refuses_unknown_methods():
         cli_ldrs.main('seq.fasta', 'db.json', folded_structure='f.pdb', loop_closure='kic')  # noqa: E501
 
 
-def test_unchecked_pairs():
-    """Test next_seeker checks every pair of conformers exactly once."""
-    pairs = set()
-    checked_C, checked_N = [], []
-    C_files, N_files = [], []
-    for round_ in range(3):
-        C_files = C_files + [f'C{round_}{i}' for i in range(2)]
-        N_files = N_files + [f'N{round_}{i}' for i in range(3)]
-        groups = cli_ldrs._unchecked_pairs(
-            C_files,
-            N_files,
-            checked_C,
-            checked_N,
+def test_new_junctions():
+    """Test every pair of halves is searched once as rounds add halves."""
+    structure = Structure(data_folder / 'EXPL_A.pdb')
+    structure.build()
+    rows = structure.data_array
+    resseq = rows[:, col_resSeq].astype(int)
+    rows = rows[resseq <= 13]
+    rows[:, col_resSeq] = (rows[:, col_resSeq].astype(int) - 3).astype(str)
+    native = half_backbone(rows, 10)
+    seen = set()
+    sizes = [(2, 2), (4, 3), (4, 5), (6, 5)]
+    previous = (0, 0)
+    for n_c, n_n in sizes:
+        found = cli_ldrs._new_junctions(
+            np.repeat(native[None], n_c, axis=0),
+            np.repeat(native[None], n_n, axis=0),
+            *previous,
             )
-        for tocheck_C, tocheck_N in groups:
-            for pair in ((c, n) for c in tocheck_C for n in tocheck_N):
-                assert pair not in pairs
-                pairs.add(pair)
-        checked_C, checked_N = C_files, N_files
-        assert len(pairs) == len(C_files) * len(N_files)
-    assert cli_ldrs._unchecked_pairs(C_files, N_files, C_files, N_files) == []
+        for row in map(tuple, found.tolist()):
+            assert row not in seen
+            seen.add(row)
+        previous = (n_c, n_n)
+    # the native chain meets itself at every residue
+    assert len(seen) == 6 * 5 * 9
+
+
+def _join_setup(tmp_path, monkeypatch):
+    """Set up a Linker-IDR between EXPL_A residues 6 and 15, native halves."""
+    from idpconfgen.core.build_definitions import forcefields
+    from idpconfgen.libs.libbuild import init_conflabels, init_confmasks
+    from idpconfgen.libs.libparse import remap_sequence
+    structure = Structure(data_folder / 'EXPL_A.pdb')
+    structure.build()
+    rows = structure.data_array
+    resseq = rows[:, col_resSeq].astype(int)
+    seq = 'AYIAKQRQISFVKSHF'[1:13]  # residues 5 to 16
+    template = rows[(resseq <= 6) | (resseq >= 15)]
+    context = prepare_ccd_context(template, template, 6, 15)
+    topology = forcefields['Amberff14SB'](add_OXT=True, add_Nterminal_H=True)
+    for name, sequence in (('ALL_ATOM', seq), ('TEMPLATE', remap_sequence(seq))):  # noqa: E501
+        labels = init_conflabels(sequence, topology.atom_names)
+        monkeypatch.setattr(cli_ldrs, f'{name}_LABELS', labels)
+        monkeypatch.setattr(cli_ldrs, f'{name}_MASKS', init_confmasks(labels.atom_labels))  # noqa: E501
+    monkeypatch.setattr(cli_ldrs, 'ALL_ATOM_EFUNC', None)
+    monkeypatch.setattr(cli_ldrs, 'ENERGYLOGSAVER', _NoLog())
+    finisher = cli_ldrs._LoopFinisher(
+        seq,
+        context,
+        rebuilt=True,
+        max_clash=1000,
+        disable_sidechains=True,
+        )
+    monkeypatch.setattr(cli_ldrs, '_JOIN', {
+        'finisher': finisher,
+        'folder': tmp_path,
+        'max_clash': 40,
+        'tolerance': 0.4,
+        })
+    loop_rows = rows[(resseq >= 5) & (resseq <= 16)]
+    loop_rows[:, col_resSeq] = (loop_rows[:, col_resSeq].astype(int) - 4).astype(str)  # noqa: E501
+
+    def half(name):
+        return {
+            'name': name,
+            'backbone': half_backbone(loop_rows, 12),
+            'hterm': np.full((3, 3), np.nan),
+            'oxt': np.full(3, np.nan),
+            }
+    return half('c'), half('n')
+
+
+def test_join_halves(tmp_path, monkeypatch):
+    """Test one loop per run of junctions, in the new peptide plane."""
+    c_half, n_half = _join_setup(tmp_path, monkeypatch)
+    found = find_junctions(c_half['backbone'][None], n_half['backbone'][None])  # noqa: E501
+    assert junction_runs(found) == {(0, 0): [list(range(1, 12))]}
+    out = cli_ldrs._join_halves([(c_half, n_half, [[4, 5, 6], [9]])])
+    assert out == {'written': 2, 'tried': 2, 'reasons': {}}
+    assert sorted(p.name for p in tmp_path.glob('*.pdb')) == ['c+n_j4.pdb', 'c+n_j9.pdb']  # noqa: E501
+    loop = Structure(tmp_path / 'c+n_j4.pdb')
+    loop.build()
+    rows = loop.data_array
+    numbers = rows[:, col_resSeq].astype(int)
+    assert sorted(set(numbers)) == list(range(1, 13))
+
+    def xyz(residue, atom):
+        return rows[(numbers == residue) & (rows[:, col_name] == atom)][0, cols_coords].astype(float)  # noqa: E501
+
+    c, o, ca, n = xyz(4, 'C'), xyz(4, 'O'), xyz(4, 'CA'), xyz(5, 'N')
+    normal = np.cross(ca - c, n - c)
+    assert abs(np.dot(normal / np.linalg.norm(normal), o - c)) < 5e-3
+
+
+def test_join_halves_overlap(tmp_path, monkeypatch):
+    """Test halves that overlap across the junction are not joined."""
+    c_half, n_half = _join_setup(tmp_path, monkeypatch)
+    n_half['backbone'] = n_half['backbone'].copy()
+    n_half['backbone'][8] = c_half['backbone'][2] + 0.2
+    out = cli_ldrs._join_halves([(c_half, n_half, [[5]])])
+    assert out == {'written': 0, 'tried': 1, 'reasons': {'halves_overlap': 1}}  # noqa: E501
+    assert not list(tmp_path.glob('*.pdb'))
+
+
+def test_conformer_generator_stop(monkeypatch):
+    """Test a conformer is yielded where `stop` ends it."""
+    from idpconfgen.core.build_definitions import forcefields
+    seq = 'A' * 12
+    for name in cli_ldrs._SEQUENCE_GLOBALS:
+        monkeypatch.setattr(cli_ldrs, name, getattr(cli_ldrs, name))
+    cli_ldrs.populate_globals(input_seq=seq, forcefield=forcefields['Amberff14SB'])  # noqa: E501
+
+    def extended(nres, cres):
+        return 'A' * nres, np.tile(np.radians((180.0, -120.0, 130.0)), nres)
+
+    def stop(backbone):
+        return np.count_nonzero(np.isfinite(backbone[2::3, 0])) >= 4
+
+    with pytest.raises(ValueError):
+        next(cli_ldrs.conformer_generator(input_seq=seq, disable_sidechains=False, stop=stop))  # noqa: E501
+    for limit in (stop, None):
+        builder = cli_ldrs.conformer_generator(
+            input_seq=seq,
+            generative_function=extended,
+            disable_sidechains=True,
+            stop=limit,
+            )
+        labels, numbers, _ = next(builder)
+        _energy, coords = next(builder)
+        ca = coords[labels == 'CA']
+        built = int(np.count_nonzero(np.isfinite(ca[:, 0])))
+        if limit is None:
+            assert built == 12
+        else:
+            assert 4 <= built < 12
+            assert np.all(np.isnan(ca[built:]))
+            assert np.isnan(coords[labels == 'OXT']).all()
 
 
 def test_half_seeds():
