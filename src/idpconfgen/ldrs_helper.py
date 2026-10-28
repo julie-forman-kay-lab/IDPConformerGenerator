@@ -26,7 +26,7 @@ from idpconfgen.core.definitions import (
     vdW_radii_tsai_1999,
     )
 from idpconfgen.core.exceptions import IDPConfGenException
-from idpconfgen.libs.libcalc import calc_torsion_angles, make_coord_Q_planar
+from idpconfgen.libs.libcalc import make_coord_Q_planar
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
@@ -51,6 +51,8 @@ disorder_cases = {
     1: "Linker-IDR",
     2: "C-IDR",
     }
+
+BACKBONE_ATOMS = ('N', 'CA', 'C', 'O')
 
 
 def tolerance_calculator(tolerance):
@@ -943,6 +945,23 @@ def break_check(fdata, membrane=False):
     return
 
 
+def _anchor_rotation(points, target):
+    """Return the rotation (for row vectors) that fits `points` on `target`."""
+    centered_idr = points - points.mean(axis=0)
+    centered_fld = target - target.mean(axis=0)
+
+    covariance_matrix = np.dot(centered_idr.T, centered_fld)
+    U, S, Vt = np.linalg.svd(covariance_matrix)
+
+    # Coordinates are rows, so `idr_xyz @ (U @ D @ Vt)` superimposes the
+    # IDR atoms onto `target`. The three atoms lie in a plane, so the
+    # sign of the third singular vectors is arbitrary: without the
+    # diagonal matrix D = diag(1, 1, +/-1), `U @ Vt` would be a reflection
+    # about half of the time and mirror the IDR (D-amino acids).
+    reflection = np.sign(np.linalg.det(U @ Vt)) or 1.0
+    return U @ np.diag((1.0, 1.0, reflection)) @ Vt
+
+
 def align_coords(sample, target, case):
     """
     Translate and rotate coordinates based on the IDR case.
@@ -1019,20 +1038,7 @@ def align_coords(sample, target, case):
     idr_xyz = sample[:, cols_coords].astype(float)
 
     idr_coords = np.array([idr_Cxyz, idr_Nxyz, idr_CAxyz])
-
-    centered_idr = idr_coords - idr_coords.mean(axis=0)
-    centered_fld = target - target.mean(axis=0)
-
-    covariance_matrix = np.dot(centered_idr.T, centered_fld)
-    U, S, Vt = np.linalg.svd(covariance_matrix)
-
-    # Coordinates are rows, so `idr_xyz @ (U @ D @ Vt)` superimposes the
-    # IDR atoms onto `target`. The three atoms lie in a plane, so the
-    # sign of the third singular vectors is arbitrary: without the
-    # diagonal matrix D = diag(1, 1, +/-1), `U @ Vt` would be a reflection
-    # about half of the time and mirror the IDR (D-amino acids).
-    reflection = np.sign(np.linalg.det(U @ Vt)) or 1.0
-    rotation_matrix = U @ np.diag((1.0, 1.0, reflection)) @ Vt
+    rotation_matrix = _anchor_rotation(idr_coords, target)
 
     rotated_points = np.dot(idr_xyz, rotation_matrix)
     translation_vector = target[0] - rotated_points[idr_term_idx["C"]]
@@ -1040,6 +1046,274 @@ def align_coords(sample, target, case):
     sample[:, cols_coords] = moved.astype(str)
 
     return sample
+
+
+def half_backbone(rows, length):
+    """
+    Return the backbone of a Linker-IDR half by residue.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Structure data array of the half, residues numbered as in the
+        Linker-IDR sequence.
+
+    length : int
+        Number of residues of the Linker-IDR sequence.
+
+    Returns
+    -------
+    np.ndarray, shape (length, 4, 3)
+        N, CA, C and O of residues 1 to `length`, NaN where missing.
+    """
+    out = np.full((length, 4, 3), np.nan)
+    numbers = rows[:, col_resSeq].astype(int)
+    names = rows[:, col_name]
+    xyz = rows[:, cols_coords].astype(float)
+    inside = (numbers >= 1) & (numbers <= length)
+    for k, atom in enumerate(BACKBONE_ATOMS):
+        pick = inside & (names == atom)
+        out[numbers[pick] - 1, k] = xyz[pick]
+    return out
+
+
+def _peptide_bonds(ca, c, n, ca_next):
+    """Tell which C, N pairs form a peptide bond, as `next_seeker` checks."""
+    cn = np.sqrt(np.sum((c - n) ** 2, axis=1))
+    cca = np.sqrt(np.sum((c - ca_next) ** 2, axis=1))
+    b0, b1, b2 = ca - c, n - c, ca_next - n
+    cos = np.sum(b0 * b1, axis=1) / (
+        np.linalg.norm(b0, axis=1) * np.linalg.norm(b1, axis=1)
+        )
+    angle = np.arccos(np.clip(cos, -1.0, 1.0))
+    axis = b1 / np.linalg.norm(b1, axis=1)[:, None]
+    v = b0 - np.sum(b0 * axis, axis=1)[:, None] * axis
+    w = b2 - np.sum(b2 * axis, axis=1)[:, None] * axis
+    omega = np.arctan2(
+        np.sum(np.cross(axis, v) * w, axis=1),
+        np.sum(v * w, axis=1),
+        )
+    # |omega| of at least 150 degrees
+    return (
+        (cn >= 1.32) & (cn <= 1.56)
+        & (angle >= 1.91) & (angle <= 2.15)
+        & (cca >= 2.2) & (cca <= 2.7)
+        & (np.abs(omega) >= 2.61)
+        )
+
+
+def find_junctions(c_backbone, n_backbone):
+    """
+    Find where C-side and N-side halves of a Linker-IDR meet.
+
+    Parameters
+    ----------
+    c_backbone, n_backbone : np.ndarray
+        :func:`half_backbone` of the C-side and N-side halves, shapes
+        (P, L, 4, 3) and (Q, L, 4, 3).
+
+    Returns
+    -------
+    np.ndarray of int, shape (K, 3)
+        C-side half, N-side half and `residue` of each junction, sorted.
+    """
+    found = [np.zeros((0, 3), dtype=int)]
+    for residue in range(1, c_backbone.shape[1]):
+        c_atoms = c_backbone[:, residue - 1]
+        n_atoms = n_backbone[:, residue]
+        cs = np.flatnonzero(np.all(np.isfinite(c_atoms[:, 1:3, 0]), axis=1))
+        ns = np.flatnonzero(np.all(np.isfinite(n_atoms[:, :2, 0]), axis=1))
+        if not len(cs) or not len(ns):
+            continue
+        pairs = cKDTree(c_atoms[cs, 2]).sparse_distance_matrix(
+            cKDTree(n_atoms[ns, 0]),
+            1.56 + 1e-6,
+            output_type='ndarray',
+            )
+        if not len(pairs):
+            continue
+        c, n = cs[pairs['i']], ns[pairs['j']]
+        bond = _peptide_bonds(
+            c_atoms[c, 1],
+            c_atoms[c, 2],
+            n_atoms[n, 0],
+            n_atoms[n, 1],
+            )
+        found.append(np.column_stack((
+            c[bond],
+            n[bond],
+            np.full(int(bond.sum()), residue),
+            )))
+    found = np.concatenate(found)
+    return found[np.lexsort((found[:, 2], found[:, 1], found[:, 0]))]
+
+
+def junction_runs(junctions):
+    """
+    Group junctions by pair of halves, in runs of consecutive residues.
+
+    Parameters
+    ----------
+    junctions : np.ndarray of int, shape (K, 3)
+        Sorted :func:`find_junctions` output.
+
+    Returns
+    -------
+    dict
+        ``(C-side half, N-side half)``: list of runs (lists of residues).
+    """
+    runs = {}
+    for c, n, residue in junctions.tolist():
+        pair = runs.setdefault((c, n), [])
+        if pair and pair[-1][-1] == residue - 1:
+            pair[-1].append(residue)
+        else:
+            pair.append([residue])
+    return runs
+
+
+REACH_STEP = 3.9
+REACH_SLACK = {'C-IDR': 2.0, 'N-IDR': 3.4}
+
+
+def linker_reach(case, numbers, length):
+    """
+    Return how far the residues of a Linker-IDR half can be from its far end.
+
+    Parameters
+    ----------
+    case : str
+        ``'C-IDR'`` or ``'N-IDR'``.
+
+    numbers : int or np.ndarray of int
+        Residue numbers in the Linker-IDR sequence.
+
+    length : int
+        Number of residues of the Linker-IDR sequence.
+
+    Returns
+    -------
+    float or np.ndarray
+    """
+    numbers = np.asarray(numbers)
+    if case == disorder_cases[2]:
+        between = length - 1 - numbers
+    else:
+        between = numbers - 2
+    return REACH_STEP * between + REACH_SLACK[case]
+
+
+def reachable_residues(rows, case, far, length):
+    """
+    Keep the residues of an aligned Linker-IDR half that can meet the other.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Structure data array of the half, residues numbered as in the
+        Linker-IDR sequence.
+
+    case : str
+        ``'C-IDR'`` (C-side half) or ``'N-IDR'`` (N-side half).
+
+    far : np.ndarray, shape (3,)
+        C of the folded residue after the IDR (``'C-IDR'``) or of the one
+        before the folded residue next to it (``'N-IDR'``).
+
+    length : int
+        Number of residues of the Linker-IDR sequence.
+
+    Returns
+    -------
+    np.ndarray
+        The rows of the residues kept.
+    """
+    numbers = rows[:, col_resSeq].astype(int)
+    backbone = half_backbone(rows, length)
+    complete = np.all(np.isfinite(backbone[:, :3, 0]), axis=1)
+    atom = 2 if case == disorder_cases[2] else 0
+    distance = np.linalg.norm(backbone[:, atom] - far, axis=1)
+    residues = np.arange(1, length + 1)
+    reach = complete & (distance <= linker_reach(case, residues, length))
+    present = np.isin(residues, numbers)
+    bad = residues[present & ~reach]
+    if case == disorder_cases[2]:
+        keep = numbers < bad.min() if len(bad) else np.ones(len(rows), bool)
+    else:
+        keep = numbers > bad.max() if len(bad) else np.ones(len(rows), bool)
+    return rows[keep]
+
+
+def linker_numbered(rows, case, length):
+    """Renumber a Linker-IDR half as in the Linker-IDR sequence."""
+    if case == disorder_cases[2]:
+        return rows
+    rows = np.array(rows, copy=True)
+    numbers = rows[:, col_resSeq].astype(int)
+    rows[:, col_resSeq] = (numbers + length - numbers.max()).astype(str)
+    return rows
+
+
+def unreachable_end(rows, case, far, length):
+    """Tell whether the free end of a Linker-IDR is out of reach."""
+    rows = linker_numbered(rows, case, length)
+    numbers = rows[:, col_resSeq].astype(int)
+    if case == disorder_cases[2]:
+        residue, atom = numbers.max(), 'C'
+    else:
+        residue, atom = numbers.min(), 'N'
+    end = rows[(numbers == residue) & (rows[:, col_name] == atom)]
+    if not len(end):
+        return False
+    distance = np.linalg.norm(end[0, cols_coords].astype(float) - far)
+    return bool(distance > linker_reach(case, residue, length))
+
+
+def linker_stop(target, far, length):
+    """
+    Return a `stop` for growing C-side Linker-IDR halves.
+    
+    Parameters
+    ----------
+    target : np.ndarray, shape (3, 3)
+        C, N, CA the half is aligned onto.
+
+    far, length
+        See :func:`reachable_residues`.
+
+    Returns
+    -------
+    callable
+    """
+    def stop(backbone):
+        built = int(np.count_nonzero(np.isfinite(backbone[2::3, 0])))
+        if built < 2:
+            return False
+        anchor = backbone[[2, 3, 4]]
+        rotation = _anchor_rotation(anchor, target)
+        last = (backbone[3 * built - 1] - anchor[0]) @ rotation + target[0]
+        limit = linker_reach(disorder_cases[2], built, length)
+        return bool(np.linalg.norm(last - far) > limit)
+    return stop
+
+
+_HALF_BACKBONES = {}
+
+
+def _read_backbone(path):
+    """Return :func:`half_backbone` of a file, read once per process."""
+    key = str(path)
+    stamp = os.stat(key).st_mtime_ns
+    hit = _HALF_BACKBONES.get(key)
+    if hit is None or hit[0] != stamp:
+        structure = Structure(Path(key))
+        structure.build()
+        rows = structure.data_array
+        length = int(rows[:, col_resSeq].astype(int).max())
+        if len(_HALF_BACKBONES) > 100000:
+            _HALF_BACKBONES.clear()
+        hit = _HALF_BACKBONES[key] = (stamp, half_backbone(rows, length))
+    return hit[1]
 
 
 def next_seeker(
@@ -1060,6 +1334,7 @@ def next_seeker(
     C-side conformer and the others from the N-side one. A pair of
     conformers can meet at several residues; every junction that passes
     the clash check is written, as ``<C-side>+<N-side>_j<residue>.pdb``.
+    The backbones of the N-side conformers are read once per process.
 
     Parameters
     ----------
@@ -1087,115 +1362,75 @@ def next_seeker(
     idr_struc = Structure(Path(cterm_idr))
     idr_struc.build()
     idr_arr = idr_struc.data_array
-    idr_name = idr_arr[:, col_name]
-    idr_coords = idr_arr[:, cols_coords].astype(float)
     idr_resseq = idr_arr[:, col_resSeq].astype(int)
     cterm_idr_stem = Path(cterm_idr).stem
-    
-    idr_C = []
-    idr_CA = []
-    idr_res = []
-    for n, name in enumerate(idr_name):
-        if name == 'C':
-            idr_C.append(idr_coords[n])
-            idr_res.append(idr_resseq[n])
-        elif name == 'CA':
-            idr_CA.append(idr_coords[n])
-    
-    for nterm_idr in nterm_idr_lib:
-        nterm_idr_struc = Structure(Path(nterm_idr))
-        nterm_idr_struc.build()
-        nterm_idr_full = nterm_idr_struc.data_array
-        nterm_idr_name = nterm_idr_full[:, col_name]
-        nterm_idr_coords = nterm_idr_full[:, cols_coords].astype(float)
-        nterm_idr_stem = Path(nterm_idr).stem
-        
-        nterm_idr_N = []
-        nterm_idr_CA = []
-        for n, name in enumerate(nterm_idr_name):
-            if name == 'N':
-                nterm_idr_N.append(nterm_idr_coords[n])
-            elif name == 'CA':
-                nterm_idr_CA.append(nterm_idr_coords[n])
-        
-        # every residue where the pair meets gives a joined conformer
-        for i, curr_c in enumerate(idr_C):
-            try:
-                next_n = nterm_idr_N[i + 1]
-                next_ca = nterm_idr_CA[i + 1]
-            except IndexError:
-                break
-            CN_dist = calculate_distance(curr_c, next_n)
-            CCA_dist = calculate_distance(curr_c, next_ca)
-            CACN_ang = calculate_angle(idr_CA[i], curr_c, next_n)
-            CACNCA_coords = np.array([idr_CA[i], curr_c, next_n, next_ca])
-            omega = calc_torsion_angles(CACNCA_coords)
-            # Here is a set of geometric checks to ensure we have closure
-            # Refer to distances and angles in `core/build_definitions.py`
-            # |omega| angle must be greater than 150 deg
-            if 1.32 <= CN_dist <= 1.56 and 1.91 <= CACN_ang <= 2.15 and 2.2 <= CCA_dist <= 2.7 and np.abs(omega) >= 2.61:  # noqa: E501
-                term_residue = idr_res[i]
-                
-                # Both conformers share one atom layout: join the C-side
-                # conformer up to `term_residue` with the N-side one after
-                # it. Slice the full arrays at every junction; they serve
-                # the other junctions and the other N-side conformers.
-                cut = int(np.argmax(idr_resseq > term_residue))
-                idr_list = list(idr_arr[:cut])
-                nterm_idr_arr = nterm_idr_full[cut:]
 
-                nterm_idr_struc._data_array = nterm_idr_arr
-                
-                clashes, _ = count_clashes(
-                    np.array(idr_list),
-                    nterm_idr_struc,
-                    disorder_cases[1],
-                    max_clash,
-                    tolerance,
-                    )
-                
-                if type(clashes) is int:
-                    nterm_idr_list = nterm_idr_arr.tolist()
-                    final_struc_arr = np.array(idr_list + nterm_idr_list)
-                    final_struc_name = final_struc_arr[:, col_name]
-                    final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
-                    H_idx = -1  # for cases like Proline without "H"
-                    for idx, name in enumerate(final_struc_name):
-                        if final_struc_res[idx] == term_residue:
-                            if name == 'O':
-                                O_idx = idx
-                        elif final_struc_res[idx] == term_residue + 1:
-                            if name == 'H':
-                                H_idx = idx
-                        elif final_struc_res[idx] == term_residue + 2:
-                            break
-                    
-                    # Place the carbonyl O and the amide H of the new
-                    # peptide bond in its plane
-                    new_O_xyz = make_coord_Q_planar(
-                        idr_CA[i],
-                        curr_c,
-                        next_n,
-                        distance=distance_C_O,
-                        bend=build_bend_CA_C_O,
-                        )
-                    for col, value in zip(cols_coords, new_O_xyz):
-                        final_struc_arr[O_idx, col] = f'{value:.3f}'
-                    
-                    if H_idx >= 0:
-                        new_H_xyz = make_coord_Q_planar(
-                            next_ca,
-                            next_n,
-                            curr_c,
-                            distance=distance_H_N,
-                            bend=build_bend_H_N_C,
-                            )
-                        for col, value in zip(cols_coords, new_H_xyz):
-                            final_struc_arr[H_idx, col] = f'{value:.3f}'
-                    
-                    final_struc = structure_to_pdb(final_struc_arr)
-                    matches += 1
-                    write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}_j{term_residue}.pdb")  # noqa: E501
+    backbones = [_read_backbone(path) for path in nterm_idr_lib]
+    length = max([int(idr_resseq.max())] + [len(b) for b in backbones])
+    c_backbone = half_backbone(idr_arr, length)
+    n_backbone = np.full((len(backbones), length, 4, 3), np.nan)
+    for k, backbone in enumerate(backbones):
+        n_backbone[k, :len(backbone)] = backbone
+
+    nterm_idr = None
+    for _, k, term_residue in find_junctions(c_backbone[None], n_backbone):
+        if nterm_idr != nterm_idr_lib[k]:
+            nterm_idr = nterm_idr_lib[k]
+            nterm_idr_struc = Structure(Path(nterm_idr))
+            nterm_idr_struc.build()
+            nterm_idr_full = nterm_idr_struc.data_array
+            nterm_idr_resseq = nterm_idr_full[:, col_resSeq].astype(int)
+            nterm_idr_stem = Path(nterm_idr).stem
+
+        # residues up to `term_residue` from the C-side conformer, the
+        # others from the N-side one
+        idr_list = idr_arr[idr_resseq <= term_residue]
+        nterm_idr_arr = nterm_idr_full[nterm_idr_resseq > term_residue]
+        nterm_idr_struc._data_array = nterm_idr_arr
+
+        clashes, _ = count_clashes(
+            idr_list,
+            nterm_idr_struc,
+            disorder_cases[1],
+            max_clash,
+            tolerance,
+            )
+        if type(clashes) is not int:
+            continue
+
+        final_struc_arr = np.concatenate((idr_list, nterm_idr_arr))
+        final_struc_name = final_struc_arr[:, col_name]
+        final_struc_res = final_struc_arr[:, col_resSeq].astype(int)
+        ca, c = c_backbone[term_residue - 1, 1:3]
+        n, next_ca = n_backbone[k, term_residue, :2]
+
+        # Place the carbonyl O and the amide H of the new peptide bond in
+        # its plane; Proline has no H
+        new_O_xyz = make_coord_Q_planar(
+            ca,
+            c,
+            n,
+            distance=distance_C_O,
+            bend=build_bend_CA_C_O,
+            )
+        new_H_xyz = make_coord_Q_planar(
+            next_ca,
+            n,
+            c,
+            distance=distance_H_N,
+            bend=build_bend_H_N_C,
+            )
+        for residue, atom, xyz in (
+                (term_residue, 'O', new_O_xyz),
+                (term_residue + 1, 'H', new_H_xyz),
+                ):
+            rows = (final_struc_res == residue) & (final_struc_name == atom)
+            for col, value in zip(cols_coords, xyz):
+                final_struc_arr[rows, col] = f'{value:.3f}'
+
+        final_struc = structure_to_pdb(final_struc_arr)
+        matches += 1
+        write_PDB(final_struc, str(output_folder) + f"/{cterm_idr_stem}+{nterm_idr_stem}_j{term_residue}.pdb")  # noqa: E501
 
     return matches
 
@@ -1828,8 +2063,10 @@ def prepare_ccd_context(chain_rows, environment_rows, lower, upper):
         before `lower` and after `upper`, NaN if missing), ``lower_rows``
         and ``upper_rows`` (template rows of the residues bonded to the
         IDR), the environment arrays ``env_coords``, ``env_radii``,
-        ``env_hydrogen``, ``env_lower`` and ``env_upper`` (the last two
-        mark the atoms of the residues bonded to the IDR), and
+        ``env_hydrogen``, ``env_backbone`` (N, CA, C and O atoms),
+        ``env_lower`` and ``env_upper`` (the atoms of the residues bonded
+        to the IDR), ``env_lower_outer`` and ``env_upper_outer`` (the same
+        for the residues before `lower` and after `upper`), and
         ``packing`` (:func:`packing_context` of the environment without
         the four overlap residues).
     """
@@ -1885,8 +2122,14 @@ def prepare_ccd_context(chain_rows, environment_rows, lower, upper):
         'env_coords': environment_rows[:, cols_coords].astype(np.float64),
         'env_radii': atom_vdw_radii(env_elements, env_names),
         'env_hydrogen': is_hydrogen(env_elements, env_names),
+        'env_backbone': np.isin(
+            [str(name).strip() for name in env_names],
+            BACKBONE_ATOMS,
+            ),
         'env_lower': _mask(lower_rows),
         'env_upper': _mask(upper_rows),
+        'env_lower_outer': _mask(chain_rows[resseq == int(lower) - 1]),
+        'env_upper_outer': _mask(chain_rows[resseq == int(upper) + 1]),
         'packing': packing_context(environment_rows, _mask(overlap_rows)),
         }
 
@@ -2059,7 +2302,13 @@ def attachment_overlaps(
     resseq = rows[:, col_resSeq].astype(int)
     end = resseq.min() if case == disorder_cases[2] else resseq.max()
     copy = resseq == end
-    near = (pairs['v'] < limit) & ~(copy[i] & bonded_residue[j])
+    # the peptide bond sets the distances of the backbone atoms of the copy
+    # and of the residue it is bonded to (in any alternate location); their
+    # side chains are compared
+    backbone = np.isin(rows[:, col_name], BACKBONE_ATOMS)
+    env_backbone = np.isin(env[:, col_name], BACKBONE_ATOMS)
+    bond = copy[i] & bonded_residue[j] & (backbone[i] | env_backbone[j])
+    near = (pairs['v'] < limit) & ~bond
     return int(np.count_nonzero(near))
 
 
@@ -2279,6 +2528,7 @@ def build_in_fragments(
         tolerance=0.4,
         max_trials=LONG_FRAGMENT_TRIALS,
         environment_overlaps=True,
+        stop=None,
         ):
     """
     Build a chain fragment by fragment, going back at dead ends.
@@ -2317,6 +2567,10 @@ def build_in_fragments(
     environment_overlaps : bool
         If False, :func:`attachment_overlaps` compares each fragment only
         with the chain, not with `environment`.
+
+    stop : callable, optional
+        ``stop(rows)`` tells, after a fragment is attached, that the chain
+        needs no more fragments; the chain is then returned shorter.
 
     Returns
     -------
@@ -2361,4 +2615,6 @@ def build_in_fragments(
         failed = 0
         chains.append(rows)
         energies.append(energy)
+        if len(chains) < nfragments and stop is not None and stop(rows):
+            break
     return chains[-1], float(sum(energies)), rebuilt
