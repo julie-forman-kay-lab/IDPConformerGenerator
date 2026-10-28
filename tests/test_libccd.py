@@ -86,15 +86,6 @@ def test_dihedral_and_backbone_phi_psi():
     assert np.allclose(libccd.wrap_angle(measured[:, 1] - psi[1:9]), 0, atol=1e-8)  # noqa: E501
 
 
-@pytest.mark.parametrize(
-    'nres,expected',
-    [(10, (0, 1, 2)), (40, (2, 1, 3)), (200, (3, 2, 4)), (5, (0, 1, 2))],
-    )
-def test_length_schedule(nres, expected):
-    """Test pivot schedule by loop length."""
-    assert libccd.length_schedule(nres) == expected
-
-
 def test_rotate_torsions_changes_each_torsion_exactly():
     """Test simultaneous rotations equal sequential C-terminal-first ones."""
     rng = np.random.default_rng(3)
@@ -188,16 +179,6 @@ def test_clash_environment_pairs_match_brute_force():
     k2, e2, cut2 = env.overlaps(loop_xyz, loop_radii, residue, 2, 11, 0.65, 0.5)  # noqa: E501
     assert np.allclose(cut2, cut + 0.5)
     assert env.count_overlaps(loop_xyz, loop_radii, residue, 2, 11, 0.65) == int(np.sum(d[~((residue == 2)[:, None] & lower[None, :])] < c[~((residue == 2)[:, None] & lower[None, :])]))  # noqa: E501
-
-
-def test_self_overlaps():
-    """Test nonlocal backbone contacts of a chain folded onto itself."""
-    params = libccd.CCDParameters()
-    chain = _build(np.radians(np.full(12, -60.0)), np.radians(np.full(12, -45.0)))  # noqa: E501
-    assert libccd.count_self_overlaps(chain, 0, 11, params) == 0
-    squeezed = chain.copy()
-    squeezed[9] = squeezed[2] + 0.3  # residue 9 almost on top of residue 2
-    assert libccd.count_self_overlaps(squeezed, 0, 11, params) > 0
 
 
 def test_contact_model():
@@ -498,16 +479,15 @@ def test_ramachandran_reference():
     assert not rama.is_outlier('W', math.radians(-65), math.radians(-40))
 
 
-@pytest.mark.parametrize('solver', libccd.SOLVERS)
 @pytest.mark.parametrize('nidr,seed', [(12, 1), (12, 7), (30, 4), (30, 8)])
-def test_close_loop(solver, nidr, seed):
+def test_close_loop(nidr, seed):
     """Test closing a perturbed chain back onto its anchors."""
     reference, candidate = _loop_case(nidr, seed)
     size = nidr + 4
     rng = np.random.default_rng(seed)
     rot = _random_frame(rng)
     candidate = candidate @ rot.T + 5.0  # arbitrary initial frame
-    params = libccd.CCDParameters(solver=solver)
+    params = libccd.CCDParameters()
     result = libccd.close_loop(
         candidate,
         'A' * size,
@@ -516,7 +496,6 @@ def test_close_loop(solver, nidr, seed):
         params=params,
         )
     assert result.accepted, result.reason
-    assert result.stats['solver'] == solver
     assert result.stats['final_rmsd'] <= params.target_rmsd
     assert result.stats['phipsi_rms_delta'] <= params.max_phipsi_rms_delta
     closed = result.backbone
@@ -528,26 +507,6 @@ def test_close_loop(solver, nidr, seed):
         flat = chain.reshape(-1, 3)
         return np.linalg.norm(flat[1:] - flat[:-1], axis=1)
     assert np.allclose(bonds(closed), bonds(candidate), atol=1e-6)
-
-
-def test_close_loop_dls_spreads_smaller_changes_than_ccd():
-    """Test the least-squares solver changes torsions less than CCD."""
-    deltas = {}
-    for solver in libccd.SOLVERS:
-        values = []
-        for seed in (0, 4, 5, 10):
-            reference, candidate = _loop_case(30, seed)
-            result = libccd.close_loop(
-                candidate,
-                'A' * 34,
-                reference[1],
-                reference[32],
-                params=libccd.CCDParameters(solver=solver),
-                )
-            assert result.accepted
-            values.append(result.stats['phipsi_rms_delta'])
-        deltas[solver] = np.mean(values)
-    assert deltas['dls'] < deltas['ccd']
 
 
 @pytest.mark.parametrize('seed', [6, 8, 10])
@@ -598,7 +557,7 @@ def test_close_loop_invalid_input():
     with pytest.raises(ValueError):
         libccd.close_loop(
             candidate, 'A' * 16, reference[1], reference[14],
-            params=libccd.CCDParameters(solver='other'),
+            params=libccd.CCDParameters(idealize='other'),
             )
 
 

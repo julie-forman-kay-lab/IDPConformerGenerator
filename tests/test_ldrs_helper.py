@@ -5,6 +5,7 @@ from itertools import islice, product
 import numpy as np
 import pytest
 
+from idpconfgen import ldrs_helper
 from idpconfgen.core.build_definitions import build_bend_CA_C_O, distance_C_O
 from idpconfgen.core.definitions import vdW_radii_tsai_1999
 from idpconfgen.core.exceptions import IDPConfGenException
@@ -13,18 +14,25 @@ from idpconfgen.ldrs_helper import (
     _random_combinations,
     align_coords,
     atom_vdw_radii,
+    attachment_anchor,
+    attachment_overlaps,
     backbone_anchor,
+    build_in_fragments,
     combinations_clash_check,
+    count_clashes,
     create_all_combinations,
     create_combinations,
+    graft_fragment,
     inter_chain_cc,
     is_hydrogen,
+    join_overlaps,
     next_seeker,
     packing_context,
     prepare_ccd_context,
     prune_duplicate_loops,
     psurgeon,
     splice_folded_rows,
+    split_long_idr,
     )
 from idpconfgen.libs.libstructure import (
     Structure,
@@ -32,6 +40,7 @@ from idpconfgen.libs.libstructure import (
     col_name,
     col_resName,
     col_resSeq,
+    col_segid,
     col_serial,
     cols_coords,
     structure_to_pdb,
@@ -151,10 +160,20 @@ def _anchor_xyz(rows, atoms):
         ]).astype(float)
 
 
-@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
-@pytest.mark.parametrize('seed', range(5))
-def test_align_coords(expl_rows, case, seed):
-    """Test a moved fragment is put back onto its anchor atoms."""
+def _handedness(rows):
+    """Sign of (N - CA) x (C - CA) . (CB - CA) of the residues with a CB."""
+    resseq = rows[:, col_resSeq].astype(int)
+    signs = []
+    for res in sorted(set(resseq)):
+        names = rows[resseq == res][:, col_name]
+        if 'CB' not in names:
+            continue
+        n, ca, c, cb = _anchor_xyz(rows, [(res, a) for a in ('N', 'CA', 'C', 'CB')])  # noqa: E501
+        signs.append(np.sign(np.dot(np.cross(n - ca, c - ca), cb - ca)))
+    return np.array(signs)
+
+
+def _fragment_and_anchors(expl_rows, case):
     rows = np.array(expl_rows, copy=True)
     resseq = rows[:, col_resSeq].astype(int)
     rows[:, col_resSeq] = (resseq - resseq.min() + 1).astype(str)
@@ -163,19 +182,32 @@ def test_align_coords(expl_rows, case, seed):
         anchors = [(last - 1, 'C'), (last, 'N'), (last, 'CA')]
     else:
         anchors = [(1, 'C'), (2, 'N'), (2, 'CA')]
+    return rows, anchors
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_align_coords(expl_rows, case):
+    """
+    Test moved fragments are put back onto their anchor atoms.
+    """
+    rows, anchors = _fragment_and_anchors(expl_rows, case)
     original = rows[:, cols_coords].astype(float)
     target = _anchor_xyz(rows, anchors)
+    handedness = _handedness(rows)
+    assert len(handedness) and np.all(handedness == handedness[0])
 
-    # move the fragment away by a random rotation and translation
-    rng = np.random.default_rng(seed)
-    rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
-    rotation *= np.sign(np.linalg.det(rotation))
-    moved = original @ rotation.T + rng.normal(scale=20, size=3)
-    rows[:, cols_coords] = np.round(moved, 3).astype(str)
+    for seed in range(100):
+        # move the fragment away by a random rotation and translation
+        rng = np.random.default_rng(seed)
+        rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+        rotation *= np.sign(np.linalg.det(rotation))
+        moved = original @ rotation.T + rng.normal(scale=20, size=3)
+        rows[:, cols_coords] = np.round(moved, 3).astype(str)
 
-    aligned = align_coords(rows, target, case)
-    assert np.allclose(_anchor_xyz(aligned, anchors), target, atol=0.005)
-    assert np.allclose(aligned[:, cols_coords].astype(float), original, atol=0.05)  # noqa: E501
+        aligned = align_coords(rows, target, case)
+        assert np.allclose(_anchor_xyz(aligned, anchors), target, atol=0.005)
+        assert np.allclose(aligned[:, cols_coords].astype(float), original, atol=0.05)  # noqa: E501
+        assert np.array_equal(_handedness(aligned), handedness)
 
 
 def test_backbone_anchor(expl_rows):
@@ -516,3 +548,269 @@ def test_prune_duplicate_loops_keeps_earlier(expl_rows, tmp_path):
     os.utime(new, (2000, 2000))
     assert prune_duplicate_loops(loops) == 1
     assert sorted(p.name for p in loops.iterdir()) == ['z.pdb']
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_split_long_idr(case):
+    """Test long IDRs split into nearly equal, overlapping fragments."""
+    folded = 'QK'
+    idr = ''.join('ACDEFGHIKLMNPQRSTVWY'[i % 20] for i in range(310))
+    seq = idr + folded if case == 'N-IDR' else folded + idr
+    assert split_long_idr(seq[:152] if case == 'C-IDR' else seq[-152:], case) == [seq[:152] if case == 'C-IDR' else seq[-152:]]  # noqa: E501
+    fragments = split_long_idr(seq, case)
+    assert len(fragments) == 3
+    assert [len(f) - 2 for f in fragments] == [104, 103, 103]
+    # the first fragment built holds the folded residues; each next one
+    # shares two residues with the one before
+    if case == 'C-IDR':
+        assert fragments[0].startswith(folded)
+        for before, after in zip(fragments, fragments[1:]):
+            assert after[:2] == before[-2:]
+        joined = fragments[0] + ''.join(f[2:] for f in fragments[1:])
+    else:
+        assert fragments[0].endswith(folded)
+        for before, after in zip(fragments, fragments[1:]):
+            assert after[-2:] == before[:2]
+        joined = ''.join(f[:-2] for f in reversed(fragments[1:])) + fragments[0]  # noqa: E501
+    assert joined == seq
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_split_long_idr_linker(case):
+    """Test the folded residues past a Linker-IDR are not IDR residues."""
+    idr = ''.join('ACDEFGHIKLMNPQRSTVWY'[i % 20] for i in range(151))
+    seq = 'QK' + idr[:150] + 'RL'
+    assert split_long_idr(seq, case, extra=2) == [seq]
+    seq = 'QK' + idr + 'RL'
+    fragments = split_long_idr(seq, case, extra=2)
+    # 76 and 75 IDR residues; the last fragment built also holds the two
+    # folded residues at the other end
+    assert [len(f) - 2 for f in fragments] == [76, 77]
+    if case == 'C-IDR':
+        assert fragments[0].startswith('QK') and fragments[1].endswith('RL')
+        assert fragments[0] + fragments[1][2:] == seq
+    else:
+        assert fragments[0].endswith('RL') and fragments[1].startswith('QK')
+        assert fragments[1][:-2] + fragments[0] == seq
+
+
+def _chain_rows(expl_rows, first, last):
+    """Residues first..last of EXPL_A renumbered from 1."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    rows = np.array(expl_rows[(resseq >= first) & (resseq <= last)], copy=True)
+    numbers = rows[:, col_resSeq].astype(int)
+    rows[:, col_resSeq] = (numbers - first + 1).astype(str)
+    return rows
+
+
+def _moved(rows, seed):
+    rows = np.array(rows, copy=True)
+    rng = np.random.default_rng(seed)
+    rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+    rotation *= np.sign(np.linalg.det(rotation))
+    xyz = rows[:, cols_coords].astype(float) @ rotation.T + rng.normal(scale=15, size=3)  # noqa: E501
+    rows[:, cols_coords] = np.round(xyz, 3).astype(str)
+    return rows
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_graft_fragment_rebuilds_the_chain(expl_rows, case):
+    """Test a chain cut in two overlapping pieces is put back together."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    last = int(expl_rows[:, col_resSeq].astype(int).max())
+    whole = _chain_rows(expl_rows, first, last)
+    if case == 'C-IDR':
+        built, piece = (first, first + 8), (first + 7, last)
+    else:
+        built, piece = (first + 7, last), (first, first + 8)
+    chain = _chain_rows(expl_rows, *built)
+    fragment = _moved(_chain_rows(expl_rows, *piece), 1)
+    target = attachment_anchor(chain, case)
+    aligned = align_coords(fragment, target, case)
+    assert attachment_overlaps(aligned, chain, case, target) == 0
+    joined = graft_fragment(chain, aligned, case)
+    assert len(joined) == len(whole)
+    assert list(joined[:, col_name]) == list(whole[:, col_name])
+    assert list(joined[:, col_resSeq]) == list(whole[:, col_resSeq])
+    assert np.allclose(joined[:, cols_coords].astype(float), whole[:, cols_coords].astype(float), atol=0.05)  # noqa: E501
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_join_overlaps(expl_rows, case):
+    """Test atoms across a join are checked, the bonded residues not."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    last = int(expl_rows[:, col_resSeq].astype(int).max())
+    # the chain has 9 residues, 8 of them kept; the join is between the
+    # residues 8 and 9 of the result
+    if case == 'C-IDR':
+        built, piece, old, new = (first, first + 8), (first + 7, last), 8, 10  # noqa: E501
+    else:
+        built, piece, old, new = (first + 7, last), (first, first + 8), 9, 7  # noqa: E501
+    chain = _chain_rows(expl_rows, *built)
+    target = attachment_anchor(chain, case)
+    aligned = align_coords(_moved(_chain_rows(expl_rows, *piece), 3), target, case)  # noqa: E501
+    joined = graft_fragment(chain, aligned, case)
+    # the peptide bond at the join is no overlap
+    assert join_overlaps(joined, 8, case) == 0
+    numbers = joined[:, col_resSeq].astype(int)
+    names = joined[:, col_name]
+    pushed = np.array(joined, copy=True)
+    atom = np.flatnonzero((numbers == new) & (names == 'CA'))[0]
+    pushed[atom, cols_coords] = joined[(numbers == old) & (names == 'CA')][0, cols_coords]  # noqa: E501
+    assert join_overlaps(pushed, 8, case) > 0
+
+
+def test_build_in_fragments_join_overlaps(expl_rows, monkeypatch):
+    """Test a fragment that overlaps the chain across the join is redrawn."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    last = int(expl_rows[:, col_resSeq].astype(int).max())
+    pieces = [(first, first + 8), (first + 7, last)]
+    calls = []
+
+    def draw(k):
+        calls.append(k)
+        return _moved(_chain_rows(expl_rows, *pieces[k]), len(calls)), 0.0
+
+    found = iter([1, 0])
+    monkeypatch.setattr(ldrs_helper, 'join_overlaps', lambda *args: next(found))  # noqa: E501
+    rows, _, rebuilt = build_in_fragments(draw, 2, 'C-IDR')
+    assert calls == [0, 1, 1]
+    assert rebuilt == 0
+    assert len(rows) == len(_chain_rows(expl_rows, first, last))
+
+
+@pytest.mark.parametrize('environment_overlaps', [True, False])
+def test_build_in_fragments_environment_overlaps(
+        expl_rows,
+        monkeypatch,
+        environment_overlaps,
+        ):
+    """Test the overlap rule can leave out the environment."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    last = int(expl_rows[:, col_resSeq].astype(int).max())
+    pieces = [(first, first + 8), (first + 7, last)]
+    environment = np.array(expl_rows, copy=True)
+    xyz = environment[:, cols_coords].astype(float) + 100
+    environment[:, cols_coords] = np.round(xyz, 3).astype(str)
+    environment[:, col_segid] = 'ENV'
+    seen = []
+
+    def overlaps(rows, fixed, *args, **kwargs):
+        seen.append(bool(np.any(fixed[:, col_segid] == 'ENV')))
+        return 0
+
+    def draw(k):
+        return _moved(_chain_rows(expl_rows, *pieces[k]), k + 1), 0.0
+
+    monkeypatch.setattr(ldrs_helper, 'attachment_overlaps', overlaps)
+    build_in_fragments(
+        draw,
+        2,
+        'C-IDR',
+        environment=environment,
+        environment_overlaps=environment_overlaps,
+        )
+    assert seen == [environment_overlaps]
+
+
+def test_with_environment_keeps_environment_residues(expl_rows):
+    """Test a template residue numbered like the chain's first is kept."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    chain = _chain_rows(expl_rows, first, first + 8)
+    # an ion with the chain ID and number of the chain's first residue
+    ion = np.array(chain[:1], copy=True)
+    ion[0, col_name] = ion[0, col_resName] = 'MG'
+    ion[0, cols_coords] = ['50.0', '50.0', '50.0']
+    target = attachment_anchor(chain, 'N-IDR')
+    fixed = ldrs_helper._with_environment(chain, ion, 'N-IDR')
+    kept, _ = ldrs_helper._without_replaced(fixed, 'N-IDR', target)
+    assert 'MG' in kept[:, col_name]
+    assert len(kept) == len(fixed) - np.count_nonzero(chain[:, col_resSeq] == '1')  # noqa: E501
+
+
+def test_attachment_overlaps(expl_rows):
+    """Test the residue next to the anchor is checked, the peptide bond not."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    first = int(resseq.min())
+    folded = Structure(data_folder / 'EXPL_A.pdb')
+    folded.build()
+    folded._data_array = expl_rows[resseq >= first + 6]
+    rows = folded.data_array
+    target = np.array([
+        rows[(rows[:, col_resSeq].astype(int) == res) & (rows[:, col_name] == name)][0, cols_coords]  # noqa: E501
+        for res, name in ((first + 6, 'C'), (first + 7, 'N'), (first + 7, 'CA'))  # noqa: E501
+        ]).astype(float)
+    fragment = _chain_rows(expl_rows, first, first + 7)
+    aligned = align_coords(_moved(fragment, 2), target, 'N-IDR')
+    assert attachment_overlaps(aligned, rows, 'N-IDR', target) == 0
+    # put a side-chain atom of the IDR residue next to the folded domain,
+    # which count_clashes leaves out, on a folded C-alpha
+    names = aligned[:, col_name]
+    numbers = aligned[:, col_resSeq].astype(int)
+    pushed = np.array(aligned, copy=True)
+    atom = np.flatnonzero((numbers == 6) & (names == 'CB'))[0]
+    pushed[atom, cols_coords] = rows[rows[:, col_name] == 'CA'][3, cols_coords]  # noqa: E501
+    assert attachment_overlaps(pushed, rows, 'N-IDR', target) > 0
+    assert count_clashes(pushed, folded, 'N-IDR', 10**6)[0] == count_clashes(aligned, folded, 'N-IDR', 10**6)[0]  # noqa: E501
+
+
+def test_attachment_overlaps_alternate_locations(expl_rows):
+    """Test alternate locations of the bonded residue are no overlaps."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    first = int(resseq.min())
+    rows = expl_rows[resseq >= first + 6]
+    numbers = rows[:, col_resSeq].astype(int)
+    target = np.array([
+        rows[(numbers == res) & (rows[:, col_name] == name)][0, cols_coords]
+        for res, name in ((first + 6, 'C'), (first + 7, 'N'), (first + 7, 'CA'))  # noqa: E501
+        ]).astype(float)
+    aligned = align_coords(_moved(_chain_rows(expl_rows, first, first + 7), 2), target, 'N-IDR')  # noqa: E501
+    # a second location of the residue bonded to the IDR, 0.7 A away,
+    # after the first one
+    bonded = rows[numbers == first + 7]
+    alternate = np.array(bonded, copy=True)
+    xyz = bonded[:, cols_coords].astype(float) + 0.4
+    alternate[:, cols_coords] = np.round(xyz, 3).astype(str)
+    rows = np.concatenate((rows[numbers <= first + 7], alternate, rows[numbers > first + 7]))  # noqa: E501
+    assert attachment_overlaps(aligned, rows, 'N-IDR', target) == 0
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_build_in_fragments(expl_rows, case, monkeypatch):
+    """Test fragments are attached in order and dead ends are rebuilt."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    last = int(expl_rows[:, col_resSeq].astype(int).max())
+    if case == 'C-IDR':
+        pieces = [(first, first + 5), (first + 4, first + 10), (first + 9, last)]  # noqa: E501
+    else:
+        pieces = [(first + 9, last), (first + 4, first + 10), (first, first + 5)]  # noqa: E501
+    calls = []
+
+    def draw(k):
+        calls.append(k)
+        rows = _moved(_chain_rows(expl_rows, *pieces[k]), len(calls))
+        if k == 1 and calls.count(1) == 1:
+            rows[:, col_segid] = 'BAD'
+        return rows, float(k)
+
+    # the first conformer of fragment 1 leaves an end nothing fits onto
+    real = ldrs_helper.attachment_overlaps
+
+    def overlaps(rows, fixed, *args, **kwargs):
+        return 99 if np.any(fixed[:, col_segid] == 'BAD') else real(rows, fixed, *args, **kwargs)  # noqa: E501
+
+    monkeypatch.setattr(ldrs_helper, 'attachment_overlaps', overlaps)
+    rows, energy, rebuilt = build_in_fragments(draw, 3, case, max_trials=3)  # noqa: E501
+    assert calls == [0, 1, 2, 2, 2, 1, 2]
+    assert rebuilt == 1
+    assert energy == 3.0
+    whole = _chain_rows(expl_rows, first, last)
+    assert list(rows[:, col_name]) == list(whole[:, col_name])
+    assert list(rows[:, col_resSeq]) == list(whole[:, col_resSeq])
+    # the first fragment stays where it was built: compare internal
+    # distances
+    xyz = rows[:, cols_coords].astype(float)
+    ref = whole[:, cols_coords].astype(float)
+    d1 = np.linalg.norm(xyz[:, None] - xyz[None], axis=-1)
+    d2 = np.linalg.norm(ref[:, None] - ref[None], axis=-1)
+    assert np.allclose(d1, d2, atol=0.1)

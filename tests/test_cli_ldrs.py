@@ -7,49 +7,52 @@ import pytest
 
 from idpconfgen import cli_ldrs
 from idpconfgen.core.exceptions import IDPConfGenException
+from idpconfgen.ldrs_helper import split_long_idr
 from idpconfgen.libs import libccd
+from idpconfgen.libs.libstructure import (
+    Structure,
+    col_name,
+    col_resSeq,
+    cols_coords,
+    )
+
+from .tcommons import data_folder
 
 
 BASE = '-db db.json -seq EGAAGAASS -fld fld.pdb'
 
 
 def test_loop_closure_defaults():
-    """Test next_seeker stays the default method."""
+    """Test ccd is the default method."""
     args = vars(cli_ldrs.ap.parse_args(BASE.split()))
-    assert args['loop_closure'] == 'next_seeker'
-    assert args['ccd_solver'] == 'dls'
-    assert args['ccd_max_trials'] == 100
-    assert cli_ldrs.LOOP_CLOSURE_METHODS[0] == 'next_seeker'
-
-
-@pytest.mark.parametrize('solver', libccd.SOLVERS)
-def test_loop_closure_ccd_arguments(solver):
-    """Test the ccd method and its options parse."""
-    cmd = f'{BASE} --loop-closure ccd --ccd-solver {solver} --ccd-max-trials 7'
-    args = vars(cli_ldrs.ap.parse_args(cmd.split()))
     assert args['loop_closure'] == 'ccd'
-    assert args['ccd_solver'] == solver
+    assert args['ccd_max_trials'] == 100
+    assert cli_ldrs.LOOP_CLOSURE_METHODS[0] == 'ccd'
+
+
+@pytest.mark.parametrize('method', cli_ldrs.LOOP_CLOSURE_METHODS)
+def test_loop_closure_arguments(method):
+    """Test both methods and the ccd budget parse."""
+    cmd = f'{BASE} --loop-closure {method} --ccd-max-trials 7'
+    args = vars(cli_ldrs.ap.parse_args(cmd.split()))
+    assert args['loop_closure'] == method
     assert args['ccd_max_trials'] == 7
 
 
 @pytest.mark.parametrize(
     'option',
-    ['--loop-closure kic', '--ccd-solver newton'],
+    ['--loop-closure kic', '--ccd-solver dls'],
     )
 def test_loop_closure_invalid_choice(option):
-    """Test unknown methods are refused by the parser."""
+    """Test unknown methods and the removed solver option are refused."""
     with pytest.raises(SystemExit):
         cli_ldrs.ap.parse_args(f'{BASE} {option}'.split())
 
 
-@pytest.mark.parametrize(
-    'kwargs',
-    [{'loop_closure': 'kic'}, {'ccd_solver': 'newton'}],
-    )
-def test_main_refuses_unknown_methods(kwargs):
-    """Test main validates the methods before doing any work."""
+def test_main_refuses_unknown_methods():
+    """Test main validates the method before doing any work."""
     with pytest.raises(ValueError):
-        cli_ldrs.main('seq.fasta', 'db.json', folded_structure='f.pdb', **kwargs)  # noqa: E501
+        cli_ldrs.main('seq.fasta', 'db.json', folded_structure='f.pdb', loop_closure='kic')  # noqa: E501
 
 
 def test_unchecked_pairs():
@@ -73,6 +76,18 @@ def test_unchecked_pairs():
         checked_C, checked_N = C_files, N_files
         assert len(pairs) == len(C_files) * len(N_files)
     assert cli_ldrs._unchecked_pairs(C_files, N_files, C_files, N_files) == []
+
+
+def test_half_seeds():
+    """Test every round and side of next_seeker has seeds of its own."""
+    assert cli_ldrs._half_seeds(7, 0, 0, 3) == [7, 8, 9]
+    seeds = [
+        seed
+        for round_ in range(4)
+        for side in (0, 1)
+        for seed in cli_ldrs._half_seeds(7, round_, side, 3)
+        ]
+    assert len(set(seeds)) == len(seeds) == 24
 
 
 def test_quiet_stdout(capfd):
@@ -224,3 +239,72 @@ def test_close_linker_ccd_first_round(tmp_path, monkeypatch):
     """Test a first round without any closed loop stops ldrs."""
     with pytest.raises(IDPConfGenException):
         _close_with(lambda r: [], tmp_path, monkeypatch)
+
+
+class _NoLog:
+    def save(self, *args):
+        pass
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+def test_build_long_conformers(tmp_path, monkeypatch, case):
+    """Test an IDR built in fragments comes out as if built in one piece."""
+    structure = Structure(data_folder / 'EXPL_A.pdb')
+    structure.build()
+    rows = structure.data_array
+    resseq = rows[:, col_resSeq].astype(int)
+    sequence = 'AYIAKQRQISFVKSHF'  # EXPL_A, residues 4 to 19
+    # IDR of 10 residues with the 2 folded residues it overlaps
+    if case == 'N-IDR':
+        folded = 14, 19
+        idr = 4, 15
+        anchor = ((14, 'C'), (15, 'N'), (15, 'CA'))
+    else:
+        folded = 4, 9
+        idr = 8, 19
+        anchor = ((8, 'C'), (9, 'N'), (9, 'CA'))
+    fld = Structure(data_folder / 'EXPL_A.pdb')
+    fld.build()
+    fld._data_array = rows[(resseq >= folded[0]) & (resseq <= folded[1])]
+    fld_xyz = np.array([
+        rows[(resseq == r) & (rows[:, col_name] == n)][0, cols_coords]
+        for r, n in anchor
+        ]).astype(float)
+    seq = sequence[idr[0] - 4:idr[1] - 3]
+    parts = split_long_idr(seq, case, size=5)
+    assert len(parts) == 2
+
+    def fake_generator(*, index=None, input_seq=None, random_seed=0, **kw):
+        first = 4 + sequence.index(input_seq)
+        sel = (resseq >= first) & (resseq < first + len(input_seq))
+        piece = rows[sel]
+        numbers = resseq[sel] - first + 1
+        yield piece[:, col_name], numbers, None
+        rng = np.random.default_rng(random_seed)
+        xyz = piece[:, cols_coords].astype(float)
+        while True:
+            rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+            rotation *= np.sign(np.linalg.det(rotation))
+            yield 0.0, xyz @ rotation.T + rng.normal(scale=10, size=3)
+
+    monkeypatch.setattr(cli_ldrs, 'conformer_generator', fake_generator)
+    monkeypatch.setattr(cli_ldrs, 'ENERGYLOGSAVER', _NoLog())
+    monkeypatch.setattr(cli_ldrs, 'FRAGMENT_GLOBALS', {0: {}, 1: {}})
+    cli_ldrs.RANDOMSEEDS.put(3)
+    cli_ldrs.CONF_NUMBER.put(1)
+    cli_ldrs._build_long_conformers(
+        fragments=[(part, key) for key, part in enumerate(parts)],
+        fld_xyz=fld_xyz,
+        fld_struc=fld,
+        disorder_case=case,
+        max_clash=10**6,
+        conformer_name='conformer',
+        output_folder=tmp_path,
+        )
+    built = Structure(tmp_path / 'conformer_1.pdb')
+    built.build()
+    out = built.data_array
+    native = rows[(resseq >= idr[0]) & (resseq <= idr[1])]
+    assert list(out[:, col_name]) == list(native[:, col_name])
+    assert sorted(set(out[:, col_resSeq].astype(int))) == list(range(1, 13))
+    assert np.allclose(out[:, cols_coords].astype(float), native[:, cols_coords].astype(float), atol=0.05)  # noqa: E501
