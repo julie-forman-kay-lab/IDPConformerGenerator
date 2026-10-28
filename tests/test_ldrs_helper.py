@@ -187,9 +187,6 @@ def _fragment_and_anchors(expl_rows, case):
 
 @pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
 def test_align_coords(expl_rows, case):
-    """
-    Test moved fragments are put back onto their anchor atoms.
-    """
     rows, anchors = _fragment_and_anchors(expl_rows, case)
     original = rows[:, cols_coords].astype(float)
     target = _anchor_xyz(rows, anchors)

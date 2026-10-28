@@ -2179,9 +2179,6 @@ def join_overlaps(joined, kept, case, scale=JOIN_OVERLAP_SCALE):
 
 
 def _with_environment(chain, environment, case):
-    """
-    Join the rows of `chain` and `environment`.
-    """
     if not len(environment):
         return chain
     if case == disorder_cases[2]:
@@ -2198,9 +2195,6 @@ def _attach_fragment(
         tolerance,
         environment_overlaps,
         ):
-    """
-    Align a fragment onto `chain` and graft it, or None if it does not fit.
-    """
     target = attachment_anchor(chain, case)
     rows = align_coords(rows, target, case)
     fixed = _with_environment(chain, environment, case)
