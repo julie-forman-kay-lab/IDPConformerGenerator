@@ -56,6 +56,55 @@ To check your outputs against what is to be expected for this tutorial section. 
 `here <https://www.dropbox.com/sh/6j9ahb4r2od45kh/AAAqPWyMoS9cZQiiaWQrpv7Ua?dl=0>`_
 and download the archive named ``slc26a9_ldrs_example.zip``.
 
+Closing Long Linker-IDRs in Torsion Space
+-----------------------------------------
+
+The ``next_seeker`` protocol compares conformer pairs from each side
+of the interacting folded domains and keeps the pairs that satisfies specific
+backbone peptide-bond geometry. The chance that two independently built IDRs
+meet drops steeply with the length of the IDR, which is why long Linker-IDRs
+need very large libraries. With ``--loop-closure ccd`` (the default),
+``ldrs`` instead attempts to close every backbone it builds onto both folded
+ends::
+
+    idpconfgen ldrs \
+        -db <PATH TO DATABASE.JSON> \
+        -seq SLC26A9_STAS.fasta \
+        -etbb 100 \
+        -dsd \
+        -nc 50 \
+        --dloop-off \
+        --dany \
+        -fld 7CH1_SLC26A9.pdb \
+        --loop-closure ccd \
+        -of ./slc26a9_ldrs_ANY_ccd \
+        -n
+
+
+Bond lengths, bond angles and omega angles of the sampled backbone never
+change, and phi/psi change by bounded amounts, so the closed loops keep the
+torsion sampling of IDPConformerGenerator instead of being fitted to the gap.
+
+A clash-aware damped least squares method closes the loops: every iteration
+changes all IDR torsions together by the smallest amount that moves the free
+end toward its folded anchor, and pulls the torsions back toward the sampled
+ones where the constraints allow.
+
+Rules of thumb:
+
+* ``--loop-closure ccd`` is the default. ``--loop-closure next_seeker``
+  needs very large libraries for Linker-IDRs longer than ~40 residues.
+  Beyond about 100 residues ``ccd`` is the only practical choice.
+* ``--ccd-max-trials`` (default 100) is the number of backbones each worker may
+  try per conformer it must deliver in a round. Every round logs why the loops
+  were rejected. If the first round closes nothing, ``ldrs`` stops. ``final_endpoint``
+  means the L-IDR could not be closed within the torsion and contact limits,
+  ``omega`` means that the sampled backbone had a twisted or non-proline cis
+  peptide bond, and ``energy``, ``folded_clash`` and ``folded_overlap`` errors
+  mean that the L-IDR failed the energy and clash checks of step 5.
+* With ``--membrane``, the bilayer atoms of the template are part of the
+  environment the L-IDR must avoid.
+
 Advanced LDRS Usage
 -------------------
 
@@ -90,6 +139,7 @@ templates for using the LDRS features of IDPConformgerGenerator.
 1. Generate 10,000 backbone-only structures (more = better sampling) of the IDR:
 
     .. code-block:: bash
+
         idpconfgen build \
             -db <PATH TO DATABASE.JSON> \
             -seq SLC26A9_IDR.fasta \
@@ -111,6 +161,7 @@ our candidates for sidechain addition.
 2. Create the necessary folders for the script to run:
 
     .. code-block:: bash
+
         mkdir slc26a9_cterm
         mkdir slc26a9_nterm
         mkdir slc26a9_matches
@@ -126,6 +177,7 @@ IDR models to the folded domain. The output for this will be in ``slc26a9_result
 5. Use the ``resre`` module to rename any ``HIS`` to ``HIP`` that exist after stitching:
 
     .. code-block:: bash
+
         idpconfgen resre \
             ./slc26a9_results \
             -of ./slc26a9_results_resre \
@@ -136,6 +188,7 @@ IDR models to the folded domain. The output for this will be in ``slc26a9_result
    generated previously in the ``results`` folder using the `MCSCE software <https://github.com/THGLab/MCSCE>`_:
 
     .. code-block:: bash
+
         mcsce \
             ./slc26a9_results_resre \
             64 \

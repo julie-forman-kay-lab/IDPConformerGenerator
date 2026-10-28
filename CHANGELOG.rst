@@ -9,6 +9,10 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Added ``idpconfgen.libs.libccd`` to close loop-IDRs between interacting folded domains in torsion space with a clash-aware damped least-squares solver (CCD inspired). 
+* Optimized ``build --long``. Each conformer is built fragment by fragment, and a fragment that leaves no room for the next one is rebuilt after 20 failed attempts.
+* Optimized ``ldrs`` to use ``build --long`` logic for N-IDRs, C-IDRs and ``next_seeker`` Linker-IDR for IDRs longer than 150 residues.
+
 v0.9.0 (2026-10-21)
 ------------------------------------------------------------
 

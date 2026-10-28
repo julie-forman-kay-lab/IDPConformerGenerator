@@ -626,6 +626,31 @@ def prepare_slice_dict(
     return slice_dict
 
 
+def share_slices(slice_dict, cache):
+    """
+    Share the slice lists of `slice_dict` with those already in `cache`.
+
+    Parameters
+    ----------
+    slice_dict : dict
+        Output of :func:`prepare_slice_dict`, changed in place.
+
+    cache : dict
+        Maps ``(xmer size, xmer)`` to the entry of the first dictionary
+        that had it; updated in place. Use one `cache` per set of search
+        options.
+
+    Returns
+    -------
+    dict
+        `slice_dict`.
+    """
+    for size, entries in slice_dict.items():
+        for key in entries:
+            entries[key] = cache.setdefault((size, key), entries[key])
+    return slice_dict
+
+
 def prepare_energy_function(
         atom_labels,
         residue_numbers,

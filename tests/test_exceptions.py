@@ -82,7 +82,7 @@ def test_IDPExceptionFormattableError(ExcptsFormattable):
     """
     num = count_string_formatters(ExcptsFormattable.errmsg)
     args = [random_type() for i in range(num)]
-    str(ExcptsFormattable(*args))
+    str(ExcptsFormattable(*args))  # noqa: B018
 
 
 @pytest.fixture(
