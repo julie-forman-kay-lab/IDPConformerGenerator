@@ -59,12 +59,13 @@ and download the archive named ``slc26a9_ldrs_example.zip``.
 Closing Long Linker-IDRs in Torsion Space
 -----------------------------------------
 
-The default ``next_seeker`` protocol compares conformer pairs from each side
+The ``next_seeker`` protocol compares conformer pairs from each side
 of the interacting folded domains and keeps the pairs that satisfies specific
 backbone peptide-bond geometry. The chance that two independently built IDRs
 meet drops steeply with the length of the IDR, which is why long Linker-IDRs
-need very large libraries. With ``--loop-closure ccd``, ``ldrs`` instead
-attempts to close every backbone it builds onto both folded ends::
+need very large libraries. With ``--loop-closure ccd`` (the default),
+``ldrs`` instead attempts to close every backbone it builds onto both folded
+ends::
 
     idpconfgen ldrs \
         -db <PATH TO DATABASE.JSON> \
@@ -84,19 +85,16 @@ Bond lengths, bond angles and omega angles of the sampled backbone never
 change, and phi/psi change by bounded amounts, so the closed loops keep the
 torsion sampling of IDPConformerGenerator instead of being fitted to the gap.
 
-By default (``--ccd-solver dls``), a clash-aware damped least squares method
-is used where every iteration changes all IDR torsions together by the smallest
-amount that moves the free end toward its folded anchor, and pulls the torsions
-back toward the sampled ones where the constraints allow. ``--ccd-solver ccd`` 
-solver uses classic cyclic coordinate descent
-(Canutescu & Dunbrack, *Protein Sci.* 2003, 12:963-972), which turns one torsion
-at a time toward the target and only screens contacts afterwards.
+A clash-aware damped least squares method closes the loops: every iteration
+changes all IDR torsions together by the smallest amount that moves the free
+end toward its folded anchor, and pulls the torsions back toward the sampled
+ones where the constraints allow.
 
 Rules of thumb:
 
-* Use ``--loop-closure ccd`` for Linker-IDRs longer than 40
-  residues; beyond about 100 residues it is the only practical choice.
-  ``next_seeker`` remains the default.
+* ``--loop-closure ccd`` is the default. ``--loop-closure next_seeker``
+  needs very large libraries for Linker-IDRs longer than ~40 residues.
+  Beyond about 100 residues ``ccd`` is the only practical choice.
 * ``--ccd-max-trials`` (default 100) is the number of backbones each worker may
   try per conformer it must deliver in a round. Every round logs why the loops
   were rejected. If the first round closes nothing, ``ldrs`` stops. ``final_endpoint``
