@@ -17,9 +17,6 @@ mcsce_defaults = {
     'parallel_worker': 1,
     }
 
-need_H_mask = True
-only_H_mask = None
-
 
 def add_mcsce_subparser(ap):
     """Add MCSCE related parameters to client."""
@@ -97,7 +94,7 @@ def init_mcsce_sidechains(
     np.ndarray (M, 3)
         Heavy atom coordinates of the protein sequence.
     """
-    from mcsce.core import build_definitions
+    from mcsce.core import build_definitions, side_chain_builder
     from mcsce.core.side_chain_builder import (
         create_side_chain,
         initialize_func_calc,
@@ -133,15 +130,25 @@ def init_mcsce_sidechains(
             ),
         structure=s,
         )
+    # MCSCE keeps the energy functions of the structure it was last
+    # initialized with in module globals. Keep those of this sequence:
+    # one process may build several sequences (the fragments of long
+    # IDRs in `build --long` and `ldrs`).
+    energy_state = (
+        side_chain_builder.sidechain_placeholders,
+        side_chain_builder.energy_calculators,
+        )
 
     params['return_first_valid'] = return_first_valid
+    sidechains = None
 
     def calc(coords):
+        nonlocal sidechains
 
-        # yes, I could have made a class, store these attributes, bla bla
-        # ... but I didn't want to :-)
-        global need_H_mask
-        global only_H_mask
+        (
+            side_chain_builder.sidechain_placeholders,
+            side_chain_builder.energy_calculators,
+            ) = energy_state
 
         s.coords = coords[template_masks.non_sidechains]
 
@@ -150,21 +157,19 @@ def init_mcsce_sidechains(
         if final_structure is None:
             return None, None
 
-        if need_H_mask:
+        if sidechains is None:
             # the atoms in final_structure are not ordered the same as the
             # atoms in cli_build. Instead of reordering the atoms in
             # final_structure, we extract a mask to take all sidechain atoms
-            # and pass those to cli_build. The globals are used to perform
-            # this operation only once.
-            need_H_mask = False
-            only_H_mask = np.where(
-                np.in1d(
+            # and pass those to cli_build, once for this sequence.
+            sidechains = np.where(
+                np.isin(
                     final_structure.data_array[:, 2],
                     ('N', 'CA', 'C', 'O', 'H1', 'H2', 'H3', 'OXT', 'H'),
                     invert=True,
                     ),
                 )
 
-        return all_atom_masks.all_sidechains, final_structure.coords[only_H_mask]  # noqa: E501
+        return all_atom_masks.all_sidechains, final_structure.coords[sidechains]  # noqa: E501
 
     return calc
