@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+v0.10.1 (2026-10-28)
+------------------------------------------------------------
+
 * Optimized ``next_seeker``. Halves are built backbone-only at first, all halves are compared at once (KD tree). Completed loops have their sidechains built after.
 * Please note that it is recommended to use the default ``--loop-closure ccd`` for L-IDRs longer than 40 residues as it is ~17x faster with more diversity for the D1D2 complex example.
 
