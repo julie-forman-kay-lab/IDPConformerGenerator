@@ -22,18 +22,27 @@ from idpconfgen.ldrs_helper import (
     count_clashes,
     create_all_combinations,
     create_combinations,
+    find_junctions,
     graft_fragment,
+    half_backbone,
     inter_chain_cc,
     is_hydrogen,
     join_overlaps,
+    junction_runs,
+    linker_numbered,
+    linker_reach,
+    linker_stop,
     next_seeker,
     packing_context,
     prepare_ccd_context,
     prune_duplicate_loops,
     psurgeon,
+    reachable_residues,
     splice_folded_rows,
     split_long_idr,
+    unreachable_end,
     )
+from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
@@ -138,6 +147,168 @@ def test_next_seeker_writes_every_junction(expl_rows, tmp_path):
         assert abs(np.arccos(cos) - 2 * build_bend_CA_C_O) < 2e-3
         normal = np.cross(ca - c, n - c)
         assert abs(np.dot(normal / np.linalg.norm(normal), o - c)) < 5e-3
+
+
+def test_next_seeker_trimmed_halves(expl_rows, tmp_path):
+    """Test halves without some residues are joined by residue number."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    backbone = expl_rows[
+        (resseq >= 4) & (resseq <= 11)
+        & np.isin(expl_rows[:, col_name], ('N', 'CA', 'C', 'O'))
+        ]
+    lower = tmp_path / 'lower.pdb'
+    upper = tmp_path / 'upper.pdb'
+    _write_backbone_fragment(backbone[backbone[:, col_resSeq].astype(int) <= 8], lower)  # noqa: E501
+    rows = np.array(backbone, copy=True)
+    rows[:, col_resSeq] = (rows[:, col_resSeq].astype(int) - 3).astype(str)
+    write_PDB(structure_to_pdb(rows[rows[:, col_resSeq].astype(int) >= 4]), upper)  # noqa: E501
+    matches = tmp_path / 'matches'
+    matches.mkdir()
+    # C-side residues 1 to 5, N-side residues 4 to 8: junctions at 3 to 5
+    assert next_seeker(lower, [upper], 40, 0.4, matches) == 3
+    for term in (3, 4, 5):
+        joined = Structure(matches / f'lower+upper_j{term}.pdb')
+        joined.build()
+        numbers = joined.data_array[:, col_resSeq].astype(int)
+        assert sorted(set(numbers)) == list(range(1, 9))
+
+
+def _backbone_array(expl_rows, first, last):
+    rows = _chain_rows(expl_rows, first, last)
+    return half_backbone(rows, last - first + 1)
+
+
+def test_find_junctions(expl_rows):
+    """Test junctions are found as the scalar next_seeker check finds them."""
+    native = _backbone_array(expl_rows, 4, 13)
+    rng = np.random.default_rng(5)
+    c_side = native[None] + rng.normal(0, 0.06, size=(3,) + native.shape)
+    n_side = native[None] + rng.normal(0, 0.06, size=(4,) + native.shape)
+    n_side[1, 6:] += 3.0  # no junction from residue 6 on
+    c_side[2, 4:] = np.nan  # a C-side half cut after residue 4
+    found = find_junctions(c_side, n_side)
+    expected = []
+    for c, n, residue in product(range(3), range(4), range(1, 10)):
+        ca, cc = c_side[c, residue - 1, 1], c_side[c, residue - 1, 2]
+        nn, ca2 = n_side[n, residue, 0], n_side[n, residue, 1]
+        if not np.all(np.isfinite([ca, cc, nn, ca2])):
+            continue
+        omega = calc_torsion_angles(np.array([ca, cc, nn, ca2]))
+        if (
+                1.32 <= ldrs_helper.calculate_distance(cc, nn) <= 1.56
+                and 1.91 <= ldrs_helper.calculate_angle(ca, cc, nn) <= 2.15
+                and 2.2 <= ldrs_helper.calculate_distance(cc, ca2) <= 2.7
+                and np.abs(omega)[0] >= 2.61
+                ):
+            expected.append((c, n, residue))
+    assert len(expected) > 20
+    assert [tuple(row) for row in found.tolist()] == expected
+    assert find_junctions(c_side[:0], n_side).shape == (0, 3)
+
+
+def test_junction_runs():
+    """Test junctions are grouped by pair in runs of consecutive residues."""
+    found = np.array([
+        (0, 1, 2), (0, 1, 3), (0, 1, 4), (0, 1, 7), (0, 2, 5), (3, 1, 6),
+        ])
+    assert junction_runs(found) == {
+        (0, 1): [[2, 3, 4], [7]],
+        (0, 2): [[5]],
+        (3, 1): [[6]],
+        }
+
+
+def _straight_half(length, direction=1.0):
+    """Rows of an extended chain along x, residues numbered 1 to `length`."""
+    rows = []
+    for residue in range(1, length + 1):
+        x = direction * 3.6 * (residue - 1)
+        for k, (name, element) in enumerate((('N', 'N'), ('CA', 'C'), ('C', 'C'), ('O', 'O'))):  # noqa: E501
+            rows.append([
+                'ATOM', str(4 * residue + k), name, '', 'ALA', 'A',
+                str(residue), '', f'{x + 0.5 * k:.3f}', '0.000', '0.000',
+                '1.00', '0.00', '', element, '',
+                ])
+    return np.array(rows)
+
+
+@pytest.mark.parametrize('case', ['C-IDR', 'N-IDR'])
+def test_reachable_residues(case):
+    """Test a half is cut where its residues can no longer reach the far end."""
+    length = 12
+    rows = _straight_half(length)
+    xyz = rows[:, cols_coords].astype(float)
+    numbers = rows[:, col_resSeq].astype(int)
+    # the far end next to residue 1 (C-side) or to residue 12 (N-side)
+    far = xyz[numbers == (1 if case == 'C-IDR' else length)].mean(axis=0) + (0, 3.0, 0)  # noqa: E501
+    atom = 'C' if case == 'C-IDR' else 'N'
+    pick = rows[:, col_name] == atom
+    distance = np.linalg.norm(xyz[pick] - far, axis=1)
+    reach = distance <= linker_reach(case, numbers[pick], length)
+    kept = reachable_residues(rows, case, far, length)
+    kept_numbers = sorted(set(kept[:, col_resSeq].astype(int)))
+    if case == 'C-IDR':
+        assert not reach.all()
+        assert kept_numbers == list(range(1, int(np.argmin(reach)) + 1))
+    else:
+        first = numbers[pick][~reach].max() + 1
+        assert kept_numbers == list(range(first, length + 1))
+    # the bound is monotonic: past the first residue out of reach, none
+    # is within it
+    assert np.all(np.diff(linker_reach(case, np.arange(1, length + 1), length)) * (1 if case == 'N-IDR' else -1) > 0)  # noqa: E501
+
+
+def test_reachable_residues_drops_incomplete_end():
+    """Test a residue without its C at the free end of a C-side half goes."""
+    rows = _straight_half(6)
+    numbers = rows[:, col_resSeq].astype(int)
+    rows = rows[~((numbers == 6) & np.isin(rows[:, col_name], ('CA', 'C', 'O')))]  # noqa: E501
+    kept = reachable_residues(rows, 'C-IDR', np.zeros(3), 12)
+    assert sorted(set(kept[:, col_resSeq].astype(int))) == [1, 2, 3, 4, 5]
+
+
+def test_linker_stop(expl_rows):
+    """Test the builder stop matches the reach of the aligned residues."""
+    length = 16
+    rows = _chain_rows(expl_rows, 4, 15)
+    rows = rows[np.isin(rows[:, col_name], ('N', 'CA', 'C', 'O'))]
+    target = np.array([[1.0, 2.0, 3.0], [2.2, 2.6, 3.0], [3.4, 2.0, 3.6]])
+    aligned = align_coords(np.array(rows, copy=True), target, 'C-IDR')
+    c_atoms = aligned[aligned[:, col_name] == 'C'][:, cols_coords].astype(float)  # noqa: E501
+    limit = linker_reach('C-IDR', np.arange(1, 13), length)
+    far = c_atoms[7] + (0.0, 0.0, limit[7] + 1.0)
+    out_of_reach = np.linalg.norm(c_atoms - far, axis=1) > limit
+    assert out_of_reach.any() and not out_of_reach.all()
+    # the builder backbone: N, CA, C of each residue in another frame
+    xyz = rows[np.isin(rows[:, col_name], ('N', 'CA', 'C'))][:, cols_coords].astype(float)  # noqa: E501
+    rotation, _ = np.linalg.qr(np.random.default_rng(3).normal(size=(3, 3)))
+    rotation *= np.sign(np.linalg.det(rotation))
+    xyz = xyz @ rotation.T + (5.0, -7.0, 2.0)
+    stop = linker_stop(target, far, length)
+    for built in range(1, 13):
+        backbone = np.full_like(xyz, np.nan)
+        backbone[:3 * built] = xyz[:3 * built]
+        expected = built >= 2 and bool(out_of_reach[built - 1])
+        assert stop(backbone) == expected
+
+
+def test_unreachable_end_and_numbering():
+    """Test the free end of halves built from their folded end."""
+    length = 12
+    rows = _straight_half(5)
+    xyz = rows[:, cols_coords].astype(float)
+    # an N-side half of 5 residues is the end of the Linker-IDR
+    renumbered = linker_numbered(rows, 'N-IDR', length)
+    assert sorted(set(renumbered[:, col_resSeq].astype(int))) == list(range(8, 13))  # noqa: E501
+    assert linker_numbered(rows, 'C-IDR', length) is rows
+    n_first = xyz[0]
+    limit = linker_reach('N-IDR', 8, length)
+    assert not unreachable_end(rows, 'N-IDR', n_first + (limit - 0.1, 0, 0), length)  # noqa: E501
+    assert unreachable_end(rows, 'N-IDR', n_first + (limit + 0.1, 0, 0), length)  # noqa: E501
+    c_last = xyz[(rows[:, col_resSeq] == '5') & (rows[:, col_name] == 'C')][0]
+    limit = linker_reach('C-IDR', 5, length)
+    assert not unreachable_end(rows, 'C-IDR', c_last + (0, limit - 0.1, 0), length)  # noqa: E501
+    assert unreachable_end(rows, 'C-IDR', c_last + (0, limit + 0.1, 0), length)  # noqa: E501
 
 
 def test_atom_vdw_radii_and_hydrogens():
@@ -674,6 +845,25 @@ def test_build_in_fragments_join_overlaps(expl_rows, monkeypatch):
     assert calls == [0, 1, 1]
     assert rebuilt == 0
     assert len(rows) == len(_chain_rows(expl_rows, first, last))
+
+
+def test_build_in_fragments_stop(expl_rows):
+    """Test no fragment is added once `stop` tells the chain is done."""
+    first = int(expl_rows[:, col_resSeq].astype(int).min())
+    pieces = [(first, first + 5), (first + 4, first + 10), (first + 9, first + 15)]  # noqa: E501
+    calls = []
+
+    def draw(k):
+        calls.append(k)
+        return _moved(_chain_rows(expl_rows, *pieces[k]), k + 1), float(k)
+
+    def stop(rows):
+        return rows[:, col_resSeq].astype(int).max() >= 10
+
+    rows, energy, _ = build_in_fragments(draw, 3, 'C-IDR', stop=stop)
+    assert calls == [0, 1]
+    assert energy == 1.0
+    assert sorted(set(rows[:, col_resSeq].astype(int))) == list(range(1, 12))
 
 
 @pytest.mark.parametrize('environment_overlaps', [True, False])
