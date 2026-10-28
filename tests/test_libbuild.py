@@ -7,6 +7,7 @@ from idpconfgen.libs.libbuild import (
     build_regex_substitutions,
     init_confmasks,
     prepare_slice_dict,
+    share_slices,
     )
 
 
@@ -83,3 +84,16 @@ def test_prepare_slice_dict(
     result = prepare_slice_dict(primary, input_seq, mers_size, res_tolerance)
     assert result.keys() == expected.keys()
     assert result == expected
+
+
+def test_share_slices():
+    """Test entries found before are reused, new ones kept."""
+    cache = {}
+    first = {1: {'A': [slice(0, 1)], 'D': [slice(2, 3)]}, 2: {'AD': [slice(1, 3)]}}  # noqa: E501
+    second = {1: {'A': [slice(0, 1)], 'E': [slice(4, 5)]}, 2: {'AD': [slice(1, 3)]}}  # noqa: E501
+    assert share_slices(first, cache) is first
+    share_slices(second, cache)
+    assert second[1]['A'] is first[1]['A']
+    assert second[2]['AD'] is first[2]['AD']
+    assert second[1]['E'] == [slice(4, 5)]
+    assert set(cache) == {(1, 'A'), (1, 'D'), (1, 'E'), (2, 'AD')}

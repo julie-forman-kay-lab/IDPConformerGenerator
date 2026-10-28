@@ -630,12 +630,6 @@ def share_slices(slice_dict, cache):
     """
     Share the slice lists of `slice_dict` with those already in `cache`.
 
-    The slices of an xmer in the database depend only on the database and
-    the search options, not on the sequence it was found in. The
-    dictionaries of several sequences built in one run (the fragments of a
-    long IDP, the IDRs of a protein) share most of their entries; keeping
-    one list per entry saves most of their memory.
-
     Parameters
     ----------
     slice_dict : dict
