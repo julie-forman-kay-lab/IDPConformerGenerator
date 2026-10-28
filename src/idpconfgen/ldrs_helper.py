@@ -31,6 +31,7 @@ from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
     col_element,
+    col_iCode,
     col_name,
     col_resName,
     col_resSeq,
@@ -1026,25 +1027,17 @@ def align_coords(sample, target, case):
     U, S, Vt = np.linalg.svd(covariance_matrix)
 
     # Coordinates are rows, so `idr_xyz @ (U @ D @ Vt)` superimposes the
-    # IDR atoms onto `target`.
-    # D amino acids undoes a reflection.
+    # IDR atoms onto `target`. The three atoms lie in a plane, so the
+    # sign of the third singular vectors is arbitrary: without the
+    # diagonal matrix D = diag(1, 1, +/-1), `U @ Vt` would be a reflection
+    # about half of the time and mirror the IDR (D-amino acids).
     reflection = np.sign(np.linalg.det(U @ Vt)) or 1.0
     rotation_matrix = U @ np.diag((1.0, 1.0, reflection)) @ Vt
 
     rotated_points = np.dot(idr_xyz, rotation_matrix)
-    sample[:, cols_coords] = rotated_points.astype(str)
-
-    translation_vector = \
-        target[0] - sample[idr_term_idx["C"]][cols_coords].astype(float)
-
-    for i, coords in enumerate(sample[:, cols_coords]):
-        x = str(round(translation_vector[0] + float(coords[0]), 3))
-        y = str(round(translation_vector[1] + float(coords[1]), 3))
-        z = str(round(translation_vector[2] + float(coords[2]), 3))
-
-        sample[i][col_x] = x
-        sample[i][col_y] = y
-        sample[i][col_z] = z
+    translation_vector = target[0] - rotated_points[idr_term_idx["C"]]
+    moved = np.round(rotated_points + translation_vector, 3)
+    sample[:, cols_coords] = moved.astype(str)
 
     return sample
 
@@ -1934,3 +1927,444 @@ def splice_folded_rows(fragment_rows, lower_rows, upper_rows):
     out = np.concatenate(parts, axis=0)
     out[:, col_serial] = [str(i) for i in range(1, len(out) + 1)]
     return out
+
+
+FOLDED_OVERLAP_SCALE = 0.6
+
+LONG_IDR_FRAGMENT = 150
+
+LONG_FRAGMENT_TRIALS = 20
+
+JOIN_OVERLAP_SCALE = 0.65
+
+
+def _anchor_index(coords, xyz):
+    """Return the index of the atom at `xyz` (within 1e-3), or None."""
+    hits = np.flatnonzero(np.all(np.abs(coords - xyz) < 1e-3, axis=1))
+    return int(hits[0]) if len(hits) else None
+
+
+def _same_residue(rows, index):
+    """Mask the consecutive rows of the residue of row `index`."""
+    key = rows[:, [col_chainID, col_segid, col_resSeq, col_iCode]]
+    same = np.all(key == key[index], axis=1)
+    start, end = index, index + 1
+    while start > 0 and same[start - 1]:
+        start -= 1
+    while end < len(rows) and same[end]:
+        end += 1
+    mask = np.zeros(len(rows), dtype=bool)
+    mask[start:end] = True
+    return mask
+
+
+def _without_replaced(environment, case, anchor):
+    """
+    Split `environment` around the residue an aligned fragment replaces.
+
+    Returns
+    -------
+    tuple
+        The rows of `environment` without that residue and the index, in
+        those rows, of the atom bonded to the fragment (None if the anchor
+        atoms are not part of `environment`).
+    """
+    if case == disorder_cases[2]:
+        replaced_xyz, bonded_xyz = anchor[1], anchor[0]
+    else:
+        replaced_xyz, bonded_xyz = anchor[0], anchor[1]
+    coords = environment[:, cols_coords].astype(float)
+    keep = np.ones(len(environment), dtype=bool)
+    replaced = _anchor_index(coords, replaced_xyz)
+    if replaced is not None:
+        keep &= ~_same_residue(environment, replaced)
+    bonded = _anchor_index(coords, bonded_xyz)
+    if bonded is not None:
+        bonded = int(np.count_nonzero(keep[:bonded])) if keep[bonded] else None
+    return environment[keep], bonded
+
+
+def _grafted_rows(fragment, case):
+    """Mask the rows of an aligned fragment that `psurgeon` keeps."""
+    resseq = fragment[:, col_resSeq].astype(int)
+    if case == disorder_cases[2]:
+        return resseq > resseq.min()
+    return resseq < resseq.max()
+
+
+def _trimmed_rows(fragment, case):
+    """Mask the rows `count_clashes` compares: 3 residues off the anchor."""
+    resseq = fragment[:, col_resSeq].astype(int)
+    if case == disorder_cases[2]:
+        return resseq >= resseq.min() + 3
+    return resseq <= resseq.max() - 3
+
+
+def attachment_overlaps(
+        fragment,
+        environment,
+        case,
+        anchor,
+        scale=FOLDED_OVERLAP_SCALE,
+        ):
+    """
+    Count heavy-atom overlaps of an aligned IDR fragment with its environment.
+
+    Parameters
+    ----------
+    fragment : np.ndarray
+        Structure data array of the fragment, aligned by
+        :func:`align_coords`.
+
+    environment : np.ndarray
+        Structure data array of the atoms the fragment must not overlap,
+        including the residues it is attached to.
+
+    case : str
+        ``'N-IDR'`` (attached by its C-terminal end) or ``'C-IDR'`` (by its
+        N-terminal end).
+
+    anchor : np.ndarray, shape (3, 3)
+        The `target` given to :func:`align_coords`.
+
+    scale : float
+        Pairs closer than `scale` times their vdW radii sum overlap.
+
+    Returns
+    -------
+    int
+        Number of overlapping atom pairs.
+    """
+    heavy = ~is_hydrogen(fragment[:, col_element], fragment[:, col_name])
+    rows = fragment[_grafted_rows(fragment, case) & heavy]
+    env, bonded = _without_replaced(environment, case, anchor)
+    bonded_residue = np.zeros(len(env), dtype=bool)
+    if bonded is not None:
+        bonded_residue = _same_residue(env, bonded)
+    heavy_env = ~is_hydrogen(env[:, col_element], env[:, col_name])
+    env, bonded_residue = env[heavy_env], bonded_residue[heavy_env]
+    first, second = _AtomSet(rows), _AtomSet(env)
+    if not len(first.coords) or not len(second.coords):
+        return 0
+    reach = scale * (first.radii.max() + second.radii.max())
+    pairs = first.tree.sparse_distance_matrix(
+        second.tree,
+        reach,
+        output_type='ndarray',
+        )
+    if not len(pairs):
+        return 0
+    i, j = pairs['i'], pairs['j']
+    limit = scale * (first.radii[i] + second.radii[j])
+    resseq = rows[:, col_resSeq].astype(int)
+    end = resseq.min() if case == disorder_cases[2] else resseq.max()
+    copy = resseq == end
+    near = (pairs['v'] < limit) & ~(copy[i] & bonded_residue[j])
+    return int(np.count_nonzero(near))
+
+
+def attachment_anchor(rows, case):
+    """
+    Return the C, N, CA atoms a new fragment is aligned onto.
+
+    Parameters
+    ----------
+    rows : np.ndarray
+        Structure data array of a chain numbered from 1.
+
+    case : str
+        ``'C-IDR'`` to attach the next fragment after the last residue of
+        `rows` (the fragment's first two residues take the place of its
+        last two), ``'N-IDR'`` to attach it before the first residue.
+
+    Returns
+    -------
+    np.ndarray, shape (3, 3)
+        The `target` of :func:`align_coords`.
+    """
+    resseq = rows[:, col_resSeq].astype(int)
+    names = rows[:, col_name]
+    if case == disorder_cases[2]:
+        last = resseq.max()
+        picks = ((last - 1, 'C'), (last, 'N'), (last, 'CA'))
+    else:
+        first = resseq.min()
+        picks = ((first, 'C'), (first + 1, 'N'), (first + 1, 'CA'))
+    return np.array([
+        rows[(resseq == res) & (names == name)][0, cols_coords]
+        for res, name in picks
+        ]).astype(float)
+
+
+def graft_fragment(rows, fragment, case):
+    """
+    Attach an aligned fragment to a chain, as :func:`psurgeon` does.
+
+    Parameters
+    ----------
+    rows, fragment : np.ndarray
+        Structure data arrays; `fragment` aligned onto
+        :func:`attachment_anchor` of `rows`.
+
+    case : str
+        ``'C-IDR'`` or ``'N-IDR'``.
+
+    Returns
+    -------
+    np.ndarray
+    """
+    resseq = rows[:, col_resSeq].astype(int)
+    fragseq = fragment[:, col_resSeq].astype(int)
+    if case == disorder_cases[2]:
+        parts = (rows[resseq < resseq.max()], fragment[fragseq > fragseq.min()])  # noqa: E501
+    else:
+        parts = (fragment[fragseq < fragseq.max()], rows[resseq > resseq.min()])  # noqa: E501
+    out = np.concatenate(parts, axis=0)
+    old = out[:, col_resSeq].astype(int)
+    starts = np.concatenate(([True], (old[1:] != old[:-1])))
+    out[:, col_resSeq] = np.cumsum(starts).astype(str)
+    out[:, col_chainID] = rows[0, col_chainID]
+    out[:, col_serial] = [str(i) for i in range(1, len(out) + 1)]
+    return out
+
+
+def join_overlaps(joined, kept, case, scale=JOIN_OVERLAP_SCALE):
+    """
+    Count heavy-atom overlaps across the join made by :func:`graft_fragment`.
+
+    Parameters
+    ----------
+    joined : np.ndarray
+        :func:`graft_fragment` of a chain and a fragment, numbered from 1.
+
+    kept : int
+        Number of residues of `joined` that come from the chain.
+
+    case : str
+        ``'C-IDR'`` (the chain comes first) or ``'N-IDR'`` (the chain comes
+        last).
+
+    scale : float
+        Pairs closer than `scale` times their vdW radii sum overlap.
+
+    Returns
+    -------
+    int
+        Number of overlapping atom pairs.
+    """
+    resseq = joined[:, col_resSeq].astype(int)
+    if case == disorder_cases[2]:
+        old = resseq < resseq.min() + kept
+    else:
+        old = resseq > resseq.max() - kept
+    heavy = ~is_hydrogen(joined[:, col_element], joined[:, col_name])
+    chain, fragment = joined[old & heavy], joined[~old & heavy]
+    first, second = _AtomSet(chain), _AtomSet(fragment)
+    if not len(first.coords) or not len(second.coords):
+        return 0
+    reach = scale * (first.radii.max() + second.radii.max())
+    pairs = first.tree.sparse_distance_matrix(
+        second.tree,
+        reach,
+        output_type='ndarray',
+        )
+    if not len(pairs):
+        return 0
+    limit = scale * (first.radii[pairs['i']] + second.radii[pairs['j']])
+    apart = np.abs(
+        chain[pairs['i'], col_resSeq].astype(int)
+        - fragment[pairs['j'], col_resSeq].astype(int)
+        ) >= 2
+    return int(np.count_nonzero((pairs['v'] < limit) & apart))
+
+
+def _with_environment(chain, environment, case):
+    """
+    Join the rows of `chain` and `environment`.
+    """
+    if not len(environment):
+        return chain
+    if case == disorder_cases[2]:
+        return np.concatenate((environment, chain), axis=0)
+    return np.concatenate((chain, environment), axis=0)
+
+
+def _attach_fragment(
+        chain,
+        rows,
+        case,
+        environment,
+        max_clash,
+        tolerance,
+        environment_overlaps,
+        ):
+    """
+    Align a fragment onto `chain` and graft it, or None if it does not fit.
+    """
+    target = attachment_anchor(chain, case)
+    rows = align_coords(rows, target, case)
+    fixed = _with_environment(chain, environment, case)
+    env = _without_replaced(fixed, case, target)[0]
+    contacts = _count_contacts(
+        _AtomSet(rows[_trimmed_rows(rows, case)]),
+        _AtomSet(env),
+        tolerance,
+        )
+    if contacts > max_clash:
+        return None
+    if not environment_overlaps:
+        fixed = chain
+    if attachment_overlaps(rows, fixed, case, target):
+        return None
+    joined = graft_fragment(chain, rows, case)
+    kept = len(np.unique(chain[:, col_resSeq])) - 1
+    if join_overlaps(joined, kept, case):
+        return None
+    return joined
+
+
+def split_long_idr(seq, case, size=LONG_IDR_FRAGMENT, extra=0):
+    """
+    Split an IDR into overlapping fragments, in the order they are built.
+
+    Parameters
+    ----------
+    seq : str
+        The IDR as ``ldrs`` builds it: with its two folded residues after
+        it (``'N-IDR'``) or before it (``'C-IDR'``).
+
+    case : str
+        ``'N-IDR'``: the IDR is built from its folded end toward its N
+        terminus; ``'C-IDR'``: toward its C terminus.
+
+    size : int
+        Largest number of IDR residues per fragment. The IDR is cut into
+        the fewest fragments of nearly equal length.
+
+    extra : int
+        Folded residues at the other end of `seq`, built with the last
+        fragment: the two after a Linker-IDR built as a ``'C-IDR'``, or
+        before it built as an ``'N-IDR'``. They are not IDR residues.
+
+    Returns
+    -------
+    list of str
+        One fragment if the IDR is not longer than `size`. Otherwise the
+        first fragment holds the two folded residues, and each fragment
+        shares two residues with the one built before it.
+    """
+    n_idr = len(seq) - 2 - extra
+    count = max(1, -(-n_idr // size))
+    if count == 1:
+        return [seq]
+    base, rest = divmod(n_idr, count)
+    lengths = [base + int(i < rest) for i in range(count)]
+    lengths[-1] += extra
+    fragments = []
+    if case == disorder_cases[2]:
+        start = 2
+        for length in lengths:
+            fragments.append(seq[start - 2:start + length])
+            start += length
+    else:
+        end = len(seq) - 2
+        for length in lengths:
+            fragments.append(seq[end - length:end + 2])
+            end -= length
+    return fragments
+
+
+def build_in_fragments(
+        draw,
+        nfragments,
+        case,
+        anchor=None,
+        environment=None,
+        first_check=None,
+        max_clash=40,
+        tolerance=0.4,
+        max_trials=LONG_FRAGMENT_TRIALS,
+        environment_overlaps=True,
+        ):
+    """
+    Build a chain fragment by fragment, going back at dead ends.
+
+    Parameters
+    ----------
+    draw : callable
+        ``draw(k)`` returns ``(rows, energy)``: a new conformer of fragment
+        `k` as a structure data array numbered from 1, and its energy.
+
+    nfragments : int
+        Number of fragments, in building order.
+
+    case : str
+        ``'C-IDR'``: each fragment follows the previous one; ``'N-IDR'``:
+        each fragment precedes it.
+
+    anchor : np.ndarray, shape (3, 3), optional
+        Where the first fragment is aligned (:func:`align_coords`). If
+        None, the first fragment stays where it was built.
+
+    environment : np.ndarray, optional
+        Structure data array of fixed atoms (the folded domains).
+
+    first_check : callable, optional
+        ``first_check(rows)`` tells whether the aligned first fragment
+        is kept; by default every first fragment is kept.
+
+    max_clash, tolerance : int, float
+        Contact budget and distance tolerance for each attached fragment.
+
+    max_trials : int
+        Failed conformers of a fragment before the previous one is
+        rebuilt.
+
+    environment_overlaps : bool
+        If False, :func:`attachment_overlaps` compares each fragment only
+        with the chain, not with `environment`.
+
+    Returns
+    -------
+    tuple
+        The chain (structure data array numbered from 1), the sum of the
+        energies of its fragments, and the number of times a fragment was
+        rebuilt.
+    """
+    if environment is None:
+        environment = np.empty((0, 0))
+    chains = []
+    energies = []
+    failed = 0
+    rebuilt = 0
+    while len(chains) < nfragments:
+        k = len(chains)
+        rows, energy = draw(k)
+        if k == 0:
+            if anchor is not None:
+                rows = align_coords(rows, anchor, case)
+            if first_check is not None and not first_check(rows):
+                continue
+        else:
+            rows = _attach_fragment(
+                chains[-1],
+                rows,
+                case,
+                environment,
+                max_clash,
+                tolerance,
+                environment_overlaps,
+                )
+            if rows is None:
+                failed += 1
+                if failed >= max_trials:
+                    # the end of the chain is buried: rebuild the fragment
+                    chains.pop()
+                    energies.pop()
+                    failed = 0
+                    rebuilt += 1
+                continue
+        failed = 0
+        chains.append(rows)
+        energies.append(energy)
+    return chains[-1], float(sum(energies)), rebuilt

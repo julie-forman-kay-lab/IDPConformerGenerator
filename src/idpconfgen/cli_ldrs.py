@@ -5,10 +5,14 @@ Build from a database of torsion angles and secondary structure
 information. Database is as created by `idpconfgen torsions` CLI.
 
 IDRs between two folded regions (Linker-IDRs) are closed with
-`--loop-closure next_seeker` (default) or `--loop-closure ccd`. The ccd
+`--loop-closure ccd` (default) or `--loop-closure next_seeker`. The ccd
 method attaches every backbone to the first folded region and closes it
-onto the second by small phi/psi changes (torsion-space loop closure).
-It is recommended for Linker-IDRs longer than 40 residues.
+onto the second by small phi/psi changes (torsion-space loop closure by
+clash-aware damped least squares). next_seeker joins conformers grown
+from each folded region where they meet.
+
+N-IDRs, C-IDRs and next_seeker Linker-IDR halves longer than 150 residues
+are built in fragments of at most 150 residues, attached one to the next.
 
 Future Ideas
 ------------
@@ -16,7 +20,6 @@ Future Ideas
 
 USAGE:
     $ idpconfgen ldrs -db torsions.json -seq sequence.fasta -fld folded.pdb
-    $ idpconfgen ldrs -db db.json -seq seq.fasta -fld fld.pdb --loop-closure ccd
 """
 import argparse
 import os
@@ -77,9 +80,13 @@ from idpconfgen.core.build_definitions import (
 from idpconfgen.core.definitions import dssp_ss_keys
 from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.ldrs_helper import (
+    FOLDED_OVERLAP_SCALE,
+    LONG_IDR_FRAGMENT,
     align_coords,
     atom_vdw_radii,
+    attachment_overlaps,
     break_check,
+    build_in_fragments,
     consecutive_grouper,
     count_clashes,
     create_all_combinations,
@@ -90,6 +97,7 @@ from idpconfgen.ldrs_helper import (
     prune_duplicate_loops,
     psurgeon,
     splice_folded_rows,
+    split_long_idr,
     tolerance_calculator,
     )
 from idpconfgen.libs import libccd, libcli
@@ -101,6 +109,7 @@ from idpconfgen.libs.libbuild import (
     init_confmasks,
     prepare_energy_function,
     prepare_slice_dict,
+    share_slices,
     )
 from idpconfgen.libs.libcalc import (
     calc_residue_num_from_index,
@@ -198,6 +207,18 @@ TEMPLATE_LABELS = None
 TEMPLATE_MASKS = None
 TEMPLATE_EFUNC = None
 
+# the globals above for each fragment of the IDRs built in fragments, by
+# their index in GET_ADJ
+_SEQUENCE_GLOBALS = (
+    'ALL_ATOM_LABELS',
+    'ALL_ATOM_MASKS',
+    'ALL_ATOM_EFUNC',
+    'TEMPLATE_LABELS',
+    'TEMPLATE_MASKS',
+    'TEMPLATE_EFUNC',
+    )
+FRAGMENT_GLOBALS = {}
+
 
 class _BuildPreparation:
     pass
@@ -248,7 +269,7 @@ def are_globals(bgeo_strategy):
 
 # Methods to close Linker-IDRs between two folded regions; the first one
 # is the default.
-LOOP_CLOSURE_METHODS = ('next_seeker', 'ccd')
+LOOP_CLOSURE_METHODS = ('ccd', 'next_seeker')
 # rounds in a row without a new distinct Linker-IDR loop before ldrs goes on
 # with the loops it has
 LOOP_STALL_ROUNDS = 5
@@ -321,29 +342,17 @@ ap.add_argument(
     '--loop-closure',
     help=(
         "Method to connect IDRs between two folded regions (Linker-IDRs). "
-        "'next_seeker' grows conformers from each folded end and keeps "
-        "pairs that meet with peptide-bond geometry. 'ccd' attaches each "
-        "backbone conformer to the first folded end and closes it onto the "
-        "second by small phi/psi changes (torsion-space loop closure), "
-        "avoiding the folded regions; it is much faster for Linker-IDRs "
-        "longer than about 40 residues and practical for loops of "
-        "hundreds of residues. Defaults to 'next_seeker'."
+        "'ccd' attaches each backbone conformer to the first folded end and "
+        "closes it onto the second by small phi/psi changes (torsion-space "
+        "loop closure by clash-aware damped least squares), steering the "
+        "loop around the folded regions; it is practical for loops of "
+        "hundreds of residues. 'next_seeker' grows conformers from each "
+        "folded end and keeps pairs that meet with peptide-bond geometry; "
+        "it needs very large libraries for long Linker-IDRs. Defaults to "
+        "'ccd'."
         ),
     choices=LOOP_CLOSURE_METHODS,
     default=LOOP_CLOSURE_METHODS[0],
-    )
-
-ap.add_argument(
-    '--ccd-solver',
-    help=(
-        "With `--loop-closure ccd`: 'dls' changes all IDR torsions together "
-        "by clash-aware damped least squares, steering the loop around "
-        "the folded regions; 'ccd' uses cyclic coordinate descent sweeps "
-        "(Canutescu & Dunbrack 2003) and only screens contacts afterwards. "
-        "Defaults to 'dls'."
-        ),
-    choices=libccd.SOLVERS,
-    default=libccd.SOLVERS[0],
     )
 
 ap.add_argument(
@@ -500,7 +509,6 @@ def main(
         energy_log='energies.log',
         sidechain_method=DEFAULT_SDM,
         loop_closure=LOOP_CLOSURE_METHODS[0],
-        ccd_solver=libccd.SOLVERS[0],
         ccd_max_trials=100,
         **kwargs,  # other kwargs target energy function, for example.
         ):
@@ -522,11 +530,6 @@ def main(
         raise ValueError(
             f'`loop_closure` must be one of {LOOP_CLOSURE_METHODS}, '
             f'got {loop_closure!r}.'
-            )
-    if ccd_solver not in libccd.SOLVERS:
-        raise ValueError(
-            f'`ccd_solver` must be one of {libccd.SOLVERS}, '
-            f'got {ccd_solver!r}.'
             )
 
     max_clash, dist_tolerance = tolerance_calculator(clash_tolerance)
@@ -818,41 +821,48 @@ def main(
         first_seq = fld_seq[0]
         last_seq = fld_seq[-1]
 
-        # these are the slices with which to sample the ANGLES array
+        # these are the slices with which to sample the ANGLES array, one
+        # entry per IDR (index in DISORDER_SEQS), then one per fragment of
+        # the IDRs built in fragments
         SLICEDICT_XMERS = []
         XMERPROBS = []
         GET_ADJ = []
-        for i, seq in enumerate(DISORDER_SEQS):
-            log.info(S(f"Preparing database for sequence: {seq}"))
 
-            SLICEDICT_XMERS.append(prepare_slice_dict(
-                primary,
-                seq,
-                dssp_regexes=dssp_regexes,
-                secondary=secondary,
-                mers_size=xmer_probs_tmp.sizes,
-                res_tolerance=residue_tolerance,
-                ncores=ncores,
-                ))
+        add_sampling = partial(
+            _add_sampling,
+            cache={},
+            primary=primary,
+            secondary=secondary,
+            dssp_regexes=dssp_regexes,
+            xmer_probs=xmer_probs_tmp,
+            residue_tolerance=residue_tolerance,
+            bgeo_strategy=bgeo_strategy,
+            ncores=ncores,
+            )
+        long_fragments = partial(
+            _long_fragments,
+            add_sampling=add_sampling,
+            bgeo_strategy=bgeo_strategy,
+            bgeo_path=bgeo_path,
+            forcefield=forcefields[forcefield],
+            **kwargs,
+            )
 
-            remove_empty_keys(SLICEDICT_XMERS[i])
-            # updates user defined fragment sizes and probabilities to the
-            # ones actually observed
-            _ = compress_xmer_to_key(xmer_probs_tmp, sorted(SLICEDICT_XMERS[i].keys()))  # noqa: E501
-            XMERPROBS.append(_.probs)
-
-            GET_ADJ.append(get_adjacent_angles(
-                sorted(SLICEDICT_XMERS[i].keys()),
-                XMERPROBS[i],
-                seq,
-                ANGLES,
-                bgeo_strategy,
-                SLICEDICT_XMERS[i],
-                csss=None,
-                residue_tolerance=residue_tolerance,
-                ))
-
-            log.info(S("done"))
+        for seq, case in zip(DISORDER_SEQS, DISORDER_CASES[chain]):
+            # IDRs built in fragments only use the tables of their
+            # fragments: N-IDRs, C-IDRs and next_seeker Linker-IDRs longer
+            # than LONG_IDR_FRAGMENT
+            linker = case == disorder_cases[1]
+            parts = split_long_idr(seq, disorder_cases[2], extra=2 * linker)
+            if len(parts) > 1 and (
+                    not linker
+                    or loop_closure == 'next_seeker'
+                    ):
+                SLICEDICT_XMERS.append(None)
+                XMERPROBS.append(None)
+                GET_ADJ.append(None)
+            else:
+                add_sampling(seq)
 
         ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
@@ -908,7 +918,7 @@ def main(
                         lower,
                         upper,
                         ),
-                    ccd_params=libccd.CCDParameters(solver=ccd_solver),
+                    ccd_params=libccd.CCDParameters(),
                     rama=rama_reference,
                     output_folder=match_of,
                     conformer_name=f"{linkeridr_num}_ccd",
@@ -975,20 +985,27 @@ def main(
                 # conformers already checked against each other
                 checked_C = []
                 checked_N = []
+                # the halves of long Linker-IDRs are built in fragments
+                fragments_C = long_fragments(seq, disorder_cases[2], 2)
+                fragments_N = long_fragments(seq, disorder_cases[0], 2)
+                workers = ncores + bool(library_remaining_confs)
                 lidr_set = 0
                 start = time()
                 while num_files < nconfs:
-                    for i in range(ncores + bool(library_remaining_confs)):
-                        RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
+                    for seed in _half_seeds(random_seed, lidr_set, 0, workers):  # noqa: E501
+                        RANDOMSEEDS.put(seed)
                     for i in range(1, library_nconfs + 1):
                         CONF_NUMBER.put(i)
 
-                    populate_globals(
-                        input_seq=seq,
-                        bgeo_strategy=bgeo_strategy,
-                        bgeo_path=bgeo_path,
-                        forcefield=forcefields[forcefield],
-                        **kwargs)
+                    # halves built in fragments use the globals of their
+                    # fragments
+                    if fragments_C is None:
+                        populate_globals(
+                            input_seq=seq,
+                            bgeo_strategy=bgeo_strategy,
+                            bgeo_path=bgeo_path,
+                            forcefield=forcefields[forcefield],
+                            **kwargs)
 
                     # Build the C-term of linker first
                     temp_of_C = make_folder_or_cwd(
@@ -998,16 +1015,13 @@ def main(
                     log.info(S(f"Generating temporary disordered library for C-terminus of linker: {seq}"))  # noqa: E501
 
                     # prepares execution function
-                    consume = partial(
-                        _build_conformers,
+                    half = dict(
                         fld_xyz=fld_coords_C,
                         fld_struc=fld_struc,
                         disorder_case=disorder_cases[2],  # Treating C-term as C-IDR  # noqa: E501
                         max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                         tolerance=dist_tolerance * 2,
-                        index=index,
                         conformer_name=f"{linkeridr_num}_{lidr_set}_C",
-                        input_seq=seq,  # string
                         output_folder=temp_of_C,
                         nconfs=library_confs_per_core,  # int
                         sidechain_parameters=sidechain_parameters,
@@ -1015,6 +1029,20 @@ def main(
                         bgeo_strategy=bgeo_strategy,
                         **kwargs,
                         )
+                    if fragments_C is None:
+                        consume = partial(
+                            _build_conformers,
+                            index=index,
+                            input_seq=seq,  # string
+                            **half,
+                            )
+                    else:
+                        consume = partial(
+                            _build_long_conformers,
+                            fragments=fragments_C,
+                            overlaps=False,
+                            **half,
+                            )
 
                     execute = partial(
                         report_on_crash,
@@ -1029,12 +1057,12 @@ def main(
                         for _ in imap:
                             pass
                         
-                    if remaining_confs:
+                    if library_remaining_confs:
                         execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
 
                     # Do the same but for N-term end of linker-IDR
-                    for i in range(ncores + bool(library_remaining_confs)):
-                        RANDOMSEEDS.put(random_seed + (lidr_set * ncores) + i)
+                    for seed in _half_seeds(random_seed, lidr_set, 1, workers):  # noqa: E501
+                        RANDOMSEEDS.put(seed)
                     for i in range(1, library_nconfs + 1):
                         CONF_NUMBER.put(i)
 
@@ -1045,16 +1073,13 @@ def main(
                     log.info(S(f"Generating temporary disordered library for N-terminus of linker: {seq}"))  # noqa: E501
 
                     # prepares execution function
-                    consume = partial(
-                        _build_conformers,
+                    half = dict(
                         fld_xyz=fld_coords_N,
                         fld_struc=fld_struc,
                         disorder_case=disorder_cases[0],  # Treating N-term as N-IDR  # noqa: E501
                         max_clash=max_clash * 2,  # 2x multiplier due to 2 fixed ends  # noqa: E501
                         tolerance=dist_tolerance * 2,
-                        index=index,
                         conformer_name=f"{linkeridr_num}_{lidr_set}_N",
-                        input_seq=seq,  # string
                         output_folder=temp_of_N,
                         nconfs=library_confs_per_core,  # int
                         sidechain_parameters=sidechain_parameters,
@@ -1062,6 +1087,20 @@ def main(
                         bgeo_strategy=bgeo_strategy,
                         **kwargs,
                         )
+                    if fragments_N is None:
+                        consume = partial(
+                            _build_conformers,
+                            index=index,
+                            input_seq=seq,  # string
+                            **half,
+                            )
+                    else:
+                        consume = partial(
+                            _build_long_conformers,
+                            fragments=fragments_N,
+                            overlaps=False,
+                            **half,
+                            )
 
                     execute = partial(
                         report_on_crash,
@@ -1076,7 +1115,7 @@ def main(
                         for _ in imap:
                             pass
                         
-                    if remaining_confs:
+                    if library_remaining_confs:
                         execute(library_confs_per_core * ncores, nconfs=library_remaining_confs)  # noqa: E501
 
                     log.info(f"Finished generating library for {seq}.")
@@ -1172,12 +1211,15 @@ def main(
                 # Coordinates of boundary to stitch to later on
                 fld_coords = np.array([fld_Cxyz, fld_Nxyz, fld_CAxyz])
 
-                populate_globals(
-                    input_seq=seq,
-                    bgeo_strategy=bgeo_strategy,
-                    bgeo_path=bgeo_path,
-                    forcefield=forcefields[forcefield],
-                    **kwargs)
+                # IDRs longer than LONG_IDR_FRAGMENT are built in fragments
+                fragments = long_fragments(seq, case)
+                if fragments is None:
+                    populate_globals(
+                        input_seq=seq,
+                        bgeo_strategy=bgeo_strategy,
+                        bgeo_path=bgeo_path,
+                        forcefield=forcefields[forcefield],
+                        **kwargs)
 
                 # create the temporary folders housing the disordered PDBs
                 # folder will be deleted when everything is grafted together
@@ -1191,17 +1233,16 @@ def main(
                     "to facilitate reconstruction later on."
                     ))
 
-                # prepares execution function
-                consume = partial(
-                    _build_conformers,
+                # prepares execution function; the residues next to the
+                # folded domain are also checked for overlaps
+                terminal = dict(
                     fld_xyz=fld_coords,
                     fld_struc=fld_struc,
                     disorder_case=case,
                     max_clash=max_clash,
                     tolerance=dist_tolerance,
-                    index=index,
+                    overlaps=True,
                     conformer_name="conformer_" + case,
-                    input_seq=seq,  # string
                     output_folder=temp_of,
                     nconfs=conformers_per_core,  # int
                     sidechain_parameters=sidechain_parameters,
@@ -1209,6 +1250,19 @@ def main(
                     bgeo_strategy=bgeo_strategy,
                     **kwargs,
                     )
+                if fragments is None:
+                    consume = partial(
+                        _build_conformers,
+                        index=index,
+                        input_seq=seq,  # string
+                        **terminal,
+                        )
+                else:
+                    consume = partial(
+                        _build_long_conformers,
+                        fragments=fragments,
+                        **terminal,
+                        )
 
                 execute = partial(
                     report_on_crash,
@@ -1379,7 +1433,7 @@ def _close_linker_ccd(
 
     log.info(S(
         f'Closing Linker-IDR of {len(input_seq) - 4} residues in torsion '
-        f'space ({ccd_params.solver} solver).'
+        'space.'
         ))
     reasons = {}
     trials = 0
@@ -1435,8 +1489,8 @@ def _close_linker_ccd(
             raise IDPConfGenException(errmsg=(
                 f'Could not close the Linker-IDR {input_seq} in '
                 f'{trials} backbones (rejected: {summary}). Consider '
-                'raising --ccd-max-trials or -tol, or check the folded '
-                'residues next to the IDR.'
+                'raising --ccd-max-trials or -tol, checking the folded '
+                'residues next to the IDR, or --loop-closure next_seeker.'
                 ))
         if done > previous:
             stalled = 0
@@ -1562,8 +1616,9 @@ def _build_ccd_loops(
     rotations (:func:`idpconfgen.libs.libccd.relax_side_chains`). The loop
     is then checked for internal energy (`energy_threshold_sidechains`, or
     `energy_threshold_backbone` without side chains), for clashes with the
-    folded structure (`max_clash`, `tolerance`) and for IDR atoms closer
-    than half their vdW radii sum to a folded atom. Accepted loops are saved
+    folded structure (`max_clash`, `tolerance`) and for IDR heavy atoms
+    closer than ``FOLDED_OVERLAP_SCALE`` times their vdW radii sum to a
+    folded heavy atom. Accepted loops are saved
     in the `next_seeker` match format, with the folded residues bonded to
     the IDR copied from the template, so `psurgeon` inserts only the IDR.
 
@@ -1677,9 +1732,10 @@ def _build_ccd_loops(
         """
         Score a loop: energies, folded clash count and folded overlaps.
 
-        Overlaps are IDR heavy atoms closer than half the vdW radii sum to
-        a folded heavy atom, also of the residues bonded to the IDR; the
-        clash count alone weighs them as any contact.
+        Overlaps are IDR heavy atoms closer than ``FOLDED_OVERLAP_SCALE``
+        times the vdW radii sum to a folded heavy atom, also of the residues
+        bonded to the IDR; the clash count alone weighs them as any
+        contact.
         """
         energy = 0.0
         if ALL_ATOM_EFUNC is not None:
@@ -1706,7 +1762,7 @@ def _build_ccd_loops(
             idr_residue[heavy],
             first,
             last,
-            0.5,
+            FOLDED_OVERLAP_SCALE,
             )
         return energy, n_clash, n_hard
 
@@ -1974,6 +2030,254 @@ def _unchecked_pairs(C_files, N_files, checked_C, checked_N):
     return [(c, n) for c, n in groups if c and n]
 
 
+def _add_sampling(
+        seq,
+        *,
+        cache,
+        primary,
+        secondary,
+        dssp_regexes,
+        xmer_probs,
+        residue_tolerance,
+        bgeo_strategy,
+        ncores,
+        ):
+    """
+    Prepare the database slices to sample `seq` from.
+
+    Appends to ``SLICEDICT_XMERS``, ``XMERPROBS`` and ``GET_ADJ``. The
+    slice lists are shared through `cache` with the sequences prepared
+    before (:func:`share_slices`).
+
+    Returns
+    -------
+    int
+        The index of the new entries (the `index` of
+        :func:`conformer_generator`).
+    """
+    log.info(S(f"Preparing database for sequence: {seq}"))
+    slices = prepare_slice_dict(
+        primary,
+        seq,
+        dssp_regexes=dssp_regexes,
+        secondary=secondary,
+        mers_size=xmer_probs.sizes,
+        res_tolerance=residue_tolerance,
+        ncores=ncores,
+        )
+    remove_empty_keys(slices)
+    share_slices(slices, cache)
+    # updates user defined fragment sizes and probabilities to the ones
+    # actually observed
+    probs = compress_xmer_to_key(xmer_probs, sorted(slices.keys())).probs
+    SLICEDICT_XMERS.append(slices)
+    XMERPROBS.append(probs)
+    GET_ADJ.append(get_adjacent_angles(
+        sorted(slices.keys()),
+        probs,
+        seq,
+        ANGLES,
+        bgeo_strategy,
+        slices,
+        csss=None,
+        residue_tolerance=residue_tolerance,
+        ))
+    log.info(S("done"))
+    return len(GET_ADJ) - 1
+
+
+def _half_seeds(random_seed, round_number, side, workers):
+    """
+    Return the random seeds of the workers building one side of a library.
+
+    Each round of ``next_seeker`` builds a library of C-side (`side` 0)
+    and N-side (`side` 1) halves of a Linker-IDR with `workers` workers.
+    Every round and side gets seeds of its own: with the same seeds, the
+    two sides would be the same conformers placed at the two anchors.
+    """
+    first = random_seed + (2 * round_number + side) * workers
+    return list(range(first, first + workers))
+
+
+def _long_fragments(seq, case, extra=0, *, add_sampling, **globals_kwargs):
+    """
+    Prepare the fragments of an IDR longer than ``LONG_IDR_FRAGMENT``.
+
+    Parameters
+    ----------
+    seq : str
+        The IDR with its two folded residues, as `ldrs` builds it.
+
+    case : str
+        ``'N-IDR'`` or ``'C-IDR'``: the direction the IDR is built in.
+
+    extra : int
+        Folded residues at the other end of `seq` (2 for the halves of a
+        Linker-IDR), see :func:`split_long_idr`.
+
+    add_sampling : callable
+        :func:`_add_sampling` with the database arguments.
+
+    globals_kwargs
+        Arguments of :func:`populate_globals` but `input_seq`.
+
+    Returns
+    -------
+    list of tuple or None
+        ``(sequence, index)`` of each fragment in building order (see
+        :func:`_build_long_conformers`), or None if `seq` is built in one
+        piece.
+    """
+    parts = split_long_idr(seq, case, extra=extra)
+    if len(parts) == 1:
+        return None
+    log.info(S(
+        f'Building the {len(seq) - 2 - extra} IDR residues of {seq} in '
+        f'{len(parts)} fragments of at most {LONG_IDR_FRAGMENT} residues.'
+        ))
+    fragments = []
+    for part in parts:
+        key = add_sampling(part)
+        _store_fragment_globals(key, input_seq=part, **globals_kwargs)
+        fragments.append((part, key))
+    return fragments
+
+
+def _store_fragment_globals(key, **kwargs):
+    """Populate the globals of a fragment and keep them under `key`."""
+    populate_globals(**kwargs)
+    FRAGMENT_GLOBALS[key] = {name: globals()[name] for name in _SEQUENCE_GLOBALS}  # noqa: E501
+
+
+def _use_fragment_globals(key):
+    """Restore the globals kept by :func:`_store_fragment_globals`."""
+    globals().update(FRAGMENT_GLOBALS[key])
+
+
+def _attached(
+        rows,
+        fld_struc,
+        disorder_case,
+        fld_xyz,
+        max_clash,
+        tolerance,
+        overlaps=True,
+        ):
+    """
+    Check an N-IDR or C-IDR fragment aligned onto the folded structure.
+
+    The fragment may have at most `max_clash` contacts with the folded
+    structure (:func:`count_clashes`) and, with `overlaps`, no heavy atom
+    closer to a folded heavy atom than ``FOLDED_OVERLAP_SCALE`` times their
+    vdW radii sum, also in the residues next to the folded domain
+    (:func:`attachment_overlaps`).
+    """
+    clashes, _ = count_clashes(
+        rows,
+        fld_struc,
+        disorder_case,
+        max_clash,
+        tolerance,
+        )
+    if type(clashes) is not int:
+        return False
+    return not overlaps or not attachment_overlaps(
+        rows,
+        fld_struc.data_array,
+        disorder_case,
+        fld_xyz,
+        )
+
+
+# private function because it depends on the global `CONF_NUMBER`
+# which is assembled in `main()`
+def _build_long_conformers(
+        *args,
+        fragments=None,
+        fld_xyz=None,
+        fld_struc=None,
+        disorder_case=None,
+        max_clash=40,
+        tolerance=0.4,
+        overlaps=True,
+        conformer_name='conformer',
+        output_folder=None,
+        nconfs=1,
+        sidechain_parameters=None,
+        bgeo_strategy=bgeo_strategies_default,
+        **kwargs,
+        ):
+    """
+    Build N-IDR or C-IDR conformers in fragments and save them to PDB files.
+
+    `fragments` are ``(sequence, index)`` pairs from ``split_long_idr``,
+    in building order; `index` points to the sampling tables (``GET_ADJ``)
+    and the globals of the fragment. The first fragment is aligned onto
+    the folded structure and checked as :func:`_build_conformers` checks a
+    whole IDR; each next one is attached to the chain built so far and
+    must also avoid it (:func:`idpconfgen.ldrs_helper.build_in_fragments`;
+    without `overlaps`, the overlap rule only applies to the chain).
+    The conformers are written as if built in one piece.
+    """
+    ROUND = np.round
+    seed = RANDOMSEEDS.get()
+    builders = {}
+
+    def draw(k):
+        seq, key = fragments[k]
+        _use_fragment_globals(key)
+        if k not in builders:
+            builder = conformer_generator(
+                index=key,
+                input_seq=seq,
+                random_seed=seed + 7919 * k,
+                sidechain_parameters=sidechain_parameters,
+                bgeo_strategy=bgeo_strategy,
+                **kwargs)
+            builders[k] = (builder, next(builder), translate_seq_to_3l(seq))
+        builder, (atom_labels, residue_numbers, _labels), seq3 = builders[k]
+        energy, coords = next(builder)
+        pdb_string = gen_PDB_from_conformer(
+            seq3,
+            atom_labels,
+            residue_numbers,
+            ROUND(coords, decimals=3),
+            )
+        return parse_pdb_to_array(pdb_string), energy
+
+    first_check = partial(
+        _attached,
+        fld_struc=fld_struc,
+        disorder_case=disorder_case,
+        fld_xyz=fld_xyz,
+        max_clash=max_clash,
+        tolerance=tolerance,
+        overlaps=overlaps,
+        )
+    for _ in range(nconfs):
+        rows, energy, rebuilt = build_in_fragments(
+            draw,
+            len(fragments),
+            disorder_case,
+            anchor=fld_xyz,
+            environment=fld_struc.data_array,
+            first_check=first_check,
+            max_clash=max_clash,
+            tolerance=tolerance,
+            environment_overlaps=overlaps,
+            )
+        log.info(S(
+            f"Built a {disorder_case} conformer in {len(fragments)} "
+            f"fragments ({rebuilt} rebuilt at dead ends)."
+            ))
+        fname = f'{conformer_name}_{CONF_NUMBER.get()}.pdb'
+        with open(Path(output_folder, fname), 'w') as fout:
+            for line in structure_to_pdb(rows):
+                fout.write(line + "\n")
+
+        ENERGYLOGSAVER.save(fname, energy)
+
+
 # private function because it depends on the global `CONF_NUMBER`
 # which is assembled in `main()`
 def _build_conformers(
@@ -1983,6 +2287,7 @@ def _build_conformers(
         disorder_case=None,
         max_clash=40,
         tolerance=0.4,
+        overlaps=False,
         index=None,
         input_seq=None,
         conformer_name='conformer',
@@ -1992,7 +2297,13 @@ def _build_conformers(
         bgeo_strategy=bgeo_strategies_default,
         **kwargs,
         ):
-    """Arrange building of conformers and saves them to PDB files."""
+    """
+    Arrange building of conformers and saves them to PDB files.
+
+    Each conformer is aligned onto the folded structure and must pass
+    :func:`_attached` (with `overlaps`, also the overlap check of the
+    residues next to the folded domain).
+    """
     ROUND = np.round
 
     # TODO: this has to be parametrized for the different HIS types
@@ -2021,15 +2332,16 @@ def _build_conformers(
 
             pdb_arr = parse_pdb_to_array(pdb_string)
             rotated = align_coords(pdb_arr, fld_xyz, disorder_case)
-            clashes, fragment = count_clashes(
-                rotated,
-                fld_struc,
-                disorder_case,
-                max_clash,
-                tolerance,
-                )
-            if type(clashes) is int:
-                final = structure_to_pdb(fragment)
+            if _attached(
+                    rotated,
+                    fld_struc,
+                    disorder_case,
+                    fld_xyz,
+                    max_clash,
+                    tolerance,
+                    overlaps=overlaps,
+                    ):
+                final = structure_to_pdb(rotated)
                 log.info(f"Succeeded. {disorder_case} to folded region clash check!")  # noqa: E501
                 break
             else:

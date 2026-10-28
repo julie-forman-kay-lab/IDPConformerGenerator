@@ -15,36 +15,22 @@ IDPConformerGenerator backbone individually:
 2.  N, CA, C of the residue preceding the IDR are superimposed onto the
     folded domain, and psi of that residue is rotated so its carbonyl O
     matches the folded one (preserves the folded peptide plane).
-3.  phi/psi angles inside the IDR are changed until N, CA, C of the residue
-    following the IDR (the endpoint) land on the folded domain.
+3.  phi/psi angles inside the IDR are changed by clash-aware damped least
+    squares (Levenberg-Marquardt inverse kinematics) until N, CA, C of the
+    residue following the IDR (the endpoint) land on the folded domain.
+    Each iteration solves for the smallest simultaneous change of all IDR
+    phi/psi angles that moves the endpoint toward its target and pushes
+    apart backbone atoms coming within a margin of each other or of the
+    fixed environment. Steps are bounded per torsion and by the largest
+    atom displacement, and torsions that reach a cumulative cap are frozen
+    while the others are re-solved. The correction is spread thinly along
+    the loop and the chain is steered around the folded domains instead of
+    through them.
 4.  The closed loop is accepted only if the endpoint residuals, the change
     of every phi/psi relative to the source conformer, the bond geometry
     and omega of both peptide junctions, nonlocal self/environment
     contacts and the observed (phi, psi) occupancy of the torsion database
     all pass.
-
-Two solvers perform step 3 (:attr:`CCDParameters.solver`):
-
-``'dls'`` (default)
-    Clash-aware damped least squares (Levenberg-Marquardt inverse
-    kinematics). Each iteration solves for the smallest simultaneous change
-    of all IDR phi/psi angles that moves the endpoint toward its target and
-    pushes apart backbone atoms coming within a margin of each other or of
-    the fixed environment. Steps are bounded per torsion and by the largest
-    atom displacement, and torsions that reach a cumulative cap are frozen
-    while the others are re-solved. The correction is spread thinly along
-    the loop and the chain is steered around the folded domains instead of
-    through them.
-
-``'ccd'``
-    Cyclic coordinate descent (CCD; Canutescu & Dunbrack, Protein Sci.
-    2003, 12:963-972): torsions are set one at a time to the angle that
-    best brings the endpoint onto its target, in staged sweeps followed by
-    a damped least-squares polish. Loops of at least
-    :attr:`CCDParameters.long_loop_threshold` residues act on C-terminal
-    windows of growing size and roll back whenever a C-alpha
-    self-crossing appears. Contacts are screened but not avoided. This is
-    the torsion-space CCD of the AlphaFlex hard-case loop builder.
 
 Rotations act on rigid sub-trees around N-CA (phi) or CA-C (psi) bonds, so
 bond lengths, bond angles, omega angles and chirality of the source
@@ -77,9 +63,6 @@ _BB_RADII = np.array([
     vdW_radii_tsai_1999['O'],
     ])
 
-
-SOLVERS = ('dls', 'ccd')
-"""Loop-closure solvers, see the module documentation."""
 
 IDEALIZE_MODES = ('auto', 'always', 'never')
 """How :func:`close_loop` treats the bond geometry of its input."""
@@ -132,31 +115,26 @@ class CCDParameters:
 
     Groups of fields:
 
-    * ``solver``: ``'dls'`` or ``'ccd'`` (see the module documentation);
     * ``idealize``: bond geometry of the source (see :func:`close_loop`);
     * ``target_*`` and ``weights``: endpoint acceptance and weights of
       N, CA and C of the residue following the IDR;
     * ``max_phipsi_*``: accepted change of phi/psi from the source;
     * ``omega_tolerance`` and ``allow_nonpro_cis``: peptide bonds;
     * ``dls_*``: the damped least-squares solver;
-    * ``stage*``, ``refine_*``, ``rescue_*``, ``stagnation_*``,
-      ``long_*`` and ``max_total_rotation``: the CCD solver;
-    * ``polish_*``: least-squares polishing of near-closed loops;
+    * ``polish_*`` and ``max_total_rotation``: least-squares polishing of
+      near-closed loops;
     * ``junction_*``: geometry of both peptide junctions;
     * ``clash_scale``, ``side_chain_radius``, ``self_*`` and
       ``max_*_clashes``: contacts (see :class:`ContactModel`);
     * ``max_rama_outlier_fraction``: database (phi, psi) occupancy.
 
-    The ``'ccd'`` solver settings, the phi/psi limits, the contact
-    criteria, the peptide bond (omega) policy and the backbone geometry
-    windows come from the AlphaFlex loop builders. The endpoint targets
+    The phi/psi limits, the contact criteria, the peptide bond (omega)
+    policy and the backbone geometry windows come from the AlphaFlex loop
+    builders. The endpoint targets
     are tighter, so that the peptide junctions keep ideal geometry
     without a final minimization. Angles are in degrees and distances in
     Angstrom.
     """
-
-    # 'dls' (clash-aware damped least squares) or 'ccd' (CCD sweeps)
-    solver: str = 'dls'
 
     # source bond geometry: 'auto' rebuilds it ideal only if it falls
     # outside GEOMETRY_WINDOWS, 'always' always, 'never' rejects it then
@@ -173,7 +151,7 @@ class CCDParameters:
     # acceptance: change of phi/psi inside the IDR relative to the source
     max_phipsi_rms_delta: float = 25.0
     max_phipsi_delta: float = 90.0
-    # 'ccd' search budget: accumulated rotation allowed per torsion
+    # polishing budget: accumulated rotation allowed per torsion
     max_total_rotation: float = 90.0
 
     # acceptance: every peptide bond of the IDR and both junctions must be
@@ -182,7 +160,7 @@ class CCDParameters:
     omega_tolerance: float = 20.0
     allow_nonpro_cis: bool = False
 
-    # 'dls' solver
+    # damped least-squares solver
     dls_iterations: int = 600
     dls_stall: int = 100
     dls_damping: float = 0.3
@@ -200,25 +178,6 @@ class CCDParameters:
     dls_finish_stall: int = 40
     dls_finish_margin: float = 0.1
 
-    # 'ccd' solver, ordinary loops (shorter than `long_loop_threshold`)
-    stage1_iterations: int = 60
-    stage1_max_step: float = 10.0
-    stage1_target: tuple = (2.0, 1.0, 3.0)
-    stage1_reject_rmsd: float = 8.0
-    stage2_iterations: int = 100
-    stage2_max_step: float = 8.0
-    coarse_target_rmsd: float = 0.60
-    stage2_reject_rmsd: float = 2.50
-    refine_window: int = 96
-    refine_iterations: int = 100
-    refine_max_step: float = 4.0
-    rescue_trigger_rmsd: float = 1.50
-    rescue_window: int = 128
-    rescue_iterations: int = 80
-    rescue_max_step: float = 2.0
-    stagnation_sweeps: int = 20
-    stagnation_tolerance: float = 1e-4
-
     # damped least-squares endpoint polishing of near-closed loops
     polish: bool = True
     polish_trigger_rmsd: float = 3.0
@@ -228,24 +187,6 @@ class CCDParameters:
     polish_tolerance: float = 0.05
     polish_clash_weight: float = 2.0
     polish_clash_margin: float = 0.05
-
-    # 'ccd' solver, long loops: adaptive C-terminal windows with
-    # self-crossing rollback
-    long_loop_threshold: int = 150
-    long_windows: tuple = (48, 72, 96, 128)
-    long_include_full_window: bool = True
-    long_stage1_iterations: int = 24
-    long_stage2_iterations: int = 40
-    long_refine_iterations: int = 36
-    long_stage1_max_step: float = 6.0
-    long_stage2_max_step: float = 4.0
-    long_refine_max_step: float = 2.0
-    long_ca_check_every: int = 1
-    long_full_check_every: int = 4
-    long_step_backoff: float = 0.50
-    long_step_recovery: float = 1.08
-    long_min_step: float = 0.50
-    long_self_hard_cutoff: float = 1.85
 
     # acceptance: peptide junctions with the folded domains, deviation of
     # the C-N bond and of the CA-C-N, O-C-N and C-N-CA angles from
@@ -367,37 +308,6 @@ def backbone_phi_psi(backbone, first, last):
 def wrap_angle(angle):
     """Wrap angle(s) in radians to the interval [-pi, pi)."""
     return (np.asarray(angle) + np.pi) % (2 * np.pi) - np.pi
-
-
-def length_schedule(nres):
-    """
-    Return the CCD pivot schedule scaled to the loop length.
-
-    Parameters
-    ----------
-    nres : int
-        Number of IDR residues.
-
-    Returns
-    -------
-    tuple of int
-        ``(buffer, stride, stage1_stride)``. `buffer` residues at each
-        end of the IDR are never rotated; `stride` and `stage1_stride`
-        are the pivot spacing of the full and sparse sweeps.
-
-    Notes
-    -----
-    Short loops have few degrees of freedom, so all their residues move.
-    Longer loops keep a small buffer next to each folded domain.
-    """
-    if nres <= 25:
-        buffer, stride, stage1_stride = 0, 1, 2
-    elif nres <= 60:
-        buffer, stride, stage1_stride = 2, 1, 3
-    else:
-        buffer, stride, stage1_stride = 3, 2, 4
-    buffer = min(buffer, max(0, (nres - 4) // 2))
-    return buffer, stride, stage1_stride
 
 
 def rotation_matrices(axes, angles):
@@ -639,69 +549,6 @@ class ClashEnvironment:
         return len(self.overlaps(*args, **kwargs)[0])
 
 
-def self_overlaps(backbone, first, last, params, hard_cutoff=None):
-    """
-    Find nonlocal overlaps between backbone heavy atoms of the IDR.
-
-    Pairs from residues closer than ``params.self_ignore_window`` in
-    sequence are ignored. A pair overlaps if closer than
-    ``params.clash_scale`` times the sum of the vdW radii, or, for
-    C-alpha pairs, closer than ``params.self_ca_cutoff``.
-
-    Parameters
-    ----------
-    backbone : np.ndarray, shape (L, 4, 3)
-
-    first, last : int
-        Zero-based IDR residue range (inclusive).
-
-    params : :class:`CCDParameters`
-
-    hard_cutoff : float, optional
-        If given, replaces the vdW-scaled criterion with this distance.
-
-    Returns
-    -------
-    tuple of np.ndarray
-        Atom indexes ``i < j`` into ``backbone[first:last + 1]`` flattened
-        to (K, 3), and the distance cutoff of each overlapping pair.
-    """
-    empty = (np.zeros(0, int), np.zeros(0, int), np.zeros(0))
-    coords = backbone[first:last + 1].reshape(-1, 3)
-    if len(coords) < 2:
-        return empty
-    nres = last - first + 1
-    residue = np.repeat(np.arange(nres), 4)
-    kind = np.tile(np.arange(4), nres)
-    radius = max(params.self_ca_cutoff, 2 * params.clash_scale * _BB_RADII.max())  # noqa: E501
-    if hard_cutoff is not None:
-        radius = max(params.self_ca_cutoff, hard_cutoff)
-    pairs = cKDTree(coords).query_pairs(r=radius, output_type='ndarray')
-    if len(pairs) == 0:
-        return empty
-    i, j = pairs[:, 0], pairs[:, 1]
-    keep = np.abs(residue[i] - residue[j]) > params.self_ignore_window
-    i, j = i[keep], j[keep]
-    if i.size == 0:
-        return empty
-    dist = np.linalg.norm(coords[i] - coords[j], axis=1)
-    if hard_cutoff is None:
-        cut = params.clash_scale * (_BB_RADII[kind[i]] + _BB_RADII[kind[j]])
-    else:
-        cut = np.full(dist.shape, float(hard_cutoff))
-    both_ca = (kind[i] == CA_) & (kind[j] == CA_)
-    cut = np.where(both_ca, np.maximum(cut, params.self_ca_cutoff), cut)
-    bad = dist < cut
-    lo = np.minimum(i[bad], j[bad])
-    hi = np.maximum(i[bad], j[bad])
-    return lo, hi, cut[bad]
-
-
-def count_self_overlaps(backbone, first, last, params, hard_cutoff=None):
-    """Count pairs reported by :func:`self_overlaps`."""
-    return len(self_overlaps(backbone, first, last, params, hard_cutoff)[0])
-
-
 class ContactModel:
     """
     Atoms of the IDR used for contact checks.
@@ -880,21 +727,6 @@ class ContactModel:
 
 def _unit(vectors):
     return vectors / np.linalg.norm(vectors, axis=-1, keepdims=True)
-
-
-def count_ca_crossings(backbone, first, last, params):
-    """Count nonlocal C-alpha pairs closer than ``params.self_ca_cutoff``."""
-    ca = backbone[first:last + 1, CA_]
-    if len(ca) < 2:
-        return 0
-    pairs = cKDTree(ca).query_pairs(
-        r=params.self_ca_cutoff,
-        output_type='ndarray',
-        )
-    if len(pairs) == 0:
-        return 0
-    sep = np.abs(pairs[:, 0] - pairs[:, 1])
-    return int(np.count_nonzero(sep > params.self_ignore_window))
 
 
 def junction_geometry(backbone, lower_anchor, upper_anchor, first, last):
@@ -1466,11 +1298,7 @@ class _LoopSearch:
         self.max_total = math.radians(params.max_total_rotation)
         self.delta = {}
         self.iterations = 0
-        self.rmsd0, self.n0, self.max0 = self.endpoint()[:3]
-        self.best_score = self.score(self.rmsd0, self.n0, self.max0)
-        self.best_endpoint = self.snapshot()
-        self.best_feasible = None
-        self.best_feasible_key = None
+        self.rmsd0 = self.endpoint()[0]
         self.closed = False
 
     # state handling
@@ -1491,14 +1319,6 @@ class _LoopSearch:
         rmsd = math.sqrt(float(np.mean(res * res)))
         return rmsd, float(res[0]), float(res.max()), points
 
-    def score(self, rmsd, n_res, max_res):
-        p = self.params
-        return (
-            (rmsd / p.target_rmsd) ** 2
-            + (n_res / p.target_n_residual) ** 2
-            + (max_res / p.target_max_residual) ** 2
-            )
-
     def within(self, rmsd, n_res, max_res, target):
         return rmsd <= target[0] and n_res <= target[1] and max_res <= target[2]
 
@@ -1506,15 +1326,6 @@ class _LoopSearch:
     def final_target(self):
         p = self.params
         return (p.target_rmsd, p.target_n_residual, p.target_max_residual)
-
-    @property
-    def coarse_target(self):
-        p = self.params
-        return (
-            p.coarse_target_rmsd,
-            max(0.25, 2.0 * p.target_n_residual),
-            max(0.80, 2.0 * p.target_max_residual),
-            )
 
     # physics
     def violations(self):
@@ -1532,18 +1343,10 @@ class _LoopSearch:
         return n_self, n_env
 
     def capture(self, audit):
-        """Record best endpoint state; audit physics when closed."""
+        """Mark the loop closed if within target and free of overlaps."""
         rmsd, n_res, max_res, _ = self.endpoint()
-        score = self.score(rmsd, n_res, max_res)
-        if score < self.best_score:
-            self.best_score = score
-            self.best_endpoint = self.snapshot()
         if audit and self.within(rmsd, n_res, max_res, self.final_target):
             n_self, n_env = self.violations()
-            key = (n_self + n_env, n_self, n_env, score)
-            if self.best_feasible_key is None or key < self.best_feasible_key:
-                self.best_feasible_key = key
-                self.best_feasible = self.snapshot()
             if (
                     n_self <= self.params.max_self_clashes
                     and n_env <= self.params.max_env_clashes
@@ -1561,81 +1364,6 @@ class _LoopSearch:
             out.append(((r, _PSI), 4 * r + CA_, 4 * r + C_, 4 * r + O_))
         out.reverse()
         return out
-
-    def sweep(self, pivots, max_step):
-        X = self.X
-        w = self.weights
-        target = self.target
-        end = self.end
-        max_total = self.max_total
-        delta = self.delta
-        for key, ia, ib, start in pivots:
-            used = delta.get(key, 0.0)
-            remaining = max_total - abs(used)
-            if remaining <= 1e-9:
-                continue
-            a = X[ia]
-            u = X[ib] - a
-            u = u / math.sqrt(float(u @ u))
-            r = X[end:end + 3] - a
-            s = target - a
-            r = r - np.outer(r @ u, u)
-            s = s - np.outer(s @ u, u)
-            num = float(w @ (np.cross(r, s) @ u))
-            den = float(w @ np.sum(r * s, axis=1))
-            theta = math.atan2(num, den)
-            limit = min(max_step, remaining)
-            theta = max(-limit, min(limit, theta))
-            if abs(theta) < 1e-7:
-                continue
-            v = X[start:] - a
-            cos, sin = math.cos(theta), math.sin(theta)
-            X[start:] = (
-                a
-                + v * cos
-                + np.cross(u, v) * sin
-                + np.outer(v @ u, u) * (1.0 - cos)
-                )
-            delta[key] = used + theta
-
-    def run(self, pivots, iterations, max_step, target, audit_every=1):
-        """Run alternating CCD sweeps until `target` or stagnation."""
-        if not pivots:
-            return False
-        max_step = math.radians(max_step)
-        forward = list(pivots)
-        reverse = list(reversed(forward))
-        best = float('inf')
-        no_improve = 0
-        for sweep in range(max(0, int(iterations))):
-            self.iterations += 1
-            rmsd, n_res, max_res, _ = self.endpoint()
-            if self.within(rmsd, n_res, max_res, target):
-                self.capture(audit=True)
-                return True
-            self.sweep(forward if sweep % 2 == 0 else reverse, max_step)
-            rmsd, n_res, max_res = self.capture(
-                audit=(self.iterations % max(1, audit_every) == 0),
-                )
-            if self.closed:
-                return True
-            stage = (
-                (rmsd / max(target[0], 1e-6)) ** 2
-                + (n_res / max(target[1], 1e-6)) ** 2
-                + (max_res / max(target[2], 1e-6)) ** 2
-                )
-            if stage < best - self.params.stagnation_tolerance:
-                best = stage
-                no_improve = 0
-            else:
-                no_improve += 1
-            if (
-                    self.params.stagnation_sweeps
-                    and no_improve >= self.params.stagnation_sweeps
-                    ):
-                break
-        rmsd, n_res, max_res = self.capture(audit=True)
-        return self.within(rmsd, n_res, max_res, target)
 
     def _clash_rows(
             self,
@@ -1751,7 +1479,7 @@ class _LoopSearch:
         axes /= np.linalg.norm(axes, axis=1)[:, None]
         return anchors, axes
 
-    def polish(self, pivots, iterations, max_step, require_safe=False):
+    def polish(self, pivots, iterations, max_step):
         """
         Close the endpoint by damped least squares in torsion space.
 
@@ -1759,9 +1487,8 @@ class _LoopSearch:
         `pivots` that removes the weighted endpoint error and pushes apart
         overlapping backbone atoms (self and environment). The correction
         is therefore spread thinly over the loop instead of concentrated on
-        a few torsions. Keeps the result if within the final target (and
-        self-avoiding when `require_safe`); otherwise restores the starting
-        state.
+        a few torsions. Keeps the result if within the final target;
+        otherwise restores the starting state.
 
         Returns
         -------
@@ -1820,8 +1547,6 @@ class _LoopSearch:
                     break
         rmsd, n_res, max_res, _ = self.endpoint()
         ok = self.within(rmsd, n_res, max_res, self.final_target)
-        if ok and require_safe and not self.self_safe():
-            ok = False
         if not ok:
             self.restore(start)
             return False
@@ -1934,102 +1659,8 @@ class _LoopSearch:
         self.capture(audit=True)
         return self.closed
 
-    # long loops
-    def self_safe(self):
-        bb = self.backbone()
-        return count_self_overlaps(
-            bb,
-            self.first,
-            self.last,
-            self.params,
-            hard_cutoff=self.params.long_self_hard_cutoff,
-            ) == 0
 
-    def run_long(self, pivots, iterations, max_step, target, safe):
-        """
-        Run CCD sweeps that roll back on new self-crossings.
-
-        `safe` is a one-element list holding the best self-avoiding
-        snapshot and its endpoint score; it is updated in place.
-        """
-        if not pivots:
-            return False
-        p = self.params
-        base_step = math.radians(max_step)
-        step = base_step
-        min_step = math.radians(p.long_min_step)
-        forward = list(pivots)
-        reverse = list(reversed(forward))
-        checkpoint = self.snapshot()
-        best = float('inf')
-        no_improve = 0
-
-        def update_safe():
-            if not self.self_safe():
-                return False
-            rmsd, n_res, max_res, _ = self.endpoint()
-            score = self.score(rmsd, n_res, max_res)
-            if score < safe[0][1]:
-                safe[0] = (self.snapshot(), score)
-            return True
-
-        def back_off(snap):
-            nonlocal step, no_improve
-            self.restore(snap)
-            step = max(min_step, step * p.long_step_backoff)
-            no_improve += 1
-
-        for sweep in range(max(0, int(iterations))):
-            self.iterations += 1
-            rmsd, n_res, max_res, _ = self.endpoint()
-            if self.within(rmsd, n_res, max_res, target):
-                if update_safe():
-                    self.capture(audit=True)
-                    return True
-                back_off(checkpoint)
-                continue
-
-            start = self.snapshot()
-            self.sweep(forward if sweep % 2 == 0 else reverse, step)
-
-            if p.long_ca_check_every and (sweep + 1) % p.long_ca_check_every == 0:  # noqa: E501
-                bb = self.backbone()
-                if count_ca_crossings(bb, self.first, self.last, p):
-                    back_off(start)
-                    if p.stagnation_sweeps and no_improve >= p.stagnation_sweeps:  # noqa: E501
-                        break
-                    continue
-
-            if p.long_full_check_every and (sweep + 1) % p.long_full_check_every == 0:  # noqa: E501
-                if not update_safe():
-                    back_off(checkpoint)
-                    if p.stagnation_sweeps and no_improve >= p.stagnation_sweeps:  # noqa: E501
-                        break
-                    continue
-                checkpoint = self.snapshot()
-                self.capture(audit=False)
-                step = min(base_step, step * p.long_step_recovery)
-
-            rmsd, n_res, max_res, _ = self.endpoint()
-            stage = (
-                (rmsd / max(target[0], 1e-6)) ** 2
-                + (n_res / max(target[1], 1e-6)) ** 2
-                + (max_res / max(target[2], 1e-6)) ** 2
-                )
-            if stage < best - p.stagnation_tolerance:
-                best = stage
-                no_improve = 0
-            else:
-                no_improve += 1
-            if p.stagnation_sweeps and no_improve >= p.stagnation_sweeps:
-                break
-
-        self.restore(safe[0][0])
-        rmsd, n_res, max_res, _ = self.endpoint()
-        return self.within(rmsd, n_res, max_res, target)
-
-
-def _try_polish(search, pivots, params, stats, require_safe=False):
+def _try_polish(search, pivots, params, stats):
     """
     Polish a near-closed state; keep it only if closed without clashes.
 
@@ -2048,133 +1679,12 @@ def _try_polish(search, pivots, params, stats, require_safe=False):
         pivots,
         params.polish_iterations,
         params.polish_max_step,
-        require_safe=require_safe,
         )
     if reached and search.closed:
         stats['polished'] = 1
         return True
     search.restore(before)
     return False
-
-
-def _search_ordinary(search, movable, params, stats):
-    """Search with sparse, full, C-terminal refine and rescue stages."""
-    first_mov, last_mov = movable
-    nres = search.last - search.first + 1
-    _buffer, stride, stage1_stride = length_schedule(nres)
-    dense = search.pivots(first_mov, last_mov, 1)
-
-    stage1 = search.pivots(first_mov, last_mov, stage1_stride)
-    stage2 = search.pivots(first_mov, last_mov, stride)
-    refine_start = max(first_mov, search.last - min(params.refine_window, nres))
-    refine = search.pivots(refine_start, last_mov, max(1, stride // 2))
-    if refine_start > first_mov:
-        # sparse pivots upstream keep the correction distributed
-        refine += search.pivots(
-            first_mov,
-            refine_start - 1,
-            max(4, 2 * stage1_stride),
-            )
-
-    search.run(stage1, params.stage1_iterations, params.stage1_max_step, params.stage1_target)  # noqa: E501
-    if _try_polish(search, dense, params, stats):
-        return None
-    rmsd, n_res, max_res, _ = search.endpoint()
-    if search.score(rmsd, n_res, max_res) > 1.05 * search.best_score:
-        search.restore(search.best_endpoint)
-        rmsd = search.endpoint()[0]
-    stats['stage1_rmsd'] = rmsd
-    if rmsd > params.stage1_reject_rmsd:
-        return 'stage1_endpoint'
-
-    search.run(stage2, params.stage2_iterations, params.stage2_max_step, search.coarse_target)  # noqa: E501
-    if _try_polish(search, dense, params, stats):
-        return None
-    rmsd, n_res, max_res, _ = search.endpoint()
-    if search.score(rmsd, n_res, max_res) > 1.05 * search.best_score:
-        search.restore(search.best_endpoint)
-        rmsd = search.endpoint()[0]
-    stats['stage2_rmsd'] = rmsd
-    if rmsd > params.stage2_reject_rmsd:
-        return 'stage2_endpoint'
-
-    search.run(refine, params.refine_iterations, params.refine_max_step, search.final_target)  # noqa: E501
-    if _try_polish(search, dense, params, stats):
-        return None
-
-    # dense rescue from the best endpoint, coordinates and budgets together
-    search.restore(search.best_endpoint)
-    rmsd, n_res, max_res, _ = search.endpoint()
-    if (
-            not search.within(rmsd, n_res, max_res, search.final_target)
-            and rmsd <= params.rescue_trigger_rmsd
-            ):
-        stats['rescue'] = 1
-        rescue_start = max(
-            first_mov,
-            search.last - min(params.rescue_window, nres),
-            )
-        rescue = search.pivots(rescue_start, last_mov, 1)
-        if rescue_start > first_mov:
-            rescue += search.pivots(first_mov, rescue_start - 1, max(2, stride))  # noqa: E501
-        search.run(rescue, params.rescue_iterations, params.rescue_max_step, search.final_target)  # noqa: E501
-        _try_polish(search, dense, params, stats)
-    return None
-
-
-def _search_long(search, movable, params, stats):
-    """Search with adaptive C-terminal windows and self-crossing rollback."""
-    first_mov, last_mov = movable
-    if not search.self_safe():
-        return 'long_initial_self_clash'
-    nres = search.last - search.first + 1
-    _buffer, stride, stage1_stride = length_schedule(nres)
-    count = last_mov - first_mov + 1
-    windows = sorted({min(int(w), count) for w in params.long_windows if w > 0})
-    if params.long_include_full_window and count not in windows:
-        windows.append(count)
-    rmsd, n_res, max_res, _ = search.endpoint()
-    safe = [(search.snapshot(), search.score(rmsd, n_res, max_res))]
-
-    for size in windows:
-        stats['long_window'] = size
-        search.restore(safe[0][0])
-        start = max(first_mov, last_mov - size + 1)
-        dense = search.pivots(start, last_mov, 1)
-        search.run_long(
-            search.pivots(start, last_mov, max(2, stage1_stride)),
-            params.long_stage1_iterations,
-            params.long_stage1_max_step,
-            params.stage1_target,
-            safe,
-            )
-        if _try_polish(search, dense, params, stats, require_safe=True):
-            return None
-        search.run_long(
-            search.pivots(start, last_mov, max(1, stride)),
-            params.long_stage2_iterations,
-            params.long_stage2_max_step,
-            search.coarse_target,
-            safe,
-            )
-        if _try_polish(search, dense, params, stats, require_safe=True):
-            return None
-        reached = search.run_long(
-            dense,
-            params.long_refine_iterations,
-            params.long_refine_max_step,
-            search.final_target,
-            safe,
-            )
-        if _try_polish(search, dense, params, stats, require_safe=True):
-            return None
-        if reached:
-            search.capture(audit=True)
-            break
-
-    if search.best_feasible is None:
-        search.restore(safe[0][0])
-    return None
 
 
 def _search_dls(search, params, stats):
@@ -2329,14 +1839,9 @@ def close_loop(
         ``'final_endpoint'``, ``'phipsi_rms_delta'``,
         ``'phipsi_max_delta'``, ``'junction_<side>_distance'``,
         ``'junction_<side>_angle'``, ``'junction_<side>_omega'``,
-        ``'self_clash'``, ``'environment_clash'``, ``'rama_outlier'``
-        or, for the ``'ccd'`` solver, a search stage.
+        ``'self_clash'``, ``'environment_clash'`` or ``'rama_outlier'``.
     """
     params = params or CCDParameters()
-    if params.solver not in SOLVERS:
-        raise ValueError(
-            f'Unknown solver {params.solver!r}; choose from {SOLVERS}.'
-            )
     if params.idealize not in IDEALIZE_MODES:
         raise ValueError(
             f'Unknown idealize mode {params.idealize!r}; '
@@ -2345,7 +1850,7 @@ def close_loop(
     bb = np.array(backbone, dtype=np.float64).reshape(-1, 4, 3)
     nres = bb.shape[0]
     first, last = 2, nres - 3
-    stats = {'loop_length': max(0, last - first + 1), 'solver': params.solver}
+    stats = {'loop_length': max(0, last - first + 1)}
     if last - first + 1 < 1 or len(sequence) != nres:
         return CCDResult(False, 'invalid_input', stats=stats)
     lower_anchor = np.asarray(lower_anchor, dtype=np.float64).reshape(4, 3)
@@ -2434,24 +1939,7 @@ def close_loop(
         )
     stats['initial_rmsd'] = search.rmsd0
 
-    nidr = last - first + 1
-    long_mode = params.solver == 'ccd' and nidr >= params.long_loop_threshold
-    stats['long_mode'] = int(long_mode)
-
-    if params.solver == 'dls':
-        reason = _search_dls(search, params, stats)
-    else:
-        buffer = length_schedule(nidr)[0]
-        movable = (first + buffer, last - buffer)
-        if long_mode:
-            reason = _search_long(search, movable, params, stats)
-        else:
-            reason = _search_ordinary(search, movable, params, stats)
-        if reason is None and not search.closed:
-            if search.best_feasible is not None:
-                search.restore(search.best_feasible)
-            elif not long_mode:
-                search.restore(search.best_endpoint)
+    reason = _search_dls(search, params, stats)
 
     if reason is None:
         reason = _final_checks(

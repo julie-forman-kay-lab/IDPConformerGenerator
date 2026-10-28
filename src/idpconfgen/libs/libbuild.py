@@ -626,6 +626,37 @@ def prepare_slice_dict(
     return slice_dict
 
 
+def share_slices(slice_dict, cache):
+    """
+    Share the slice lists of `slice_dict` with those already in `cache`.
+
+    The slices of an xmer in the database depend only on the database and
+    the search options, not on the sequence it was found in. The
+    dictionaries of several sequences built in one run (the fragments of a
+    long IDP, the IDRs of a protein) share most of their entries; keeping
+    one list per entry saves most of their memory.
+
+    Parameters
+    ----------
+    slice_dict : dict
+        Output of :func:`prepare_slice_dict`, changed in place.
+
+    cache : dict
+        Maps ``(xmer size, xmer)`` to the entry of the first dictionary
+        that had it; updated in place. Use one `cache` per set of search
+        options.
+
+    Returns
+    -------
+    dict
+        `slice_dict`.
+    """
+    for size, entries in slice_dict.items():
+        for key in entries:
+            entries[key] = cache.setdefault((size, key), entries[key])
+    return slice_dict
+
+
 def prepare_energy_function(
         atom_labels,
         residue_numbers,
