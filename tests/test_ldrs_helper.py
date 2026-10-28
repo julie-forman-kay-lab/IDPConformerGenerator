@@ -11,6 +11,7 @@ from idpconfgen.core.exceptions import IDPConfGenException
 from idpconfgen.ldrs_helper import (
     _assemble_combinations,
     _random_combinations,
+    align_coords,
     atom_vdw_radii,
     backbone_anchor,
     combinations_clash_check,
@@ -139,6 +140,42 @@ def test_atom_vdw_radii_and_hydrogens():
     assert list(is_hydrogen(['H', '', 'C', ''], ['H', 'HA', 'CB', 'N'])) == [
         True, True, False, False,
         ]
+
+
+def _anchor_xyz(rows, atoms):
+    """Coordinates of the (residue, atom name) pairs of `rows`."""
+    resseq = rows[:, col_resSeq].astype(int)
+    return np.array([
+        rows[(resseq == res) & (rows[:, col_name] == name)][0, cols_coords]
+        for res, name in atoms
+        ]).astype(float)
+
+
+@pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
+@pytest.mark.parametrize('seed', range(5))
+def test_align_coords(expl_rows, case, seed):
+    """Test a moved fragment is put back onto its anchor atoms."""
+    rows = np.array(expl_rows, copy=True)
+    resseq = rows[:, col_resSeq].astype(int)
+    rows[:, col_resSeq] = (resseq - resseq.min() + 1).astype(str)
+    last = int(rows[:, col_resSeq].astype(int).max())
+    if case == 'N-IDR':
+        anchors = [(last - 1, 'C'), (last, 'N'), (last, 'CA')]
+    else:
+        anchors = [(1, 'C'), (2, 'N'), (2, 'CA')]
+    original = rows[:, cols_coords].astype(float)
+    target = _anchor_xyz(rows, anchors)
+
+    # move the fragment away by a random rotation and translation
+    rng = np.random.default_rng(seed)
+    rotation, _ = np.linalg.qr(rng.normal(size=(3, 3)))
+    rotation *= np.sign(np.linalg.det(rotation))
+    moved = original @ rotation.T + rng.normal(scale=20, size=3)
+    rows[:, cols_coords] = np.round(moved, 3).astype(str)
+
+    aligned = align_coords(rows, target, case)
+    assert np.allclose(_anchor_xyz(aligned, anchors), target, atol=0.005)
+    assert np.allclose(aligned[:, cols_coords].astype(float), original, atol=0.05)  # noqa: E501
 
 
 def test_backbone_anchor(expl_rows):

@@ -1024,12 +1024,11 @@ def align_coords(sample, target, case):
 
     covariance_matrix = np.dot(centered_idr.T, centered_fld)
     U, S, Vt = np.linalg.svd(covariance_matrix)
-    
-    # Check for reflection and correct if necessary
-    if np.linalg.det(Vt.T @ U.T) < 0:
-        Vt[-1, :] *= -1
-    # Compute the rotation matrix
-    rotation_matrix = np.dot(Vt.T, U.T)
+
+    # Coordinates are rows, so `idr_xyz @ (U @ D @ Vt)` superimposes the IDR atoms onto `target`
+    # D amino acids undoes a reflection
+    reflection = np.sign(np.linalg.det(U @ Vt)) or 1.0
+    rotation_matrix = U @ np.diag((1.0, 1.0, reflection)) @ Vt
 
     rotated_points = np.dot(idr_xyz, rotation_matrix)
     sample[:, cols_coords] = rotated_points.astype(str)
