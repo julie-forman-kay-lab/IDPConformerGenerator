@@ -101,11 +101,15 @@ Rules of thumb:
   needs very large libraries for Linker-IDRs longer than ~40 residues.
   Beyond about 100 residues ``ccd`` is the only practical choice.
 * ``--ccd-max-trials`` (default 100) is the number of backbones each worker may
-  try per conformer it must deliver in a round. Every round logs why the loops
-  were rejected. If the first round closes nothing, ``ldrs`` stops. ``final_endpoint``
-  means the L-IDR could not be closed within the torsion and contact limits,
-  ``omega`` means that the sampled backbone had a twisted or non-proline cis
-  peptide bond, and ``energy``, ``folded_clash`` and ``folded_overlap`` errors
+  try per conformer it must deliver in a round. All workers stop once the loops
+  of the round are closed. Every round logs why the loops were rejected. If no
+  L-IDR is closed after 5 rounds, or after ``--ccd-max-trials``,
+  ``ldrs`` stops. ``final_endpoint`` error means the L-IDR could
+  not be closed within the torsion and contact limits, ``omega`` error means
+  that the sampled backbone had a twisted or non-proline cis peptide bond,
+  ``junction_lower_distance`` and ``junction_lower_angle`` errors mean that the
+  sampled backbone did not fit the folded residue it starts from (closure is not
+  attempted), and ``energy``, ``folded_clash`` and ``folded_overlap`` errors
   mean that the L-IDR failed the energy and clash checks of step 5.
 * With ``--membrane``, the bilayer atoms of the template are part of the
   environment the L-IDR must avoid.
