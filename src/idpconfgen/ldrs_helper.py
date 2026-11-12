@@ -233,6 +233,7 @@ class _AtomSet:
     def __init__(self, rows):
         self.coords = rows[:, cols_coords].astype(np.float64)
         self.radii = atom_vdw_radii(rows[:, col_element], rows[:, col_name])
+        self.heavy = ~is_hydrogen(rows[:, col_element], rows[:, col_name])
         if len(self.coords):
             self.low = self.coords.min(axis=0)
             self.high = self.coords.max(axis=0)
@@ -277,6 +278,40 @@ def _count_contacts(first, second, tolerance):
         return 0
     limit = first.radii[pairs['i']] + second.radii[pairs['j']] + tolerance
     return int(np.count_nonzero(pairs['v'] < limit))
+
+
+def _count_overlaps(first, second, scale):
+    """
+    Count heavy-atom pairs closer than `scale` times their vdW radii sum.
+
+    Parameters
+    ----------
+    first, second : :class:`_AtomSet`
+
+    scale : float
+        Fraction of the vdW radii sum below which two atoms overlap.
+
+    Returns
+    -------
+    int
+    """
+    if not len(first.coords) or not len(second.coords):
+        return 0
+    reach = scale * (first.radii.max() + second.radii.max())
+    if np.any(first.low - reach > second.high) \
+            or np.any(second.low - reach > first.high):
+        return 0
+    pairs = first.tree.sparse_distance_matrix(
+        second.tree,
+        reach,
+        output_type='ndarray',
+        )
+    if not len(pairs):
+        return 0
+    i, j = pairs['i'], pairs['j']
+    limit = scale * (first.radii[i] + second.radii[j])
+    near = (pairs['v'] < limit) & first.heavy[i] & second.heavy[j]
+    return int(np.count_nonzero(near))
 
 
 def _fragment_rows(path):
@@ -1799,7 +1834,7 @@ def psurgeon(
     return new_struc_arr_complete
 
 
-def inter_chain_cc(all_files, nconfs, max_trials=None):
+def inter_chain_cc(all_files, nconfs, max_trials=None, cases=None):
     """
     Check for clashes between all chains of IDRs.
 
@@ -1807,9 +1842,8 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
     :func:`create_combinations`: each entry of a chain is used in at most
     one combination while that is possible, and entries are reused only
     to complete ``nconfs``, the least used first. No combination is
-    repeated. A combination     passes when no IDR of a chain has a
-    contact (within the vdW radii sum + 0.4 A) with an IDR of another chain.
-
+    repeated.
+    
     Parameters
     ----------
     all_files : dict
@@ -1822,6 +1856,11 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
     max_trials : int, optional
         Maximum number of combinations across chains to check.
         Defaults to ``max(1000, 100 * nconfs)``.
+
+    cases : dict, optional
+        Disorder cases of the IDRs of each chain, in sequence order, for
+        example ``{'A': ['N-IDR', 'Linker-IDR', 'C-IDR']}``. When given,
+        the folded residues carried by the fragments are not compared.
     
     Returns
     -------
@@ -1850,11 +1889,21 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
 
     def fragments(k, i):
         if (k, i) not in atoms:
+            paths = _combination_fragments(selections[k][i])
+            kinds = [None] * len(paths)
+            if cases is not None and len(cases[chains[k]]) == len(paths):
+                kinds = cases[chains[k]]
             atoms[k, i] = [
-                _AtomSet(_fragment_rows(path))
-                for path in _combination_fragments(selections[k][i])
+                _AtomSet(_idr_rows(_fragment_rows(path), kind))
+                for path, kind in zip(paths, kinds)
                 ]
         return atoms[k, i]
+
+    def compatible(first, second):
+        return (
+            _count_contacts(first, second, 1.0) <= 40
+            and _count_overlaps(first, second, FOLDED_OVERLAP_SCALE) == 0
+            )
 
     pair_ok = {}
 
@@ -1863,7 +1912,7 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
             key = (k1, i1, k2, i2)
             if key not in pair_ok:
                 pair_ok[key] = all(
-                    _count_contacts(first, second, 0.4) == 0
+                    compatible(first, second)
                     for first in fragments(k1, i1)
                     for second in fragments(k2, i2)
                     )
@@ -1881,8 +1930,9 @@ def inter_chain_cc(all_files, nconfs, max_trials=None):
     if not chosen:
         raise IDPConfGenException(errmsg=(
             f"None of the {tried} combinations of IDR conformers across "
-            "chains tried passed the clash check between chains. Build "
-            "more conformers for each IDR."
+            "chains tried passed the clash check between chains (more "
+            "than 40 contacts within the vdW radii sum + 1.0 A, or "
+            "overlapping heavy atoms)."
             ))
 
     if len(chosen) < nconfs:

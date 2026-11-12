@@ -29,7 +29,7 @@ from contextlib import contextmanager
 from functools import partial
 from glob import glob
 from itertools import cycle
-from multiprocessing import Pool, Queue
+from multiprocessing import Array, Pool, Queue
 from random import randint
 from time import time
 
@@ -284,6 +284,9 @@ LOOP_CLOSURE_METHODS = ('ccd', 'next_seeker')
 LOOP_STALL_ROUNDS = 5
 # Linker-IDR halves built on each side per round of next_seeker
 NEXT_SEEKER_HALVES = 640
+# added to the random seed for every further chain of the template, so that
+# chains with the same sequence are not given the same conformers
+CHAIN_SEED_STEP = 15485863
 
 # CLI argument parser parameters
 _name = 'ldrs'
@@ -371,10 +374,10 @@ ap.add_argument(
     help=(
         "With `--loop-closure ccd`: number of backbone conformers each "
         "core may try per Linker-IDR conformer it must deliver in a round. "
-        "ldrs stops if the first round closes no loop; otherwise it keeps "
-        "closing loops until all conformers are built, or until "
-        f"{LOOP_STALL_ROUNDS} rounds in a row add no new distinct loop. "
-        "Defaults to 100."
+        "All cores work on a round and stop as soon as enough loops are "
+        "closed. ldrs keeps closing loops until all conformers are built, "
+        f"or until {LOOP_STALL_ROUNDS} rounds in a row add no new distinct "
+        "loop. Defaults to 100."
         ),
     type=int,
     default=100,
@@ -590,6 +593,10 @@ def main(
         # convert input_seq to a dict because that's how we will process
         input_seq = {"A": input_seq}
     
+    # Linker-IDR closure and the database search use every core, also
+    # when fewer conformers than cores are requested
+    all_cores = max(1, ncores)
+
     # Calculates how many conformers are built per core
     if nconfs < ncores:
         ncores = 1
@@ -725,12 +732,20 @@ def main(
     DISORDER_BOUNDS = {}
     DISORDER_CASES = {}
     rama_reference = None
-    for chain in fld_chainseq:
+    # the database is read once and the sampling tables of an IDR sequence
+    # are prepared once, for all the chains
+    primary = None
+    slice_cache = {}
+    prepared = {}
+    ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
+    for chain_number, chain in enumerate(fld_chainseq):
         log.info(f"Building IDRs onto chain {chain}")
         fld_fasta = fld_chainseq[chain][0]
         in_seq = list(input_seq.values())[fld_chainseq[chain][1]]
         chain_arr = fld_chainseq[chain][2]
         temp_dir = TEMP_DIRNAME + f"chain{chain}/"
+        # the first chain uses `random_seed` itself
+        chain_seed = random_seed + CHAIN_SEED_STEP * chain_number
         
         # Find out what our disordered sequences are
         # Can be C-term, N-term, in the middle, or all the above
@@ -785,26 +800,27 @@ def main(
 
         log.info(S('done'))
 
-        db = read_dictionary_from_disk(database)
+        if primary is None:
+            db = read_dictionary_from_disk(database)
 
-        if bgeo_strategy == bgeo_exact_name:
-            try:
-                _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
-            except KeyError:
-                log.info(S('!!!!!!!!!!!!!!!'))
-                log.info(S(
-                    'DATABASE ERROR: '
-                    'the `database` requested is invalid. Please give the '
-                    'database generated with `bgeodb`. See the usage '
-                    'documentation for details while using '
-                    '`--bgeo-strategy exact`.'
-                    ))
-                return
+            if bgeo_strategy == bgeo_exact_name:
+                try:
+                    _, ANGLES, BEND_ANGS, BOND_LENS, secondary, primary = aligndb(db, True)  # noqa: E501
+                except KeyError:
+                    log.info(S('!!!!!!!!!!!!!!!'))
+                    log.info(S(
+                        'DATABASE ERROR: '
+                        'the `database` requested is invalid. Please give '
+                        'the database generated with `bgeodb`. See the '
+                        'usage documentation for details while using '
+                        '`--bgeo-strategy exact`.'
+                        ))
+                    return
 
-        else:
-            _, ANGLES, secondary, primary = aligndb(db)
+            else:
+                _, ANGLES, secondary, primary = aligndb(db)
 
-        del db
+            del db
 
         if residue_tolerance is not None:
             _restol = str(residue_tolerance)[1:-1]
@@ -841,14 +857,15 @@ def main(
 
         add_sampling = partial(
             _add_sampling,
-            cache={},
+            cache=slice_cache,
+            prepared=prepared,
             primary=primary,
             secondary=secondary,
             dssp_regexes=dssp_regexes,
             xmer_probs=xmer_probs_tmp,
             residue_tolerance=residue_tolerance,
             bgeo_strategy=bgeo_strategy,
-            ncores=ncores,
+            ncores=all_cores,
             )
         long_fragments = partial(
             _long_fragments,
@@ -874,8 +891,6 @@ def main(
                 GET_ADJ.append(None)
             else:
                 add_sampling(seq)
-
-        ENERGYLOGSAVER.start(output_folder.joinpath(energy_log))
 
         # get sidechain dedicated parameters
         sidechain_parameters = \
@@ -933,8 +948,8 @@ def main(
                     output_folder=match_of,
                     conformer_name=f"{linkeridr_num}_ccd",
                     nconfs=nconfs,
-                    ncores=ncores,
-                    random_seed=random_seed,
+                    ncores=all_cores,
+                    random_seed=chain_seed,
                     max_trials=ccd_max_trials,
                     max_clash=max_clash * 2,  # 2 fixed ends, as for linkers
                     tolerance=dist_tolerance,
@@ -1016,7 +1031,7 @@ def main(
                     fragments_N=fragments_N,
                     nconfs=nconfs,
                     ncores=ncores,
-                    random_seed=random_seed,
+                    random_seed=chain_seed,
                     max_clash=max_clash,
                     tolerance=dist_tolerance,
                     report_folder=output_folder,
@@ -1029,7 +1044,7 @@ def main(
 
             else:
                 for i in range(ncores + bool(remaining_confs)):
-                    RANDOMSEEDS.put(random_seed + i)
+                    RANDOMSEEDS.put(chain_seed + i)
 
                 for i in range(1, nconfs + 1):
                     CONF_NUMBER.put(i)
@@ -1160,7 +1175,11 @@ def main(
         
         files_to_process = []
         if MULTICHAIN:
-            files_to_process = inter_chain_cc(all_files, nconfs)
+            files_to_process = inter_chain_cc(
+                all_files,
+                nconfs,
+                cases=DISORDER_CASES,
+                )
         else:
             for i in range(len(list(all_files.values())[0])):
                 new_dict = {}
@@ -1236,6 +1255,13 @@ def _close_linker_ccd(
     written (repeats are deleted), or until `LOOP_STALL_ROUNDS`
     rounds in a row add no distinct loop (a warning is logged).
 
+    Every core works on a round, also when it needs fewer loops than
+    there are cores, and stops when the round has its loops (see
+    :func:`_build_ccd_loops`); the round does not wait for each core to
+    close loops of its own. A round keeps its first loops by trial number
+    and worker, so the loops written depend on `random_seed` and `ncores`
+    only, not on which core is faster.
+
     Parameters
     ----------
     input_seq : str
@@ -1262,6 +1288,13 @@ def _close_linker_ccd(
 
     **kwargs
         Passed to :func:`_build_ccd_loops`.
+
+    Raises
+    ------
+    IDPConfGenException
+        If no loop is closed in `LOOP_STALL_ROUNDS` rounds, or in
+        `max_trials` backbones per conformer requested (for at least
+        `LOOP_STALL_ROUNDS` conformers).
     """
     def n_done():
         # distinct loops only: repeats are deleted
@@ -1301,37 +1334,42 @@ def _close_linker_ccd(
     done = n_done()
     while done < nconfs:
         needed = nconfs - done
-        if round_ == 0:
-            workers = max(1, min(ncores, needed))
-            quotas = [
-                needed // workers + int(worker < needed % workers)
-                for worker in range(workers)
-                ]
-        else:
-            # every core works on the loops left
-            workers = max(1, ncores)
-            quotas = [-(-needed // workers)] * workers
+        # every core works on the loops left
+        workers = max(1, ncores)
+        quota = -(-needed // workers)
         tasks = [
             (
                 worker,
-                quotas[worker],
+                quota,
                 random_seed + 104729 * index + 7919 * round_ + worker,
                 round_,
+                needed,
                 )
             for worker in range(workers)
             ]
+        # loops closed in the round, by the trial number of their backbone
+        hits = Array('i', max(0, max_trials * quota) + 1)
         if workers == 1:
+            _share_round_hits(hits)
             results = [execute(tasks[0])]
         else:
-            with Pool(workers) as pool:
+            with Pool(workers, _share_round_hits, (hits,)) as pool:
                 results = list(pool.imap_unordered(execute, tasks))
 
-        built = 0
+        loops = []
         for result in results:
-            built += result['built']
+            loops.extend(result['loops'])
             trials += result['trials']
             for reason, count in result['reasons'].items():
                 reasons[reason] = reasons.get(reason, 0) + count
+        # the first loops by trial number, then worker, are those of the
+        # round; a core that was ahead of the others may have closed more
+        loops.sort()
+        for _trial, _worker, fname, energy in loops[:needed]:
+            ENERGYLOGSAVER.save(fname, energy)
+        for _trial, _worker, fname, _energy in loops[needed:]:
+            os.remove(Path(output_folder, fname))
+        built = min(len(loops), needed)
         summary = ', '.join(
             f'{reason}={count}'
             for reason, count in sorted(reasons.items(), key=lambda x: -x[1])
@@ -1343,21 +1381,35 @@ def _close_linker_ccd(
             f'{min(done, nconfs)}/{nconfs} distinct from {trials} backbones '
             f'(rejected: {summary or "none"}).'
             ))
-        if built == 0 and round_ == 0:
+        if done > previous:
+            stalled = 0
+        else:
+            stalled += 1
+        # a Linker-IDR that few backbones close may leave a round empty;
+        # ldrs gives up when no loop at all is closed within this budget
+        budget = max_trials * max(nconfs, LOOP_STALL_ROUNDS)
+        if done == 0 and (stalled == LOOP_STALL_ROUNDS or trials >= budget):
             raise IDPConfGenException(errmsg=(
                 f'Could not close the Linker-IDR {input_seq} in '
                 f'{trials} backbones (rejected: {summary}). Consider '
                 'raising --ccd-max-trials or -tol, checking the folded '
                 'residues next to the IDR, or --loop-closure next_seeker.'
                 ))
-        if done > previous:
-            stalled = 0
-        else:
-            stalled += 1
-            if stalled == LOOP_STALL_ROUNDS:
-                log.info(S(_stalled_loops_warning(done, nconfs)))
-                break
+        if stalled == LOOP_STALL_ROUNDS:
+            log.info(S(_stalled_loops_warning(done, nconfs)))
+            break
         round_ += 1
+
+
+# trial numbers at which the workers of a loop-closure round closed a loop:
+# a shared array, given to each worker by `_close_linker_ccd`
+_ROUND_HITS = None
+
+
+def _share_round_hits(hits):
+    """Give this process the closed-loop counts of a loop-closure round."""
+    global _ROUND_HITS
+    _ROUND_HITS = hits
 
 
 @contextmanager
@@ -1782,20 +1834,34 @@ def _build_ccd_loops(
     `next_seeker` match format, with the folded residues bonded to the IDR
     copied from the template, so `psurgeon` inserts only the IDR.
 
+    A round needs `needed` loops from all its workers together, and
+    keeps the first ones by the trial number of their backbone (then by
+    worker). Each worker records the trial number of the loops it closes
+    in the array set by :func:`_share_round_hits`, and stops before a
+    trial once the earlier trials of all workers have closed `needed`
+    loops: later loops would not be kept. It also stops after
+    ``max_trials * quota`` backbones.
+
     Parameters
     ----------
     task : tuple
-        ``(worker, quota, random_seed, round)``.
+        ``(worker, quota, random_seed, round, needed)``.
 
     Returns
     -------
     dict
-        Number of loops built, backbones tried and rejection counts.
+        Number of loops built, backbones tried, rejection counts and
+        ``loops``, the ``(trial, worker, file name, energy)`` of each loop
+        built.
     """
-    worker, quota, seed, round_ = task
-    out = {'built': 0, 'trials': 0, 'reasons': {}}
+    worker, quota, seed, round_, needed = task
+    out = {'built': 0, 'trials': 0, 'reasons': {}, 'loops': []}
     if quota < 1:
         return out
+    hits = _ROUND_HITS
+    if hits is None:
+        # called on its own, not from a round of `_close_linker_ccd`
+        hits = Array('i', max(0, max_trials * quota) + 1)
 
     nres = len(input_seq)
     builder = conformer_generator(
@@ -1827,7 +1893,10 @@ def _build_ccd_loops(
     def reject(reason):
         out['reasons'][reason] = out['reasons'].get(reason, 0) + 1
 
-    while out['built'] < quota and out['trials'] < max_trials * quota:
+    while out['trials'] < max_trials * quota:
+        # trials are numbered from 1; `hits[0]` stays 0
+        if sum(hits[:out['trials'] + 1]) >= needed:
+            break
         try:
             _energy, coords = next(builder)
         except StopIteration:
@@ -1861,7 +1930,11 @@ def _build_ccd_loops(
         out['built'] += 1
         fname = f'{conformer_name}_{round_}_{worker}_{out["built"]}.pdb'
         finisher.write(all_atom, Path(output_folder, fname))
-        ENERGYLOGSAVER.save(fname, np.nansum(energy))
+        out['loops'].append(
+            (out['trials'], worker, fname, float(np.nansum(energy)))
+            )
+        with hits.get_lock():
+            hits[out['trials']] += 1
 
     del builder
     return out
@@ -1895,11 +1968,13 @@ def populate_globals(
             bgeo_path = bgeo_sampling_path
 
         global BGEO_full, BGEO_trimer, BGEO_res  # noqa: F824
-        BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
-        _1, _2 = bgeo_reduce(BGEO_full)
-        BGEO_trimer.update(_1)
-        BGEO_res.update(_2)
-        del _1, _2
+        # read once: every IDR of every chain calls this function
+        if not (BGEO_full and BGEO_trimer and BGEO_res):
+            BGEO_full.update(read_dictionary_from_disk(bgeo_sampling_path))
+            _1, _2 = bgeo_reduce(BGEO_full)
+            BGEO_trimer.update(_1)
+            BGEO_res.update(_2)
+            del _1, _2
         assert BGEO_full
         assert BGEO_trimer
         assert BGEO_res
@@ -2363,13 +2438,16 @@ def _add_sampling(
         residue_tolerance,
         bgeo_strategy,
         ncores,
+        prepared=None,
         ):
     """
     Prepare the database slices to sample `seq` from.
 
     Appends to ``SLICEDICT_XMERS``, ``XMERPROBS`` and ``GET_ADJ``. The
     slice lists are shared through `cache` with the sequences prepared
-    before (:func:`share_slices`).
+    before (:func:`share_slices`). With `prepared`, a dictionary kept
+    between calls with the same search options, the database is searched
+    once per sequence: the chains of a homo-oligomer use the same tables.
 
     Returns
     -------
@@ -2377,34 +2455,41 @@ def _add_sampling(
         The index of the new entries (the `index` of
         :func:`conformer_generator`).
     """
-    log.info(S(f"Preparing database for sequence: {seq}"))
-    slices = prepare_slice_dict(
-        primary,
-        seq,
-        dssp_regexes=dssp_regexes,
-        secondary=secondary,
-        mers_size=xmer_probs.sizes,
-        res_tolerance=residue_tolerance,
-        ncores=ncores,
-        )
-    remove_empty_keys(slices)
-    share_slices(slices, cache)
-    # updates user defined fragment sizes and probabilities to the ones
-    # actually observed
-    probs = compress_xmer_to_key(xmer_probs, sorted(slices.keys())).probs
+    if prepared is not None and seq in prepared:
+        log.info(S(f"Using the database slices prepared for sequence: {seq}"))
+        slices, probs, get_adj = prepared[seq]
+    else:
+        log.info(S(f"Preparing database for sequence: {seq}"))
+        slices = prepare_slice_dict(
+            primary,
+            seq,
+            dssp_regexes=dssp_regexes,
+            secondary=secondary,
+            mers_size=xmer_probs.sizes,
+            res_tolerance=residue_tolerance,
+            ncores=ncores,
+            )
+        remove_empty_keys(slices)
+        share_slices(slices, cache)
+        # updates user defined fragment sizes and probabilities to the ones
+        # actually observed
+        probs = compress_xmer_to_key(xmer_probs, sorted(slices.keys())).probs
+        get_adj = get_adjacent_angles(
+            sorted(slices.keys()),
+            probs,
+            seq,
+            ANGLES,
+            bgeo_strategy,
+            slices,
+            csss=None,
+            residue_tolerance=residue_tolerance,
+            )
+        if prepared is not None:
+            prepared[seq] = (slices, probs, get_adj)
+        log.info(S("done"))
     SLICEDICT_XMERS.append(slices)
     XMERPROBS.append(probs)
-    GET_ADJ.append(get_adjacent_angles(
-        sorted(slices.keys()),
-        probs,
-        seq,
-        ANGLES,
-        bgeo_strategy,
-        slices,
-        csss=None,
-        residue_tolerance=residue_tolerance,
-        ))
-    log.info(S("done"))
+    GET_ADJ.append(get_adj)
     return len(GET_ADJ) - 1
 
 
