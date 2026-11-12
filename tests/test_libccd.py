@@ -250,6 +250,10 @@ def test_junction_failure():
     assert libccd.junction_failure(dict(good, upper_omega=-165.0), params) is None  # noqa: E501
     twisted = dict(good, upper_omega=155.0)
     assert libccd.junction_failure(twisted, params) == 'junction_upper_omega'
+    # one junction only
+    assert libccd.junction_failure(bad, params, sides=('lower',)) is None
+    assert libccd.junction_failure(bad, params, sides=('upper',)) == 'junction_upper_distance'  # noqa: E501
+    assert libccd.junction_failure(cis, params, sides=('upper',)) is None
 
 
 @pytest.mark.parametrize(
@@ -451,6 +455,30 @@ def test_close_loop_checks_the_bond_to_the_upper_anchor():
     cis = _build(phi + dphi, psi + dpsi, omega)
     result = libccd.close_loop(cis, 'A' * 34, reference[1], reference[32])
     assert result.reason == 'omega'
+
+
+def test_close_loop_checks_the_lower_junction_before_the_search():
+    """Test a conformer that misses the lower junction is not searched."""
+    phi, psi, (dphi, dpsi) = _loop_torsions(30, 4)
+    reference = _build(phi, psi)
+    candidate = _build(phi + dphi, psi + dpsi)
+    result = libccd.close_loop(candidate, 'A' * 34, reference[1], reference[32])  # noqa: E501
+    assert result.accepted, result.reason
+    assert result.stats['iterations'] > 0
+    # stretch C(1)-N(2), the anchor residue to the first IDR residue: fine
+    # as a bond of the source, too long for a junction
+    stretched = candidate.copy()
+    bond = candidate[2, 0] - candidate[1, 2]
+    stretched[2:] += 0.1 * bond / np.linalg.norm(bond)
+    result = libccd.close_loop(stretched, 'A' * 34, reference[1], reference[32])  # noqa: E501
+    assert result.reason == 'junction_lower_distance'
+    assert result.stats['idealized'] == 0
+    assert 'iterations' not in result.stats
+    assert abs(result.stats['lower_c_n'] - 1.429) < 0.01
+    # the conformer comes back attached to the lower anchor
+    assert np.allclose(result.backbone[1, :3], reference[1, :3], atol=1e-6)
+    moved = stretched[0] @ result.rotation.T + result.translation
+    assert np.allclose(moved, result.backbone[0], atol=1e-6)
 
 
 def test_close_loop_rotation_maps_residue_zero():

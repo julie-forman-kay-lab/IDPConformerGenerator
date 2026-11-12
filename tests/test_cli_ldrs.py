@@ -1,6 +1,7 @@
 """Test the Linker-IDR loop-closure options of cli_ldrs."""
 import math
 import os
+import time
 
 import numpy as np
 import pytest
@@ -297,20 +298,29 @@ def _write_loop(path, offset):
     path.write_text('\n'.join(lines) + '\n')
 
 
-def _close_with(plan, tmp_path, monkeypatch, nconfs=3):
+def _close_with(plan, tmp_path, monkeypatch, nconfs=3, trials=1):
     """Run `_close_linker_ccd` with loops given by `plan(round)`."""
     rounds = []
 
     def build(task, *, output_folder, conformer_name, **kwargs):
-        worker, quota, _seed, round_ = task
+        worker, quota, _seed, round_, needed = task
+        assert quota == needed  # one worker
         offsets = plan(round_)[:quota]
+        loops = []
         for n, offset in enumerate(offsets):
             name = f'{conformer_name}_{round_}_{worker}_{n}.pdb'
             _write_loop(output_folder / name, offset)
+            loops.append((n + 1, worker, name, 0.0))
         rounds.append(round_)
-        return {'built': len(offsets), 'trials': 1, 'reasons': {}}
+        return {
+            'built': len(offsets),
+            'trials': trials,
+            'reasons': {},
+            'loops': loops,
+            }
 
     monkeypatch.setattr(cli_ldrs, '_build_ccd_loops', build)
+    monkeypatch.setattr(cli_ldrs, 'ENERGYLOGSAVER', _NoLog())
     cli_ldrs._close_linker_ccd(
         'GGAAAAGG',
         index=0,
@@ -356,15 +366,222 @@ def test_close_linker_ccd_stalls(tmp_path, monkeypatch):
     assert files == ['loop_0_0_0.pdb']
 
 
-def test_close_linker_ccd_first_round(tmp_path, monkeypatch):
-    """Test a first round without any closed loop stops ldrs."""
+def test_close_linker_ccd_no_loop(tmp_path, monkeypatch):
+    """Test rounds that never close a loop stop ldrs."""
+    seen = []
+
+    def plan(round_):
+        seen.append(round_)
+        return []
+
     with pytest.raises(IDPConfGenException):
-        _close_with(lambda r: [], tmp_path, monkeypatch)
+        _close_with(plan, tmp_path, monkeypatch)
+    assert seen == list(range(cli_ldrs.LOOP_STALL_ROUNDS))
+
+
+def test_close_linker_ccd_first_loop_in_a_later_round(tmp_path, monkeypatch):
+    """Test first rounds without a loop do not stop ldrs."""
+    plan = {3: [0.0, 5.0, 10.0]}
+    rounds, files = _close_with(
+        lambda r: plan.get(r, []),
+        tmp_path,
+        monkeypatch,
+        )
+    assert rounds == [0, 1, 2, 3]
+    assert len(files) == 3
+
+
+def test_close_linker_ccd_budget(tmp_path, monkeypatch):
+    """Test ldrs stops once the backbones for all conformers are spent."""
+    seen = []
+
+    def plan(round_):
+        seen.append(round_)
+        return []
+
+    # `max_trials` is 1: 7 conformers allow 7 backbones without a loop
+    with pytest.raises(IDPConfGenException):
+        _close_with(plan, tmp_path, monkeypatch, nconfs=7, trials=4)
+    assert seen == [0, 1]
+
+
+class _FakeMasks:
+    """Atom masks of a two-residue conformer of 11 atoms."""
+
+    bb4 = np.arange(8)
+    cterm = np.array([8])
+    Hterm = np.array([9, 10])
+
+
+class _FakeFinisher:
+    """Accept every closed loop and write it as a C-alpha trace."""
+
+    bb_env = None
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def finish(self, backbone, hterm, oxt):
+        # the energy tells the seed and trial number of the loop
+        return backbone, backbone[0, 0, 0]
+
+    def write(self, all_atom, path):
+        # distinct loops: seed and trial number are in the coordinates
+        seed, trial = divmod(int(all_atom[0, 0, 0]), 1000)
+        _write_loop(path, 5.0 * trial + 60.0 * (seed % 10))
+
+
+def _schedule(tmp_path, monkeypatch, closes, delays, nconfs, ncores):
+    """
+    Run `_close_linker_ccd` on fake backbones.
+
+    Backbone `trial` of the worker with seed `seed` closes if `trial` is
+    in ``closes[seed]``; the worker waits ``delays[seed]`` seconds at
+    every backbone.
+    """
+    def fake_generator(*, random_seed=0, **kwargs):
+        yield None
+        trial = 0
+        while True:
+            trial += 1
+            yield 0.0, np.full((11, 3), 1000.0 * random_seed + trial)
+
+    def fake_close_loop(backbone, sequence, lower, upper, **kwargs):
+        seed, trial = divmod(int(backbone[0, 0, 0]), 1000)
+        time.sleep(delays.get(seed, 0.0))
+        return libccd.CCDResult(
+            trial in closes.get(seed, ()),
+            'final_endpoint',
+            backbone=backbone,
+            extra=kwargs['extra'],
+            rotation=np.eye(3),
+            translation=np.zeros(3),
+            stats={},
+            )
+
+    monkeypatch.setattr(cli_ldrs, 'conformer_generator', fake_generator)
+    monkeypatch.setattr(libccd, 'close_loop', fake_close_loop)
+    monkeypatch.setattr(cli_ldrs, '_LoopFinisher', _FakeFinisher)
+    monkeypatch.setattr(cli_ldrs, 'ALL_ATOM_MASKS', _FakeMasks)
+    energy_log = _NoLog()
+    monkeypatch.setattr(cli_ldrs, 'ENERGYLOGSAVER', energy_log)
+    cli_ldrs._close_linker_ccd(
+        'AA',
+        index=0,
+        ccd_context={'lower_anchor': None, 'upper_anchor': None},
+        ccd_params=libccd.CCDParameters(),
+        rama=None,
+        output_folder=tmp_path,
+        conformer_name='loop',
+        nconfs=nconfs,
+        ncores=ncores,
+        random_seed=0,
+        max_trials=10,
+        max_clash=40,
+        tolerance=0.4,
+        report_folder=tmp_path,
+        )
+    files = sorted(path.name for path in tmp_path.glob('*.pdb'))
+    # the energies logged are those of the loops kept
+    assert sorted(name for name, _energy in energy_log.saved) == files
+    return files
+
+
+def test_ccd_round_one_worker(tmp_path, monkeypatch, caplog):
+    """Test one worker closes the loops needed and stops."""
+    closes = {0: {3, 5, 6}}
+    files = _schedule(tmp_path, monkeypatch, closes, {}, nconfs=2, ncores=1)
+    assert files == ['loop_0_0_1.pdb', 'loop_0_0_2.pdb']
+    assert '2/2 distinct from 5 backbones' in caplog.text
+
+
+@pytest.mark.parametrize('delays', [{0: 0.0, 1: 0.05}, {0: 0.05, 1: 0.0}])
+def test_ccd_round_keeps_first_loops(tmp_path, monkeypatch, delays):
+    """Test a round keeps its first loops by trial, whoever is faster."""
+    # worker 1 closes both loops needed at its trials 2 and 3; the loop of
+    # worker 0, at trial 5, is not needed, closed or not
+    closes = {0: {5}, 1: {2, 3}}
+    files = _schedule(tmp_path, monkeypatch, closes, delays, nconfs=2, ncores=2)  # noqa: E501
+    assert files == ['loop_0_1_1.pdb', 'loop_0_1_2.pdb']
+    saved = cli_ldrs.ENERGYLOGSAVER.saved
+    assert saved == [('loop_0_1_1.pdb', 1002.0), ('loop_0_1_2.pdb', 1003.0)]
+
+
+def test_ccd_round_more_cores_than_loops(tmp_path, monkeypatch):
+    """Test every core works on a round that needs a single loop."""
+    # worker 2 is the only one to close a loop in its 10 backbones
+    closes = {2: {4}}
+    files = _schedule(tmp_path, monkeypatch, closes, {}, nconfs=1, ncores=3)
+    assert files == ['loop_0_2_1.pdb']
+
+
+def test_add_sampling_prepares_a_sequence_once(monkeypatch):
+    """Test chains with the same IDR sequences share their tables."""
+    from idpconfgen.components.xmer_probs import prepare_xmer_probs
+    searched = []
+
+    def fake_slices(primary, seq, **kwargs):
+        searched.append(seq)
+        return {1: {'A': [slice(0, 1)]}}
+
+    monkeypatch.setattr(cli_ldrs, 'prepare_slice_dict', fake_slices)
+    monkeypatch.setattr(cli_ldrs, 'get_adjacent_angles', lambda *a, **k: object())  # noqa: E501
+    options = dict(
+        cache={},
+        prepared={},
+        primary='A',
+        secondary='L',
+        dssp_regexes=['L'],
+        xmer_probs=prepare_xmer_probs(None),
+        residue_tolerance=None,
+        bgeo_strategy='fixed',
+        ncores=1,
+        )
+    tables = []
+    for _chain in range(2):
+        # `main` starts these lists again for every chain
+        for name in ('SLICEDICT_XMERS', 'XMERPROBS', 'GET_ADJ'):
+            monkeypatch.setattr(cli_ldrs, name, [])
+        assert cli_ldrs._add_sampling('AAA', **options) == 0
+        assert cli_ldrs._add_sampling('AGA', **options) == 1
+        tables.append((cli_ldrs.SLICEDICT_XMERS, cli_ldrs.GET_ADJ))
+    assert searched == ['AAA', 'AGA']
+    for k in range(2):
+        assert tables[0][0][k] is tables[1][0][k]
+        assert tables[0][1][k] is tables[1][1][k]
+    # without `prepared` the database is searched again
+    del options['prepared']
+    cli_ldrs._add_sampling('AAA', **options)
+    assert searched == ['AAA', 'AGA', 'AAA']
+
+
+def test_populate_globals_reads_bgeo_library_once(monkeypatch):
+    """Test the bond geometry library is read for the first IDR only."""
+    from idpconfgen.core.build_definitions import forcefields
+    reads = []
+
+    def fake_read(path):
+        reads.append(path)
+        return {'AAA': 1}
+
+    for name in cli_ldrs._SEQUENCE_GLOBALS:
+        monkeypatch.setattr(cli_ldrs, name, getattr(cli_ldrs, name))
+    for name in ('BGEO_full', 'BGEO_trimer', 'BGEO_res'):
+        monkeypatch.setattr(cli_ldrs, name, {})
+    monkeypatch.setattr(cli_ldrs, 'read_dictionary_from_disk', fake_read)
+    monkeypatch.setattr(cli_ldrs, 'bgeo_reduce', lambda full: ({'AAA': 1}, {'AAA': 1}))  # noqa: E501
+    for seq in ('AAAA', 'AGAA', 'AAAA'):
+        cli_ldrs.populate_globals(input_seq=seq, forcefield=forcefields['Amberff14SB'])  # noqa: E501
+        assert len(cli_ldrs.ALL_ATOM_LABELS.res_nums) > 0
+    assert len(reads) == 1
 
 
 class _NoLog:
+    def __init__(self):
+        self.saved = []
+
     def save(self, *args):
-        pass
+        self.saved.append(args)
 
 
 @pytest.mark.parametrize('case', ['N-IDR', 'C-IDR'])
