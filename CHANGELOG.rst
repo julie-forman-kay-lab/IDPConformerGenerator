@@ -9,6 +9,8 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Optimized ``ldrs --loop-closure ccd`` for templates with many chains and L-IDRs.
+
 v0.10.1 (2026-10-28)
 ------------------------------------------------------------
 
