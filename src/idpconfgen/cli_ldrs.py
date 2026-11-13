@@ -943,7 +943,11 @@ def main(
                         lower,
                         upper,
                         ),
-                    ccd_params=libccd.CCDParameters(),
+                    # the closure accepts no backbone contact that the
+                    # overlap check of the finished loop rejects
+                    ccd_params=libccd.CCDParameters(
+                        clash_scale=FOLDED_OVERLAP_SCALE,
+                        ),
                     rama=rama_reference,
                     output_folder=match_of,
                     conformer_name=f"{linkeridr_num}_ccd",

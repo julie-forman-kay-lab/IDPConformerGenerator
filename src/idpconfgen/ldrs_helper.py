@@ -314,6 +314,28 @@ def _count_overlaps(first, second, scale):
     return int(np.count_nonzero(near))
 
 
+def _idrs_fit(first, second):
+    """
+    Tell whether two IDRs leave room for each other.
+
+    They may have at most 40 contacts (within the vdW radii sum + 1.0 A)
+    and no heavy atoms closer than ``FOLDED_OVERLAP_SCALE`` times their
+    vdW radii sum.
+
+    Parameters
+    ----------
+    first, second : :class:`_AtomSet`
+
+    Returns
+    -------
+    bool
+    """
+    return (
+        _count_contacts(first, second, 1.0) <= 40
+        and _count_overlaps(first, second, FOLDED_OVERLAP_SCALE) == 0
+        )
+
+
 def _fragment_rows(path):
     """Return the data array of a fragment file."""
     structure = Structure(Path(path))
@@ -345,7 +367,9 @@ def combinations_clash_check(selected, cases=None):
     -------
     list or tuple, or False
         ``selected`` when no pair of IDRs has more than 40 contacts
-        (within the vdW radii sum + 1.0 A), False otherwise.
+        (within the vdW radii sum + 1.0 A) or overlapping heavy atoms
+        (closer than ``FOLDED_OVERLAP_SCALE`` times their vdW radii
+        sum), False otherwise.
     """
     if cases is None:
         cases = [None] * len(selected)
@@ -356,7 +380,7 @@ def combinations_clash_check(selected, cases=None):
             idrs.append(_AtomSet(_idr_rows(_fragment_rows(path), case)))
 
     for first, second in combinations(idrs, 2):
-        if _count_contacts(first, second, 1.0) > 40:
+        if not _idrs_fit(first, second):
             return False
 
     return selected
@@ -702,7 +726,7 @@ def create_combinations(
         for (key1, first), (key2, second) in combinations(sets, 2):
             key = (key1, key2)
             if key not in pair_ok:
-                pair_ok[key] = _count_contacts(first, second, 1.0) <= 40
+                pair_ok[key] = _idrs_fit(first, second)
             if not pair_ok[key]:
                 return False
         return True
@@ -718,8 +742,8 @@ def create_combinations(
         raise IDPConfGenException(errmsg=(
             f"None of the {tried} combinations of IDR conformers tried "
             "passed the clash check between IDRs (more than 40 contacts "
-            "within the vdW radii sum + 1.0 A). Build more conformers "
-            "for each IDR."
+            "within the vdW radii sum + 1.0 A, or overlapping heavy "
+            "atoms). Build more conformers for each IDR."
             ))
 
     if len(chosen) < num_combinations:
@@ -1899,12 +1923,6 @@ def inter_chain_cc(all_files, nconfs, max_trials=None, cases=None):
                 ]
         return atoms[k, i]
 
-    def compatible(first, second):
-        return (
-            _count_contacts(first, second, 1.0) <= 40
-            and _count_overlaps(first, second, FOLDED_OVERLAP_SCALE) == 0
-            )
-
     pair_ok = {}
 
     def passes(indexes):
@@ -1912,7 +1930,7 @@ def inter_chain_cc(all_files, nconfs, max_trials=None, cases=None):
             key = (k1, i1, k2, i2)
             if key not in pair_ok:
                 pair_ok[key] = all(
-                    compatible(first, second)
+                    _idrs_fit(first, second)
                     for first in fragments(k1, i1)
                     for second in fragments(k2, i2)
                     )
@@ -2222,7 +2240,7 @@ def splice_folded_rows(fragment_rows, lower_rows, upper_rows):
     return out
 
 
-FOLDED_OVERLAP_SCALE = 0.6
+FOLDED_OVERLAP_SCALE = 0.7
 
 LONG_IDR_FRAGMENT = 150
 

@@ -684,6 +684,29 @@ def test_inter_chain_cc_overlap(expl_rows, tmp_path):
         inter_chain_cc({'A': [first], 'B': [small]}, 1)
 
 
+def test_combinations_overlap(expl_rows, tmp_path):
+    """Test overlapping heavy atoms fail IDRs of a chain with few contacts."""
+    first = _write_residues(expl_rows, tmp_path / 'a.pdb', 4, 11)
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    pair = np.array(
+        expl_rows[(resseq == 4) & np.isin(expl_rows[:, col_name], ('N', 'CA'))],  # noqa: E501
+        copy=True,
+        )
+    # two atoms 0.5 A from their copies in the first fragment
+    x = pair[:, cols_coords[0]].astype(float) + 0.5
+    pair[:, cols_coords[0]] = [f'{value:.3f}' for value in x]
+    pair[:, col_resSeq] = '1'
+    small = tmp_path / 'small.pdb'
+    write_PDB(structure_to_pdb(pair), small)
+    atoms = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(first))
+    other = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(small))
+    assert ldrs_helper._count_contacts(atoms, other, 1.0) <= 40
+    assert not ldrs_helper._idrs_fit(atoms, other)
+    assert combinations_clash_check((first, small)) is False
+    with pytest.raises(IDPConfGenException):
+        create_combinations([[first], [small]], 1)
+
+
 def test_count_overlaps_heavy_atoms_only(expl_rows):
     """Test hydrogens are not counted as overlaps."""
     resseq = expl_rows[:, col_resSeq].astype(int)
@@ -1014,6 +1037,30 @@ def test_attachment_overlaps(expl_rows):
     pushed[atom, cols_coords] = rows[rows[:, col_name] == 'CA'][3, cols_coords]  # noqa: E501
     assert attachment_overlaps(pushed, rows, 'N-IDR', target) > 0
     assert count_clashes(pushed, folded, 'N-IDR', 10**6)[0] == count_clashes(aligned, folded, 'N-IDR', 10**6)[0]  # noqa: E501
+
+
+def test_attachment_overlaps_scale(expl_rows):
+    """Test atoms within 0.7 times their vdW radii sum overlap."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    first = int(resseq.min())
+    rows = expl_rows[resseq >= first + 6]
+    target = attachment_anchor(rows, 'N-IDR')
+    fragment = _chain_rows(expl_rows, first, first + 7)
+    aligned = align_coords(_moved(fragment, 2), target, 'N-IDR')
+    # a carbon away from the folded domain
+    carbon = np.array(rows[rows[:, col_name] == 'CA'][-1:], copy=True)
+    carbon[0, col_resSeq] = str(int(resseq.max()) + 5)
+    carbon[0, cols_coords] = ['150.000', '150.000', '150.000']
+    environment = np.concatenate((rows, carbon))
+    atom = np.flatnonzero(
+        (aligned[:, col_resSeq].astype(int) == 6)
+        & (aligned[:, col_name] == 'CB')
+        )[0]
+    # two carbons overlap below 0.7 * (1.7 + 1.7) = 2.38 A
+    for distance, overlaps in ((2.45, 0), (2.30, 1)):
+        pushed = np.array(aligned, copy=True)
+        pushed[atom, cols_coords] = [f'{150 + distance:.3f}', '150.000', '150.000']  # noqa: E501
+        assert attachment_overlaps(pushed, environment, 'N-IDR', target) == overlaps  # noqa: E501
 
 
 def test_attachment_overlaps_alternate_locations(expl_rows):
