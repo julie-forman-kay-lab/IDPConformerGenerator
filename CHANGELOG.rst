@@ -9,6 +9,9 @@ While in version ``0``, minor and patch upgrades converge in the ``patch`` numbe
 Changelog
 =========
 
+* Optimized ``ldrs --loop-closure ccd`` for templates with many chains and L-IDRs.
+* Tightened the heavy-atom overlap check in ``ldrs`` from 0.6 to 0.7 times the vdW radii sum.
+
 v0.10.1 (2026-10-28)
 ------------------------------------------------------------
 

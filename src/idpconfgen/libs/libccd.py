@@ -774,7 +774,13 @@ def junction_geometry(backbone, lower_anchor, upper_anchor, first, last):
     return out
 
 
-def junction_failure(geometry, params, lower_is_pro=False, upper_is_pro=False):
+def junction_failure(
+        geometry,
+        params,
+        lower_is_pro=False,
+        upper_is_pro=False,
+        sides=('lower', 'upper'),
+        ):
     """
     Return the first junction measure outside its window, or None.
 
@@ -794,12 +800,17 @@ def junction_failure(geometry, params, lower_is_pro=False, upper_is_pro=False):
         Whether the residue after each junction is a proline, which also
         allows a cis peptide bond.
 
+    sides : tuple of str
+        The junctions to check, ``'lower'`` and/or ``'upper'``.
+
     Returns
     -------
     str or None
     """
     ideal_c_n = IDEAL_GEOMETRY['C_N']
-    for side, is_pro in (('lower', lower_is_pro), ('upper', upper_is_pro)):
+    is_pro_of = {'lower': lower_is_pro, 'upper': upper_is_pro}
+    for side in sides:
+        is_pro = is_pro_of[side]
         dist = geometry[f'{side}_c_n']
         if not abs(dist - ideal_c_n) <= params.junction_distance_tolerance:
             return f'junction_{side}_distance'
@@ -1793,10 +1804,13 @@ def close_loop(
     ``'auto'`` a conformer outside them is first rebuilt with
     :func:`idealize_backbone`; ``'always'`` rebuilds every conformer and
     ``'never'`` rejects it), and every peptide bond must be allowed by
-    :func:`omega_state`, since closure keeps omega. The closed loop must
+    :func:`omega_state`, since closure keeps omega. Once attached to
+    `lower_anchor`, the junction with it must be within its windows
+    (:func:`junction_failure`): closure does not change it, so a conformer
+    that fails is rejected without a search. The closed loop must
     then pass the endpoint targets, the phi/psi limits, the junction
-    geometry (:func:`junction_failure`), the contact criteria and, if
-    `rama` is given, the database (phi, psi) occupancy.
+    geometry, the contact criteria and, if `rama` is given, the database
+    (phi, psi) occupancy.
 
     Parameters
     ----------
@@ -1832,7 +1846,9 @@ def close_loop(
         candidates, for diagnostics; after a ``'backbone_geometry'`` or
         ``'omega'`` rejection it is the source, possibly rebuilt and not
         superimposed, and `extra`, `rotation` and `translation` are
-        None); `rotation` and `translation` map atoms rigidly attached to
+        None; after a ``'junction_lower_*'`` rejection it is the source
+        attached to `lower_anchor`, not closed); `rotation` and
+        `translation` map atoms rigidly attached to
         residue 0 of `backbone` onto the result. `reason` is
         ``'accepted'`` or why the loop was
         rejected: ``'backbone_geometry'``, ``'omega'``,
@@ -1924,6 +1940,38 @@ def close_loop(
             )
 
     source = X[:4 * nres].reshape(nres, 4, 3)
+
+    # the junction with the first folded domain is set from here on: the
+    # search turns phi and psi of the IDR, which leave N and CA of its
+    # first residue in place. A conformer that fails it is not searched.
+    geometry = junction_geometry(
+        source,
+        lower_anchor,
+        upper_anchor,
+        first,
+        last,
+        )
+    failure = junction_failure(
+        geometry,
+        params,
+        lower_is_pro=sequence[first] == 'P',
+        sides=('lower',),
+        )
+    if failure:
+        stats.update(
+            (key, value) for key, value in geometry.items()
+            if key.startswith('lower_')
+            )
+        return CCDResult(
+            False,
+            failure,
+            backbone=source.copy(),
+            extra=X[4 * nres:].copy(),
+            rotation=rotation @ pre_rotation,
+            translation=rotation @ pre_translation + translation,
+            stats=stats,
+            )
+
     raw_torsions = backbone_phi_psi(source, first, last)
     is_pro = np.array([aa == 'P' for aa in sequence])
     search = _LoopSearch(

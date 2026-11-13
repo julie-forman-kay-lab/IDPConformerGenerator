@@ -39,7 +39,9 @@ def process_multichain_pdb(fld_struc, input_seq):
     # Check if missing chain ID but there should be segment ID
     if not all(c for c in fld_chain):
         fld_chain = fld_struc[:, col_segid]
-    unique_chains = set(fld_chain)
+    # in the order of the structure, so chains are processed and written
+    # in the same order in every run
+    unique_chains = list(dict.fromkeys(fld_chain))
     fld_chainseq = {}
     
     for chain in unique_chains:

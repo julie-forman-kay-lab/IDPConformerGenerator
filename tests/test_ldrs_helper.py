@@ -46,6 +46,7 @@ from idpconfgen.libs.libcalc import calc_torsion_angles
 from idpconfgen.libs.libstructure import (
     Structure,
     col_chainID,
+    col_element,
     col_name,
     col_resName,
     col_resSeq,
@@ -634,6 +635,103 @@ def test_inter_chain_cc(fragments):
         inter_chain_cc({'A': [fragments['a']], 'B': [fragments['X']]}, 2)
 
 
+def test_inter_chain_cc_touching_idrs(expl_rows, tmp_path):
+    """Test IDRs of two chains may touch, as those of one chain may."""
+    first = _write_residues(expl_rows, tmp_path / 'a.pdb', 4, 11)
+    paths = {
+        shift: _write_residues(expl_rows, tmp_path / f'{shift}.pdb', 4, 11, shift=shift)  # noqa: E501
+        for shift in (9.0, 11.0)
+        }
+    atoms = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(first))
+    counts = {}
+    for shift, path in paths.items():
+        other = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(path))
+        counts[shift] = (
+            ldrs_helper._count_contacts(atoms, other, 0.4),
+            ldrs_helper._count_contacts(atoms, other, 1.0),
+            ldrs_helper._count_overlaps(atoms, other, 0.6),
+            )
+    # 11 A apart: a few contacts and no overlap
+    assert counts[11.0][0] > 0 and counts[11.0][1] <= 40
+    assert counts[11.0][2] == 0
+    expected = [{'A': [first], 'B': [paths[11.0]]}]
+    assert inter_chain_cc({'A': [first], 'B': [paths[11.0]]}, 1) == expected
+    # 9 A apart: more than 40 contacts
+    assert counts[9.0][1] > 40
+    with pytest.raises(IDPConfGenException):
+        inter_chain_cc({'A': [first], 'B': [paths[9.0]]}, 1)
+
+
+def test_inter_chain_cc_overlap(expl_rows, tmp_path):
+    """Test overlapping heavy atoms fail chains with few contacts."""
+    first = _write_residues(expl_rows, tmp_path / 'a.pdb', 4, 11)
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    pair = np.array(
+        expl_rows[(resseq == 4) & np.isin(expl_rows[:, col_name], ('N', 'CA'))],  # noqa: E501
+        copy=True,
+        )
+    # two atoms 0.5 A from their copies in the first fragment
+    x = pair[:, cols_coords[0]].astype(float) + 0.5
+    pair[:, cols_coords[0]] = [f'{value:.3f}' for value in x]
+    pair[:, col_resSeq] = '1'
+    small = tmp_path / 'small.pdb'
+    write_PDB(structure_to_pdb(pair), small)
+    atoms = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(first))
+    other = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(small))
+    assert ldrs_helper._count_contacts(atoms, other, 1.0) <= 40
+    assert ldrs_helper._count_overlaps(atoms, other, 0.6) > 0
+    with pytest.raises(IDPConfGenException):
+        inter_chain_cc({'A': [first], 'B': [small]}, 1)
+
+
+def test_combinations_overlap(expl_rows, tmp_path):
+    """Test overlapping heavy atoms fail IDRs of a chain with few contacts."""
+    first = _write_residues(expl_rows, tmp_path / 'a.pdb', 4, 11)
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    pair = np.array(
+        expl_rows[(resseq == 4) & np.isin(expl_rows[:, col_name], ('N', 'CA'))],  # noqa: E501
+        copy=True,
+        )
+    # two atoms 0.5 A from their copies in the first fragment
+    x = pair[:, cols_coords[0]].astype(float) + 0.5
+    pair[:, cols_coords[0]] = [f'{value:.3f}' for value in x]
+    pair[:, col_resSeq] = '1'
+    small = tmp_path / 'small.pdb'
+    write_PDB(structure_to_pdb(pair), small)
+    atoms = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(first))
+    other = ldrs_helper._AtomSet(ldrs_helper._fragment_rows(small))
+    assert ldrs_helper._count_contacts(atoms, other, 1.0) <= 40
+    assert not ldrs_helper._idrs_fit(atoms, other)
+    assert combinations_clash_check((first, small)) is False
+    with pytest.raises(IDPConfGenException):
+        create_combinations([[first], [small]], 1)
+
+
+def test_count_overlaps_heavy_atoms_only(expl_rows):
+    """Test hydrogens are not counted as overlaps."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    rows = np.array(expl_rows[resseq == 4], copy=True)
+    heavy = ldrs_helper._AtomSet(rows)
+    assert ldrs_helper._count_overlaps(heavy, heavy, 0.6) >= len(rows)
+    rows[:, col_element] = 'H'
+    hydrogens = ldrs_helper._AtomSet(rows)
+    assert ldrs_helper._count_overlaps(heavy, hydrogens, 0.6) == 0
+    assert ldrs_helper._count_overlaps(hydrogens, hydrogens, 0.6) == 0
+
+
+def test_inter_chain_cc_carried_residues(expl_rows, tmp_path):
+    """Test folded residues carried by IDRs of two chains are not compared."""
+    # N-IDR 4-8 carries 9-10, the Linker-IDR 11-14 carries 9-10, 15-16
+    nidr = _write_residues(expl_rows, tmp_path / 'n.pdb', 4, 10)
+    lidr = _write_residues(expl_rows, tmp_path / 'l.pdb', 9, 16)
+    all_files = {'A': [nidr], 'B': [[lidr]]}
+    with pytest.raises(IDPConfGenException):
+        inter_chain_cc(all_files, 1)
+    cases = {'A': ['N-IDR'], 'B': ['Linker-IDR']}
+    combos = inter_chain_cc(all_files, 1, cases=cases)
+    assert combos == [{'A': [nidr], 'B': [lidr]}]
+
+
 def _template(rows, missing):
     """Return a built structure of `rows` without residues `missing`."""
     resseq = rows[:, col_resSeq].astype(int)
@@ -939,6 +1037,30 @@ def test_attachment_overlaps(expl_rows):
     pushed[atom, cols_coords] = rows[rows[:, col_name] == 'CA'][3, cols_coords]  # noqa: E501
     assert attachment_overlaps(pushed, rows, 'N-IDR', target) > 0
     assert count_clashes(pushed, folded, 'N-IDR', 10**6)[0] == count_clashes(aligned, folded, 'N-IDR', 10**6)[0]  # noqa: E501
+
+
+def test_attachment_overlaps_scale(expl_rows):
+    """Test atoms within 0.7 times their vdW radii sum overlap."""
+    resseq = expl_rows[:, col_resSeq].astype(int)
+    first = int(resseq.min())
+    rows = expl_rows[resseq >= first + 6]
+    target = attachment_anchor(rows, 'N-IDR')
+    fragment = _chain_rows(expl_rows, first, first + 7)
+    aligned = align_coords(_moved(fragment, 2), target, 'N-IDR')
+    # a carbon away from the folded domain
+    carbon = np.array(rows[rows[:, col_name] == 'CA'][-1:], copy=True)
+    carbon[0, col_resSeq] = str(int(resseq.max()) + 5)
+    carbon[0, cols_coords] = ['150.000', '150.000', '150.000']
+    environment = np.concatenate((rows, carbon))
+    atom = np.flatnonzero(
+        (aligned[:, col_resSeq].astype(int) == 6)
+        & (aligned[:, col_name] == 'CB')
+        )[0]
+    # two carbons overlap below 0.7 * (1.7 + 1.7) = 2.38 A
+    for distance, overlaps in ((2.45, 0), (2.30, 1)):
+        pushed = np.array(aligned, copy=True)
+        pushed[atom, cols_coords] = [f'{150 + distance:.3f}', '150.000', '150.000']  # noqa: E501
+        assert attachment_overlaps(pushed, environment, 'N-IDR', target) == overlaps  # noqa: E501
 
 
 def test_attachment_overlaps_alternate_locations(expl_rows):
